@@ -1,0 +1,169 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package hll
+
+import (
+	"fmt"
+	"math"
+
+	"github.com/apache/datasketches-go/common"
+)
+
+const (
+	defaultLgK     = 12
+	lgInitListSize = 3
+	lgInitSetSize  = 5
+)
+
+const (
+	minLogK         = 4
+	maxLogK         = 21
+	empty           = 0
+	keyBits26       = 26
+	valBits6        = 6
+	keyMask26       = (1 << keyBits26) - 1
+	valMask6        = (1 << valBits6) - 1
+	resizeNumber    = 3
+	resizeDenom     = 4
+	couponRSEFactor = .409 //at transition point not the asymptote
+	couponRSE       = couponRSEFactor / (1 << 13)
+	hiNibbleMask    = 0xf0
+	loNibbleMask    = 0x0f
+
+	auxToken = 0xf
+)
+
+var (
+	hllNonHipRSEFactor = math.Sqrt((3.0 * math.Log(2.0)) - 1.0) //1.03896
+	hllHipRSEFActor    = math.Sqrt(math.Log(2.0))               //.8325546
+)
+
+type TgtHllType int
+type curMode int
+
+const (
+	curMode_LIST curMode = 0
+	curMode_SET  curMode = 1
+	curMode_HLL  curMode = 2
+)
+
+const (
+	TgtHllType_HLL_4   TgtHllType = 0
+	TgtHllType_HLL_6   TgtHllType = 1
+	TgtHllType_HLL_8   TgtHllType = 2
+	TgtHllType_DEFAULT            = TgtHllType_HLL_4
+)
+
+var (
+	// lgAuxArrInts is the Log2 table sizes for exceptions based on lgK from 0 to 26.
+	//However, only lgK from 4 to 21 are used.
+	lgAuxArrInts = []int{
+		0, 2, 2, 2, 2, 2, 2, 3, 3, 3, //0 - 9
+		4, 4, 5, 5, 6, 7, 8, 9, 10, 11, //10 - 19
+		12, 13, 14, 15, 16, 17, 18, //20 - 26
+	}
+)
+
+// CheckLgK checks the given lgK and returns it if it is valid and panics otherwise.
+func checkLgK(lgK int) (int, error) {
+	if lgK >= minLogK && lgK <= maxLogK {
+		return lgK, nil
+	}
+	return 0, fmt.Errorf("log K must be between 4 and 21, inclusive: %d", lgK)
+}
+
+// pair returns a value where the lower 26 bits are the slotNo and the upper 6 bits are the value.
+func pair(slotNo int, value int) int {
+	return (value << keyBits26) | (slotNo & keyMask26)
+}
+
+// pairString returns a string representation of the pair.
+func pairString(pair int) string {
+	return fmt.Sprintf("SlotNo: %d, Value: %d", getPairLow26(pair), getPairValue(pair))
+}
+
+// getPairLow26 returns the pair, the lower 26 bits of the pair.
+func getPairLow26(pair int) int {
+	return pair & keyMask26
+}
+
+// getPairValue returns the value of the pair.
+// The value is the upper 6 bits of the pair.
+func getPairValue(pair int) int {
+	return pair >> keyBits26
+}
+
+func checkNumStdDev(numStdDev int) error {
+	if numStdDev < 1 || numStdDev > 3 {
+		return fmt.Errorf("NumStdDev may not be less than 1 or greater than 3: %d", numStdDev)
+	}
+	return nil
+}
+
+// checkPreamble checks the given preamble and returns the curMode if it is valid and panics otherwise.
+func checkPreamble(preamble []byte) (curMode, error) {
+	if len(preamble) == 0 {
+		return 0, fmt.Errorf("preamble cannot be nil or empty")
+	}
+	preInts := extractPreInts(preamble)
+	if len(preamble) < (preInts * 4) {
+		return 0, fmt.Errorf("preamble length mismatch: %d, %d", len(preamble), preInts)
+	}
+	serVer := extractSerVer(preamble)
+	famId := extractFamilyID(preamble)
+	curMode := extractCurMode(preamble)
+
+	if famId != common.Family_HLL_ID {
+		return 0, fmt.Errorf("possible Corruption: Invalid Family: %d", famId)
+	}
+	if serVer != 1 {
+		return 0, fmt.Errorf("possible Corruption: Invalid Serialization Version: %d", serVer)
+	}
+
+	if preInts != listPreInts && preInts != hashSetPreInts && preInts != hllPreInts {
+		return 0, fmt.Errorf("possible Corruption: Invalid Preamble Ints: %d", preInts)
+	}
+
+	if curMode == curMode_LIST && preInts != listPreInts {
+		return 0, fmt.Errorf("possible Corruption: Invalid Preamble Ints: %d", preInts)
+	}
+
+	if curMode == curMode_SET && preInts != hashSetPreInts {
+		return 0, fmt.Errorf("possible Corruption: Invalid Preamble Ints: %d", preInts)
+	}
+
+	if curMode == curMode_HLL && preInts != hllPreInts {
+		return 0, fmt.Errorf("possible Corruption: Invalid Preamble Ints: %d", preInts)
+	}
+
+	return curMode, nil
+}
+
+func getMaxUpdatableSerializationBytes(lgConfigK int, tgtHllType TgtHllType) int {
+	var arrBytes int
+	if tgtHllType == TgtHllType_HLL_4 {
+		auxBytes := 4 << lgAuxArrInts[lgConfigK]
+		arrBytes = (1 << (lgConfigK - 1)) + auxBytes
+	} else if tgtHllType == TgtHllType_HLL_6 {
+		numSlots := 1 << lgConfigK
+		arrBytes = ((numSlots * 3) >> 2) + 1
+	} else {
+		arrBytes = 1 << lgConfigK
+	}
+	return hllByteArrStart + arrBytes
+}

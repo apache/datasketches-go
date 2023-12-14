@@ -105,11 +105,10 @@ func mergeCouponTo(from hllCoupon, dest HllSketch) {
 	arrLen := len(intArrFrom)
 	for i := 0; i < arrLen; i++ {
 		pair := intArrFrom[i]
-		if pair == empty {
-			continue
+		if pair != empty {
+			sk := dest.(*hllSketchImpl).sketch.couponUpdate(pair)
+			dest.(*hllSketchImpl).sketch = sk
 		}
-		sk := dest.(*hllSketchImpl).sketch.couponUpdate(pair)
-		dest.(*hllSketchImpl).sketch = sk
 	}
 }
 

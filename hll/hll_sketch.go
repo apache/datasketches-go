@@ -101,19 +101,6 @@ type hllSketchImpl struct { // extends BaseHllSketch
 	scratch [8]byte
 }
 
-func (h *hllSketchImpl) Reset() error {
-	lgK, err := checkLgK(h.sketch.GetLgConfigK())
-	if err != nil {
-		return err
-	}
-	couponList, err := newCouponList(lgK, h.sketch.GetTgtHllType(), curMode_LIST)
-	if err != nil {
-		return err
-	}
-	h.sketch = &couponList
-	return nil
-}
-
 func NewHllSketch(lgConfigK int, tgtHllType TgtHllType) (HllSketch, error) {
 	lgK := lgConfigK
 	lgK, err := checkLgK(lgK)
@@ -211,8 +198,7 @@ func (h *hllSketchImpl) GetUpdatableSerializationBytes() int {
 
 func (h *hllSketchImpl) UpdateUInt64(datum uint64) {
 	binary.LittleEndian.PutUint64(h.scratch[:], datum)
-	hi, lo := h.hash(h.scratch[:])
-	h.couponUpdate(coupon(hi, lo))
+	h.couponUpdate(coupon(h.hash(h.scratch[:])))
 }
 
 func (h *hllSketchImpl) UpdateInt64(datum int64) {
@@ -223,14 +209,12 @@ func (h *hllSketchImpl) UpdateSlice(datum []byte) {
 	if len(datum) == 0 {
 		return
 	}
-	hi, lo := h.hash(datum)
-	h.couponUpdate(coupon(hi, lo))
+	h.couponUpdate(coupon(h.hash(datum)))
 }
 
 func (h *hllSketchImpl) UpdateString(datum string) {
 	// get a slice to the string data (avoiding a copy to heap)
-	unsafeSlice := unsafe.Slice(unsafe.StringData(datum), len(datum))
-	h.UpdateSlice(unsafeSlice)
+	h.UpdateSlice(unsafe.Slice(unsafe.StringData(datum), len(datum)))
 }
 
 func (h *hllSketchImpl) IsEmpty() bool {
@@ -255,6 +239,19 @@ func (h *hllSketchImpl) GetTgtHllType() TgtHllType {
 
 func (h *hllSketchImpl) GetCurMode() curMode {
 	return h.sketch.GetCurMode()
+}
+
+func (h *hllSketchImpl) Reset() error {
+	lgK, err := checkLgK(h.sketch.GetLgConfigK())
+	if err != nil {
+		return err
+	}
+	couponList, err := newCouponList(lgK, h.sketch.GetTgtHllType(), curMode_LIST)
+	if err != nil {
+		return err
+	}
+	h.sketch = &couponList
+	return nil
 }
 
 func (h *hllSketchImpl) iterator() pairIterator {
@@ -285,13 +282,11 @@ func (h *hllSketchImpl) mergeTo(dest HllSketch) {
 }
 
 func (h *hllSketchImpl) CopyAs(tgtHllType TgtHllType) HllSketch {
-	a := h.sketch.copyAs(tgtHllType)
-	return newHllSketchImpl(a)
+	return newHllSketchImpl(h.sketch.copyAs(tgtHllType))
 }
 
 func (h *hllSketchImpl) Copy() HllSketch {
-	a := h.sketch.copy()
-	return newHllSketchImpl(a)
+	return newHllSketchImpl(h.sketch.copy())
 }
 
 // IsEstimationMode returns true for all sketches in this package.
@@ -306,6 +301,5 @@ func (h *hllSketchImpl) GetSerializationVersion() int {
 }
 
 func (h *hllSketchImpl) hash(bs []byte) (uint64, uint64) {
-	hi, lo := murmur3.Sum128WithSeed(bs, thetacommon.DEFAULT_UPDATE_SEED)
-	return hi, lo
+	return murmur3.Sum128WithSeed(bs, thetacommon.DEFAULT_UPDATE_SEED)
 }

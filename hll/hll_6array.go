@@ -194,6 +194,5 @@ func (h *hll6Iterator) getValue() int {
 }
 
 func (h *hll6Iterator) getPair() int {
-	v := h.getValue()
-	return pair(h.index, v)
+	return pair(h.index, h.getValue())
 }

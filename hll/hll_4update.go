@@ -23,18 +23,18 @@ import (
 
 // internalHll4Update is the internal update method for Hll4Array.
 func internalHll4Update(h *hll4ArrayImpl, slotNo int, newValue int) {
-	curMin := h.curMin
-	rawStoredOldNibble := h.getNibble(slotNo)   // could be 0
-	lb0nOldValue := rawStoredOldNibble + curMin // provable lower bound, could be 0
+	var (
+		actualOldValue     int
+		shiftedNewValue    int //value - curMin
+		curMin             = h.curMin
+		rawStoredOldNibble = h.getNibble(slotNo)           // could be 0
+		lb0nOldValue       = rawStoredOldNibble + h.curMin // provable lower bound, could be 0
+	)
 
 	if newValue <= lb0nOldValue {
 		return
 	}
 
-	var (
-		actualOldValue  int
-		shiftedNewValue int //value - curMin
-	)
 	// Based on whether we have an AUX_TOKEN and whether the shiftedNewValue is greater than
 	// AUX_TOKEN, we have four cases for how to actually modify the data structure:
 	// 1. (shiftedNewValue >= AUX_TOKEN) && (rawStoredOldNibble = AUX_TOKEN) //881:
@@ -109,14 +109,16 @@ func internalHll4Update(h *hll4ArrayImpl, slotNo int, newValue int) {
 // Entering this routine assumes that all slots have valid nibbles > 0 and <= 15.
 // An auxHashMap must exist if any values in the current hllByteArray are already 15.
 func shiftToBiggerCurMin(h *hll4ArrayImpl) {
-	oldCurMin := h.curMin
-	newCurMin := oldCurMin + 1
-	lgConfigK := h.lgConfigK
-	configK := 1 << lgConfigK
-	configKmask := configK - 1
+	var (
+		oldCurMin   = h.curMin
+		newCurMin   = oldCurMin + 1
+		lgConfigK   = h.lgConfigK
+		configK     = 1 << lgConfigK
+		configKmask = configK - 1
 
-	numAtNewCurMin := 0
-	numAuxTokens := 0
+		numAtNewCurMin = 0
+		numAuxTokens   = 0
+	)
 
 	// Walk through the slots of 4-bit array decrementing stored values by one unless it
 	// equals AUX_TOKEN, where it is left alone but counted to be checked later.
@@ -143,8 +145,10 @@ func shiftToBiggerCurMin(h *hll4ArrayImpl) {
 	}
 	// If old auxHashMap exists, walk through it updating some slots and build a new auxHashMap
 	// if needed.
-	var newAuxMap auxHashMap
-	oldAuxMap := h.auxHashMap
+	var (
+		newAuxMap *auxHashMap
+		oldAuxMap = h.auxHashMap
+	)
 
 	if oldAuxMap != nil {
 		var (

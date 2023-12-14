@@ -165,6 +165,5 @@ func (h *hll8Iterator) getValue() int {
 }
 
 func (h *hll8Iterator) getPair() int {
-	v := h.getValue()
-	return pair(h.index, v)
+	return pair(h.index, h.getValue())
 }

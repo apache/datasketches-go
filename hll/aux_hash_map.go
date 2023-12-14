@@ -22,37 +22,24 @@ import (
 	"fmt"
 )
 
-type auxHashMap interface {
-	mustFindValueFor(slotNo int) int
-	mustReplace(slotNo int, value int)
-	mustAdd(slotNo int, value int)
-	iterator() pairIterator
-	getAuxCount() int
-	getLgAuxArrInts() int
-	copy() auxHashMap
-	getUpdatableSizeBytes() int
-	getCompactSizeBytes() int
-	getAuxIntArr() []int
-}
-
-// auxHashMapImpl is a hash table for the Aux array.
-type auxHashMapImpl struct {
+// auxHashMap is a hash table for the Aux array.
+type auxHashMap struct {
 	lgConfigK    int //required for #slot bits
 	lgAuxArrInts int
 	auxCount     int
 	auxIntArr    []int
 }
 
-func (a *auxHashMapImpl) copy() auxHashMap {
-	newA := a
+func (a *auxHashMap) copy() *auxHashMap {
+	newA := *a
 	newA.auxIntArr = make([]int, len(a.auxIntArr))
 	copy(newA.auxIntArr, a.auxIntArr)
-	return newA
+	return &newA
 }
 
 // newAuxHashMap returns a new auxHashMap.
-func newAuxHashMap(lgAuxArrInts int, lgConfigK int) auxHashMap {
-	return &auxHashMapImpl{
+func newAuxHashMap(lgAuxArrInts int, lgConfigK int) *auxHashMap {
+	return &auxHashMap{
 		lgConfigK:    lgConfigK,
 		lgAuxArrInts: lgAuxArrInts,
 		auxCount:     0,
@@ -61,7 +48,7 @@ func newAuxHashMap(lgAuxArrInts int, lgConfigK int) auxHashMap {
 }
 
 // deserializeAuxHashMap returns a new auxHashMap from the given byte array.
-func deserializeAuxHashMap(byteArray []byte, offset int, lgConfigL int, auxCount int, srcCompact bool) auxHashMap {
+func deserializeAuxHashMap(byteArray []byte, offset int, lgConfigL int, auxCount int, srcCompact bool) *auxHashMap {
 	var (
 		lgAuxArrInts int
 	)
@@ -97,19 +84,19 @@ func deserializeAuxHashMap(byteArray []byte, offset int, lgConfigL int, auxCount
 	return auxMap
 }
 
-func (a *auxHashMapImpl) getAuxIntArr() []int {
+func (a *auxHashMap) getAuxIntArr() []int {
 	return a.auxIntArr
 }
 
-func (a *auxHashMapImpl) getCompactSizeBytes() int {
+func (a *auxHashMap) getCompactSizeBytes() int {
 	return a.auxCount << 2
 }
 
-func (a *auxHashMapImpl) getUpdatableSizeBytes() int {
+func (a *auxHashMap) getUpdatableSizeBytes() int {
 	return 4 << a.lgAuxArrInts
 }
 
-func (a *auxHashMapImpl) mustFindValueFor(slotNo int) int {
+func (a *auxHashMap) mustFindValueFor(slotNo int) int {
 	index := findAuxHashMap(a.auxIntArr, a.lgAuxArrInts, a.lgConfigK, slotNo)
 	if index < 0 {
 		panic(fmt.Sprintf("SlotNo not found: %d", slotNo))
@@ -117,7 +104,7 @@ func (a *auxHashMapImpl) mustFindValueFor(slotNo int) int {
 	return getPairValue(a.auxIntArr[index])
 }
 
-func (a *auxHashMapImpl) mustReplace(slotNo int, value int) {
+func (a *auxHashMap) mustReplace(slotNo int, value int) {
 	index := findAuxHashMap(a.auxIntArr, a.lgAuxArrInts, a.lgConfigK, slotNo)
 	if index < 0 {
 		pairStr := pairString(pair(slotNo, value))
@@ -129,7 +116,7 @@ func (a *auxHashMapImpl) mustReplace(slotNo int, value int) {
 // mustAdd adds the slotNo and value to the aux array.
 // slotNo the index from the HLL array
 // value the HLL value at the slotNo.
-func (a *auxHashMapImpl) mustAdd(slotNo int, value int) {
+func (a *auxHashMap) mustAdd(slotNo int, value int) {
 	index := findAuxHashMap(a.auxIntArr, a.lgAuxArrInts, a.lgConfigK, slotNo)
 	pair := pair(slotNo, value)
 	if index >= 0 {
@@ -141,22 +128,22 @@ func (a *auxHashMapImpl) mustAdd(slotNo int, value int) {
 	a.checkGrow()
 }
 
-func (a *auxHashMapImpl) getLgAuxArrInts() int {
+func (a *auxHashMap) getLgAuxArrInts() int {
 	return a.lgAuxArrInts
 }
 
 // iterator returns an iterator over the Aux array.
-func (a *auxHashMapImpl) iterator() pairIterator {
+func (a *auxHashMap) iterator() pairIterator {
 	return newIntArrayPairIterator(a.auxIntArr, a.lgConfigK)
 }
 
 // getAuxCount returns the number of entries in the Aux array.
-func (a *auxHashMapImpl) getAuxCount() int {
+func (a *auxHashMap) getAuxCount() int {
 	return a.auxCount
 }
 
 // checkGrow checks to see if the aux array should be grown and does so if needed.
-func (a *auxHashMapImpl) checkGrow() {
+func (a *auxHashMap) checkGrow() {
 	if (resizeDenom * a.auxCount) <= (resizeNumber * len(a.auxIntArr)) {
 		return
 	}
@@ -164,7 +151,7 @@ func (a *auxHashMapImpl) checkGrow() {
 }
 
 // growAuxSpace doubles the size of the aux array and reinsert the existing entries.
-func (a *auxHashMapImpl) growAuxSpace() {
+func (a *auxHashMap) growAuxSpace() {
 	oldArray := a.auxIntArr
 	configKMask := int((1 << a.lgConfigK) - 1)
 	a.lgAuxArrInts++

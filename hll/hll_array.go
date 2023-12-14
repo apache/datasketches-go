@@ -25,7 +25,7 @@ import (
 type hllArray interface {
 	hllSketchBase
 
-	getAuxHashMap() auxHashMap
+	getAuxHashMap() *auxHashMap
 	getAuxStart() int
 	getCurMin() int
 	getHipAccum() float64
@@ -35,7 +35,7 @@ type hllArray interface {
 	getKxQ1() float64
 	getNumAtCurMin() int
 
-	putAuxHashMap(auxHashMap auxHashMap, compact bool)
+	putAuxHashMap(auxHashMap *auxHashMap, compact bool)
 	putCurMin(curMin int)
 	putHipAccum(hipAccum float64)
 	putKxQ0(kxq0 float64)
@@ -60,7 +60,7 @@ type hllArrayImpl struct {
 
 	hllByteArr []byte
 
-	auxHashMap auxHashMap
+	auxHashMap *auxHashMap
 	auxStart   int //used for direct HLL4
 }
 
@@ -176,7 +176,7 @@ func (a *hllArrayImpl) isOutOfOrder() bool {
 	return a.oooFrag
 }
 
-func (a *hllArrayImpl) putAuxHashMap(auxHashMap auxHashMap, _ bool) {
+func (a *hllArrayImpl) putAuxHashMap(auxHashMap *auxHashMap, _ bool) {
 	a.auxHashMap = auxHashMap
 }
 
@@ -203,12 +203,12 @@ func (a *hllArrayImpl) putRebuildCurMinNumKxQFlag(rebuildCurMinNumKxQ bool) {
 }
 
 // getNewAuxHashMap returns a new auxHashMap.
-func (a *hllArrayImpl) getNewAuxHashMap() auxHashMap {
+func (a *hllArrayImpl) getNewAuxHashMap() *auxHashMap {
 	return newAuxHashMap(lgAuxArrInts[a.lgConfigK], a.lgConfigK)
 }
 
 // getAuxHashMap returns the auxHashMap.
-func (a *hllArrayImpl) getAuxHashMap() auxHashMap {
+func (a *hllArrayImpl) getAuxHashMap() *auxHashMap {
 	return a.auxHashMap
 }
 

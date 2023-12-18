@@ -44,15 +44,15 @@ func CeilPowerOf2(n int) int {
 	return int(math.Pow(2, math.Ceil(math.Log2(float64(n)))))
 }
 
-func ExactLog2OfLong(powerOf2 uint64) (int, error) {
-	if !isLongPowerOf2(powerOf2) {
+func ExactLog2(powerOf2 int) (int, error) {
+	if !isPowerOf2(powerOf2) {
 		return 0, fmt.Errorf("argument 'powerOf2' must be a positive power of 2")
 	}
-	return bits.TrailingZeros64(powerOf2), nil
+	return bits.TrailingZeros64(uint64(powerOf2)), nil
 }
 
-// isLongPowerOf2 returns true if the given number is a power of 2.
-func isLongPowerOf2(powerOf2 uint64) bool {
+// isPowerOf2 returns true if the given number is a power of 2.
+func isPowerOf2(powerOf2 int) bool {
 	return powerOf2 > 0 && (powerOf2&(powerOf2-1)) == 0
 }
 

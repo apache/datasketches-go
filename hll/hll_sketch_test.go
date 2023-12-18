@@ -246,7 +246,7 @@ func TestHLLDataSketchT(b *testing.T) {
 	}
 	est, err := hll.GetEstimate()
 	assert.NoError(b, err)
-	assert.InDelta(b, 1000000, est, float64(1000000)*0.03)
+	assert.InDelta(b, 1000000, est, float64(1000000)*0.00028)
 
 }
 

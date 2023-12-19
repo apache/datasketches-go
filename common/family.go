@@ -18,5 +18,5 @@
 package common
 
 const (
-	Family_HLL_ID = 7
+	FamilyHllId = 7
 )

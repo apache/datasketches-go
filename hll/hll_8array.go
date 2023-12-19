@@ -36,23 +36,23 @@ func (h *hll8ArrayImpl) iterator() pairIterator {
 	return &a
 }
 
-func (h *hll8ArrayImpl) copyAs(tgtHllType TgtHllType) hllSketchBase {
+func (h *hll8ArrayImpl) copyAs(tgtHllType TgtHllType) (hllSketchBase, error) {
 	if tgtHllType == h.tgtHllType {
 		return h.copy()
 	}
-	if tgtHllType == TgtHllType_HLL_4 {
+	if tgtHllType == TgtHllTypeHll4 {
 		return convertToHll4(h)
 	}
-	if tgtHllType == TgtHllType_HLL_6 {
+	if tgtHllType == TgtHllTypeHll6 {
 		return convertToHll6(h)
 	}
-	panic(fmt.Sprintf("Cannot convert to TgtHllType id: %d", int(tgtHllType)))
+	return nil, fmt.Errorf("cannot convert to TgtHllType id: %d", int(tgtHllType))
 }
 
-func (h *hll8ArrayImpl) copy() hllSketchBase {
+func (h *hll8ArrayImpl) copy() (hllSketchBase, error) {
 	return &hll8ArrayImpl{
 		hllArrayImpl: h.copyCommon(),
-	}
+	}, nil
 }
 
 func (h *hll8ArrayImpl) ToCompactSlice() ([]byte, error) {
@@ -69,8 +69,8 @@ func newHll8Array(lgConfigK int) hllArray {
 		hllArrayImpl: hllArrayImpl{
 			hllSketchConfig: hllSketchConfig{
 				lgConfigK:  lgConfigK,
-				tgtHllType: TgtHllType_HLL_8,
-				curMode:    curMode_HLL,
+				tgtHllType: TgtHllTypeHll8,
+				curMode:    curModeHll,
 			},
 			curMin:      0,
 			numAtCurMin: 1 << lgConfigK,
@@ -91,46 +91,59 @@ func deserializeHll8(byteArray []byte) hllArray {
 	return hll8
 }
 
-func convertToHll8(srcAbsHllArr hllArray) hllSketchBase {
+func convertToHll8(srcAbsHllArr hllArray) (hllSketchBase, error) {
 	lgConfigK := srcAbsHllArr.GetLgConfigK()
 	hll8Array := newHll8Array(lgConfigK)
 	hll8Array.putOutOfOrder(srcAbsHllArr.isOutOfOrder())
 	numZeros := 1 << lgConfigK
 	itr := srcAbsHllArr.iterator()
 	for itr.nextAll() {
-		v := itr.getValue()
+		v, err := itr.getValue()
+		if err != nil {
+			return nil, err
+		}
 		if v != empty {
 			numZeros--
-			p := itr.getPair()
-			hll8Array.couponUpdate(p) //creates KxQ registers
+			p, err := itr.getPair()
+			if err != nil {
+				return nil, err
+			}
+			_, err = hll8Array.couponUpdate(p) //creates KxQ registers
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	hll8Array.putNumAtCurMin(numZeros)
 	hll8Array.putHipAccum(srcAbsHllArr.getHipAccum()) //intentional overwrite
 	hll8Array.putRebuildCurMinNumKxQFlag(false)
-	return hll8Array
+	return hll8Array, nil
 }
 
-func (h *hll8ArrayImpl) couponUpdate(coupon int) hllSketchBase {
+func (h *hll8ArrayImpl) couponUpdate(coupon int) (hllSketchBase, error) {
 	newValue := coupon >> keyBits26
 	configKmask := (1 << h.lgConfigK) - 1
 	slotNo := coupon & configKmask
-	h.updateSlotWithKxQ(slotNo, newValue)
-	return h
+	err := h.updateSlotWithKxQ(slotNo, newValue)
+	return h, err
 }
 
-func (h *hll8ArrayImpl) updateSlotWithKxQ(slotNo int, newValue int) {
+func (h *hll8ArrayImpl) updateSlotWithKxQ(slotNo int, newValue int) error {
 	oldValue := h.getSlotValue(slotNo)
 	if newValue > oldValue {
 		h.hllByteArr[slotNo] = byte(newValue & valMask6)
-		h.hipAndKxQIncrementalUpdate(oldValue, newValue)
+		err := h.hipAndKxQIncrementalUpdate(oldValue, newValue)
+		if err != nil {
+			return err
+		}
 		if oldValue == 0 {
 			h.numAtCurMin-- //interpret numAtCurMin as num Zeros
 			if h.numAtCurMin < 0 {
-				panic("numAtCurMin < 0")
+				return fmt.Errorf("numAtCurMin < 0")
 			}
 		}
 	}
+	return nil
 }
 
 func (h *hll8ArrayImpl) updateSlotNoKxQ(slotNo int, newValue int) {
@@ -160,10 +173,11 @@ func (h *hll8Iterator) nextValid() bool {
 	return false
 }
 
-func (h *hll8Iterator) getValue() int {
-	return int(h.hll.hllByteArr[h.index]) & valMask6
+func (h *hll8Iterator) getValue() (int, error) {
+	return int(h.hll.hllByteArr[h.index]) & valMask6, nil
 }
 
-func (h *hll8Iterator) getPair() int {
-	return pair(h.index, h.getValue())
+func (h *hll8Iterator) getPair() (int, error) {
+	v, err := h.getValue()
+	return pair(h.index, v), err
 }

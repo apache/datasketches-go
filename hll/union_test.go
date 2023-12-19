@@ -63,24 +63,25 @@ func checkBasicUnion(t *testing.T, n1 int, n2 int, lgK1 int, lgK2 int, lgMaxK in
 	assert.NoError(t, err)
 
 	for i := 0; i < n1; i++ {
-		h1.UpdateInt64(int64(v + i))
-		control.UpdateInt64(int64(v + i))
+		assert.NoError(t, h1.UpdateInt64(int64(v+i)))
+		assert.NoError(t, control.UpdateInt64(int64(v+i)))
 	}
 	v += n1
 	for i := 0; i < n2; i++ {
-		h2.UpdateInt64(int64(v + i))
-		control.UpdateInt64(int64(v + i))
+		assert.NoError(t, h2.UpdateInt64(int64(v+i)))
+		assert.NoError(t, control.UpdateInt64(int64(v+i)))
 	}
 	//v += n2
 
 	union, err := NewUnion(lgMaxK)
 	assert.NoError(t, err)
-	union.UpdateSketch(h1)
-	union.UpdateSketch(h2)
+	assert.NoError(t, union.UpdateSketch(h1))
+	assert.NoError(t, union.UpdateSketch(h2))
 	result, err := union.GetResult(resultType)
 	assert.NoError(t, err)
 
-	uEst := result.GetEstimate()
+	uEst, err := result.GetEstimate()
+	assert.NoError(t, err)
 	uUb, err := result.GetUpperBound(2)
 	assert.NoError(t, err)
 	uLb, err := result.GetLowerBound(2)
@@ -92,7 +93,8 @@ func checkBasicUnion(t *testing.T, n1 int, n2 int, lgK1 int, lgK2 int, lgMaxK in
 	//modeR := result.GetCurMode()
 
 	// Control
-	controlEst := control.GetEstimate()
+	controlEst, err := control.GetEstimate()
+	assert.NoError(t, err)
 	controlUb, err := control.GetUpperBound(2)
 	assert.NoError(t, err)
 	controlLb, err := control.GetLowerBound(2)
@@ -107,7 +109,8 @@ func checkBasicUnion(t *testing.T, n1 int, n2 int, lgK1 int, lgK2 int, lgMaxK in
 	assert.True(t, uEst-uLb >= 0)
 
 	assert.Equal(t, 7, result.GetLgConfigK())
-	est := result.GetEstimate()
+	est, err := result.GetEstimate()
+	assert.NoError(t, err)
 	assert.InDelta(t, tot, est, float64(tot)*0.03)
 }
 
@@ -115,9 +118,9 @@ func TestToFromUnion1(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		n := nArr[i]
 		for lgK := 4; lgK <= 13; lgK++ {
-			toFrom1(t, lgK, TgtHllType_HLL_4, n)
-			toFrom1(t, lgK, TgtHllType_HLL_6, n)
-			toFrom1(t, lgK, TgtHllType_HLL_8, n)
+			toFrom1(t, lgK, TgtHllTypeHll4, n)
+			toFrom1(t, lgK, TgtHllTypeHll6, n)
+			toFrom1(t, lgK, TgtHllTypeHll8, n)
 		}
 	}
 }
@@ -128,17 +131,19 @@ func toFrom1(t *testing.T, lgK int, tgtHllType TgtHllType, n int) {
 	srcSk, err := NewHllSketch(lgK, tgtHllType)
 	assert.NoError(t, err)
 	for i := 0; i < n; i++ {
-		srcSk.UpdateInt64(int64(i))
+		assert.NoError(t, srcSk.UpdateInt64(int64(i)))
 	}
-	srcU.UpdateSketch(srcSk)
+	assert.NoError(t, srcU.UpdateSketch(srcSk))
 	fmt.Printf("n: %d, lgK: %d, type: %d\n", n, lgK, tgtHllType)
 
 	byteArr, err := srcU.ToCompactSlice()
 	assert.NoError(t, err)
 	dstU, _ := DeserializeUnion(byteArr)
 
-	dstUest := dstU.GetEstimate()
-	srcUest := srcU.GetEstimate()
+	dstUest, err := dstU.GetEstimate()
+	assert.NoError(t, err)
+	srcUest, err := srcU.GetEstimate()
+	assert.NoError(t, err)
 
 	assert.Equal(t, dstUest, srcUest)
 }
@@ -146,18 +151,21 @@ func toFrom1(t *testing.T, lgK int, tgtHllType TgtHllType, n int) {
 func TestUnionCompositeEst(t *testing.T) {
 	u, err := NewUnionWithDefault()
 	assert.NoError(t, err)
-	est := u.GetCompositeEstimate()
+	est, err := u.GetCompositeEstimate()
+	assert.NoError(t, err)
 	assert.Equal(t, est, 0.0)
 	for i := 1; i <= 15; i++ {
-		u.UpdateInt64(int64(i))
+		assert.NoError(t, u.UpdateInt64(int64(i)))
 	}
-	est = u.GetCompositeEstimate()
+	est, err = u.GetCompositeEstimate()
+	assert.NoError(t, err)
 
 	assert.InDelta(t, est, 15.0, 15.0*0.03)
 	for i := 15; i <= 1000; i++ {
-		u.UpdateInt64(int64(i))
+		assert.NoError(t, u.UpdateInt64(int64(i)))
 	}
-	est = u.GetCompositeEstimate()
+	est, err = u.GetCompositeEstimate()
+	assert.NoError(t, err)
 	assert.InDelta(t, est, 1000.0, 1000.0*0.03)
 }
 
@@ -165,14 +173,16 @@ func TestDeserialize1k(t *testing.T) {
 	u, err := NewUnion(16)
 	assert.NoError(t, err)
 	for i := 0; i < (1 << 10); i++ {
-		u.UpdateInt64(int64(i))
+		assert.NoError(t, u.UpdateInt64(int64(i)))
 	}
-	expected := u.GetEstimate()
+	expected, err := u.GetEstimate()
+	assert.NoError(t, err)
 	byteArr, err := u.ToUpdatableSlice()
 	assert.NoError(t, err)
 	u2, e := DeserializeUnion(byteArr)
 	assert.NoError(t, e)
-	est := u2.GetEstimate()
+	est, err := u2.GetEstimate()
+	assert.NoError(t, err)
 	assert.Equal(t, expected, est)
 }
 
@@ -180,14 +190,16 @@ func TestDeserialize1M(t *testing.T) {
 	u, err := NewUnion(16)
 	assert.NoError(t, err)
 	for i := 0; i < (1 << 20); i++ {
-		u.UpdateInt64(int64(i))
+		assert.NoError(t, u.UpdateInt64(int64(i)))
 	}
-	expected := u.GetEstimate()
+	expected, err := u.GetEstimate()
+	assert.NoError(t, err)
 	byteArr, err := u.ToUpdatableSlice()
 	assert.NoError(t, err)
 	u2, e := DeserializeUnion(byteArr)
 	assert.NoError(t, e)
-	est := u2.GetEstimate()
+	est, err := u2.GetEstimate()
+	assert.NoError(t, err)
 	assert.Equal(t, expected, est)
 }
 
@@ -196,37 +208,43 @@ func TestEmptyCouponMisc(t *testing.T) {
 	u, err := NewUnion(lgK)
 	assert.NoError(t, err)
 	for i := 0; i < 20; i++ {
-		u.UpdateInt64(int64(i))
+		assert.NoError(t, u.UpdateInt64(int64(i)))
 	}
-	u.couponUpdate(0)
-	est := u.GetEstimate()
+	_, err = u.couponUpdate(0)
+	assert.NoError(t, err)
+	est, err := u.GetEstimate()
+	assert.NoError(t, err)
 	assert.InDelta(t, est, 20.0, 0.001)
-	assert.Equal(t, u.GetTgtHllType(), TgtHllType_HLL_8)
+	assert.Equal(t, u.GetTgtHllType(), TgtHllTypeHll8)
 	bytes := u.GetUpdatableSerializationBytes()
-	assert.True(t, bytes <= getMaxUpdatableSerializationBytes(lgK, TgtHllType_HLL_8))
+	assert.True(t, bytes <= getMaxUpdatableSerializationBytes(lgK, TgtHllTypeHll8))
 }
 
 func TestUnionWithWrap(t *testing.T) {
 	lgK := 4
-	type1 := TgtHllType_HLL_4
+	type1 := TgtHllTypeHll4
 	n := 2
 	sk, err := NewHllSketch(lgK, type1)
 	assert.NoError(t, err)
 	for i := 0; i < n; i++ {
-		sk.UpdateInt64(int64(i))
+		assert.NoError(t, sk.UpdateInt64(int64(i)))
 	}
-	est := sk.GetEstimate()
+	est, err := sk.GetEstimate()
+	assert.NoError(t, err)
 	skByteArr, err := sk.ToCompactSlice()
 	assert.NoError(t, err)
 
 	sk2, _ := DeserializeHllSketch(skByteArr, false)
-	est2 := sk2.GetEstimate()
+	est2, err := sk2.GetEstimate()
+	assert.NoError(t, err)
 	assert.Equal(t, est2, est)
 
 	u, err := NewUnion(lgK)
 	assert.NoError(t, err)
-	u.UpdateSketch(sk2)
-	estU := u.GetEstimate()
+	err = u.UpdateSketch(sk2)
+	assert.NoError(t, err)
+	estU, err := u.GetEstimate()
+	assert.NoError(t, err)
 	assert.Equal(t, estU, est)
 }
 
@@ -236,47 +254,54 @@ func TestUnionWithWrap2(t *testing.T) {
 	sk, err := NewHllSketchDefault(lgK)
 	assert.NoError(t, err)
 	for i := 0; i < n; i++ {
-		sk.UpdateInt64(int64(i))
+		assert.NoError(t, sk.UpdateInt64(int64(i)))
 	}
-	est := sk.GetEstimate()
+	est, err := sk.GetEstimate()
+	assert.NoError(t, err)
 	skByteArr, err := sk.ToCompactSlice()
 	assert.NoError(t, err)
 
 	sk2, _ := DeserializeHllSketch(skByteArr, false)
-	sk2Est := sk2.GetEstimate()
+	sk2Est, err := sk2.GetEstimate()
+	assert.NoError(t, err)
 	assert.Equal(t, sk2Est, est)
 
 	u, err := NewUnion(lgK)
 	assert.NoError(t, err)
-	u.UpdateSketch(sk2)
-	estU := u.GetEstimate()
+	err = u.UpdateSketch(sk2)
+	assert.NoError(t, err)
+	estU, err := u.GetEstimate()
+	assert.NoError(t, err)
 	assert.Equal(t, estU, est)
 }
 
 func TestConversions(t *testing.T) {
 	lgK := 4
-	sk1, err := NewHllSketch(lgK, TgtHllType_HLL_8)
+	sk1, err := NewHllSketch(lgK, TgtHllTypeHll8)
 	assert.NoError(t, err)
-	sk2, err := NewHllSketch(lgK, TgtHllType_HLL_8)
+	sk2, err := NewHllSketch(lgK, TgtHllTypeHll8)
 	assert.NoError(t, err)
 	u := 1 << 20
 	for i := 0; i < u; i++ {
-		sk1.UpdateInt64(int64(i))
-		sk2.UpdateInt64(int64(i + u))
+		assert.NoError(t, sk1.UpdateInt64(int64(i)))
+		assert.NoError(t, sk2.UpdateInt64(int64(i+u)))
 	}
 	union, err := NewUnion(lgK)
 	assert.NoError(t, err)
-	union.UpdateSketch(sk1)
-	union.UpdateSketch(sk2)
-	rsk1, err := union.GetResult(TgtHllType_HLL_8)
+	assert.NoError(t, union.UpdateSketch(sk1))
+	assert.NoError(t, union.UpdateSketch(sk2))
+	rsk1, err := union.GetResult(TgtHllTypeHll8)
 	assert.NoError(t, err)
-	rsk2, err := union.GetResult(TgtHllType_HLL_6)
+	rsk2, err := union.GetResult(TgtHllTypeHll6)
 	assert.NoError(t, err)
-	rsk3, err := union.GetResult(TgtHllType_HLL_4)
+	rsk3, err := union.GetResult(TgtHllTypeHll4)
 	assert.NoError(t, err)
-	est1 := rsk1.GetEstimate()
-	est2 := rsk2.GetEstimate()
-	est3 := rsk3.GetEstimate()
+	est1, err := rsk1.GetEstimate()
+	assert.NoError(t, err)
+	est2, err := rsk2.GetEstimate()
+	assert.NoError(t, err)
+	est3, err := rsk3.GetEstimate()
+	assert.NoError(t, err)
 	assert.Equal(t, est2, est1)
 	assert.Equal(t, est3, est1)
 }
@@ -290,13 +315,13 @@ func TestCheckUnionDeserializeRebuildAfterMerge(t *testing.T) {
 	sk2, err := NewHllSketchDefault(lgK)
 	assert.NoError(t, err)
 	for i := 0; i < u; i++ {
-		sk1.UpdateInt64(int64(i))
-		sk2.UpdateInt64(int64(i + u))
+		assert.NoError(t, sk1.UpdateInt64(int64(i)))
+		assert.NoError(t, sk2.UpdateInt64(int64(i+u)))
 	}
 	union1, err := NewUnion(lgK)
 	assert.NoError(t, err)
-	union1.UpdateSketch(sk1)
-	union1.UpdateSketch(sk2) //oooFlag = Rebuild_KxQ = TRUE
+	assert.NoError(t, union1.UpdateSketch(sk1))
+	assert.NoError(t, union1.UpdateSketch(sk2)) //oooFlag = Rebuild_KxQ = TRUE
 	rebuild := union1.(*unionImpl).gadget.(*hllSketchImpl).sketch.(*hll8ArrayImpl).isRebuildCurMinNumKxQFlag()
 	hipAccum := union1.(*unionImpl).gadget.(*hllSketchImpl).sketch.(*hll8ArrayImpl).hipAccum
 	assert.True(t, rebuild)

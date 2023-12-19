@@ -27,15 +27,15 @@ type couponListImpl struct {
 	hllCouponState
 }
 
-func (c *couponListImpl) GetCompositeEstimate() float64 {
+func (c *couponListImpl) GetCompositeEstimate() (float64, error) {
 	return getEstimate(c)
 }
 
-func (c *couponListImpl) GetEstimate() float64 {
+func (c *couponListImpl) GetEstimate() (float64, error) {
 	return getEstimate(c)
 }
 
-func (c *couponListImpl) GetHipEstimate() float64 {
+func (c *couponListImpl) GetHipEstimate() (float64, error) {
 	return getEstimate(c)
 }
 
@@ -61,7 +61,7 @@ func (c *couponListImpl) ToUpdatableSlice() ([]byte, error) {
 
 // couponUpdate updates the couponListImpl with the given coupon.
 // it returns the updated couponListImpl or a newly promoted couponHashSetImpl.
-func (c *couponListImpl) couponUpdate(coupon int) hllSketchBase {
+func (c *couponListImpl) couponUpdate(coupon int) (hllSketchBase, error) {
 	length := 1 << c.lgCouponArrInts
 	for i := 0; i < length; i++ {
 		couponAtIdx := c.couponIntArr[i]
@@ -74,15 +74,15 @@ func (c *couponListImpl) couponUpdate(coupon int) hllSketchBase {
 				}
 				return promoteListToSet(c) //oooFlag = true
 			}
-			return c
+			return c, nil
 		}
 		//cell not empty
 		if couponAtIdx == coupon {
-			return c //duplicate
+			return c, nil //duplicate
 		}
 		//cell not empty & not a duplicate, continue
 	}
-	panic("array invalid: no empties & no duplicates")
+	return nil, fmt.Errorf("array invalid: no empties & no duplicates")
 }
 
 // iterator returns an iterator over the couponListImpl.
@@ -98,55 +98,65 @@ func (c *couponListImpl) getPreInts() int {
 	return listPreInts
 }
 
-func (c *couponListImpl) copyAs(tgtHllType TgtHllType) hllSketchBase {
+func (c *couponListImpl) copyAs(tgtHllType TgtHllType) (hllSketchBase, error) {
 	newC := &couponListImpl{
-		hllSketchConfig: newHllSketchConfig(c.lgConfigK, tgtHllType, curMode_LIST),
+		hllSketchConfig: newHllSketchConfig(c.lgConfigK, tgtHllType, curModeList),
 		hllCouponState:  newHllCouponState(c.lgCouponArrInts, c.couponCount, make([]int, len(c.couponIntArr))),
 	}
 
 	copy(newC.couponIntArr, c.couponIntArr)
-	return newC
+	return newC, nil
 }
 
-func (c *couponListImpl) copy() hllSketchBase {
-	newC := &couponListImpl{
-		hllSketchConfig: newHllSketchConfig(c.lgConfigK, c.tgtHllType, curMode_LIST),
-		hllCouponState:  newHllCouponState(c.lgCouponArrInts, c.couponCount, make([]int, len(c.couponIntArr))),
-	}
-
-	copy(newC.couponIntArr, c.couponIntArr)
-	return newC
+func (c *couponListImpl) copy() (hllSketchBase, error) {
+	return c.copyAs(c.tgtHllType)
 }
 
-func (c *couponListImpl) mergeTo(dest HllSketch) {
-	mergeCouponTo(c, dest)
+func (c *couponListImpl) mergeTo(dest HllSketch) error {
+	return mergeCouponTo(c, dest)
 }
 
 // promoteListToHll move coupons to an hllArray from couponListImpl
-func promoteListToHll(src *couponListImpl) hllArray {
+func promoteListToHll(src *couponListImpl) (hllArray, error) {
 	tgtHllArr, _ := newHllArray(src.lgConfigK, src.tgtHllType)
 	srcIter := src.iterator()
 	tgtHllArr.putKxQ0(float64(uint64(1) << src.lgConfigK))
 
 	for srcIter.nextValid() {
-		p := srcIter.getPair()
-		tgtHllArr.couponUpdate(p)
+		p, err := srcIter.getPair()
+		if err != nil {
+			return nil, err
+		}
+		_, err = tgtHllArr.couponUpdate(p)
+		if err != nil {
+			return nil, err
+		}
 	}
-	est := src.GetEstimate()
+	est, err := src.GetEstimate()
+	if err != nil {
+		return nil, err
+	}
 	tgtHllArr.putHipAccum(est)
 	tgtHllArr.putOutOfOrder(false)
-	return tgtHllArr
+	return tgtHllArr, nil
 }
 
 // promoteListToSet move coupons to a couponHashSetImpl from couponListImpl
-func promoteListToSet(c *couponListImpl) hllSketchBase {
+func promoteListToSet(c *couponListImpl) (hllSketchBase, error) {
 	couponCount := c.getCouponCount()
 	arr := c.couponIntArr
-	chSet, _ := newCouponHashSet(c.lgConfigK, c.tgtHllType)
-	for i := 0; i < couponCount; i++ {
-		chSet.couponUpdate(arr[i])
+	chSet, err := newCouponHashSet(c.lgConfigK, c.tgtHllType)
+	if err != nil {
+		return nil, err
 	}
-	return &chSet
+	for i := 0; i < couponCount && err == nil; i++ {
+		_, err = chSet.couponUpdate(arr[i])
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	return &chSet, nil
 }
 
 // newCouponList returns a new couponListImpl.
@@ -155,7 +165,7 @@ func newCouponList(lgConfigK int, tgtHllType TgtHllType, curMode curMode) (coupo
 		lgCouponArrInts = lgInitSetSize //SET
 	)
 
-	if curMode == curMode_LIST {
+	if curMode == curModeList {
 		lgCouponArrInts = lgInitListSize
 	} else if lgConfigK <= 7 {
 		return couponListImpl{}, fmt.Errorf("lgConfigK must be > 7 for non-HLL mode")
@@ -175,7 +185,7 @@ func deserializeCouponList(byteArray []byte) (hllCoupon, error) {
 	lgConfigK := extractLgK(byteArray)
 	tgtHllType := extractTgtHllType(byteArray)
 
-	list, err := newCouponList(lgConfigK, tgtHllType, curMode_LIST)
+	list, err := newCouponList(lgConfigK, tgtHllType, curModeList)
 	if err != nil {
 		return nil, err
 	}

@@ -48,13 +48,17 @@ func newAuxHashMap(lgAuxArrInts int, lgConfigK int) *auxHashMap {
 }
 
 // deserializeAuxHashMap returns a new auxHashMap from the given byte array.
-func deserializeAuxHashMap(byteArray []byte, offset int, lgConfigL int, auxCount int, srcCompact bool) *auxHashMap {
+func deserializeAuxHashMap(byteArray []byte, offset int, lgConfigL int, auxCount int, srcCompact bool) (*auxHashMap, error) {
 	var (
 		lgAuxArrInts int
 	)
 
 	if srcCompact {
-		lgAuxArrInts = computeLgArr(byteArray, auxCount, lgConfigL)
+		v, err := computeLgArr(byteArray, auxCount, lgConfigL)
+		if err != nil {
+			return nil, err
+		}
+		lgAuxArrInts = v
 	} else {
 		lgAuxArrInts = extractLgArr(byteArray)
 	}
@@ -67,7 +71,10 @@ func deserializeAuxHashMap(byteArray []byte, offset int, lgConfigL int, auxCount
 			pair := int(binary.LittleEndian.Uint32(byteArray[offset+(i<<2) : offset+(i<<2)+4]))
 			slotNo := getPairLow26(pair) & configKMask
 			value := getPairValue(pair)
-			auxMap.mustAdd(slotNo, value) //increments count
+			err := auxMap.mustAdd(slotNo, value) //increments count
+			if err != nil {
+				return nil, err
+			}
 		}
 	} else { //updatable
 		auxArrInts := 1 << lgAuxArrInts
@@ -78,10 +85,13 @@ func deserializeAuxHashMap(byteArray []byte, offset int, lgConfigL int, auxCount
 			}
 			slotNo := getPairLow26(pair) & configKMask
 			value := getPairValue(pair)
-			auxMap.mustAdd(slotNo, value) //increments count
+			err := auxMap.mustAdd(slotNo, value) //increments count
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
-	return auxMap
+	return auxMap, nil
 }
 
 func (a *auxHashMap) getAuxIntArr() []int {
@@ -96,36 +106,46 @@ func (a *auxHashMap) getUpdatableSizeBytes() int {
 	return 4 << a.lgAuxArrInts
 }
 
-func (a *auxHashMap) mustFindValueFor(slotNo int) int {
-	index := findAuxHashMap(a.auxIntArr, a.lgAuxArrInts, a.lgConfigK, slotNo)
-	if index < 0 {
-		panic(fmt.Sprintf("SlotNo not found: %d", slotNo))
+func (a *auxHashMap) mustFindValueFor(slotNo int) (int, error) {
+	index, err := findAuxHashMap(a.auxIntArr, a.lgAuxArrInts, a.lgConfigK, slotNo)
+	if err != nil {
+		return 0, err
 	}
-	return getPairValue(a.auxIntArr[index])
+	if index < 0 {
+		return 0, fmt.Errorf("SlotNo not found: %d", slotNo)
+	}
+	return getPairValue(a.auxIntArr[index]), nil
 }
 
-func (a *auxHashMap) mustReplace(slotNo int, value int) {
-	index := findAuxHashMap(a.auxIntArr, a.lgAuxArrInts, a.lgConfigK, slotNo)
+func (a *auxHashMap) mustReplace(slotNo int, value int) error {
+	index, err := findAuxHashMap(a.auxIntArr, a.lgAuxArrInts, a.lgConfigK, slotNo)
+	if err != nil {
+		return err
+	}
 	if index < 0 {
 		pairStr := pairString(pair(slotNo, value))
-		panic(fmt.Sprintf("pair not found: %v", pairStr))
+		return fmt.Errorf("pair not found: %v", pairStr)
 	}
 	a.auxIntArr[index] = pair(slotNo, value)
+	return nil
 }
 
 // mustAdd adds the slotNo and value to the aux array.
 // slotNo the index from the HLL array
 // value the HLL value at the slotNo.
-func (a *auxHashMap) mustAdd(slotNo int, value int) {
-	index := findAuxHashMap(a.auxIntArr, a.lgAuxArrInts, a.lgConfigK, slotNo)
+func (a *auxHashMap) mustAdd(slotNo int, value int) error {
+	index, err := findAuxHashMap(a.auxIntArr, a.lgAuxArrInts, a.lgConfigK, slotNo)
+	if err != nil {
+		return err
+	}
 	pair := pair(slotNo, value)
 	if index >= 0 {
 		pairStr := pairString(pair)
-		panic(fmt.Sprintf("found a slotNo that should not be there: %s", pairStr))
+		return fmt.Errorf("found a slotNo that should not be there: %s", pairStr)
 	}
 	a.auxIntArr[^index] = pair
 	a.auxCount++
-	a.checkGrow()
+	return a.checkGrow()
 }
 
 func (a *auxHashMap) getLgAuxArrInts() int {
@@ -143,15 +163,15 @@ func (a *auxHashMap) getAuxCount() int {
 }
 
 // checkGrow checks to see if the aux array should be grown and does so if needed.
-func (a *auxHashMap) checkGrow() {
+func (a *auxHashMap) checkGrow() error {
 	if (resizeDenom * a.auxCount) <= (resizeNumber * len(a.auxIntArr)) {
-		return
+		return nil
 	}
-	a.growAuxSpace()
+	return a.growAuxSpace()
 }
 
 // growAuxSpace doubles the size of the aux array and reinsert the existing entries.
-func (a *auxHashMap) growAuxSpace() {
+func (a *auxHashMap) growAuxSpace() error {
 	oldArray := a.auxIntArr
 	configKMask := int((1 << a.lgConfigK) - 1)
 	a.lgAuxArrInts++
@@ -159,20 +179,24 @@ func (a *auxHashMap) growAuxSpace() {
 	for _, fetched := range oldArray {
 		if fetched != empty {
 			//find empty in new array
-			idx := findAuxHashMap(a.auxIntArr, a.lgAuxArrInts, a.lgConfigK, fetched&configKMask)
+			idx, err := findAuxHashMap(a.auxIntArr, a.lgAuxArrInts, a.lgConfigK, fetched&configKMask)
+			if err != nil {
+				return err
+			}
 			a.auxIntArr[^idx] = fetched
 		}
 	}
+	return nil
 }
 
 // findAuxHashMap searches the Aux arr hash table for an empty or a matching slotNo depending on the context.
 // If entire entry is empty, returns one's complement of index = found empty.
 // If entry contains given slotNo, returns its index = found slotNo.
 // Continues searching.
-// If the probe comes back to original index, panic.
-func findAuxHashMap(auxArr []int, lgAuxArrInts int, lgConfigK int, slotNo int) int {
+// If the probe comes back to original index, return an error.
+func findAuxHashMap(auxArr []int, lgAuxArrInts int, lgConfigK int, slotNo int) (int, error) {
 	if lgAuxArrInts >= lgConfigK {
-		panic("lgAuxArrInts >= lgConfigK")
+		return 0, fmt.Errorf("lgAuxArrInts >= lgConfigK")
 	}
 	auxArrMask := (1 << lgAuxArrInts) - 1
 	configKMask := (1 << lgConfigK) - 1
@@ -181,14 +205,14 @@ func findAuxHashMap(auxArr []int, lgAuxArrInts int, lgConfigK int, slotNo int) i
 	for {
 		arrVal := auxArr[probe]
 		if arrVal == empty {
-			return ^probe
+			return ^probe, nil
 		} else if slotNo == (arrVal & configKMask) {
-			return probe
+			return probe, nil
 		}
 		stride := (slotNo >> lgAuxArrInts) | 1
 		probe = (probe + stride) & auxArrMask
 		if probe == loopIndex {
-			panic("key not found and no empty slots")
+			return 0, fmt.Errorf("key not found and no empty slots")
 		}
 	}
 }

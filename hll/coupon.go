@@ -72,10 +72,10 @@ func newHllCouponState(lgCouponArrInts int, couponCount int, couponIntArr []int)
 }
 
 // GetEstimate returns the estimate of the hllCouponState.
-func getEstimate(c hllCoupon) float64 {
+func getEstimate(c hllCoupon) (float64, error) {
 	couponCount := c.getCouponCount()
-	est := usingXAndYTables(couponMappingXArr, couponMappingYArr, float64(couponCount))
-	return max(est, float64(couponCount))
+	est, err := usingXAndYTables(couponMappingXArr, couponMappingYArr, float64(couponCount))
+	return max(est, float64(couponCount)), err
 }
 
 func getUpperBound(c hllCoupon, numStdDev int) (float64, error) {
@@ -84,9 +84,9 @@ func getUpperBound(c hllCoupon, numStdDev int) (float64, error) {
 		return 0, err
 	}
 	couponCount := c.getCouponCount()
-	est := usingXAndYTables(couponMappingXArr, couponMappingYArr, float64(couponCount))
+	est, err := usingXAndYTables(couponMappingXArr, couponMappingYArr, float64(couponCount))
 	tmp := est / (1.0 - (float64(numStdDev) * couponRSE))
-	return max(tmp, float64(couponCount)), nil
+	return max(tmp, float64(couponCount)), err
 }
 
 func getLowerBound(c hllCoupon, numStdDev int) (float64, error) {
@@ -95,21 +95,27 @@ func getLowerBound(c hllCoupon, numStdDev int) (float64, error) {
 		return 0, err
 	}
 	couponCount := c.getCouponCount()
-	est := usingXAndYTables(couponMappingXArr, couponMappingYArr, float64(couponCount))
+	est, err := usingXAndYTables(couponMappingXArr, couponMappingYArr, float64(couponCount))
 	tmp := est / (1.0 + (float64(numStdDev) * couponRSE))
-	return max(tmp, float64(couponCount)), nil
+	return max(tmp, float64(couponCount)), err
 }
 
-func mergeCouponTo(from hllCoupon, dest HllSketch) {
-	intArrFrom := from.getCouponIntArr()
-	arrLen := len(intArrFrom)
-	for i := 0; i < arrLen; i++ {
+func mergeCouponTo(from hllCoupon, dest HllSketch) error {
+	var (
+		intArrFrom = from.getCouponIntArr()
+		arrLen     = len(intArrFrom)
+		err        error
+		sk         hllSketchBase
+	)
+
+	for i := 0; i < arrLen && err == nil; i++ {
 		pair := intArrFrom[i]
 		if pair != empty {
-			sk := dest.(*hllSketchImpl).sketch.couponUpdate(pair)
+			sk, err = dest.(*hllSketchImpl).sketch.couponUpdate(pair)
 			dest.(*hllSketchImpl).sketch = sk
 		}
 	}
+	return err
 }
 
 var (

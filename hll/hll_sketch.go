@@ -34,24 +34,24 @@ type HllSketch interface {
 	toSliceSketch
 	privatelyUpdatable
 	iterableSketch
-	CopyAs(tgtHllType TgtHllType) HllSketch
-	Copy() HllSketch
+	CopyAs(tgtHllType TgtHllType) (HllSketch, error)
+	Copy() (HllSketch, error)
 	IsEstimationMode() bool
 	GetSerializationVersion() int
 }
 
 type publiclyUpdatable interface {
-	UpdateUInt64(datum uint64)
-	UpdateInt64(datum int64)
-	UpdateSlice(datum []byte)
-	UpdateString(datum string)
+	UpdateUInt64(datum uint64) error
+	UpdateInt64(datum int64) error
+	UpdateSlice(datum []byte) error
+	UpdateString(datum string) error
 	Reset() error
 }
 
 type estimableSketch interface {
-	GetCompositeEstimate() float64
-	GetEstimate() float64
-	GetHipEstimate() float64
+	GetCompositeEstimate() (float64, error)
+	GetEstimate() (float64, error)
+	GetHipEstimate() (float64, error)
 	GetLowerBound(numStdDev int) (float64, error)
 	GetUpperBound(numStdDev int) (float64, error)
 	IsEmpty() bool
@@ -70,7 +70,7 @@ type toSliceSketch interface {
 }
 
 type privatelyUpdatable interface {
-	couponUpdate(coupon int) hllSketchBase
+	couponUpdate(coupon int) (hllSketchBase, error)
 }
 
 type iterableSketch interface {
@@ -91,9 +91,9 @@ type hllSketchBase interface {
 
 	putOutOfOrder(oooFlag bool)
 	putRebuildCurMinNumKxQFlag(rebuildCurMinNumKxQFlag bool)
-	copyAs(tgtHllType TgtHllType) hllSketchBase
-	copy() hllSketchBase
-	mergeTo(dest HllSketch)
+	copyAs(tgtHllType TgtHllType) (hllSketchBase, error)
+	copy() (hllSketchBase, error)
+	mergeTo(dest HllSketch) error
 }
 
 type hllSketchImpl struct { // extends BaseHllSketch
@@ -107,7 +107,7 @@ func NewHllSketch(lgConfigK int, tgtHllType TgtHllType) (HllSketch, error) {
 	if err != nil {
 		return nil, err
 	}
-	couponList, err := newCouponList(lgK, tgtHllType, curMode_LIST)
+	couponList, err := newCouponList(lgK, tgtHllType, curModeList)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func NewHllSketchDefault(lgConfigK int) (HllSketch, error) {
 	if err != nil {
 		return nil, err
 	}
-	couponList, err := newCouponList(lgK, TgtHllType_DEFAULT, curMode_LIST)
+	couponList, err := newCouponList(lgK, TgtHllTypeDefault, curModeList)
 	if err != nil {
 		return nil, err
 	}
@@ -134,11 +134,15 @@ func DeserializeHllSketch(byteArray []byte, checkRebuild bool) (HllSketch, error
 	if err != nil {
 		return nil, err
 	}
-	if curMode == curMode_HLL {
+	if curMode == curModeHll {
 		tgtHllType := extractTgtHllType(byteArray)
-		if tgtHllType == TgtHllType_HLL_4 {
-			return newHllSketchImpl(deserializeHll4(byteArray)), nil
-		} else if tgtHllType == TgtHllType_HLL_6 {
+		if tgtHllType == TgtHllTypeHll4 {
+			sk, err := deserializeHll4(byteArray)
+			if err != nil {
+				return nil, err
+			}
+			return newHllSketchImpl(sk), nil
+		} else if tgtHllType == TgtHllTypeHll6 {
 			return newHllSketchImpl(deserializeHll6(byteArray)), nil
 		} else {
 			a := newHllSketchImpl(deserializeHll8(byteArray))
@@ -150,7 +154,7 @@ func DeserializeHllSketch(byteArray []byte, checkRebuild bool) (HllSketch, error
 			}
 			return a, nil
 		}
-	} else if curMode == curMode_LIST {
+	} else if curMode == curModeList {
 		cp, err := deserializeCouponList(byteArray)
 		if err != nil {
 			return nil, err
@@ -172,15 +176,15 @@ func newHllSketchImpl(coupon hllSketchBase) HllSketch {
 	}
 }
 
-func (h *hllSketchImpl) GetEstimate() float64 {
+func (h *hllSketchImpl) GetEstimate() (float64, error) {
 	return h.sketch.GetEstimate()
 }
 
-func (h *hllSketchImpl) GetCompositeEstimate() float64 {
+func (h *hllSketchImpl) GetCompositeEstimate() (float64, error) {
 	return h.sketch.GetCompositeEstimate()
 }
 
-func (h *hllSketchImpl) GetHipEstimate() float64 {
+func (h *hllSketchImpl) GetHipEstimate() (float64, error) {
 	return h.sketch.GetHipEstimate()
 }
 
@@ -196,25 +200,27 @@ func (h *hllSketchImpl) GetUpdatableSerializationBytes() int {
 	return h.sketch.GetUpdatableSerializationBytes()
 }
 
-func (h *hllSketchImpl) UpdateUInt64(datum uint64) {
+func (h *hllSketchImpl) UpdateUInt64(datum uint64) error {
 	binary.LittleEndian.PutUint64(h.scratch[:], datum)
-	h.couponUpdate(coupon(h.hash(h.scratch[:])))
+	_, err := h.couponUpdate(coupon(h.hash(h.scratch[:])))
+	return err
 }
 
-func (h *hllSketchImpl) UpdateInt64(datum int64) {
-	h.UpdateUInt64(uint64(datum))
+func (h *hllSketchImpl) UpdateInt64(datum int64) error {
+	return h.UpdateUInt64(uint64(datum))
 }
 
-func (h *hllSketchImpl) UpdateSlice(datum []byte) {
+func (h *hllSketchImpl) UpdateSlice(datum []byte) error {
 	if len(datum) == 0 {
-		return
+		return nil
 	}
-	h.couponUpdate(coupon(h.hash(datum)))
+	_, err := h.couponUpdate(coupon(h.hash(datum)))
+	return err
 }
 
-func (h *hllSketchImpl) UpdateString(datum string) {
+func (h *hllSketchImpl) UpdateString(datum string) error {
 	// get a slice to the string data (avoiding a copy to heap)
-	h.UpdateSlice(unsafe.Slice(unsafe.StringData(datum), len(datum)))
+	return h.UpdateSlice(unsafe.Slice(unsafe.StringData(datum), len(datum)))
 }
 
 func (h *hllSketchImpl) IsEmpty() bool {
@@ -246,7 +252,7 @@ func (h *hllSketchImpl) Reset() error {
 	if err != nil {
 		return err
 	}
-	couponList, err := newCouponList(lgK, h.sketch.GetTgtHllType(), curMode_LIST)
+	couponList, err := newCouponList(lgK, h.sketch.GetTgtHllType(), curModeList)
 	if err != nil {
 		return err
 	}
@@ -265,28 +271,37 @@ func coupon(hashLo uint64, hashHi uint64) int {
 	return int((value << keyBits26) | addr26)
 }
 
-func (h *hllSketchImpl) couponUpdate(coupon int) hllSketchBase {
+func (h *hllSketchImpl) couponUpdate(coupon int) (hllSketchBase, error) {
 	if (coupon >> keyBits26) == empty {
-		return h.sketch
+		return h.sketch, nil
 	}
-	h.sketch = h.sketch.couponUpdate(coupon)
-	return h.sketch
+	sk, err := h.sketch.couponUpdate(coupon)
+	h.sketch = sk
+	return h.sketch, err
 }
 
 func (h *hllSketchImpl) putRebuildCurMinNumKxQFlag(rebuildCurMinNumKxQFlag bool) {
 	h.sketch.putRebuildCurMinNumKxQFlag(rebuildCurMinNumKxQFlag)
 }
 
-func (h *hllSketchImpl) mergeTo(dest HllSketch) {
-	h.sketch.mergeTo(dest)
+func (h *hllSketchImpl) mergeTo(dest HllSketch) error {
+	return h.sketch.mergeTo(dest)
 }
 
-func (h *hllSketchImpl) CopyAs(tgtHllType TgtHllType) HllSketch {
-	return newHllSketchImpl(h.sketch.copyAs(tgtHllType))
+func (h *hllSketchImpl) CopyAs(tgtHllType TgtHllType) (HllSketch, error) {
+	sketch, err := h.sketch.copyAs(tgtHllType)
+	if err != nil {
+		return nil, err
+	}
+	return newHllSketchImpl(sketch), nil
 }
 
-func (h *hllSketchImpl) Copy() HllSketch {
-	return newHllSketchImpl(h.sketch.copy())
+func (h *hllSketchImpl) Copy() (HllSketch, error) {
+	sketch, err := h.sketch.copy()
+	if err != nil {
+		return nil, err
+	}
+	return newHllSketchImpl(sketch), nil
 }
 
 // IsEstimationMode returns true for all sketches in this package.
@@ -301,5 +316,5 @@ func (h *hllSketchImpl) GetSerializationVersion() int {
 }
 
 func (h *hllSketchImpl) hash(bs []byte) (uint64, uint64) {
-	return murmur3.Sum128WithSeed(bs, thetacommon.DEFAULT_UPDATE_SEED)
+	return murmur3.Sum128WithSeed(bs, thetacommon.DefaultUpdateSeed)
 }

@@ -20,28 +20,31 @@ package hll
 import "fmt"
 
 // UsingXAndYTables returns the cubic interpolation using the X and Y tables.
-func usingXAndYTables(xArr []float64, yArr []float64, x float64) float64 {
+func usingXAndYTables(xArr []float64, yArr []float64, x float64) (float64, error) {
 	if len(xArr) < 4 || len(xArr) != len(yArr) {
-		panic(fmt.Sprintf("X value out of range: %f", x))
+		return 0, fmt.Errorf("X value out of range: %f", x)
 	}
 
 	if x == xArr[len(xArr)-1] {
-		return yArr[len(yArr)-1] // corer case
+		return yArr[len(yArr)-1], nil // corer case
 	}
 
-	offset := findStraddle(xArr, x) //uses recursion
+	offset, err := findStraddle(xArr, x) //uses recursion
+	if err != nil {
+		return 0, err
+	}
 	if (offset < 0) || (offset > (len(xArr) - 2)) {
-		panic(fmt.Sprintf("offset out of range: %d", offset))
+		return 0, fmt.Errorf("offset out of range: %d", offset)
 	}
 	if offset == 0 {
-		return interpolateUsingXAndYTables(xArr, yArr, offset, x) // corner case
+		return interpolateUsingXAndYTables(xArr, yArr, offset, x), nil // corner case
 	}
 
 	if offset == len(xArr)-2 {
-		return interpolateUsingXAndYTables(xArr, yArr, offset-2, x) // corner case
+		return interpolateUsingXAndYTables(xArr, yArr, offset-2, x), nil // corner case
 	}
 
-	return interpolateUsingXAndYTables(xArr, yArr, offset-1, x)
+	return interpolateUsingXAndYTables(xArr, yArr, offset-1, x), nil
 }
 
 func interpolateUsingXAndYTables(xArr []float64, yArr []float64, offset int, x float64) float64 {
@@ -53,28 +56,31 @@ func interpolateUsingXAndYTables(xArr []float64, yArr []float64, offset int, x f
 		x)
 }
 
-func usingXArrAndYStride(xArr []float64, yStride float64, x float64) float64 {
+func usingXArrAndYStride(xArr []float64, yStride float64, x float64) (float64, error) {
 	xArrLen := len(xArr)
 	xArrLenM1 := xArrLen - 1
 
 	if xArrLen < 4 || x < xArr[0] || x > xArr[xArrLenM1] {
-		panic(fmt.Sprintf("X value out of range: %f", x))
+		return 0, fmt.Errorf("X value out of range: %f", x)
 	}
 	if x == xArr[xArrLenM1] {
-		return yStride * float64(xArrLenM1) // corner case
+		return yStride * float64(xArrLenM1), nil // corner case
 	}
-	offset := findStraddle(xArr, x) //uses recursion
+	offset, err := findStraddle(xArr, x) //uses recursion
+	if err != nil {
+		return 0, err
+	}
 	xArrLenM2 := xArrLen - 2
 	if (offset < 0) || (offset > xArrLenM2) {
-		panic(fmt.Sprintf("offset out of range: %d", offset))
+		return 0, fmt.Errorf("offset out of range: %d", offset)
 	}
 	if offset == 0 {
-		return interpolateUsingXArrAndYStride(xArr, yStride, offset, x) // corner case
+		return interpolateUsingXArrAndYStride(xArr, yStride, offset, x), nil // corner case
 	}
 	if offset == xArrLenM2 {
-		return interpolateUsingXArrAndYStride(xArr, yStride, offset-2, x) // corner case
+		return interpolateUsingXArrAndYStride(xArr, yStride, offset-2, x), nil // corner case
 	}
-	return interpolateUsingXArrAndYStride(xArr, yStride, offset-1, x)
+	return interpolateUsingXArrAndYStride(xArr, yStride, offset-1, x), nil
 }
 
 // interpolateUsingXArrAndYStride interpolates using the X array and the Y stride.
@@ -107,25 +113,25 @@ func cubicInterpolate(x0 float64, y0 float64, x1 float64, y1 float64, x2 float64
 }
 
 // findStraddle returns the index of the largest value in the array that is less than or equal to the given value.
-func findStraddle(xArr []float64, x float64) int {
+func findStraddle(xArr []float64, x float64) (int, error) {
 	if len(xArr) < 2 || x < xArr[0] || x > xArr[len(xArr)-1] {
-		panic(fmt.Sprintf("X value out of range: %f", x))
+		return 0, fmt.Errorf("X value out of range: %f", x)
 	}
 	return recursiveFindStraddle(xArr, 0, len(xArr)-1, x)
 }
 
 // recursiveFindStraddle returns the index of the largest value in the array that is less than or equal to the given value.
-func recursiveFindStraddle(xArr []float64, left int, right int, x float64) int {
+func recursiveFindStraddle(xArr []float64, left int, right int, x float64) (int, error) {
 	if left >= right {
-		panic(fmt.Sprintf("left >= right: %d >= %d", left, right))
+		return 0, fmt.Errorf("left >= right: %d >= %d", left, right)
 	}
 
 	if xArr[left] > x || x >= xArr[right] {
-		panic(fmt.Sprintf("X value out of range: %f", x))
+		return 0, fmt.Errorf("X value out of range: %f", x)
 	}
 
 	if left+1 == right {
-		return left
+		return left, nil
 	}
 
 	middle := left + ((right - left) / 2)

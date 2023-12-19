@@ -18,5 +18,5 @@
 package thetacommon
 
 const (
-	DEFAULT_UPDATE_SEED = uint32(9001)
+	DefaultUpdateSeed = uint32(9001)
 )

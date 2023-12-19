@@ -24,20 +24,20 @@ import (
 )
 
 func TestCompositeEst(t *testing.T) {
-	testComposite(t, 4, TgtHllType_HLL_4, 1000)
-	testComposite(t, 5, TgtHllType_HLL_4, 1000)
-	testComposite(t, 6, TgtHllType_HLL_4, 1000)
-	testComposite(t, 13, TgtHllType_HLL_4, 10000)
+	testComposite(t, 4, TgtHllTypeHll4, 1000)
+	testComposite(t, 5, TgtHllTypeHll4, 1000)
+	testComposite(t, 6, TgtHllTypeHll4, 1000)
+	testComposite(t, 13, TgtHllTypeHll4, 10000)
 
-	testComposite(t, 4, TgtHllType_HLL_6, 1000)
-	testComposite(t, 5, TgtHllType_HLL_6, 1000)
-	testComposite(t, 6, TgtHllType_HLL_6, 1000)
-	testComposite(t, 13, TgtHllType_HLL_6, 10000)
+	testComposite(t, 4, TgtHllTypeHll6, 1000)
+	testComposite(t, 5, TgtHllTypeHll6, 1000)
+	testComposite(t, 6, TgtHllTypeHll6, 1000)
+	testComposite(t, 13, TgtHllTypeHll6, 10000)
 
-	testComposite(t, 4, TgtHllType_HLL_8, 1000)
-	testComposite(t, 5, TgtHllType_HLL_8, 1000)
-	testComposite(t, 6, TgtHllType_HLL_8, 1000)
-	testComposite(t, 13, TgtHllType_HLL_8, 10000)
+	testComposite(t, 4, TgtHllTypeHll8, 1000)
+	testComposite(t, 5, TgtHllTypeHll8, 1000)
+	testComposite(t, 6, TgtHllTypeHll8, 1000)
+	testComposite(t, 13, TgtHllTypeHll8, 10000)
 }
 
 func testComposite(t *testing.T, lgK int, tgtHllType TgtHllType, n int) {
@@ -47,43 +47,46 @@ func testComposite(t *testing.T, lgK int, tgtHllType TgtHllType, n int) {
 	assert.NoError(t, err)
 
 	for i := 0; i < n; i++ {
-		u.UpdateInt64(int64(i))
-		sk.UpdateInt64(int64(i))
+		assert.NoError(t, u.UpdateInt64(int64(i)))
+		assert.NoError(t, sk.UpdateInt64(int64(i)))
 	}
 
-	u.UpdateSketch(sk)
+	err = u.UpdateSketch(sk)
+	assert.NoError(t, err)
 	res, err := u.GetResult(tgtHllType)
 	assert.NoError(t, err)
-	res.GetCompositeEstimate()
+	_, err = res.GetCompositeEstimate()
+	assert.NoError(t, err)
+
 }
 
 func TestBigHipGetRse(t *testing.T) {
-	sk, err := NewHllSketch(13, TgtHllType_HLL_8)
+	sk, err := NewHllSketch(13, TgtHllTypeHll8)
 	assert.NoError(t, err)
 
 	for i := 0; i < 10000; i++ {
-		sk.UpdateInt64(int64(i))
+		assert.NoError(t, sk.UpdateInt64(int64(i)))
 	}
 }
 
 func TestToArraySliceDeserialize(t *testing.T) {
 	lgK := 4
 	u := 8
-	toArraySliceDeserialize(t, lgK, TgtHllType_HLL_4, u)
-	toArraySliceDeserialize(t, lgK, TgtHllType_HLL_6, u)
-	toArraySliceDeserialize(t, lgK, TgtHllType_HLL_8, u)
+	toArraySliceDeserialize(t, lgK, TgtHllTypeHll4, u)
+	toArraySliceDeserialize(t, lgK, TgtHllTypeHll6, u)
+	toArraySliceDeserialize(t, lgK, TgtHllTypeHll8, u)
 
 	lgK = 16
 	u = (((1 << (lgK - 3)) * 3) / 4) + 100
-	toArraySliceDeserialize(t, lgK, TgtHllType_HLL_4, u)
-	toArraySliceDeserialize(t, lgK, TgtHllType_HLL_6, u)
-	toArraySliceDeserialize(t, lgK, TgtHllType_HLL_8, u)
+	toArraySliceDeserialize(t, lgK, TgtHllTypeHll4, u)
+	toArraySliceDeserialize(t, lgK, TgtHllTypeHll6, u)
+	toArraySliceDeserialize(t, lgK, TgtHllTypeHll8, u)
 
 	lgK = 21
 	u = (((1 << (lgK - 3)) * 3) / 4) + 1000
-	toArraySliceDeserialize(t, lgK, TgtHllType_HLL_4, u)
-	toArraySliceDeserialize(t, lgK, TgtHllType_HLL_6, u)
-	toArraySliceDeserialize(t, lgK, TgtHllType_HLL_8, u)
+	toArraySliceDeserialize(t, lgK, TgtHllTypeHll4, u)
+	toArraySliceDeserialize(t, lgK, TgtHllTypeHll6, u)
+	toArraySliceDeserialize(t, lgK, TgtHllTypeHll8, u)
 }
 
 func toArraySliceDeserialize(t *testing.T, lgK int, tgtHllType TgtHllType, u int) {
@@ -91,15 +94,17 @@ func toArraySliceDeserialize(t *testing.T, lgK int, tgtHllType TgtHllType, u int
 	assert.NoError(t, err)
 
 	for i := 0; i < u; i++ {
-		sk1.UpdateInt64(int64(i))
+		assert.NoError(t, sk1.UpdateInt64(int64(i)))
 	}
 	_, isArray := sk1.(*hllSketchImpl).sketch.(hllArray)
 	assert.True(t, isArray)
 
 	// Update
-	est1 := sk1.GetEstimate()
+	est1, err := sk1.GetEstimate()
+	assert.NoError(t, err)
 	assert.InDelta(t, est1, u, float64(u)*.03)
-	est := sk1.GetHipEstimate()
+	est, err := sk1.GetHipEstimate()
+	assert.NoError(t, err)
 	assert.Equal(t, est, est1, 0.0)
 
 	// misc
@@ -110,11 +115,13 @@ func toArraySliceDeserialize(t *testing.T, lgK int, tgtHllType TgtHllType, u int
 	assert.NoError(t, err)
 	sk2, e := DeserializeHllSketch(sl1, true)
 	assert.NoError(t, e)
-	est2 := sk2.GetEstimate()
+	est2, err := sk2.GetEstimate()
+	assert.NoError(t, err)
 	assert.Equal(t, est2, est1, 0.0)
 
 	err = sk1.Reset()
 	assert.NoError(t, err)
-	est = sk1.GetEstimate()
+	est, err = sk1.GetEstimate()
+	assert.NoError(t, err)
 	assert.Equal(t, est, 0.0, 0.0)
 }

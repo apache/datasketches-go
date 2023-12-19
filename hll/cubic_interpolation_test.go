@@ -24,15 +24,18 @@ import (
 )
 
 func TestInterpolationExceptions(t *testing.T) {
-	assert.Panics(t, func() { usingXAndYTables(couponMappingXArr, couponMappingYArr, -1) }, "X value out of range: -1.000000")
+	_, err := usingXAndYTables(couponMappingXArr, couponMappingYArr, -1)
+	assert.Error(t, err, "X value out of range: -1.000000")
 
-	assert.Panics(t, func() { usingXAndYTables(couponMappingXArr, couponMappingYArr, 11000000.0) }, "X value out of range: 11000000.000000")
+	_, err = usingXAndYTables(couponMappingXArr, couponMappingYArr, 11000000.0)
+	assert.Error(t, err, "X value out of range: 11000000.000000")
 }
 
 func TestCornerCases(t *testing.T) {
 	leng := len(couponMappingXArr)
 	x := couponMappingXArr[leng-1]
-	y := usingXAndYTables(couponMappingXArr, couponMappingYArr, x)
+	y, err := usingXAndYTables(couponMappingXArr, couponMappingYArr, x)
+	assert.NoError(t, err)
 	yExp := couponMappingYArr[leng-1]
 	assert.Equal(t, y, yExp)
 }

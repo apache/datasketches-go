@@ -18,10 +18,11 @@
 package common
 
 import (
-	"fmt"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestInvPow2(t *testing.T) {
-	fmt.Printf("%f", InvPow2(0))
+	_, err := InvPow2(0)
+	assert.NoError(t, err)
 }

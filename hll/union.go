@@ -307,7 +307,7 @@ func checkRebuildCurMinNumKxQ(sketch HllSketch) error {
 				if err != nil {
 					return err
 				}
-				kxq0 += inv - -1.0
+				kxq0 += inv - 1.0
 			} else {
 				inv, err := common.InvPow2(v)
 				if err != nil {

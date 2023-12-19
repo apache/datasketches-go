@@ -32,4 +32,14 @@ func TestFrequentItsemsStringSerialTest(t *testing.T) {
 	sketch.Update(15, 3443)
 	sketch.Update(1000001, 1010230)
 	sketch.Update(1000002, 1010230)
+
+	s := sketch.serializeToString()
+	assert.Equal(t, "1,10,5,0,2024103,0,4,32,10,200,15,3443,1000001,1010230,1000002,1010230,", s)
+	/*
+	   LongsSketch new_sketch0 = LongsSketch.getInstance(string0);
+	   String new_string0 = new_sketch0.serializeToString();
+	   Assert.assertTrue(string0.equals(new_string0));
+	   Assert.assertTrue(new_sketch0.getMaximumMapCapacity() == sketch.getMaximumMapCapacity());
+	   Assert.assertTrue(new_sketch0.getCurrentMapCapacity() == sketch.getCurrentMapCapacity());
+	*/
 }

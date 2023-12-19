@@ -20,6 +20,7 @@ package frequencies
 import (
 	"fmt"
 	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/thetacommon"
 	"math/bits"
 	"strconv"
 	"strings"
@@ -135,9 +136,7 @@ func (r *reversePurgeLongHashMap) purge(sampleSize int) int64 {
 		i++
 	}
 
-	// TODO implement quickSelect
-	//val := quickSelect(samples, 0, numSamples-1, limit/2)
-	val := int64(0)
+	val := thetacommon.QuickSelect(samples, 0, numSamples-1, limit/2)
 	r.adjustAllValuesBy(-1 * val)
 	r.keepOnlyPositiveCounts()
 	return val

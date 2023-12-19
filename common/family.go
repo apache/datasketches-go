@@ -18,5 +18,6 @@
 package common
 
 const (
-	FamilyHllId = 7
+	FamilyHllId     = 7
+	FamilyFrequencyId = 10
 )

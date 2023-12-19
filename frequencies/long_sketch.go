@@ -20,6 +20,7 @@ package frequencies
 import (
 	"fmt"
 	"github.com/apache/datasketches-go/common"
+	"strings"
 )
 
 type LongSketch struct {
@@ -131,4 +132,19 @@ func (s *LongSketch) Update(item int64, count int64) error {
 		}
 	}
 	return nil
+}
+
+func (s *LongSketch) serializeToString() string {
+	var sb strings.Builder
+	//start the string with parameters of the sketch
+	serVer := serVer //0
+	famID := common.FamilyFrequencyId
+	lgMaxMapSz := s.lgMaxMapSize
+	flags := 0
+	if s.hashMap.numActive == 0 {
+		flags = emptyFlagMask
+	}
+	fmt.Fprintf(&sb, "%d,%d,%d,%d,%d,%d,", serVer, famID, lgMaxMapSz, flags, s.streamWeight, s.offset)
+	sb.WriteString(s.hashMap.serializeToString()) //numActive, curMaplen, key[i], value[i], ...
+	return sb.String()
 }

@@ -24,7 +24,7 @@ import (
 	"unsafe"
 
 	"github.com/apache/datasketches-go/thetacommon"
-	"github.com/spaolacci/murmur3"
+	"github.com/twmb/murmur3"
 )
 
 type HllSketch interface {
@@ -316,5 +316,5 @@ func (h *hllSketchImpl) GetSerializationVersion() int {
 }
 
 func (h *hllSketchImpl) hash(bs []byte) (uint64, uint64) {
-	return murmur3.Sum128WithSeed(bs, thetacommon.DefaultUpdateSeed)
+	return murmur3.SeedSum128(thetacommon.DefaultUpdateSeed, thetacommon.DefaultUpdateSeed, bs)
 }

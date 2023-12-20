@@ -57,16 +57,16 @@ type TgtHllType int
 type curMode int
 
 const (
-	curMode_LIST curMode = 0
-	curMode_SET  curMode = 1
-	curMode_HLL  curMode = 2
+	curModeList curMode = 0
+	curModeSet  curMode = 1
+	curModeHll  curMode = 2
 )
 
 const (
-	TgtHllType_HLL_4   TgtHllType = 0
-	TgtHllType_HLL_6   TgtHllType = 1
-	TgtHllType_HLL_8   TgtHllType = 2
-	TgtHllType_DEFAULT            = TgtHllType_HLL_4
+	TgtHllTypeHll4    TgtHllType = 0
+	TgtHllTypeHll6    TgtHllType = 1
+	TgtHllTypeHll8    TgtHllType = 2
+	TgtHllTypeDefault            = TgtHllTypeHll4
 )
 
 var (
@@ -79,7 +79,7 @@ var (
 	}
 )
 
-// CheckLgK checks the given lgK and returns it if it is valid and panics otherwise.
+// CheckLgK checks the given lgK and returns it if it is valid and return an error otherwise.
 func checkLgK(lgK int) (int, error) {
 	if lgK >= minLogK && lgK <= maxLogK {
 		return lgK, nil
@@ -115,7 +115,7 @@ func checkNumStdDev(numStdDev int) error {
 	return nil
 }
 
-// checkPreamble checks the given preamble and returns the curMode if it is valid and panics otherwise.
+// checkPreamble checks the given preamble and returns the curMode if it is valid and return an error otherwise.
 func checkPreamble(preamble []byte) (curMode, error) {
 	if len(preamble) == 0 {
 		return 0, fmt.Errorf("preamble cannot be nil or empty")
@@ -128,7 +128,7 @@ func checkPreamble(preamble []byte) (curMode, error) {
 	famId := extractFamilyID(preamble)
 	curMode := extractCurMode(preamble)
 
-	if famId != common.Family_HLL_ID {
+	if famId != common.FamilyHllId {
 		return 0, fmt.Errorf("possible Corruption: Invalid Family: %d", famId)
 	}
 	if serVer != 1 {
@@ -139,15 +139,15 @@ func checkPreamble(preamble []byte) (curMode, error) {
 		return 0, fmt.Errorf("possible Corruption: Invalid Preamble Ints: %d", preInts)
 	}
 
-	if curMode == curMode_LIST && preInts != listPreInts {
+	if curMode == curModeList && preInts != listPreInts {
 		return 0, fmt.Errorf("possible Corruption: Invalid Preamble Ints: %d", preInts)
 	}
 
-	if curMode == curMode_SET && preInts != hashSetPreInts {
+	if curMode == curModeSet && preInts != hashSetPreInts {
 		return 0, fmt.Errorf("possible Corruption: Invalid Preamble Ints: %d", preInts)
 	}
 
-	if curMode == curMode_HLL && preInts != hllPreInts {
+	if curMode == curModeHll && preInts != hllPreInts {
 		return 0, fmt.Errorf("possible Corruption: Invalid Preamble Ints: %d", preInts)
 	}
 
@@ -156,10 +156,10 @@ func checkPreamble(preamble []byte) (curMode, error) {
 
 func getMaxUpdatableSerializationBytes(lgConfigK int, tgtHllType TgtHllType) int {
 	var arrBytes int
-	if tgtHllType == TgtHllType_HLL_4 {
+	if tgtHllType == TgtHllTypeHll4 {
 		auxBytes := 4 << lgAuxArrInts[lgConfigK]
 		arrBytes = (1 << (lgConfigK - 1)) + auxBytes
-	} else if tgtHllType == TgtHllType_HLL_6 {
+	} else if tgtHllType == TgtHllTypeHll6 {
 		numSlots := 1 << lgConfigK
 		arrBytes = ((numSlots * 3) >> 2) + 1
 	} else {

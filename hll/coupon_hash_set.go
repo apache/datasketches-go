@@ -27,15 +27,15 @@ type couponHashSetImpl struct {
 	hllCouponState
 }
 
-func (c *couponHashSetImpl) GetCompositeEstimate() float64 {
+func (c *couponHashSetImpl) GetCompositeEstimate() (float64, error) {
 	return getEstimate(c)
 }
 
-func (c *couponHashSetImpl) GetEstimate() float64 {
+func (c *couponHashSetImpl) GetEstimate() (float64, error) {
 	return getEstimate(c)
 }
 
-func (c *couponHashSetImpl) GetHipEstimate() float64 {
+func (c *couponHashSetImpl) GetHipEstimate() (float64, error) {
 	return getEstimate(c)
 }
 
@@ -60,21 +60,24 @@ func (c *couponHashSetImpl) ToUpdatableSlice() ([]byte, error) {
 }
 
 // couponUpdate updates the couponHashSetImpl with the given coupon.
-func (c *couponHashSetImpl) couponUpdate(coupon int) hllSketchBase {
-	index := findCoupon(c.couponIntArr, c.lgCouponArrInts, coupon)
+func (c *couponHashSetImpl) couponUpdate(coupon int) (hllSketchBase, error) {
+	index, err := findCoupon(c.couponIntArr, c.lgCouponArrInts, coupon)
+	if err != nil {
+		return nil, err
+	}
 	if index >= 0 {
-		return c //found duplicate, ignore
+		return c, nil //found duplicate, ignore
 	}
 	c.couponIntArr[^index] = coupon
 	c.couponCount++ //found empty
 	t, err := c.checkGrowOrPromote()
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	if t {
 		return promoteSetToHll(c)
 	}
-	return c
+	return c, nil
 }
 
 func (c *couponHashSetImpl) iterator() pairIterator {
@@ -89,28 +92,22 @@ func (c *couponHashSetImpl) getPreInts() int {
 	return hashSetPreInts
 }
 
-func (c *couponHashSetImpl) copyAs(tgtHllType TgtHllType) hllSketchBase {
+func (c *couponHashSetImpl) copyAs(tgtHllType TgtHllType) (hllSketchBase, error) {
 	newC := &couponHashSetImpl{
-		hllSketchConfig: newHllSketchConfig(c.lgConfigK, tgtHllType, curMode_SET),
+		hllSketchConfig: newHllSketchConfig(c.lgConfigK, tgtHllType, curModeSet),
 		hllCouponState:  newHllCouponState(c.lgCouponArrInts, c.couponCount, make([]int, len(c.couponIntArr))),
 	}
 
 	copy(newC.couponIntArr, c.couponIntArr)
-	return newC
+	return newC, nil
 }
 
-func (c *couponHashSetImpl) copy() hllSketchBase {
-	newC := &couponHashSetImpl{
-		hllSketchConfig: newHllSketchConfig(c.lgConfigK, c.tgtHllType, curMode_SET),
-		hllCouponState:  newHllCouponState(c.lgCouponArrInts, c.couponCount, make([]int, len(c.couponIntArr))),
-	}
-
-	copy(newC.couponIntArr, c.couponIntArr)
-	return newC
+func (c *couponHashSetImpl) copy() (hllSketchBase, error) {
+	return c.copyAs(c.tgtHllType)
 }
 
-func (c *couponHashSetImpl) mergeTo(dest HllSketch) {
-	mergeCouponTo(c, dest)
+func (c *couponHashSetImpl) mergeTo(dest HllSketch) error {
+	return mergeCouponTo(c, dest)
 }
 
 // checkGrowOrPromote checks if the couponHashSetImpl should grow or promote to HLL.
@@ -122,49 +119,61 @@ func (c *couponHashSetImpl) checkGrowOrPromote() (bool, error) {
 		return true, nil // promote to HLL
 	}
 	c.lgCouponArrInts++
-	arr := growHashSet(c.couponIntArr, c.lgCouponArrInts)
+	arr, err := growHashSet(c.couponIntArr, c.lgCouponArrInts)
 	c.couponIntArr = arr
-	return false, nil
+	return false, err
 }
 
 // growHashSet doubles the size of the given couponHashSetImpl and reinsert the existing entries.
-func growHashSet(couponIntArr []int, tgtLgCoupArrSize int) []int {
+func growHashSet(couponIntArr []int, tgtLgCoupArrSize int) ([]int, error) {
 	tgtCouponIntArr := make([]int, 1<<tgtLgCoupArrSize)
 	for _, fetched := range couponIntArr {
 		if fetched != empty {
-			idx := findCoupon(tgtCouponIntArr, tgtLgCoupArrSize, fetched)
+			idx, err := findCoupon(tgtCouponIntArr, tgtLgCoupArrSize, fetched)
+			if err != nil {
+				return nil, err
+			}
 			if idx < 0 {
 				tgtCouponIntArr[^idx] = fetched
 				continue
 			}
-			panic("growHashSet, found duplicate")
+			return nil, fmt.Errorf("growHashSet, found duplicate")
 		}
 	}
-	return tgtCouponIntArr
+	return tgtCouponIntArr, nil
 }
 
 // promoteSetToHll move coupons to an hllArray from couponHashSetImpl
-func promoteSetToHll(src *couponHashSetImpl) hllArray {
+func promoteSetToHll(src *couponHashSetImpl) (hllArray, error) {
 	tgtHllArr, _ := newHllArray(src.lgConfigK, src.tgtHllType)
 	srcIter := src.iterator()
 	tgtHllArr.putKxQ0(float64(uint64(1) << src.lgConfigK))
 
 	for srcIter.nextValid() {
-		p := srcIter.getPair()
-		tgtHllArr.couponUpdate(p)
+		p, err := srcIter.getPair()
+		if err != nil {
+			return nil, err
+		}
+		_, err = tgtHllArr.couponUpdate(p)
+		if err != nil {
+			return nil, err
+		}
 	}
-	est := src.GetEstimate()
+	est, err := src.GetEstimate()
+	if err != nil {
+		return nil, err
+	}
 	tgtHllArr.putHipAccum(est)
 	tgtHllArr.putOutOfOrder(false)
-	return tgtHllArr
+	return tgtHllArr, nil
 }
 
 // findCoupon searches the Coupon hash table for an empty slot or a duplicate depending on the context.
 // If entire entry is empty, returns one's complement of index = found empty.
 // If entry equals given coupon, returns its index = found duplicate coupon.
 // Continues searching.
-// If the probe comes back to original index, panic.
-func findCoupon(array []int, lgArrInts int, coupon int) int {
+// If the probe comes back to original index, return an error.
+func findCoupon(array []int, lgArrInts int, coupon int) (int, error) {
 	arrMask := len(array) - 1
 	probe := coupon & arrMask
 	loopIndex := probe
@@ -172,14 +181,14 @@ func findCoupon(array []int, lgArrInts int, coupon int) int {
 	for ok := true; ok; ok = probe != loopIndex {
 		couponAtIdx := array[probe]
 		if couponAtIdx == empty {
-			return ^probe //empty
+			return ^probe, nil //empty
 		} else if coupon == couponAtIdx {
-			return probe //duplicate
+			return probe, nil //duplicate
 		}
 		stride := ((coupon & keyMask26) >> lgArrInts) | 1
 		probe = (probe + stride) & arrMask
 	}
-	panic("key not found and no empty slots")
+	return 0, fmt.Errorf("key not found and no empty slots")
 }
 
 // newCouponHashSet returns a new couponHashSetImpl.
@@ -189,7 +198,7 @@ func newCouponHashSet(lgConfigK int, tgtHllType TgtHllType) (couponHashSetImpl, 
 	if lgConfigK <= 7 {
 		return couponHashSetImpl{}, fmt.Errorf("lgConfigK must be > 7 for SET mode")
 	}
-	cl, err := newCouponList(lgConfigK, tgtHllType, curMode_SET)
+	cl, err := newCouponList(lgConfigK, tgtHllType, curModeSet)
 	if err != nil {
 		return couponHashSetImpl{}, err
 	}
@@ -203,7 +212,7 @@ func deserializeCouponHashSet(byteArray []byte) (hllCoupon, error) {
 
 	curMode := extractCurMode(byteArray)
 	memArrStart := listIntArrStart
-	if curMode == curMode_SET {
+	if curMode == curModeSet {
 		memArrStart = hashSetIntArrStart
 	}
 	set, err := newCouponHashSet(lgConfigK, tgtHllType)
@@ -214,11 +223,17 @@ func deserializeCouponHashSet(byteArray []byte) (hllCoupon, error) {
 	couponCount := extractHashSetCount(byteArray)
 	lgCouponArrInts := extractLgArr(byteArray)
 	if lgCouponArrInts < lgInitSetSize {
-		lgCouponArrInts = computeLgArr(byteArray, couponCount, lgConfigK)
+		lgCouponArrInts, err = computeLgArr(byteArray, couponCount, lgConfigK)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if memIsCompact {
-		for it := 0; it < couponCount; it++ {
-			set.couponUpdate(int(binary.LittleEndian.Uint32(byteArray[memArrStart+(it<<2) : memArrStart+(it<<2)+4])))
+		for it := 0; it < couponCount && err == nil; it++ {
+			_, err = set.couponUpdate(int(binary.LittleEndian.Uint32(byteArray[memArrStart+(it<<2) : memArrStart+(it<<2)+4])))
+		}
+		if err != nil {
+			return nil, err
 		}
 	} else {
 		set.couponCount = couponCount

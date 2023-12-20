@@ -18,6 +18,7 @@
 package hll
 
 import (
+	"fmt"
 	"github.com/apache/datasketches-go/common"
 )
 
@@ -27,7 +28,7 @@ type Union interface {
 	configuredSketch
 	toSliceSketch
 	privatelyUpdatable
-	UpdateSketch(sketch HllSketch)
+	UpdateSketch(sketch HllSketch) error
 	GetResult(tgtHllType TgtHllType) (HllSketch, error)
 }
 
@@ -36,7 +37,7 @@ type unionImpl struct {
 	gadget HllSketch
 }
 
-func (u *unionImpl) GetHipEstimate() float64 {
+func (u *unionImpl) GetHipEstimate() (float64, error) {
 	return u.gadget.GetHipEstimate()
 }
 
@@ -48,13 +49,13 @@ func (u *unionImpl) GetLowerBound(numStdDev int) (float64, error) {
 	return u.gadget.GetLowerBound(numStdDev)
 }
 
-func (u *unionImpl) couponUpdate(coupon int) hllSketchBase {
+func (u *unionImpl) couponUpdate(coupon int) (hllSketchBase, error) {
 	if coupon == empty {
-		return u.gadget.(*hllSketchImpl).sketch
+		return u.gadget.(*hllSketchImpl).sketch, nil
 	}
-	sk := u.gadget.couponUpdate(coupon)
+	sk, err := u.gadget.couponUpdate(coupon)
 	u.gadget.(*hllSketchImpl).sketch = sk
-	return sk
+	return sk, err
 }
 
 func (u *unionImpl) GetResult(tgtHllType TgtHllType) (HllSketch, error) {
@@ -62,7 +63,7 @@ func (u *unionImpl) GetResult(tgtHllType TgtHllType) (HllSketch, error) {
 	if err != nil {
 		return nil, err
 	}
-	return u.gadget.CopyAs(tgtHllType), nil
+	return u.gadget.CopyAs(tgtHllType)
 }
 
 func NewUnionWithDefault() (Union, error) {
@@ -70,7 +71,7 @@ func NewUnionWithDefault() (Union, error) {
 }
 
 func NewUnion(lgMaxK int) (Union, error) {
-	sk, err := NewHllSketch(lgMaxK, TgtHllType_HLL_8)
+	sk, err := NewHllSketch(lgMaxK, TgtHllTypeHll8)
 	if err != nil {
 		return nil, err
 	}
@@ -93,37 +94,41 @@ func DeserializeUnion(byteArray []byte) (Union, error) {
 	if err != nil {
 		return nil, err
 	}
-	union.UpdateSketch(sk)
-	return union, nil
+	err = union.UpdateSketch(sk)
+	return union, err
 }
 
-func (u *unionImpl) GetCompositeEstimate() float64 {
+func (u *unionImpl) GetCompositeEstimate() (float64, error) {
 	return u.gadget.GetCompositeEstimate()
 }
 
-func (u *unionImpl) GetEstimate() float64 {
+func (u *unionImpl) GetEstimate() (float64, error) {
 	return u.gadget.GetEstimate()
 }
 
-func (u *unionImpl) UpdateUInt64(datum uint64) {
-	u.gadget.UpdateUInt64(datum)
+func (u *unionImpl) UpdateUInt64(datum uint64) error {
+	return u.gadget.UpdateUInt64(datum)
 }
 
-func (u *unionImpl) UpdateInt64(datum int64) {
-	u.gadget.UpdateInt64(datum)
+func (u *unionImpl) UpdateInt64(datum int64) error {
+	return u.gadget.UpdateInt64(datum)
 }
 
-func (u *unionImpl) UpdateSlice(datum []byte) {
-	u.gadget.UpdateSlice(datum)
+func (u *unionImpl) UpdateSlice(datum []byte) error {
+	return u.gadget.UpdateSlice(datum)
 }
 
-func (u *unionImpl) UpdateString(datum string) {
-	u.gadget.UpdateString(datum)
+func (u *unionImpl) UpdateString(datum string) error {
+	return u.gadget.UpdateString(datum)
 }
 
-func (u *unionImpl) UpdateSketch(sketch HllSketch) {
-	un := u.unionImpl(sketch)
+func (u *unionImpl) UpdateSketch(sketch HllSketch) error {
+	un, err := u.unionImpl(sketch)
+	if err != nil {
+		return err
+	}
 	u.gadget.(*hllSketchImpl).sketch = un
+	return nil
 }
 
 func (u *unionImpl) GetLgConfigK() int {
@@ -166,35 +171,35 @@ func (u *unionImpl) Reset() error {
 	return u.gadget.Reset()
 }
 
-func (u *unionImpl) unionImpl(source HllSketch) hllSketchBase {
-	if u.gadget.GetTgtHllType() != TgtHllType_HLL_8 {
-		panic("gadget must be HLL_8")
+func (u *unionImpl) unionImpl(source HllSketch) (hllSketchBase, error) {
+	if u.gadget.GetTgtHllType() != TgtHllTypeHll8 {
+		return nil, fmt.Errorf("gadget must be HLL_8")
 	}
 	if source == nil || source.IsEmpty() {
-		return u.gadget.(*hllSketchImpl).sketch
+		return u.gadget.(*hllSketchImpl).sketch, nil
 	}
 
 	gadgetC := u.gadget.(*hllSketchImpl)
 	sourceC := source.(*hllSketchImpl)
 
 	srcMode := sourceC.sketch.GetCurMode()
-	if srcMode == curMode_LIST {
-		sourceC.mergeTo(u.gadget)
-		return u.gadget.(*hllSketchImpl).sketch
+	if srcMode == curModeList {
+		err := sourceC.mergeTo(u.gadget)
+		return u.gadget.(*hllSketchImpl).sketch, err
 	}
 
 	srcLgK := source.GetLgConfigK()
 	gdgtLgK := u.gadget.GetLgConfigK()
 	gdgtEmpty := u.gadget.IsEmpty()
 
-	if srcMode == curMode_SET {
+	if srcMode == curModeSet {
 		if gdgtEmpty && srcLgK == gdgtLgK {
-			un := sourceC.CopyAs(TgtHllType_HLL_8)
+			un, err := sourceC.CopyAs(TgtHllTypeHll8)
 			gadgetC.sketch = un.(*hllSketchImpl).sketch
-			return gadgetC.sketch
+			return gadgetC.sketch, err
 		}
-		sourceC.mergeTo(u.gadget)
-		return gadgetC.sketch
+		err := sourceC.mergeTo(u.gadget)
+		return gadgetC.sketch, err
 	}
 
 	// Hereafter, the source is in HLL mode.
@@ -228,42 +233,51 @@ func (u *unionImpl) unionImpl(source HllSketch) hllSketchBase {
 		// case 10: src <= max, src <  gdt, gdtSET,  gdtHeap
 		{
 			// Action: copy src, reverse merge w/autofold, ooof=src
-			srcHll8 := sourceC.CopyAs(TgtHllType_HLL_8)
-			gadgetC.mergeTo(srcHll8.(*hllSketchImpl))
-			return srcHll8.(*hllSketchImpl).sketch
+			srcHll8, err := sourceC.CopyAs(TgtHllTypeHll8)
+			if err != nil {
+				return nil, err
+			}
+			err = gadgetC.mergeTo(srcHll8.(*hllSketchImpl))
+			return srcHll8.(*hllSketchImpl).sketch, err
 		}
 	case 16, 18:
 		// case 16: src >  max, src >= gdt, gdtList, gdtHeap
 		// case 18: src >  max, src >= gdt, gdtSet,  gdtHeap
 		{ //Action: downsample src to MaxLgK, reverse merge w/autofold, ooof=src
-			panic("not implemented")
+			return nil, fmt.Errorf("not implemented cas 16,18")
 		}
 	case 4, 20:
 		// case 4: src <= max, src >= gdt, gdtHLL, gdtHeap
 		// case 20: src >  max, src >= gdt, gdtHLL, gdtHeap
 		{ //Action: forward HLL merge w/autofold, ooof=True
 			//merge src(Hll4,6,8,heap/mem,Mode=HLL) -> gdt(Hll8,heap,Mode=HLL)
-			mergeHlltoHLLmode(source, u.gadget, srcLgK, gdgtLgK)
+			err := mergeHlltoHLLmode(source, u.gadget, srcLgK, gdgtLgK)
+			if err != nil {
+				return nil, err
+			}
 			u.gadget.(*hllSketchImpl).sketch.putOutOfOrder(true)
-			return u.gadget.(*hllSketchImpl).sketch
+			return u.gadget.(*hllSketchImpl).sketch, nil
 		}
 	case 12: //src <= max, src <  gdt, gdtHLL, gdtHeap
 		{ //Action: downsample gdt to srcLgK, forward HLL merge w/autofold, ooof=True
-			panic("not implemented")
+			return nil, fmt.Errorf("not implemented case 12")
 		}
 	case 6, 14:
 		// case 6: src <= max, src >= gdt, gdtEmpty, gdtHeap
 		// case 14: src <= max, src <  gdt, gdtEmpty, gdtHeap
 		{ //Action: copy src, replace gdt, ooof=src
-			srcHll8 := sourceC.CopyAs(TgtHllType_HLL_8)
-			return srcHll8.(*hllSketchImpl).sketch
+			srcHll8, err := sourceC.CopyAs(TgtHllTypeHll8)
+			if err != nil {
+				return nil, err
+			}
+			return srcHll8.(*hllSketchImpl).sketch, nil
 		}
 	case 22: //src >  max, src >= gdt, gdtEmpty, gdtHeap
 		{ //Action: downsample src to lgMaxK, replace gdt, ooof=src
-			panic("not implemented")
+			return nil, fmt.Errorf("not implemented")
 		}
 	default:
-		panic("impossible")
+		return nil, fmt.Errorf("impossible")
 	}
 }
 
@@ -272,7 +286,7 @@ func checkRebuildCurMinNumKxQ(sketch HllSketch) error {
 	curMode := sketch.GetCurMode()
 	tgtHllType := sketch.GetTgtHllType()
 	rebuild := sketchImpl.isRebuildCurMinNumKxQFlag()
-	if !rebuild || curMode != curMode_HLL || tgtHllType != TgtHllType_HLL_8 {
+	if !rebuild || curMode != curModeHll || tgtHllType != TgtHllTypeHll8 {
 		return nil
 	}
 
@@ -283,12 +297,23 @@ func checkRebuildCurMinNumKxQ(sketch HllSketch) error {
 	kxq1 := 0.0
 	itr := sketchArrImpl.iterator()
 	for itr.nextAll() {
-		v := itr.getValue()
+		v, err := itr.getValue()
+		if err != nil {
+			return err
+		}
 		if v > 0 {
 			if v < 32 {
-				kxq0 += common.InvPow2(v) - 1.0
+				inv, err := common.InvPow2(v)
+				if err != nil {
+					return err
+				}
+				kxq0 += inv - 1.0
 			} else {
-				kxq1 += common.InvPow2(v) - 1.0
+				inv, err := common.InvPow2(v)
+				if err != nil {
+					return err
+				}
+				kxq1 += inv - 1.0
 			}
 		}
 		if v > curMin {
@@ -311,12 +336,12 @@ func checkRebuildCurMinNumKxQ(sketch HllSketch) error {
 	return nil
 }
 
-func mergeHlltoHLLmode(src HllSketch, tgt HllSketch, srcLgK int, tgtLgK int) {
+func mergeHlltoHLLmode(src HllSketch, tgt HllSketch, srcLgK int, tgtLgK int) error {
 	sw := 0
 	if srcLgK > tgtLgK {
 		sw |= 4
 	}
-	if src.GetTgtHllType() != TgtHllType_HLL_8 {
+	if src.GetTgtHllType() != TgtHllTypeHll8 {
 		sw |= 8
 	}
 	srcK := 1 << srcLgK
@@ -335,7 +360,7 @@ func mergeHlltoHLLmode(src HllSketch, tgt HllSketch, srcLgK int, tgtLgK int) {
 	case 8, 9: //!HLL_8, srcLgK=tgtLgK, src=heap, tgt=heap/mem
 		{
 			tgtAbsHllArr := tgt.(*hllSketchImpl).sketch.(*hll8ArrayImpl)
-			if src.GetTgtHllType() == TgtHllType_HLL_4 {
+			if src.GetTgtHllType() == TgtHllTypeHll4 {
 				src4 := src.(*hllSketchImpl).sketch.(*hll4ArrayImpl)
 				auxHashMap := src4.auxHashMap
 				curMin := src4.curMin
@@ -346,7 +371,10 @@ func mergeHlltoHLLmode(src HllSketch, tgt HllSketch, srcLgK int, tgtLgK int) {
 					i++
 					value := uint(b) & loNibbleMask
 					if value == auxToken {
-						v := auxHashMap.mustFindValueFor(j)
+						v, err := auxHashMap.mustFindValueFor(j)
+						if err != nil {
+							return err
+						}
 						tgtAbsHllArr.updateSlotNoKxQ(j, v)
 					} else {
 						tgtAbsHllArr.updateSlotNoKxQ(j, int(value)+curMin)
@@ -354,7 +382,10 @@ func mergeHlltoHLLmode(src HllSketch, tgt HllSketch, srcLgK int, tgtLgK int) {
 					j++
 					value = uint(b) >> 4
 					if value == auxToken {
-						v := auxHashMap.mustFindValueFor(j)
+						v, err := auxHashMap.mustFindValueFor(j)
+						if err != nil {
+							return err
+						}
 						tgtAbsHllArr.updateSlotNoKxQ(j, v)
 					} else {
 						tgtAbsHllArr.updateSlotNoKxQ(j, int(value)+curMin)
@@ -389,7 +420,8 @@ func mergeHlltoHLLmode(src HllSketch, tgt HllSketch, srcLgK int, tgtLgK int) {
 		}
 		// TODO continue implementing
 	default:
-		panic("not implemented")
+		return fmt.Errorf("not implemented")
 	}
 	tgt.(*hllSketchImpl).sketch.putRebuildCurMinNumKxQFlag(true)
+	return nil
 }

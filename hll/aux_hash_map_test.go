@@ -25,20 +25,27 @@ import (
 
 func TestMustReplace(t *testing.T) {
 	auxMap := newAuxHashMap(3, 7)
-	auxMap.mustAdd(100, 5)
-	val := auxMap.mustFindValueFor(100)
+	err := auxMap.mustAdd(100, 5)
+	assert.NoError(t, err)
+	val, err := auxMap.mustFindValueFor(100)
+	assert.NoError(t, err)
 	assert.Equal(t, 5, val)
-	auxMap.mustReplace(100, 10)
-	val = auxMap.mustFindValueFor(100)
+	err = auxMap.mustReplace(100, 10)
+	assert.NoError(t, err)
+	val, err = auxMap.mustFindValueFor(100)
+	assert.NoError(t, err)
 	assert.Equal(t, 10, val)
-	assert.Panics(t, func() { auxMap.mustReplace(101, 5) }, "pair not found: SlotNo: 101, Value: 5")
+
+	err = auxMap.mustReplace(101, 5)
+	assert.Error(t, err, "pair not found: SlotNo: 101, Value: 5")
 }
 
 func TestGrowAuxSpace(t *testing.T) {
 	auxMap := newAuxHashMap(3, 7)
 	assert.Equal(t, 3, auxMap.getLgAuxArrInts())
 	for i := 1; i <= 7; i++ {
-		auxMap.mustAdd(i, i)
+		err := auxMap.mustAdd(i, i)
+		assert.NoError(t, err)
 	}
 	assert.Equal(t, 4, auxMap.getLgAuxArrInts())
 	itr := auxMap.iterator()
@@ -50,7 +57,8 @@ func TestGrowAuxSpace(t *testing.T) {
 
 	for itr.nextAll() {
 		count2++
-		pair := itr.getPair()
+		pair, err := itr.getPair()
+		assert.NoError(t, err)
 		if pair != 0 {
 			count1++
 		}
@@ -61,12 +69,16 @@ func TestGrowAuxSpace(t *testing.T) {
 
 func TestExceptions1(t *testing.T) {
 	auxMap := newAuxHashMap(3, 7)
-	auxMap.mustAdd(100, 5)
-	assert.Panics(t, func() { auxMap.mustFindValueFor(101) }, "SlotNo not found: 101")
+	err := auxMap.mustAdd(100, 5)
+	assert.NoError(t, err)
+	_, err = auxMap.mustFindValueFor(101)
+	assert.Error(t, err, "SlotNo not found: 101")
 }
 
 func TestExceptions2(t *testing.T) {
 	auxMap := newAuxHashMap(3, 7)
-	auxMap.mustAdd(100, 5)
-	assert.Panics(t, func() { auxMap.mustAdd(100, 6) }, "found a slotNo that should not be there: SlotNo: 100, Value: 6")
+	err := auxMap.mustAdd(100, 5)
+	assert.NoError(t, err)
+	err = auxMap.mustAdd(100, 6)
+	assert.Error(t, err, "found a slotNo that should not be there: SlotNo: 100, Value: 6")
 }

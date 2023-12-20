@@ -45,7 +45,7 @@ type hllArray interface {
 	putOutOfOrder(oooFlag bool)
 
 	extractCommonHll(byteArr []byte)
-	hipAndKxQIncrementalUpdate(oldValue int, newValue int)
+	hipAndKxQIncrementalUpdate(oldValue int, newValue int) error
 }
 
 type hllArrayImpl struct {
@@ -67,11 +67,11 @@ type hllArrayImpl struct {
 // newHllArray returns a new hllArray of the given lgConfigK and tgtHllType.
 func newHllArray(lgConfigK int, tgtHllType TgtHllType) (hllArray, error) {
 	switch tgtHllType {
-	case TgtHllType_HLL_4:
+	case TgtHllTypeHll4:
 		return newHll4Array(lgConfigK), nil
-	case TgtHllType_HLL_6:
+	case TgtHllTypeHll6:
 		return newHll6Array(lgConfigK), nil
-	case TgtHllType_HLL_8:
+	case TgtHllTypeHll8:
 		return newHll8Array(lgConfigK), nil
 	}
 	return nil, fmt.Errorf("unknown TgtHllType")
@@ -85,20 +85,20 @@ func (a *hllArrayImpl) IsEmpty() bool {
 	return false
 }
 
-func (a *hllArrayImpl) GetEstimate() float64 {
+func (a *hllArrayImpl) GetEstimate() (float64, error) {
 	if a.oooFrag {
 		return a.GetCompositeEstimate()
 	}
-	return a.hipAccum
+	return a.hipAccum, nil
 }
 
 // GetCompositeEstimate getCompositeEstimate returns the composite estimate.
-func (a *hllArrayImpl) GetCompositeEstimate() float64 {
+func (a *hllArrayImpl) GetCompositeEstimate() (float64, error) {
 	return hllCompositeEstimate(a)
 }
 
-func (a *hllArrayImpl) GetHipEstimate() float64 {
-	return a.hipAccum
+func (a *hllArrayImpl) GetHipEstimate() (float64, error) {
+	return a.hipAccum, nil
 }
 
 func (a *hllArrayImpl) getMemDataStart() int {
@@ -237,8 +237,8 @@ func (a *hllArrayImpl) putNibble(slotNo int, value byte) {
 	}
 }
 
-func (a *hllArrayImpl) mergeTo(HllSketch) {
-	panic("possible Corruption, improper access")
+func (a *hllArrayImpl) mergeTo(HllSketch) error {
+	return fmt.Errorf("possible Corruption, improper access")
 }
 
 func (a *hllArrayImpl) copyCommon() hllArrayImpl {
@@ -259,34 +259,51 @@ func (a *hllArrayImpl) isRebuildCurMinNumKxQFlag() bool {
 
 // hipAndKxQIncrementalUpdate is the HIP and KxQ incremental update for hll.
 // This is used when incrementally updating an existing array with non-zero values.
-func (a *hllArrayImpl) hipAndKxQIncrementalUpdate(oldValue int, newValue int) {
+func (a *hllArrayImpl) hipAndKxQIncrementalUpdate(oldValue int, newValue int) error {
 	if oldValue >= newValue {
-		panic("oldValue >= newValue")
+		return fmt.Errorf("oldValue >= newValue")
 	}
 	kxq0 := a.kxq0
 	kxq1 := a.kxq1
 	//update hipAccum BEFORE updating kxq0 and kxq1
 	a.addToHipAccum(float64(uint64(1<<a.lgConfigK)) / (kxq0 + kxq1))
-	a.incrementalUpdateKxQ(oldValue, newValue, kxq0, kxq1)
+	return a.incrementalUpdateKxQ(oldValue, newValue, kxq0, kxq1)
 }
 
 // incrementalUpdateKxQ updates kxq0 and kxq1.
-func (a *hllArrayImpl) incrementalUpdateKxQ(oldValue int, newValue int, kxq0 float64, kxq1 float64) {
+func (a *hllArrayImpl) incrementalUpdateKxQ(oldValue int, newValue int, kxq0 float64, kxq1 float64) error {
 	//update kxq0 and kxq1; subtract first, then add.
 	if oldValue < 32 {
-		kxq0 -= common.InvPow2(oldValue)
+		v, err := common.InvPow2(oldValue)
+		if err != nil {
+			return err
+		}
+		kxq0 -= v
 		a.kxq0 = kxq0
 	} else {
-		kxq1 -= common.InvPow2(oldValue)
+		v, err := common.InvPow2(oldValue)
+		if err != nil {
+			return err
+		}
+		kxq1 -= v
 		a.kxq1 = kxq1
 	}
 	if newValue < 32 {
-		kxq0 += common.InvPow2(newValue)
+		v, err := common.InvPow2(newValue)
+		if err != nil {
+			return err
+		}
+		kxq0 += v
 		a.kxq0 = kxq0
 	} else {
-		kxq1 += common.InvPow2(newValue)
+		v, err := common.InvPow2(newValue)
+		if err != nil {
+			return err
+		}
+		kxq1 += v
 		a.kxq1 = kxq1
 	}
+	return nil
 }
 
 // extractCommonHll extracts the common fields from the given byte array.

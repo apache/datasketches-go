@@ -21,9 +21,9 @@ type pairIterator interface {
 	nextValid() bool
 	nextAll() bool
 	getIndex() int
-	getPair() int
+	getPair() (int, error)
 	getKey() int
-	getValue() int
+	getValue() (int, error)
 	getSlot() int
 }
 
@@ -51,8 +51,8 @@ func newIntArrayPairIterator(array []int, lgConfigK int) pairIterator {
 
 // getPair returns the current key, value pair as a single int where the key is the lower 26 bits
 // and the value is in the upper 6 bits.
-func (i *intArrayPairIterator) getPair() int {
-	return i.pair
+func (i *intArrayPairIterator) getPair() (int, error) {
+	return i.pair, nil
 }
 
 // nextValid returns true at the next pair where getKey() and getValue() are valid.
@@ -86,8 +86,8 @@ func (i *intArrayPairIterator) getKey() int {
 }
 
 // getValue returns the value of the pair.
-func (i *intArrayPairIterator) getValue() int {
-	return getPairValue(i.pair)
+func (i *intArrayPairIterator) getValue() (int, error) {
+	return getPairValue(i.pair), nil
 }
 
 func (i *intArrayPairIterator) getSlot() int {

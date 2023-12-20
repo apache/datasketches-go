@@ -39,23 +39,23 @@ func (h *hll6ArrayImpl) iterator() pairIterator {
 	return &a
 }
 
-func (h *hll6ArrayImpl) copyAs(tgtHllType TgtHllType) hllSketchBase {
+func (h *hll6ArrayImpl) copyAs(tgtHllType TgtHllType) (hllSketchBase, error) {
 	if tgtHllType == h.tgtHllType {
 		return h.copy()
 	}
-	if tgtHllType == TgtHllType_HLL_4 {
+	if tgtHllType == TgtHllTypeHll4 {
 		return convertToHll4(h)
 	}
-	if tgtHllType == TgtHllType_HLL_8 {
+	if tgtHllType == TgtHllTypeHll8 {
 		return convertToHll8(h)
 	}
-	panic(fmt.Sprintf("Cannot convert to TgtHllType id: %d", int(tgtHllType)))
+	return nil, fmt.Errorf("cannot convert to TgtHllType id: %d", int(tgtHllType))
 }
 
-func (h *hll6ArrayImpl) copy() hllSketchBase {
+func (h *hll6ArrayImpl) copy() (hllSketchBase, error) {
 	return &hll6ArrayImpl{
 		hllArrayImpl: h.copyCommon(),
-	}
+	}, nil
 }
 
 func (h *hll6ArrayImpl) ToCompactSlice() ([]byte, error) {
@@ -72,8 +72,8 @@ func newHll6Array(lgConfigK int) hllArray {
 		hllArrayImpl: hllArrayImpl{
 			hllSketchConfig: hllSketchConfig{
 				lgConfigK:  lgConfigK,
-				tgtHllType: TgtHllType_HLL_6,
-				curMode:    curMode_HLL,
+				tgtHllType: TgtHllTypeHll6,
+				curMode:    curModeHll,
 			},
 			curMin:      0,
 			numAtCurMin: 1 << lgConfigK,
@@ -94,26 +94,30 @@ func deserializeHll6(byteArray []byte) hllArray {
 	return hll6
 }
 
-func (h *hll6ArrayImpl) couponUpdate(coupon int) hllSketchBase {
+func (h *hll6ArrayImpl) couponUpdate(coupon int) (hllSketchBase, error) {
 	newValue := coupon >> keyBits26
 	configKmask := (1 << h.lgConfigK) - 1
 	slotNo := coupon & configKmask
-	h.updateSlotWithKxQ(slotNo, newValue)
-	return h
+	err := h.updateSlotWithKxQ(slotNo, newValue)
+	return h, err
 }
 
-func (h *hll6ArrayImpl) updateSlotWithKxQ(slotNo int, newValue int) {
+func (h *hll6ArrayImpl) updateSlotWithKxQ(slotNo int, newValue int) error {
 	oldValue := h.getSlotValue(slotNo)
 	if newValue > oldValue {
 		put6Bit(h.hllByteArr, 0, slotNo, newValue)
-		h.hipAndKxQIncrementalUpdate(oldValue, newValue)
+		err := h.hipAndKxQIncrementalUpdate(oldValue, newValue)
+		if err != nil {
+			return err
+		}
 		if oldValue == 0 {
 			h.numAtCurMin-- //interpret numAtCurMin as num Zeros
 			if h.numAtCurMin < 0 {
-				panic("numAtCurMin < 0")
+				return fmt.Errorf("numAtCurMin < 0")
 			}
 		}
 	}
+	return nil
 }
 
 func (h *hll6ArrayImpl) getSlotValue(slotNo int) int {
@@ -137,24 +141,33 @@ func put6Bit(arr []byte, offsetBytes int, slotNo int, newValue int) {
 	common.PutShortLE(arr, byteIdx, insert)
 }
 
-func convertToHll6(srcAbsHllArr hllArray) hllSketchBase {
+func convertToHll6(srcAbsHllArr hllArray) (hllSketchBase, error) {
 	lgConfigK := srcAbsHllArr.GetLgConfigK()
 	hll6Array := newHll6Array(lgConfigK)
 	hll6Array.putOutOfOrder(srcAbsHllArr.isOutOfOrder())
 	numZeros := 1 << lgConfigK
 	srcItr := srcAbsHllArr.iterator()
 	for srcItr.nextAll() {
-		v := srcItr.getValue()
+		v, err := srcItr.getValue()
+		if err != nil {
+			return nil, err
+		}
 		if v != empty {
 			numZeros--
-			p := srcItr.getPair()
-			hll6Array.couponUpdate(p) //couponUpdate creates KxQ registers
+			p, err := srcItr.getPair()
+			if err != nil {
+				return nil, err
+			}
+			_, err = hll6Array.couponUpdate(p) //couponUpdate creates KxQ registers
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	hll6Array.putNumAtCurMin(numZeros)
 	hll6Array.putHipAccum(srcAbsHllArr.getHipAccum()) //intentional overwrite
 	hll6Array.putRebuildCurMinNumKxQFlag(false)
-	return hll6Array
+	return hll6Array, nil
 }
 
 func newHll6Iterator(lengthPairs int, hll *hll6ArrayImpl) hll6Iterator {
@@ -187,12 +200,13 @@ func (h *hll6Iterator) nextValid() bool {
 	return false
 }
 
-func (h *hll6Iterator) getValue() int {
+func (h *hll6Iterator) getValue() (int, error) {
 	tmp := common.GetShortLE(h.hll.hllByteArr, h.bitOffset/8)
 	shift := (h.bitOffset % 8) & 0x7
-	return (tmp >> shift) & valMask6
+	return (tmp >> shift) & valMask6, nil
 }
 
-func (h *hll6Iterator) getPair() int {
-	return pair(h.index, h.getValue())
+func (h *hll6Iterator) getPair() (int, error) {
+	v, err := h.getValue()
+	return pair(h.index, v), err
 }

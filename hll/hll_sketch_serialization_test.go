@@ -26,31 +26,31 @@ import (
 )
 
 const (
-	DSKETCH_TEST_GENERATE_GO = "DSKETCH_TEST_GENERATE_GO"
-	DSKETCH_TEST_CROSS_JAVA  = "DSKETCH_TEST_CROSS_JAVA"
-	DSKETCH_TEST_CROSS_CPP   = "DSKETCH_TEST_CROSS_CPP"
-	DSKETCH_TEST_CROSS_GO    = "DSKETCH_TEST_CROSS_GO"
+	dSketchTestGenerateGo = "DSKETCH_TEST_GENERATE_GO"
+	dSketchTestCrossJava  = "DSKETCH_TEST_CROSS_JAVA"
+	dSketchTestCrossCpp   = "DSKETCH_TEST_CROSS_CPP"
+	dSketchTestCrossGo    = "DSKETCH_TEST_CROSS_GO"
 )
 
 // Run me manually for generation
 func TestGenerateGoFiles(t *testing.T) {
-	if len(os.Getenv(DSKETCH_TEST_GENERATE_GO)) == 0 {
-		t.Skipf("%s not set", DSKETCH_TEST_GENERATE_GO)
+	if len(os.Getenv(dSketchTestGenerateGo)) == 0 {
+		t.Skipf("%s not set", dSketchTestGenerateGo)
 	}
 
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	for _, n := range nArr {
-		hll4, err := NewHllSketch(defaultLgK, TgtHllType_HLL_4)
+		hll4, err := NewHllSketch(defaultLgK, TgtHllTypeHll4)
 		assert.NoError(t, err)
-		hll6, err := NewHllSketch(defaultLgK, TgtHllType_HLL_6)
+		hll6, err := NewHllSketch(defaultLgK, TgtHllTypeHll6)
 		assert.NoError(t, err)
-		hll8, err := NewHllSketch(defaultLgK, TgtHllType_HLL_8)
+		hll8, err := NewHllSketch(defaultLgK, TgtHllTypeHll8)
 		assert.NoError(t, err)
 
 		for i := 0; i < n; i++ {
-			hll4.UpdateUInt64(uint64(i))
-			hll6.UpdateUInt64(uint64(i))
-			hll8.UpdateUInt64(uint64(i))
+			assert.NoError(t, hll4.UpdateUInt64(uint64(i)))
+			assert.NoError(t, hll6.UpdateUInt64(uint64(i)))
+			assert.NoError(t, hll8.UpdateUInt64(uint64(i)))
 		}
 		err = os.MkdirAll(goPath, os.ModePerm)
 		assert.NoError(t, err)
@@ -73,8 +73,8 @@ func TestGenerateGoFiles(t *testing.T) {
 }
 
 func TestJavaCompat(t *testing.T) {
-	if len(os.Getenv(DSKETCH_TEST_CROSS_JAVA)) == 0 {
-		t.Skipf("%s not set", DSKETCH_TEST_CROSS_JAVA)
+	if len(os.Getenv(dSketchTestCrossJava)) == 0 {
+		t.Skipf("%s not set", dSketchTestCrossJava)
 	}
 
 	t.Run("Java Hll4", func(t *testing.T) {
@@ -88,7 +88,8 @@ func TestJavaCompat(t *testing.T) {
 			}
 
 			assert.Equal(t, 12, sketch.GetLgConfigK())
-			est := sketch.GetEstimate()
+			est, err := sketch.GetEstimate()
+			assert.NoError(t, err)
 			assert.InDelta(t, n, est, float64(n)*0.02)
 		}
 	})
@@ -105,7 +106,8 @@ func TestJavaCompat(t *testing.T) {
 			}
 
 			assert.Equal(t, 12, sketch.GetLgConfigK())
-			est := sketch.GetEstimate()
+			est, err := sketch.GetEstimate()
+			assert.NoError(t, err)
 			assert.InDelta(t, n, est, float64(n)*0.02)
 		}
 	})
@@ -121,15 +123,16 @@ func TestJavaCompat(t *testing.T) {
 			}
 
 			assert.Equal(t, 12, sketch.GetLgConfigK())
-			est := sketch.GetEstimate()
+			est, err := sketch.GetEstimate()
+			assert.NoError(t, err)
 			assert.InDelta(t, n, est, float64(n)*0.02)
 		}
 	})
 }
 
 func TestCppCompat(t *testing.T) {
-	if len(os.Getenv(DSKETCH_TEST_CROSS_CPP)) == 0 {
-		t.Skipf("%s not set", DSKETCH_TEST_CROSS_CPP)
+	if len(os.Getenv(dSketchTestCrossCpp)) == 0 {
+		t.Skipf("%s not set", dSketchTestCrossCpp)
 	}
 
 	t.Run("Cpp Hll4", func(t *testing.T) {
@@ -143,7 +146,8 @@ func TestCppCompat(t *testing.T) {
 			}
 
 			assert.Equal(t, 12, sketch.GetLgConfigK())
-			est := sketch.GetEstimate()
+			est, err := sketch.GetEstimate()
+			assert.NoError(t, err)
 			assert.InDelta(t, n, est, float64(n)*0.02)
 		}
 	})
@@ -160,7 +164,8 @@ func TestCppCompat(t *testing.T) {
 			}
 
 			assert.Equal(t, 12, sketch.GetLgConfigK())
-			est := sketch.GetEstimate()
+			est, err := sketch.GetEstimate()
+			assert.NoError(t, err)
 			assert.InDelta(t, n, est, float64(n)*0.02)
 		}
 	})
@@ -176,15 +181,16 @@ func TestCppCompat(t *testing.T) {
 			}
 
 			assert.Equal(t, 12, sketch.GetLgConfigK())
-			est := sketch.GetEstimate()
+			est, err := sketch.GetEstimate()
+			assert.NoError(t, err)
 			assert.InDelta(t, n, est, float64(n)*0.02)
 		}
 	})
 }
 
 func TestGoCompat(t *testing.T) {
-	if len(os.Getenv(DSKETCH_TEST_CROSS_GO)) == 0 {
-		t.Skipf("%s not set", DSKETCH_TEST_CROSS_GO)
+	if len(os.Getenv(dSketchTestCrossGo)) == 0 {
+		t.Skipf("%s not set", dSketchTestCrossGo)
 	}
 
 	t.Run("Go Hll4", func(t *testing.T) {
@@ -199,7 +205,8 @@ func TestGoCompat(t *testing.T) {
 			}
 
 			assert.Equal(t, 12, sketch.GetLgConfigK())
-			est := sketch.GetEstimate()
+			est, err := sketch.GetEstimate()
+			assert.NoError(t, err)
 			assert.InDelta(t, n, est, float64(n)*0.02)
 		}
 	})
@@ -216,7 +223,8 @@ func TestGoCompat(t *testing.T) {
 			}
 
 			assert.Equal(t, 12, sketch.GetLgConfigK())
-			est := sketch.GetEstimate()
+			est, err := sketch.GetEstimate()
+			assert.NoError(t, err)
 			assert.InDelta(t, n, est, float64(n)*0.02)
 		}
 	})
@@ -233,7 +241,8 @@ func TestGoCompat(t *testing.T) {
 			}
 
 			assert.Equal(t, 12, sketch.GetLgConfigK())
-			est := sketch.GetEstimate()
+			est, err := sketch.GetEstimate()
+			assert.NoError(t, err)
 			assert.InDelta(t, n, est, float64(n)*0.02)
 		}
 	})

@@ -22,17 +22,18 @@ import (
 )
 
 // internalHll4Update is the internal update method for Hll4Array.
-func internalHll4Update(h *hll4ArrayImpl, slotNo int, newValue int) {
+func internalHll4Update(h *hll4ArrayImpl, slotNo int, newValue int) error {
 	var (
 		actualOldValue     int
 		shiftedNewValue    int //value - curMin
 		curMin             = h.curMin
 		rawStoredOldNibble = h.getNibble(slotNo)           // could be 0
 		lb0nOldValue       = rawStoredOldNibble + h.curMin // provable lower bound, could be 0
+		err                error
 	)
 
 	if newValue <= lb0nOldValue {
-		return
+		return nil
 	}
 
 	// Based on whether we have an AUX_TOKEN and whether the shiftedNewValue is greater than
@@ -54,35 +55,47 @@ func internalHll4Update(h *hll4ArrayImpl, slotNo int, newValue int) {
 
 	if rawStoredOldNibble == auxToken { //846 Note: This is rare and really hard to test!
 		if h.auxHashMap == nil {
-			panic("auxHashMap must already exist")
+			return fmt.Errorf("auxHashMap must already exist")
 		}
-		actualOldValue = h.auxHashMap.mustFindValueFor(slotNo)
-		if newValue <= actualOldValue {
-			return
+		actualOldValue, err = h.auxHashMap.mustFindValueFor(slotNo)
+		if newValue <= actualOldValue || err != nil {
+			return err
 		}
 		// We know that the array will be changed, but we haven't actually updated yet.
-		h.hipAndKxQIncrementalUpdate(actualOldValue, newValue)
+		err := h.hipAndKxQIncrementalUpdate(actualOldValue, newValue)
+		if err != nil {
+			return err
+		}
 		shiftedNewValue = newValue - curMin
 		if shiftedNewValue < 0 {
-			panic("shifedNewValue < 0")
+			return fmt.Errorf("shifedNewValue < 0")
 		}
 		if shiftedNewValue >= auxToken { //CASE 1:
-			h.auxHashMap.mustReplace(slotNo, newValue)
+			err := h.auxHashMap.mustReplace(slotNo, newValue)
+			if err != nil {
+				return err
+			}
 		} //else                         //CASE 2: impossible
 	} else { //rawStoredOldNibble < AUX_TOKEN
 		actualOldValue = lb0nOldValue
 		// We know that the array will be changed, but we haven't actually updated yet.
-		h.hipAndKxQIncrementalUpdate(actualOldValue, newValue)
+		err := h.hipAndKxQIncrementalUpdate(actualOldValue, newValue)
+		if err != nil {
+			return err
+		}
 		shiftedNewValue = newValue - curMin
 		if shiftedNewValue < 0 {
-			panic("shifedNewValue < 0")
+			return fmt.Errorf("shifedNewValue < 0")
 		}
 		if shiftedNewValue >= auxToken { //CASE 3: //892
 			h.putNibble(slotNo, auxToken)
 			if h.auxHashMap == nil {
 				h.auxHashMap = h.getNewAuxHashMap()
 			}
-			h.auxHashMap.mustAdd(slotNo, newValue)
+			err := h.auxHashMap.mustAdd(slotNo, newValue)
+			if err != nil {
+				return err
+			}
 		} else { // CASE 4: //897
 			h.putNibble(slotNo, byte(shiftedNewValue))
 		}
@@ -91,15 +104,19 @@ func internalHll4Update(h *hll4ArrayImpl, slotNo int, newValue int) {
 	// We just changed the HLL array, so it might be time to change curMin.
 	if actualOldValue == curMin {
 		if h.numAtCurMin < 1 {
-			panic("h.numAtCurMin < 1")
+			return fmt.Errorf("h.numAtCurMin < 1")
 		}
 		h.numAtCurMin--
 		for h.numAtCurMin == 0 {
 			// Increases curMin by 1, and builds a new aux table,
 			// shifts values in 4-bit table, and recounts curMin.
-			shiftToBiggerCurMin(h)
+			err := shiftToBiggerCurMin(h)
+			if err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 // This scheme only works with two double registers (2 kxq values).
@@ -108,7 +125,7 @@ func internalHll4Update(h *hll4ArrayImpl, slotNo int, newValue int) {
 //
 // Entering this routine assumes that all slots have valid nibbles > 0 and <= 15.
 // An auxHashMap must exist if any values in the current hllByteArray are already 15.
-func shiftToBiggerCurMin(h *hll4ArrayImpl) {
+func shiftToBiggerCurMin(h *hll4ArrayImpl) error {
 	var (
 		oldCurMin   = h.curMin
 		newCurMin   = oldCurMin + 1
@@ -128,7 +145,7 @@ func shiftToBiggerCurMin(h *hll4ArrayImpl) {
 	for i := 0; i < configK; i++ { //724
 		oldStoredNibble := uint64(h.getNibble(i))
 		if oldStoredNibble == 0 {
-			panic("array slots cannot be 0 at this point")
+			return fmt.Errorf("array slots cannot be 0 at this point")
 		}
 		if oldStoredNibble < auxToken {
 			oldStoredNibble--
@@ -139,7 +156,7 @@ func shiftToBiggerCurMin(h *hll4ArrayImpl) {
 		} else { //oldStoredNibble == AUX_TOKEN
 			numAuxTokens++
 			if h.auxHashMap == nil {
-				panic("auxHashMap cannot be nil at this point")
+				return fmt.Errorf("auxHashMap cannot be nil at this point")
 			}
 		}
 	}
@@ -155,23 +172,26 @@ func shiftToBiggerCurMin(h *hll4ArrayImpl) {
 			slotNum       int
 			oldActualVal  int
 			newShiftedVal int
+			err           error
 		)
 
 		itr := oldAuxMap.iterator()
 		for itr.nextValid() {
 			slotNum = itr.getKey() & configKmask
-			oldActualVal = itr.getValue()
-
+			oldActualVal, err = itr.getValue()
+			if err != nil {
+				return err
+			}
 			newShiftedVal = oldActualVal - newCurMin
 			if newShiftedVal < 0 {
-				panic("newShiftedVal < 0")
+				return fmt.Errorf("newShiftedVal < 0")
 			}
 			if h.getNibble(slotNum) != auxToken {
-				panic(fmt.Sprintf("Array slot != AUX_TOKEN %d", h.getNibble(slotNum)))
+				return fmt.Errorf(fmt.Sprintf("Array slot != AUX_TOKEN %d", h.getNibble(slotNum)))
 			}
 			if newShiftedVal < auxToken {
 				if newShiftedVal != 14 {
-					panic("newShiftedVal != 14")
+					return fmt.Errorf("newShiftedVal != 14")
 				}
 				// The former exception value isn't one anymore, so it stays out of new auxHashMap.
 				// Correct the AUX_TOKEN value in the HLL array to the newShiftedVal (14).
@@ -182,20 +202,24 @@ func shiftToBiggerCurMin(h *hll4ArrayImpl) {
 				if newAuxMap == nil {
 					newAuxMap = h.getNewAuxHashMap()
 				}
-				newAuxMap.mustAdd(slotNum, oldActualVal)
+				err := newAuxMap.mustAdd(slotNum, oldActualVal)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	} else {
 		if numAuxTokens != 0 {
-			panic("numAuxTokens != 0")
+			return fmt.Errorf("numAuxTokens != 0")
 		}
 	}
 	if newAuxMap != nil {
 		if newAuxMap.getAuxCount() != numAuxTokens {
-			panic("newAuxMap.getAuxCount() != numAuxTokens")
+			return fmt.Errorf("newAuxMap.getAuxCount() != numAuxTokens")
 		}
 	}
 	h.auxHashMap = newAuxMap
 	h.curMin = newCurMin
 	h.numAtCurMin = numAtNewCurMin
+	return nil
 }

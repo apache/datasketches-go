@@ -32,43 +32,49 @@ func TestCrossCounting(t *testing.T) {
 }
 
 func crossCountingCheck(t *testing.T, lgK int, n int) {
-	sk4, err := buildSketch(lgK, n, TgtHllType_HLL_4)
+	sk4, err := buildSketch(lgK, n, TgtHllTypeHll4)
 	assert.NoError(t, err)
 	s4csum := computeCheckSum(t, sk4)
 
-	sk6, err := buildSketch(lgK, n, TgtHllType_HLL_6)
+	sk6, err := buildSketch(lgK, n, TgtHllTypeHll6)
 	assert.NoError(t, err)
 	s6csum := computeCheckSum(t, sk6)
 
 	assert.Equal(t, s6csum, s4csum)
 
-	sk8, err := buildSketch(lgK, n, TgtHllType_HLL_8)
+	sk8, err := buildSketch(lgK, n, TgtHllTypeHll8)
 	assert.NoError(t, err)
 	s8csum := computeCheckSum(t, sk8)
 	assert.Equal(t, s8csum, s4csum)
 
 	// Conversions
-	sk6to4 := sk6.CopyAs(TgtHllType_HLL_4)
+	sk6to4, err := sk6.CopyAs(TgtHllTypeHll4)
+	assert.NoError(t, err)
 	sk6to4csum := computeCheckSum(t, sk6to4)
 	assert.Equal(t, sk6to4csum, s4csum)
 
-	sk8to4 := sk8.CopyAs(TgtHllType_HLL_4)
+	sk8to4, err := sk8.CopyAs(TgtHllTypeHll4)
+	assert.NoError(t, err)
 	sk8to4csum := computeCheckSum(t, sk8to4)
 	assert.Equal(t, sk8to4csum, s4csum)
 
-	sk4to6 := sk4.CopyAs(TgtHllType_HLL_6)
+	sk4to6, err := sk4.CopyAs(TgtHllTypeHll6)
+	assert.NoError(t, err)
 	sk4to6csum := computeCheckSum(t, sk4to6)
 	assert.Equal(t, sk4to6csum, s4csum)
 
-	sk8to6 := sk8.CopyAs(TgtHllType_HLL_6)
+	sk8to6, err := sk8.CopyAs(TgtHllTypeHll6)
+	assert.NoError(t, err)
 	sk8to6csum := computeCheckSum(t, sk8to6)
 	assert.Equal(t, sk8to6csum, s4csum)
 
-	sk4to8 := sk4.CopyAs(TgtHllType_HLL_8)
+	sk4to8, err := sk4.CopyAs(TgtHllTypeHll8)
+	assert.NoError(t, err)
 	sk4to8csum := computeCheckSum(t, sk4to8)
 	assert.Equal(t, sk4to8csum, s4csum)
 
-	sk6to8 := sk6.CopyAs(TgtHllType_HLL_8)
+	sk6to8, err := sk6.CopyAs(TgtHllTypeHll8)
+	assert.NoError(t, err)
 	sk6to8csum := computeCheckSum(t, sk6to8)
 	assert.Equal(t, sk6to8csum, s4csum)
 
@@ -80,7 +86,10 @@ func buildSketch(lgK int, n int, tgtHllType TgtHllType) (HllSketch, error) {
 		return nil, err
 	}
 	for i := 0; i < n; i++ {
-		sketch.UpdateInt64(int64(i))
+		err = sketch.UpdateInt64(int64(i))
+		if err != nil {
+			return nil, err
+		}
 	}
 	return sketch, nil
 }
@@ -89,7 +98,8 @@ func computeCheckSum(t *testing.T, sketch HllSketch) int {
 	itr := sketch.iterator()
 	checksum := 0
 	for itr.nextAll() {
-		p := itr.getPair()
+		p, err := itr.getPair()
+		assert.NoError(t, err)
 		checksum += p
 		_ = itr.getKey()
 	}

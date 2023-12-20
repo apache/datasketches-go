@@ -43,7 +43,8 @@ func TestIsomorphicUnionUpdatableHeap(t *testing.T) {
 				union, err := NewUnion(lgK)
 				assert.NoError(t, err)
 				//UNION
-				union.UpdateSketch(sk1)
+				err = union.UpdateSketch(sk1)
+				assert.NoError(t, err)
 				sk2, err := union.GetResult(tgtHllType1)
 				assert.NoError(t, err)
 				sk2bytes, err := sk2.ToUpdatableSlice() //UPDATABLE
@@ -70,7 +71,8 @@ func TestIsomorphicUnionCompactHeap(t *testing.T) {
 				assert.NoError(t, err)
 				union, err := NewUnion(lgK) //UNION
 				assert.NoError(t, err)
-				union.UpdateSketch(sk1)
+				err = union.UpdateSketch(sk1)
+				assert.NoError(t, err)
 				sk2, err := union.GetResult(tgtHllType1)
 				assert.NoError(t, err)
 				sk2bytes, err := sk2.ToCompactSlice() //COMPACT
@@ -100,8 +102,10 @@ func TestIsomorphicCopyAsUpdatableHeap(t *testing.T) {
 						continue
 					}
 					tgtHllType2 := TgtHllType(t2)
-					sk2 := sk1.CopyAs(tgtHllType2)            //COPY AS
-					sk1B := sk2.CopyAs(tgtHllType1)           //COPY AS
+					sk2, err := sk1.CopyAs(tgtHllType2) //COPY AS
+					assert.NoError(t, err)
+					sk1B, err := sk2.CopyAs(tgtHllType1) //COPY AS
+					assert.NoError(t, err)
 					sk1Bbytes, err := sk1B.ToUpdatableSlice() //UPDATABLE
 					assert.NoError(t, err)
 					comp := fmt.Sprintf("LgK=%d, curMode=%d, Type1:%d, Type2:%d", lgK, curMode, tgtHllType1, tgtHllType2)
@@ -116,20 +120,22 @@ func TestIsomorphicHllMerges2(t *testing.T) {
 	for lgK := 4; lgK <= 4; lgK++ { //All LgK
 		u, err := buildHeapUnionHllMode(lgK, 0)
 		assert.NoError(t, err)
-		sk, err := buildHeapSketchHllMode(lgK, TgtHllType_HLL_8, 1<<lgK)
+		sk, err := buildHeapSketchHllMode(lgK, TgtHllTypeHll8, 1<<lgK)
 		assert.NoError(t, err)
-		u.UpdateSketch(sk)
-		resultOut8, err := u.GetResult(TgtHllType_HLL_8) //The reference
+		err = u.UpdateSketch(sk)
+		assert.NoError(t, err)
+		resultOut8, err := u.GetResult(TgtHllTypeHll8) //The reference
 		assert.NoError(t, err)
 		bytesOut8, err := resultOut8.ToUpdatableSlice()
 		assert.NoError(t, err)
 
 		u, err = buildHeapUnionHllMode(lgK, 0)
 		assert.NoError(t, err)
-		sk, err = buildHeapSketchHllMode(lgK, TgtHllType_HLL_6, 1<<lgK)
+		sk, err = buildHeapSketchHllMode(lgK, TgtHllTypeHll6, 1<<lgK)
 		assert.NoError(t, err)
-		u.UpdateSketch(sk)
-		resultOut6, err := u.GetResult(TgtHllType_HLL_8) //should be identical except for HllAccum
+		err = u.UpdateSketch(sk)
+		assert.NoError(t, err)
+		resultOut6, err := u.GetResult(TgtHllTypeHll8) //should be identical except for HllAccum
 		assert.NoError(t, err)
 		bytesOut6, err := resultOut6.ToUpdatableSlice()
 		assert.NoError(t, err)
@@ -139,10 +145,11 @@ func TestIsomorphicHllMerges2(t *testing.T) {
 
 		u, err = buildHeapUnionHllMode(lgK, 0)
 		assert.NoError(t, err)
-		sk, err = buildHeapSketchHllMode(lgK, TgtHllType_HLL_4, 1<<lgK)
+		sk, err = buildHeapSketchHllMode(lgK, TgtHllTypeHll4, 1<<lgK)
 		assert.NoError(t, err)
-		u.UpdateSketch(sk)
-		resultOut4, err := u.GetResult(TgtHllType_HLL_8) //should be identical except for HllAccum
+		err = u.UpdateSketch(sk)
+		assert.NoError(t, err)
+		resultOut4, err := u.GetResult(TgtHllTypeHll8) //should be identical except for HllAccum
 		assert.NoError(t, err)
 		bytesOut4, err := resultOut4.ToUpdatableSlice()
 		assert.NoError(t, err)
@@ -169,8 +176,10 @@ func TestIsomorphicCopyAsCompactHeap(t *testing.T) {
 						continue
 					}
 					tgtHllType2 := TgtHllType(t2)
-					sk2 := sk1.CopyAs(tgtHllType2)          //COPY AS
-					sk1B := sk2.CopyAs(tgtHllType1)         //COPY AS
+					sk2, err := sk1.CopyAs(tgtHllType2) //COPY AS
+					assert.NoError(t, err)
+					sk1B, err := sk2.CopyAs(tgtHllType1) //COPY AS
+					assert.NoError(t, err)
 					sk1Bbytes, err := sk1B.ToCompactSlice() //COMPACT
 					assert.NoError(t, err)
 					comp := fmt.Sprintf("LgK=%d, curMode=%d, Type1:%d, Type2:%d", lgK, curMode, tgtHllType1, tgtHllType2)
@@ -203,9 +212,12 @@ func buildHeapUnionHllMode(lgK int, startN int) (Union, error) {
 	if err != nil {
 		return nil, err
 	}
-	n := getN(lgK, curMode_HLL)
+	n := getN(lgK, curModeHll)
 	for i := 0; i < n; i++ {
-		u.UpdateUInt64(uint64(i + startN))
+		err = u.UpdateUInt64(uint64(i + startN))
+		if err != nil {
+			return nil, err
+		}
 	}
 	return u, nil
 }
@@ -217,7 +229,10 @@ func buildHeapSketch(lgK int, tgtHllType TgtHllType, curMode curMode) (HllSketch
 	}
 	n := getN(lgK, curMode)
 	for i := 0; i < n; i++ {
-		sk.UpdateUInt64(uint64(i + v))
+		err = sk.UpdateUInt64(uint64(i + v))
+		if err != nil {
+			return nil, err
+		}
 	}
 	v += n
 	return sk, nil
@@ -228,22 +243,25 @@ func buildHeapSketchHllMode(lgK int, tgtHllType TgtHllType, startN int) (HllSket
 	if err != nil {
 		return nil, err
 	}
-	n := getN(lgK, curMode_HLL)
+	n := getN(lgK, curModeHll)
 	for i := 0; i < n; i++ {
-		sk.UpdateUInt64(uint64(i + startN))
+		err = sk.UpdateUInt64(uint64(i + startN))
+		if err != nil {
+			return nil, err
+		}
 	}
 	return sk, nil
 }
 
 // if lgK >= 8, curMode != SET!
 func getN(lgK int, curMode curMode) int {
-	if curMode == curMode_LIST {
+	if curMode == curModeList {
 		return 4
 	}
-	if curMode == curMode_SET {
+	if curMode == curModeSet {
 		return 1 << (lgK - 4)
 	}
-	if (lgK < 8) && (curMode == curMode_HLL) {
+	if (lgK < 8) && (curMode == curModeHll) {
 		return 1 << lgK
 	}
 	return 1 << (lgK - 3)

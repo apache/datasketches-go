@@ -23,7 +23,7 @@ import (
 
 // hllCompositeEstimate is the (non-HIP) estimator.
 // It is called "composite" because multiple estimators are pasted together.
-func hllCompositeEstimate(hllArray *hllArrayImpl) float64 {
+func hllCompositeEstimate(hllArray *hllArrayImpl) (float64, error) {
 	lgConfigK := hllArray.lgConfigK
 	rawEst := getHllRawEstimate(lgConfigK, hllArray.kxq0+hllArray.kxq1)
 
@@ -32,7 +32,7 @@ func hllCompositeEstimate(hllArray *hllArrayImpl) float64 {
 	xArrLen := len(xArr)
 
 	if rawEst < xArr[0] {
-		return 0
+		return 0, nil
 	}
 
 	xArrLenM1 := xArrLen - 1
@@ -40,13 +40,16 @@ func hllCompositeEstimate(hllArray *hllArrayImpl) float64 {
 	if rawEst > xArr[xArrLenM1] {
 		finalY := yStride * float64(xArrLenM1)
 		factor := finalY / xArr[xArrLenM1]
-		return rawEst * factor
+		return rawEst * factor, nil
 	}
-	adjEst := usingXArrAndYStride(xArr, yStride, rawEst)
+	adjEst, err := usingXArrAndYStride(xArr, yStride, rawEst)
+	if err != nil {
+		return 0, err
+	}
 	// We need to completely avoid the linear_counting estimator if it might have a crazy value.
 	// Empirical evidence suggests that the threshold 3*k will keep us safe if 2^4 <= k <= 2^21.
 	if adjEst > float64(uint64(3<<lgConfigK)) {
-		return adjEst
+		return adjEst, nil
 	}
 
 	linEst := getHllBitMapEstimate(lgConfigK, hllArray.curMin, hllArray.numAtCurMin)
@@ -67,9 +70,9 @@ func hllCompositeEstimate(hllArray *hllArrayImpl) float64 {
 	}
 
 	if avgEst > (crossOver * float64(uint64(1<<lgConfigK))) {
-		return adjEst
+		return adjEst, nil
 	} else {
-		return linEst
+		return linEst, nil
 	}
 }
 
@@ -111,7 +114,10 @@ func getHllRawEstimate(lgConfigK int, kxqSum float64) float64 {
 
 func hllUpperBound(hllArray *hllArrayImpl, numStdDev int) (float64, error) {
 	lgConfigK := hllArray.lgConfigK
-	estimate := hllArray.GetEstimate()
+	estimate, err := hllArray.GetEstimate()
+	if err != nil {
+		return 0, err
+	}
 	oooFlag := hllArray.isOutOfOrder()
 	relErr, err := getRelErrAllK(true, oooFlag, lgConfigK, numStdDev)
 	if err != nil {
@@ -127,7 +133,10 @@ func hllLowerBound(hllArray *hllArrayImpl, numStdDev int) (float64, error) {
 	if hllArray.curMin == 0 {
 		numNonZeros -= float64(hllArray.numAtCurMin)
 	}
-	estimate := hllArray.GetEstimate()
+	estimate, err := hllArray.GetEstimate()
+	if err != nil {
+		return 0, err
+	}
 	oooFlag := hllArray.isOutOfOrder()
 	relErr, err := getRelErrAllK(false, oooFlag, lgConfigK, numStdDev)
 	if err != nil {

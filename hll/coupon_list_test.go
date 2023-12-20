@@ -29,7 +29,7 @@ func TestCouponIterator(t *testing.T) {
 	sk, err := NewHllSketchDefault(lgK)
 	assert.NoError(t, err)
 	for i := 0; i < n; i++ {
-		sk.UpdateInt64(int64(i))
+		assert.NoError(t, sk.UpdateInt64(int64(i)))
 	}
 
 	iter := sk.iterator()
@@ -44,31 +44,36 @@ func TestCouponDuplicatesAndMisc(t *testing.T) {
 	sk, err := NewHllSketchDefault(8)
 	assert.NoError(t, err)
 	for i := 1; i <= 7; i++ {
-		sk.UpdateInt64(int64(i))
-		sk.UpdateInt64(int64(i))
+		assert.NoError(t, sk.UpdateInt64(int64(i)))
+		assert.NoError(t, sk.UpdateInt64(int64(i)))
 	}
-	assert.Equal(t, sk.GetCurMode(), curMode_LIST)
-	est := sk.GetCompositeEstimate()
+	assert.Equal(t, sk.GetCurMode(), curModeList)
+	est, err := sk.GetCompositeEstimate()
+	assert.NoError(t, err)
 	assert.InDelta(t, est, 7.0, 7*.01)
-	est = sk.GetHipEstimate()
+	est, err = sk.GetHipEstimate()
+	assert.NoError(t, err)
 	assert.InDelta(t, est, 7.0, 7*.01)
 	sk.(*hllSketchImpl).putRebuildCurMinNumKxQFlag(false) //dummy
 
-	sk.UpdateInt64(8)
-	sk.UpdateInt64(8)
-	assert.Equal(t, sk.GetCurMode(), curMode_SET)
-	est = sk.GetCompositeEstimate()
+	assert.NoError(t, sk.UpdateInt64(8))
+	assert.NoError(t, sk.UpdateInt64(8))
+	assert.Equal(t, sk.GetCurMode(), curModeSet)
+	est, err = sk.GetCompositeEstimate()
+	assert.NoError(t, err)
 	assert.InDelta(t, est, 8.0, 8*.01)
-	est = sk.GetHipEstimate()
+	est, err = sk.GetHipEstimate()
+	assert.NoError(t, err)
 	assert.InDelta(t, est, 8.0, 8*.01)
 
 	for i := 9; i <= 25; i++ {
-		sk.UpdateInt64(int64(i))
-		sk.UpdateInt64(int64(i))
+		assert.NoError(t, sk.UpdateInt64(int64(i)))
+		assert.NoError(t, sk.UpdateInt64(int64(i)))
 	}
 
-	assert.Equal(t, sk.GetCurMode(), curMode_HLL)
-	est = sk.GetCompositeEstimate()
+	assert.Equal(t, sk.GetCurMode(), curModeHll)
+	est, err = sk.GetCompositeEstimate()
+	assert.NoError(t, err)
 	assert.InDelta(t, est, 25.0, 25*.1)
 }
 
@@ -88,26 +93,29 @@ func toCouponSliceDeserialize(t *testing.T, lgK int) {
 	}
 
 	for i := 0; i < u; i++ {
-		sk1.UpdateInt64(int64(i))
+		assert.NoError(t, sk1.UpdateInt64(int64(i)))
 	}
 
 	_, isCoupon := sk1.(*hllSketchImpl).sketch.(hllCoupon)
 	assert.True(t, isCoupon)
 
-	est1 := sk1.GetEstimate()
+	est1, err := sk1.GetEstimate()
+	assert.NoError(t, err)
 	assert.InDelta(t, est1, float64(u), float64(u)*100.0e-6)
 
 	sl1, err := sk1.ToCompactSlice()
 	assert.NoError(t, err)
-	sk2, e := DeserializeHllSketch(sl1, true)
-	assert.NoError(t, e)
-	est2 := sk2.GetEstimate()
+	sk2, err := DeserializeHllSketch(sl1, true)
+	assert.NoError(t, err)
+	est2, err := sk2.GetEstimate()
+	assert.NoError(t, err)
 	assert.Equal(t, est2, est1)
 
 	sl1, err = sk1.ToUpdatableSlice()
 	assert.NoError(t, err)
-	sk2, e = DeserializeHllSketch(sl1, true)
-	assert.NoError(t, e)
-	est2 = sk2.GetEstimate()
+	sk2, err = DeserializeHllSketch(sl1, true)
+	assert.NoError(t, err)
+	est2, err = sk2.GetEstimate()
+	assert.NoError(t, err)
 	assert.Equal(t, est2, est1)
 }

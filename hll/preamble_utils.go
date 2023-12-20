@@ -163,26 +163,29 @@ func extractAuxCount(byteArr []byte) int {
 	return int(binary.LittleEndian.Uint32(byteArr[auxCountInt : auxCountInt+4]))
 }
 
-func computeLgArr(byteArr []byte, couponCount int, lgConfigK int) int {
+func computeLgArr(byteArr []byte, couponCount int, lgConfigK int) (int, error) {
 	//value is missing, recompute
 	curMode := extractCurMode(byteArr)
-	if curMode == curMode_LIST {
-		return lgInitListSize
+	if curMode == curModeList {
+		return lgInitListSize, nil
 	}
 	ceilPwr2 := common.CeilPowerOf2(couponCount)
 	if (resizeDenom * couponCount) > (resizeNumber * ceilPwr2) {
 		ceilPwr2 <<= 1
 	}
-	if curMode == curMode_SET {
-		return max(lgInitSetSize, common.ExactLog2OfLong(uint64(ceilPwr2)))
+	if curMode == curModeSet {
+		v, err := common.ExactLog2OfLong(uint64(ceilPwr2))
+		return max(lgInitSetSize, v), err
 	}
 	//only used for HLL4
-	return max(lgAuxArrInts[lgConfigK], common.ExactLog2OfLong(uint64(ceilPwr2)))
+	v, err := common.ExactLog2OfLong(uint64(ceilPwr2))
+	return max(lgAuxArrInts[lgConfigK], v), err
 
 }
 
-func insertAuxCount(byteArr []byte, auxCount int) {
+func insertAuxCount(byteArr []byte, auxCount int) error {
 	binary.LittleEndian.PutUint32(byteArr[auxCountInt:auxCountInt+4], uint32(auxCount))
+	return nil
 }
 
 func insertListCount(byteArr []byte, listCnt int) {

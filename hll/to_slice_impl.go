@@ -24,7 +24,7 @@ import (
 
 func toHllByteArr(impl hllArray, compact bool) ([]byte, error) {
 	auxBytes := 0
-	if impl.GetTgtHllType() == TgtHllType_HLL_4 {
+	if impl.GetTgtHllType() == TgtHllTypeHll4 {
 		auxHashMap := impl.getAuxHashMap()
 		if auxHashMap != nil {
 			if compact {
@@ -50,7 +50,7 @@ func toCouponSlice(impl hllCoupon, dstCompact bool) ([]byte, error) {
 	srcCouponCount := impl.getCouponCount()
 	srcLgCouponArrInts := impl.getLgCouponArrInts()
 	srcCouponArrInts := 1 << srcLgCouponArrInts
-	list := impl.GetCurMode() == curMode_LIST
+	list := impl.GetCurMode() == curModeList
 	if dstCompact {
 		//Src Heap,   Src Updatable, Dst Compact
 		dataStart := impl.getMemDataStart()
@@ -61,7 +61,10 @@ func toCouponSlice(impl hllCoupon, dstCompact bool) ([]byte, error) {
 		itr := impl.iterator()
 		cnt := 0
 		for itr.nextValid() {
-			p := itr.getPair()
+			p, err := itr.getPair()
+			if err != nil {
+				return nil, err
+			}
 			binary.LittleEndian.PutUint32(byteArrOut[dataStart+(cnt<<2):dataStart+(cnt<<2)+4], uint32(p))
 			cnt++
 		}
@@ -107,11 +110,10 @@ func insertHll(impl hllArray, dst []byte, compact bool) error {
 	hllByteArr := impl.getHllByteArr()
 	copy(dst[hllByteArrStart:], hllByteArr)
 	if impl.getAuxHashMap() != nil {
-		insertAux(impl, dst, compact)
+		return insertAux(impl, dst, compact)
 	} else {
-		insertAuxCount(dst, 0)
+		return insertAuxCount(dst, 0)
 	}
-	return nil
 }
 
 func insertCommonHll(impl hllArray, dst []byte, compact bool) {
@@ -132,22 +134,28 @@ func insertCommonHll(impl hllArray, dst []byte, compact bool) {
 	insertRebuildCurMinNumKxQFlag(dst, impl.isRebuildCurMinNumKxQFlag())
 }
 
-func insertAux(impl hllArray, dst []byte, compact bool) {
+func insertAux(impl hllArray, dst []byte, compact bool) error {
 	auxHashMap := impl.getAuxHashMap()
 	auxCount := auxHashMap.getAuxCount()
-	insertAuxCount(dst, auxCount)
+	err := insertAuxCount(dst, auxCount)
+	if err != nil {
+		return err
+	}
 	insertLgArr(dst, auxHashMap.getLgAuxArrInts())
 	auxStart := impl.getAuxStart()
 	if compact {
 		itr := auxHashMap.iterator()
 		cnt := 0
 		for itr.nextValid() {
-			p := itr.getPair()
+			p, err := itr.getPair()
+			if err != nil {
+				return err
+			}
 			binary.LittleEndian.PutUint32(dst[auxStart+(cnt<<2):auxStart+(cnt<<2)+4], uint32(p))
 			cnt++
 		}
 		if cnt != auxCount {
-			panic(fmt.Sprintf("corruption, should not happen: %d != %d", cnt, auxCount))
+			return fmt.Errorf("corruption, should not happen: %d != %d", cnt, auxCount)
 		}
 	} else {
 		auxInts := 1 << auxHashMap.getLgAuxArrInts()
@@ -156,4 +164,5 @@ func insertAux(impl hllArray, dst []byte, compact bool) {
 			binary.LittleEndian.PutUint32(dst[auxStart+(i<<2):auxStart+(i<<2)+4], uint32(v))
 		}
 	}
+	return nil
 }

@@ -18,17 +18,18 @@
 package common
 
 import (
+	"fmt"
 	"math"
 	"math/bits"
 	"strconv"
 )
 
 // InvPow2 returns 2^(-e).
-func InvPow2(e int) float64 {
+func InvPow2(e int) (float64, error) {
 	if (e | 1024 - e - 1) < 0 {
-		panic("e cannot be negative or greater than 1023: " + strconv.Itoa(e))
+		return 0, fmt.Errorf("e cannot be negative or greater than 1023: " + strconv.Itoa(e))
 	}
-	return math.Float64frombits((1023 - uint64(e)) << 52)
+	return math.Float64frombits((1023 - uint64(e)) << 52), nil
 }
 
 // CeilPowerOf2 returns the smallest power of 2 greater than or equal to n.
@@ -43,11 +44,11 @@ func CeilPowerOf2(n int) int {
 	return int(math.Pow(2, math.Ceil(math.Log2(float64(n)))))
 }
 
-func ExactLog2OfLong(powerOf2 uint64) int {
+func ExactLog2OfLong(powerOf2 uint64) (int, error) {
 	if !isLongPowerOf2(powerOf2) {
-		panic("Argument 'powerOf2' must be a positive power of 2.")
+		return 0, fmt.Errorf("argument 'powerOf2' must be a positive power of 2")
 	}
-	return bits.TrailingZeros64(powerOf2)
+	return bits.TrailingZeros64(powerOf2), nil
 }
 
 // isLongPowerOf2 returns true if the given number is a power of 2.

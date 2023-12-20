@@ -22,23 +22,6 @@ import (
 	"sort"
 )
 
-/*
-  public static class Row implements Comparable<Row> {
-    final long item;
-    final long est;
-    final long ub;
-    final long lb;
-    private static final String fmt =  ("  %20d%20d%20d %d");
-    private static final String hfmt = ("  %20s%20s%20s %s");
-
-    Row(final long item, final long estimate, final long ub, final long lb) {
-      this.item = item;
-      est = estimate;
-      this.ub = ub;
-      this.lb = lb;
-    }
-*/
-
 const (
 	hfmt string = "  %20s%20s%20s %s"
 )

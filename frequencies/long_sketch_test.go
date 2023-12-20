@@ -291,3 +291,18 @@ func tryBadMem(t *testing.T, mem []byte, byteOffset, byteValue int) {
 	_, err := NewLongSketchFromSlice(mem)
 	assert.Error(t, err)
 }
+
+func TestFreqLongStringSerDeError(t *testing.T) {
+	//sk1, err := NewLongSketchWithMaxMapSize(8)
+	// str1 := sk1.serializeToString()
+	// correct   = "1,10,2,4,0,0,0,4,";
+
+	tryBadString(t, "2,10,2,4,0,0,0,4,")   //bad SerVer of 2
+	tryBadString(t, "1,10,2,0,0,0,0,4,")   //bad empty of 0
+	tryBadString(t, "1,10,2,4,0,0,0,4,0,") //one extra
+}
+
+func tryBadString(t *testing.T, badString string) {
+	_, err := NewLongSketchFromString(badString)
+	assert.Error(t, err)
+}

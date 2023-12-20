@@ -25,6 +25,7 @@ import (
 const (
 	// ###### DO NOT MESS WITH THIS FROM HERE ...
 	// Preamble byte Addresses
+	_PREAMBLE_LONGS_BYTE  = 0
 	_SER_VER_BYTE         = 1
 	_FAMILY_BYTE          = 2
 	_LG_MAX_MAP_SIZE_BYTE = 3

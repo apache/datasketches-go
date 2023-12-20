@@ -18,6 +18,7 @@
 package frequencies
 
 import (
+	"encoding/binary"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -27,11 +28,11 @@ func TestFrequentItemsStringSerial(t *testing.T) {
 	assert.NoError(t, err)
 	sketch2, err := NewLongSketchWithMaxMapSize(128)
 	assert.NoError(t, err)
-	sketch.Update(10, 100)
-	sketch.Update(10, 100)
-	sketch.Update(15, 3443)
-	sketch.Update(1000001, 1010230)
-	sketch.Update(1000002, 1010230)
+	sketch.UpdateMany(10, 100)
+	sketch.UpdateMany(10, 100)
+	sketch.UpdateMany(15, 3443)
+	sketch.UpdateMany(1000001, 1010230)
+	sketch.UpdateMany(1000002, 1010230)
 
 	ser, err := sketch.serializeToString()
 	assert.NoError(t, err)
@@ -43,25 +44,25 @@ func TestFrequentItemsStringSerial(t *testing.T) {
 	assert.Equal(t, sketch.getMaximumMapCapacity(), newSk0.getMaximumMapCapacity())
 	assert.Equal(t, sketch.getCurrentMapCapacity(), newSk0.getCurrentMapCapacity())
 
-	sketch2.Update(190, 12902390)
-	sketch2.Update(191, 12902390)
-	sketch2.Update(192, 12902390)
-	sketch2.Update(193, 12902390)
-	sketch2.Update(194, 12902390)
-	sketch2.Update(195, 12902390)
-	sketch2.Update(196, 12902390)
-	sketch2.Update(197, 12902390)
-	sketch2.Update(198, 12902390)
-	sketch2.Update(199, 12902390)
-	sketch2.Update(200, 12902390)
-	sketch2.Update(201, 12902390)
-	sketch2.Update(202, 12902390)
-	sketch2.Update(203, 12902390)
-	sketch2.Update(204, 12902390)
-	sketch2.Update(205, 12902390)
-	sketch2.Update(206, 12902390)
-	sketch2.Update(207, 12902390)
-	sketch2.Update(208, 12902390)
+	sketch2.UpdateMany(190, 12902390)
+	sketch2.UpdateMany(191, 12902390)
+	sketch2.UpdateMany(192, 12902390)
+	sketch2.UpdateMany(193, 12902390)
+	sketch2.UpdateMany(194, 12902390)
+	sketch2.UpdateMany(195, 12902390)
+	sketch2.UpdateMany(196, 12902390)
+	sketch2.UpdateMany(197, 12902390)
+	sketch2.UpdateMany(198, 12902390)
+	sketch2.UpdateMany(199, 12902390)
+	sketch2.UpdateMany(200, 12902390)
+	sketch2.UpdateMany(201, 12902390)
+	sketch2.UpdateMany(202, 12902390)
+	sketch2.UpdateMany(203, 12902390)
+	sketch2.UpdateMany(204, 12902390)
+	sketch2.UpdateMany(205, 12902390)
+	sketch2.UpdateMany(206, 12902390)
+	sketch2.UpdateMany(207, 12902390)
+	sketch2.UpdateMany(208, 12902390)
 
 	s2, err := sketch2.serializeToString()
 	assert.NoError(t, err)
@@ -102,11 +103,11 @@ func TestFrequentItemsByteSerial(t *testing.T) {
 
 	sketch2, err := NewLongSketchWithMaxMapSize(128)
 	assert.NoError(t, err)
-	sketch.Update(10, 100)
-	sketch.Update(10, 100)
-	sketch.Update(15, 3443)
-	sketch.Update(1000001, 1010230)
-	sketch.Update(1000002, 1010230)
+	sketch.UpdateMany(10, 100)
+	sketch.UpdateMany(10, 100)
+	sketch.UpdateMany(15, 3443)
+	sketch.UpdateMany(1000001, 1010230)
+	sketch.UpdateMany(1000002, 1010230)
 
 	byteArray1, err := sketch.toSlice()
 	assert.NoError(t, err)
@@ -119,25 +120,25 @@ func TestFrequentItemsByteSerial(t *testing.T) {
 	assert.Equal(t, sketch.getMaximumMapCapacity(), newSk1.getMaximumMapCapacity())
 	assert.Equal(t, sketch.getCurrentMapCapacity(), newSk1.getCurrentMapCapacity())
 
-	sketch2.Update(190, 12902390)
-	sketch2.Update(191, 12902390)
-	sketch2.Update(192, 12902390)
-	sketch2.Update(193, 12902390)
-	sketch2.Update(194, 12902390)
-	sketch2.Update(195, 12902390)
-	sketch2.Update(196, 12902390)
-	sketch2.Update(197, 12902390)
-	sketch2.Update(198, 12902390)
-	sketch2.Update(199, 12902390)
-	sketch2.Update(200, 12902390)
-	sketch2.Update(201, 12902390)
-	sketch2.Update(202, 12902390)
-	sketch2.Update(203, 12902390)
-	sketch2.Update(204, 12902390)
-	sketch2.Update(205, 12902390)
-	sketch2.Update(206, 12902390)
-	sketch2.Update(207, 12902390)
-	sketch2.Update(208, 12902390)
+	sketch2.UpdateMany(190, 12902390)
+	sketch2.UpdateMany(191, 12902390)
+	sketch2.UpdateMany(192, 12902390)
+	sketch2.UpdateMany(193, 12902390)
+	sketch2.UpdateMany(194, 12902390)
+	sketch2.UpdateMany(195, 12902390)
+	sketch2.UpdateMany(196, 12902390)
+	sketch2.UpdateMany(197, 12902390)
+	sketch2.UpdateMany(198, 12902390)
+	sketch2.UpdateMany(199, 12902390)
+	sketch2.UpdateMany(200, 12902390)
+	sketch2.UpdateMany(201, 12902390)
+	sketch2.UpdateMany(202, 12902390)
+	sketch2.UpdateMany(203, 12902390)
+	sketch2.UpdateMany(204, 12902390)
+	sketch2.UpdateMany(205, 12902390)
+	sketch2.UpdateMany(206, 12902390)
+	sketch2.UpdateMany(207, 12902390)
+	sketch2.UpdateMany(208, 12902390)
 
 	byteArray2, err := sketch2.toSlice()
 	assert.NoError(t, err)
@@ -171,11 +172,11 @@ func TestFrequentItemsByteSerial(t *testing.T) {
 func TestFrequentItemsByteResetAndEmptySerial(t *testing.T) {
 	sketch, err := NewLongSketchWithMaxMapSize(16)
 	assert.NoError(t, err)
-	sketch.Update(10, 100)
-	sketch.Update(10, 100)
-	sketch.Update(15, 3443)
-	sketch.Update(1000001, 1010230)
-	sketch.Update(1000002, 1010230)
+	sketch.UpdateMany(10, 100)
+	sketch.UpdateMany(10, 100)
+	sketch.UpdateMany(15, 3443)
+	sketch.UpdateMany(1000001, 1010230)
+	sketch.UpdateMany(1000002, 1010230)
 	sketch.Reset()
 
 	byteArray0, err := sketch.toSlice()
@@ -195,11 +196,11 @@ func TestFreqLongSliceSerDe(t *testing.T) {
 	minSize := 1 << _LG_MIN_MAP_SIZE
 	sk1, err := NewLongSketchWithMaxMapSize(minSize)
 	assert.NoError(t, err)
-	sk1.Update(10, 100)
-	sk1.Update(10, 100)
-	sk1.Update(15, 3443)
-	sk1.Update(1000001, 1010230)
-	sk1.Update(1000002, 1010230)
+	sk1.UpdateMany(10, 100)
+	sk1.UpdateMany(10, 100)
+	sk1.UpdateMany(15, 3443)
+	sk1.UpdateMany(1000001, 1010230)
+	sk1.UpdateMany(1000002, 1010230)
 
 	byteArray0, err := sk1.toSlice()
 	assert.NoError(t, err)
@@ -213,11 +214,11 @@ func TestFreqLongStringSerDe(t *testing.T) {
 	minSize := 1 << _LG_MIN_MAP_SIZE
 	sk1, err := NewLongSketchWithMaxMapSize(minSize)
 	assert.NoError(t, err)
-	sk1.Update(10, 100)
-	sk1.Update(10, 100)
-	sk1.Update(15, 3443)
-	sk1.Update(1000001, 1010230)
-	sk1.Update(1000002, 1010230)
+	sk1.UpdateMany(10, 100)
+	sk1.UpdateMany(10, 100)
+	sk1.UpdateMany(15, 3443)
+	sk1.UpdateMany(1000001, 1010230)
+	sk1.UpdateMany(1000002, 1010230)
 
 	str1, err := sk1.serializeToString()
 	assert.NoError(t, err)
@@ -260,4 +261,33 @@ func checkEquality(t *testing.T, sk1, sk2 *LongSketch) {
 		s2 := rowArr2[i].String()
 		assert.Equal(t, s1, s2)
 	}
+}
+
+func TestFreqLongSliceSerDeError(t *testing.T) {
+	minSize := 1 << _LG_MIN_MAP_SIZE
+	sk1, err := NewLongSketchWithMaxMapSize(minSize)
+	assert.NoError(t, err)
+	sk1.Update(1)
+
+	byteArray0, err := sk1.toSlice()
+	pre0 := binary.LittleEndian.Uint64(byteArray0)
+
+	tryBadMem(t, byteArray0, _PREAMBLE_LONGS_BYTE, 2) //Corrupt
+	binary.LittleEndian.PutUint64(byteArray0, pre0)
+
+	tryBadMem(t, byteArray0, _SER_VER_BYTE, 2) //Corrupt
+	binary.LittleEndian.PutUint64(byteArray0, pre0)
+
+	tryBadMem(t, byteArray0, _FAMILY_BYTE, 2) //Corrupt
+	binary.LittleEndian.PutUint64(byteArray0, pre0)
+
+	tryBadMem(t, byteArray0, _FLAGS_BYTE, 4) //Corrupt
+	binary.LittleEndian.PutUint64(byteArray0, pre0)
+
+}
+
+func tryBadMem(t *testing.T, mem []byte, byteOffset, byteValue int) {
+	binary.LittleEndian.PutUint64(mem[byteOffset:], uint64(byteValue))
+	_, err := NewLongSketchFromSlice(mem)
+	assert.Error(t, err)
 }

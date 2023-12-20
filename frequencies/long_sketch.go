@@ -164,9 +164,9 @@ func NewLongSketchFromSlice(slc []byte) (*LongSketch, error) {
 		itemArray[i] = int64(binary.LittleEndian.Uint64(slc[itemsOffset+(i<<3):]))
 	}
 
-	// Update the sketch
+	// UpdateMany the sketch
 	for i := 0; i < activeItems; i++ {
-		fls.Update(itemArray[i], countArray[i])
+		fls.UpdateMany(itemArray[i], countArray[i])
 	}
 
 	fls.streamWeight = preArr[2] //override streamWeight due to updating
@@ -304,7 +304,11 @@ func (s *LongSketch) isEmpty() bool {
 	return s.getNumActiveItems() == 0
 }
 
-func (s *LongSketch) Update(item int64, count int64) error {
+func (s *LongSketch) Update(item int64) error {
+	return s.UpdateMany(item, 1)
+}
+
+func (s *LongSketch) UpdateMany(item int64, count int64) error {
 	if count == 0 {
 		return nil
 	}
@@ -341,7 +345,7 @@ func (s *LongSketch) merge(other *LongSketch) (*LongSketch, error) {
 	streamWt := s.streamWeight + other.streamWeight //capture before merge
 	iter := other.hashMap.iterator()
 	for iter.next() {
-		err := s.Update(iter.getKey(), iter.getValue())
+		err := s.UpdateMany(iter.getKey(), iter.getValue())
 		if err != nil {
 			return nil, err
 		}

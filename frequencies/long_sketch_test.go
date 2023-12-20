@@ -191,7 +191,7 @@ func TestFrequentItemsByteResetAndEmptySerial(t *testing.T) {
 	assert.Equal(t, sketch.getCurrentMapCapacity(), newSk0.getCurrentMapCapacity())
 }
 
-func TestFreqLongMeSerDe(t *testing.T) {
+func TestFreqLongSliceSerDe(t *testing.T) {
 	minSize := 1 << _LG_MIN_MAP_SIZE
 	sk1, err := NewLongSketchWithMaxMapSize(minSize)
 	assert.NoError(t, err)
@@ -204,6 +204,24 @@ func TestFreqLongMeSerDe(t *testing.T) {
 	byteArray0, err := sk1.toSlice()
 	assert.NoError(t, err)
 	sk2, err := NewLongSketchFromSlice(byteArray0)
+	assert.NoError(t, err)
+
+	checkEquality(t, sk1, sk2)
+}
+
+func TestFreqLongStringSerDe(t *testing.T) {
+	minSize := 1 << _LG_MIN_MAP_SIZE
+	sk1, err := NewLongSketchWithMaxMapSize(minSize)
+	assert.NoError(t, err)
+	sk1.Update(10, 100)
+	sk1.Update(10, 100)
+	sk1.Update(15, 3443)
+	sk1.Update(1000001, 1010230)
+	sk1.Update(1000002, 1010230)
+
+	str1, err := sk1.serializeToString()
+	assert.NoError(t, err)
+	sk2, err := NewLongSketchFromString(str1)
 	assert.NoError(t, err)
 
 	checkEquality(t, sk1, sk2)

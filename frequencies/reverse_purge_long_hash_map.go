@@ -74,6 +74,17 @@ func NewReversePurgeLongHashMap(mapSize int) (*reversePurgeLongHashMap, error) {
 	}, nil
 }
 
+func (r *reversePurgeLongHashMap) get(key int64) (int64, error) {
+	probe := r.hashProbe(key)
+	if r.states[probe] > 0 {
+		if r.keys[probe] == key {
+			return r.values[probe], nil
+		}
+		return 0, fmt.Errorf("key not found")
+	}
+	return 0, nil
+}
+
 // getCapacity returns the current capacity of the hash map (i.e., max number of keys that can be stored).
 func (r *reversePurgeLongHashMap) getCapacity() int {
 	return r.loadThreshold
@@ -330,6 +341,15 @@ func (r *reversePurgeLongHashMap) getActiveKeys() []int64 {
 
 func (s *reversePurgeLongHashMap) iterator() *iteratorHashMap {
 	return newIterator(s.keys, s.values, s.states, s.numActive)
+}
+
+func (s *reversePurgeLongHashMap) hashProbe(key int64) int {
+	arrayMask := len(s.keys) - 1
+	probe := int(hash(key)) & arrayMask
+	for s.states[probe] > 0 && s.keys[probe] != key {
+		probe = (probe + 1) & arrayMask
+	}
+	return probe
 }
 
 func newIterator(keys []int64, values []int64, states []int16, numActive int) *iteratorHashMap {

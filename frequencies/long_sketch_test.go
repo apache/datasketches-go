@@ -190,3 +190,75 @@ func TestFrequentItemsByteResetAndEmptySerial(t *testing.T) {
 	assert.Equal(t, sketch.getMaximumMapCapacity(), newSk0.getMaximumMapCapacity())
 	assert.Equal(t, sketch.getCurrentMapCapacity(), newSk0.getCurrentMapCapacity())
 }
+
+func TestFreqLongMeSerDe(t *testing.T) {
+	minSize := 1 << _LG_MIN_MAP_SIZE
+	sk1, err := NewLongSketchWithMaxMapSize(minSize)
+	assert.NoError(t, err)
+	sk1.Update(10, 100)
+	sk1.Update(10, 100)
+	sk1.Update(15, 3443)
+	sk1.Update(1000001, 1010230)
+	sk1.Update(1000002, 1010230)
+
+	byteArray0, err := sk1.toSlice()
+	assert.NoError(t, err)
+	sk2, err := NewLongSketchFromSlice(byteArray0)
+	assert.NoError(t, err)
+
+	checkEquality(t, sk1, sk2)
+}
+
+/*
+  @Test
+  public void checkFreqLongsMemSerDe() {
+    int minSize = 1 << LG_MIN_MAP_SIZE;
+    LongsSketch sk1 = new LongsSketch(minSize);
+    sk1.update(10, 100);
+    sk1.update(10, 100);
+    sk1.update(15, 3443); println(sk1.toString());
+    sk1.update(1000001, 1010230); println(sk1.toString());
+    sk1.update(1000002, 1010230); println(sk1.toString());
+
+    byte[] bytearray0 = sk1.toByteArray();
+    Memory mem0 = Memory.wrap(bytearray0);
+    LongsSketch sk2 = LongsSketch.getInstance(mem0);
+
+    checkEquality(sk1, sk2);
+  }
+*/
+
+func checkEquality(t *testing.T, sk1, sk2 *LongSketch) {
+	assert.Equal(t, sk1.getNumActiveItems(), sk2.getNumActiveItems())
+	assert.Equal(t, sk1.getCurrentMapCapacity(), sk2.getCurrentMapCapacity())
+	assert.Equal(t, sk1.getMaximumError(), sk2.getMaximumError())
+	assert.Equal(t, sk1.getMaximumMapCapacity(), sk2.getMaximumMapCapacity())
+	assert.Equal(t, sk1.getStorageBytes(), sk2.getStorageBytes())
+	assert.Equal(t, sk1.getStreamLength(), sk2.getStreamLength())
+	assert.Equal(t, sk1.isEmpty(), sk2.isEmpty())
+
+	NFN := NO_FALSE_NEGATIVES
+	NFP := NO_FALSE_POSITIVES
+
+	rowArr1, err := sk1.getFrequentItems(NFN)
+	assert.NoError(t, err)
+	rowArr2, err := sk2.getFrequentItems(NFN)
+	assert.NoError(t, err)
+	assert.Equal(t, len(rowArr1), len(rowArr2))
+	for i := 0; i < len(rowArr1); i++ {
+		s1 := rowArr1[i].String()
+		s2 := rowArr2[i].String()
+		assert.Equal(t, s1, s2)
+	}
+
+	rowArr1, err = sk1.getFrequentItems(NFP)
+	assert.NoError(t, err)
+	rowArr2, err = sk2.getFrequentItems(NFP)
+	assert.NoError(t, err)
+	assert.Equal(t, len(rowArr1), len(rowArr2))
+	for i := 0; i < len(rowArr1); i++ {
+		s1 := rowArr1[i].String()
+		s2 := rowArr2[i].String()
+		assert.Equal(t, s1, s2)
+	}
+}

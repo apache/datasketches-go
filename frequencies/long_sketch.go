@@ -250,6 +250,27 @@ func NewLongSketchFromString(str string) (*LongSketch, error) {
 	return sk, nil
 }
 
+func (s *LongSketch) getEstimate(item int64) (int64, error) {
+	itemCount, err := s.hashMap.get(item)
+	if err != nil {
+		return 0, err
+	}
+	return itemCount + s.offset, nil
+}
+
+func (s *LongSketch) getLowerBound(item int64) (int64, error) {
+	// LB = itemCount
+	return s.hashMap.get(item)
+}
+
+func (s *LongSketch) getUpperBound(item int64) (int64, error) {
+	itemCount, err := s.hashMap.get(item)
+	if err != nil {
+		return 0, err
+	}
+	return itemCount + s.offset, nil
+}
+
 func (s *LongSketch) getNumActiveItems() int {
 	return s.hashMap.numActive
 }
@@ -260,8 +281,19 @@ func (s *LongSketch) getMaximumMapCapacity() int {
 	return int(float64(uint64(1<<s.lgMaxMapSize)) * loadFactor)
 }
 
+func (s *LongSketch) getStorageBytes() int {
+	if s.isEmpty() {
+		return 8
+	}
+	return (4 * 8) + (16 * s.getNumActiveItems())
+}
+
 func (s *LongSketch) getCurrentMapCapacity() int {
 	return s.curMapCap
+}
+
+func (s *LongSketch) getMaximumError() int64 {
+	return s.offset
 }
 
 func (s *LongSketch) getStreamLength() int64 {
@@ -388,11 +420,6 @@ func (s *LongSketch) Reset() {
 	s.hashMap = hasMap
 }
 
-/*
-  public void reset() {
-    hashMap = new ReversePurgeLongHashMap(1 << LG_MIN_MAP_SIZE);
-    curMapCap = hashMap.getCapacity();
-    offset = 0;
-    streamWeight = 0;
-  }
-*/
+func (s *LongSketch) getFrequentItems(errorType ErrorType) ([]*Row, error) {
+	return sortItems(s, s.getMaximumError(), errorType)
+}

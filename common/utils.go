@@ -24,6 +24,10 @@ import (
 	"strconv"
 )
 
+const (
+	InverseGolden = float64(0.6180339887498949025)
+)
+
 // InvPow2 returns 2^(-e).
 func InvPow2(e int) (float64, error) {
 	if (e | 1024 - e - 1) < 0 {

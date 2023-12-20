@@ -190,6 +190,14 @@ func (s *LongSketch) getCurrentMapCapacity() int {
 	return s.curMapCap
 }
 
+func (s *LongSketch) getStreamLength() int64 {
+	return s.streamWeight
+}
+
+func (s *LongSketch) isEmpty() bool {
+	return s.getNumActiveItems() == 0
+}
+
 func (s *LongSketch) Update(item int64, count int64) error {
 	if count == 0 {
 		return nil
@@ -198,7 +206,10 @@ func (s *LongSketch) Update(item int64, count int64) error {
 		return fmt.Errorf("count may not be negative")
 	}
 	s.streamWeight += count
-	s.hashMap.adjustOrPutValue(item, count)
+	err := s.hashMap.adjustOrPutValue(item, count)
+	if err != nil {
+		return err
+	}
 
 	if s.hashMap.numActive > s.curMapCap {
 		// Over the threshold, we need to do something
@@ -215,6 +226,23 @@ func (s *LongSketch) Update(item int64, count int64) error {
 		}
 	}
 	return nil
+}
+
+func (s *LongSketch) merge(other *LongSketch) (*LongSketch, error) {
+	if other == nil || other.isEmpty() {
+		return s, nil
+	}
+	streamWt := s.streamWeight + other.streamWeight //capture before merge
+	iter := other.hashMap.iterator()
+	for iter.next() {
+		err := s.Update(iter.getKey(), iter.getValue())
+		if err != nil {
+			return nil, err
+		}
+	}
+	s.offset += other.offset
+	s.streamWeight = streamWt //corrected streamWeight
+	return s, nil
 }
 
 func (s *LongSketch) serializeToString() (string, error) {

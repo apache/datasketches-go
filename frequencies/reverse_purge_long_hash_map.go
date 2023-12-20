@@ -35,6 +35,17 @@ type reversePurgeLongHashMap struct {
 	numActive     int
 }
 
+type iteratorHashMap struct {
+	keys_      []int64
+	values_    []int64
+	states_    []int16
+	numActive_ int
+	stride_    int
+	mask_      int
+	i_         int
+	count_     int
+}
+
 const (
 	loadFactor = float64(0.75)
 	driftLimit = 1024 //used only in stress testing
@@ -74,7 +85,7 @@ func (r *reversePurgeLongHashMap) getCapacity() int {
 //
 // key the key of the value to increment
 // adjustAmount the amount by which to increment the value
-func (r *reversePurgeLongHashMap) adjustOrPutValue(key int64, adjustAmount int64) {
+func (r *reversePurgeLongHashMap) adjustOrPutValue(key int64, adjustAmount int64) error {
 	var (
 		arrayMask = len(r.keys) - 1
 		probe     = hash(key) & int64(arrayMask)
@@ -90,8 +101,8 @@ func (r *reversePurgeLongHashMap) adjustOrPutValue(key int64, adjustAmount int64
 	//found either an empty slot or the key
 	if r.states[probe] == 0 { //found empty slot
 		// adding the key and value to the table
-		if r.numActive >= r.loadThreshold {
-			panic("numActive >= loadThreshold")
+		if r.numActive > r.loadThreshold {
+			return fmt.Errorf("numActive >= loadThreshold")
 		}
 		r.keys[probe] = key
 		r.values[probe] = adjustAmount
@@ -103,9 +114,10 @@ func (r *reversePurgeLongHashMap) adjustOrPutValue(key int64, adjustAmount int64
 		}
 		r.values[probe] += adjustAmount
 	}
+	return nil
 }
 
-func (r *reversePurgeLongHashMap) resize(newSize int) {
+func (r *reversePurgeLongHashMap) resize(newSize int) error {
 	oldKeys := r.keys
 	oldValues := r.values
 	oldStates := r.states
@@ -115,12 +127,13 @@ func (r *reversePurgeLongHashMap) resize(newSize int) {
 	r.loadThreshold = int(float64(newSize) * loadFactor)
 	r.lgLength = bits.TrailingZeros(uint(newSize))
 	r.numActive = 0
-	for i := 0; i < len(oldKeys); i++ {
+	err := error(nil)
+	for i := 0; i < len(oldKeys) && err == nil; i++ {
 		if oldStates[i] > 0 {
-			r.adjustOrPutValue(oldKeys[i], oldValues[i])
+			err = r.adjustOrPutValue(oldKeys[i], oldValues[i])
 		}
 	}
-
+	return err
 }
 
 func (r *reversePurgeLongHashMap) purge(sampleSize int) int64 {
@@ -232,7 +245,7 @@ func deserializeReversePurgeLongHashMapFromString(string string) (*reversePurgeL
 		return nil, err
 	}
 	j := 2
-	for i := 0; i < numActive; i++ {
+	for i := 0; i < numActive && err == nil; i++ {
 		key, err := strconv.Atoi(tokens[j])
 		if err != nil {
 			return nil, err
@@ -241,7 +254,10 @@ func deserializeReversePurgeLongHashMapFromString(string string) (*reversePurgeL
 		if err != nil {
 			return nil, err
 		}
-		table.adjustOrPutValue(int64(key), int64(value))
+		err = table.adjustOrPutValue(int64(key), int64(value))
+		if err != nil {
+			return nil, err
+		}
 		j += 2
 	}
 	return table, nil
@@ -257,10 +273,62 @@ func deserializeFromStringArray(tokens []string) (*reversePurgeLongHashMap, erro
 	}
 	j := 2 + ignore
 	for i := 0; i < int(numActive); i++ {
-		key, _ := strconv.ParseUint(tokens[j], 10, 64)
-		value, _ := strconv.ParseUint(tokens[j+1], 10, 64)
-		hashMap.adjustOrPutValue(int64(key), int64(value))
+		key, err := strconv.ParseUint(tokens[j], 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		value, err := strconv.ParseUint(tokens[j+1], 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		err = hashMap.adjustOrPutValue(int64(key), int64(value))
+		if err != nil {
+			return nil, err
+		}
 		j += 2
 	}
 	return hashMap, nil
+}
+
+func (s *reversePurgeLongHashMap) iterator() *iteratorHashMap {
+	return &iteratorHashMap{
+		keys_:      s.keys,
+		values_:    s.values,
+		states_:    s.states,
+		numActive_: s.numActive,
+	}
+}
+
+func newIterator(keys []int64, values []int64, states []int16, numActive int) *iteratorHashMap {
+	stride := int(uint64(float64(len(keys))*common.InverseGolden) | 1)
+	return &iteratorHashMap{
+		keys_:      keys,
+		values_:    values,
+		states_:    states,
+		numActive_: numActive,
+
+		stride_: stride,
+		mask_:   len(keys) - 1,
+		i_:      -stride,
+	}
+}
+
+func (i *iteratorHashMap) next() bool {
+	i.i_ = (i.i_ + i.stride_) & i.mask_
+	for i.count_ < i.numActive_ {
+		if i.states_[i.i_] > 0 {
+			i.count_++
+			return true
+		}
+		i.i_ = (i.i_ + i.stride_) & i.mask_
+	}
+	return false
+}
+
+func (i *iteratorHashMap) getKey() int64 {
+	return i.keys_[i.i_]
+}
+
+func (i *iteratorHashMap) getValue() int64 {
+	return i.values_[i.i_]
 }

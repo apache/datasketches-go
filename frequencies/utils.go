@@ -18,7 +18,7 @@
 package frequencies
 
 const (
-	lgMinMapSize = 3
+	_LG_MIN_MAP_SIZE = 3
 	// This constant is large enough so that computing the median of SAMPLE_SIZE
 	// randomly selected entries from a list of numbers and outputting
 	// the empirical median will give a constant-factor approximation to the

@@ -33,23 +33,24 @@ func QuickSelect(arr []int64, lo int, hi int, pivot int) int64 {
 }
 
 func partition(arr []int64, lo int, hi int) int {
-	i := lo      // left scan index
-	j := hi + 1  // right scan index
-	v := arr[lo] //partitioning item value
+	i := lo
+	j := hi + 1
+	v := arr[lo]
 	for {
-		// Scan right, scan left, check for scan complete, and exchange
-		for arr[i] < v {
+		for arr[i+1] < v {
 			i++
 			if i == hi {
 				break
 			}
 		}
-		for v < arr[j] {
+		i++
+		for v < arr[j-1] {
 			j--
 			if j == lo {
 				break
 			}
 		}
+		j--
 		if i >= j {
 			break
 		}
@@ -57,7 +58,6 @@ func partition(arr []int64, lo int, hi int) int {
 		arr[i] = arr[j]
 		arr[j] = x
 	}
-	// put v=arr[j] into position with a[lo .. j-1] <= a[j] <= a[j+1 .. hi]
 	x := arr[lo]
 	arr[lo] = arr[j]
 	arr[j] = x

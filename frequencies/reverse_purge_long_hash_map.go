@@ -183,6 +183,7 @@ func (r *reversePurgeLongHashMap) keepOnlyPositiveCounts() {
 	}
 	//Work towards the front; delete any non-positive entries.
 	for probe := firstProbe; probe > 0; {
+		probe--
 		// When we find the next non-empty cell, we know we are at the high end of a cluster,
 		//  which is tracked by firstProbe.
 		if r.states[probe] > 0 && r.values[probe] <= 0 {
@@ -191,7 +192,8 @@ func (r *reversePurgeLongHashMap) keepOnlyPositiveCounts() {
 		}
 	}
 	//now work on the first cluster that was skipped.
-	for probe := len(r.keys); probe > firstProbe; {
+	for probe := len(r.keys); probe-1 > firstProbe; {
+		probe--
 		if r.states[probe] > 0 && r.values[probe] <= 0 {
 			r.hashDelete(probe)
 			r.numActive--
@@ -290,13 +292,44 @@ func deserializeFromStringArray(tokens []string) (*reversePurgeLongHashMap, erro
 	return hashMap, nil
 }
 
-func (s *reversePurgeLongHashMap) iterator() *iteratorHashMap {
-	return &iteratorHashMap{
-		keys_:      s.keys,
-		values_:    s.values,
-		states_:    s.states,
-		numActive_: s.numActive,
+func (r *reversePurgeLongHashMap) getActiveValues() []int64 {
+	if r.numActive == 0 {
+		return nil
 	}
+	returnValues := make([]int64, r.numActive)
+	j := 0
+	for i := 0; i < len(r.values); i++ {
+		if r.states[i] > 0 { //isActive
+			returnValues[j] = r.values[i]
+			j++
+		}
+	}
+	if j != r.numActive {
+		panic("j != r.numActive")
+	}
+	return returnValues
+}
+
+func (r *reversePurgeLongHashMap) getActiveKeys() []int64 {
+	if r.numActive == 0 {
+		return nil
+	}
+	returnValues := make([]int64, r.numActive)
+	j := 0
+	for i := 0; i < len(r.keys); i++ {
+		if r.states[i] > 0 { //isActive
+			returnValues[j] = r.keys[i]
+			j++
+		}
+	}
+	if j != r.numActive {
+		panic("j != r.numActive")
+	}
+	return returnValues
+}
+
+func (s *reversePurgeLongHashMap) iterator() *iteratorHashMap {
+	return newIterator(s.keys, s.values, s.states, s.numActive)
 }
 
 func newIterator(keys []int64, values []int64, states []int16, numActive int) *iteratorHashMap {

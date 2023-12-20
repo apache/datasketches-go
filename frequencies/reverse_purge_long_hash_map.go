@@ -246,3 +246,21 @@ func deserializeReversePurgeLongHashMapFromString(string string) (*reversePurgeL
 	}
 	return table, nil
 }
+
+func deserializeFromStringArray(tokens []string) (*reversePurgeLongHashMap, error) {
+	ignore := strPreambleTokens
+	numActive, _ := strconv.ParseUint(tokens[ignore], 10, 32)
+	length, _ := strconv.ParseUint(tokens[ignore+1], 10, 32)
+	hashMap, err := NewReversePurgeLongHashMap(int(length))
+	if err != nil {
+		return nil, err
+	}
+	j := 2 + ignore
+	for i := 0; i < int(numActive); i++ {
+		key, _ := strconv.ParseUint(tokens[j], 10, 64)
+		value, _ := strconv.ParseUint(tokens[j+1], 10, 64)
+		hashMap.adjustOrPutValue(int64(key), int64(value))
+		j += 2
+	}
+	return hashMap, nil
+}

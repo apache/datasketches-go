@@ -86,13 +86,13 @@ func NewLongSketch(lgMaxMapSize int, lgCurMapSize int) (*LongSketch, error) {
 	}, nil
 }
 
-// NewLongSketchForMaxMapSize constructs a new LongSketch with the given maxMapSize and the
+// NewLongSketchWithMaxMapSize constructs a new LongSketch with the given maxMapSize and the
 // default initialMapSize (8).
 // maxMapSize determines the physical size of the internal hash map managed by this
 // sketch and must be a power of 2.  The maximum capacity of this internal hash map is
 // 0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are a
 // function of maxMapSize.
-func NewLongSketchForMaxMapSize(maxMapSize int) (*LongSketch, error) {
+func NewLongSketchWithMaxMapSize(maxMapSize int) (*LongSketch, error) {
 	log2OfInt, err := common.ExactLog2(maxMapSize)
 	if err != nil {
 		return nil, fmt.Errorf("maxMapSize, %e", err)
@@ -379,3 +379,20 @@ func (s *LongSketch) toSlice() ([]byte, error) {
 	}
 	return outArr, nil
 }
+
+func (s *LongSketch) Reset() {
+	hasMap, _ := NewReversePurgeLongHashMap(1 << _LG_MIN_MAP_SIZE)
+	s.curMapCap = hasMap.getCapacity()
+	s.offset = 0
+	s.streamWeight = 0
+	s.hashMap = hasMap
+}
+
+/*
+  public void reset() {
+    hashMap = new ReversePurgeLongHashMap(1 << LG_MIN_MAP_SIZE);
+    curMapCap = hashMap.getCapacity();
+    offset = 0;
+    streamWeight = 0;
+  }
+*/

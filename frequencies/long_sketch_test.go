@@ -23,9 +23,9 @@ import (
 )
 
 func TestFrequentItemsStringSerial(t *testing.T) {
-	sketch, err := NewLongSketchForMaxMapSize(8)
+	sketch, err := NewLongSketchWithMaxMapSize(8)
 	assert.NoError(t, err)
-	sketch2, err := NewLongSketchForMaxMapSize(128)
+	sketch2, err := NewLongSketchWithMaxMapSize(128)
 	assert.NoError(t, err)
 	sketch.Update(10, 100)
 	sketch.Update(10, 100)
@@ -89,7 +89,7 @@ func TestFrequentItemsStringSerial(t *testing.T) {
 }
 
 func TestFrequentItemsByteSerial(t *testing.T) {
-	sketch, err := NewLongSketchForMaxMapSize(16)
+	sketch, err := NewLongSketchWithMaxMapSize(16)
 	assert.NoError(t, err)
 	byteArray0, err := sketch.toSlice()
 	newSk0, err := NewLongSketchFromSlice(byteArray0)
@@ -100,7 +100,7 @@ func TestFrequentItemsByteSerial(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, str0, newStr0)
 
-	sketch2, err := NewLongSketchForMaxMapSize(128)
+	sketch2, err := NewLongSketchWithMaxMapSize(128)
 	assert.NoError(t, err)
 	sketch.Update(10, 100)
 	sketch.Update(10, 100)
@@ -166,4 +166,27 @@ func TestFrequentItemsByteSerial(t *testing.T) {
 	assert.Equal(t, mergedSketch.getMaximumMapCapacity(), newSk3.getMaximumMapCapacity())
 	assert.Equal(t, mergedSketch.getCurrentMapCapacity(), newSk3.getCurrentMapCapacity())
 	assert.Equal(t, mergedSketch.getStreamLength(), newSk3.getStreamLength())
+}
+
+func TestFrequentItemsByteResetAndEmptySerial(t *testing.T) {
+	sketch, err := NewLongSketchWithMaxMapSize(16)
+	assert.NoError(t, err)
+	sketch.Update(10, 100)
+	sketch.Update(10, 100)
+	sketch.Update(15, 3443)
+	sketch.Update(1000001, 1010230)
+	sketch.Update(1000002, 1010230)
+	sketch.Reset()
+
+	byteArray0, err := sketch.toSlice()
+	assert.NoError(t, err)
+	newSk0, err := NewLongSketchFromSlice(byteArray0)
+	assert.NoError(t, err)
+	str0, err := sketch.serializeToString()
+	assert.NoError(t, err)
+	newStr0, err := newSk0.serializeToString()
+	assert.NoError(t, err)
+	assert.Equal(t, str0, newStr0)
+	assert.Equal(t, sketch.getMaximumMapCapacity(), newSk0.getMaximumMapCapacity())
+	assert.Equal(t, sketch.getCurrentMapCapacity(), newSk0.getCurrentMapCapacity())
 }

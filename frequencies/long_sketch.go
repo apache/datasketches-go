@@ -76,7 +76,7 @@ func NewLongSketch(lgMaxMapSize int, lgCurMapSize int) (*LongSketch, error) {
 	curMapCap := hashMap.getCapacity()
 	maxMapCap := int(float64(uint64(1<<lgMaxMapSize)) * loadFactor)
 	offset := int64(0)
-	sampleSize := min(sampleSize, maxMapCap)
+	sampleSize := min(_SAMPLE_SIZE, maxMapCap)
 	return &LongSketch{
 		lgMaxMapSize: int(lgMaxMapSize),
 		curMapCap:    curMapCap,

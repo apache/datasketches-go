@@ -316,5 +316,5 @@ func (h *hllSketchImpl) GetSerializationVersion() int {
 }
 
 func (h *hllSketchImpl) hash(bs []byte) (uint64, uint64) {
-	return murmur3.SeedSum128(thetacommon.DefaultUpdateSeed, thetacommon.DefaultUpdateSeed, bs)
+	return murmur3.SeedSum128(thetacommon.DEFAULT_UPDATE_SEED, thetacommon.DEFAULT_UPDATE_SEED, bs)
 }

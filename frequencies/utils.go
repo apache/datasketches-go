@@ -23,7 +23,7 @@ const (
 	// randomly selected entries from a list of numbers and outputting
 	// the empirical median will give a constant-factor approximation to the
 	// true median with high probability.
-	sampleSize = 1024
+	_SAMPLE_SIZE = 1024
 )
 
 // hash returns an index into the hash table.

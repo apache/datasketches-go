@@ -17,6 +17,49 @@
 
 package thetacommon
 
-const (
-	DEFAULT_UPDATE_SEED = uint64(9001)
-)
+func QuickSelect(arr []int64, lo int, hi int, pivot int) int64 {
+	for hi > 0 {
+		j := partition(arr, lo, hi)
+		if j == pivot {
+			return arr[pivot]
+		}
+		if j > pivot {
+			hi = j - 1
+		} else {
+			lo = j + 1
+		}
+	}
+	return arr[pivot]
+}
+
+func partition(arr []int64, lo int, hi int) int {
+	i := lo
+	j := hi + 1
+	v := arr[lo]
+	for {
+		for arr[i+1] < v {
+			i++
+			if i == hi {
+				break
+			}
+		}
+		i++
+		for v < arr[j-1] {
+			j--
+			if j == lo {
+				break
+			}
+		}
+		j--
+		if i >= j {
+			break
+		}
+		x := arr[i]
+		arr[i] = arr[j]
+		arr[j] = x
+	}
+	x := arr[lo]
+	arr[lo] = arr[j]
+	arr[j] = x
+	return j
+}

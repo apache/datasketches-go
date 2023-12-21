@@ -174,11 +174,11 @@ func computeLgArr(byteArr []byte, couponCount int, lgConfigK int) (int, error) {
 		ceilPwr2 <<= 1
 	}
 	if curMode == curModeSet {
-		v, err := common.ExactLog2OfLong(uint64(ceilPwr2))
+		v, err := common.ExactLog2(ceilPwr2)
 		return max(lgInitSetSize, v), err
 	}
 	//only used for HLL4
-	v, err := common.ExactLog2OfLong(uint64(ceilPwr2))
+	v, err := common.ExactLog2(ceilPwr2)
 	return max(lgAuxArrInts[lgConfigK], v), err
 
 }

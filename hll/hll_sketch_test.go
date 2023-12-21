@@ -26,12 +26,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	javaPath = "../serialization_test_data/java_generated_files"
-	cppPath  = "../serialization_test_data/cpp_generated_files"
-	goPath   = "../serialization_test_data/go_generated_files"
-)
-
 func TestMisc(t *testing.T) {
 	hll, err := NewHllSketch(10, TgtHllTypeHll4)
 	assert.NoError(t, err)

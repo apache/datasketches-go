@@ -15,8 +15,25 @@
  * limitations under the License.
  */
 
-package thetacommon
+package frequencies
 
-const (
-	DEFAULT_UPDATE_SEED = uint64(9001)
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
+
+func TestHashMapSerial(t *testing.T) {
+	mp, err := newReversePurgeLongHashMap(8)
+	assert.NoError(t, err)
+	mp.adjustOrPutValue(10, 15)
+	mp.adjustOrPutValue(10, 5)
+	mp.adjustOrPutValue(1, 1)
+	mp.adjustOrPutValue(2, 3)
+	strMp := mp.serializeToString()
+
+	newMp, err := deserializeReversePurgeLongHashMapFromString(strMp)
+	assert.NoError(t, err)
+	newStrMp := newMp.serializeToString()
+	assert.Equal(t, strMp, newStrMp)
+
+}

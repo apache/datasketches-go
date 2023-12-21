@@ -128,7 +128,7 @@ func checkPreamble(preamble []byte) (curMode, error) {
 	famId := extractFamilyID(preamble)
 	curMode := extractCurMode(preamble)
 
-	if famId != common.FamilyHllId {
+	if famId != common.FamilyEnum.HLL.Id {
 		return 0, fmt.Errorf("possible Corruption: Invalid Family: %d", famId)
 	}
 	if serVer != 1 {

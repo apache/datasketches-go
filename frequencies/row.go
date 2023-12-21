@@ -46,7 +46,19 @@ func (r *Row) String() string {
 	return fmt.Sprintf("  %20d%20d%20d %d", r.item, r.est, r.ub, r.lb)
 }
 
-func sortItems(sk *LongSketch, threshold int64, errorType ErrorType) ([]*Row, error) {
+func (r *Row) getEstimate() int64 {
+	return r.est
+}
+
+func (r *Row) getUpperBound() int64 {
+	return r.ub
+}
+
+func (r *Row) getLowerBound() int64 {
+	return r.lb
+}
+
+func sortItems(sk *LongsSketch, threshold int64, errorType ErrorType) ([]*Row, error) {
 	rowList := make([]*Row, 0)
 	iter := sk.hashMap.iterator()
 	if errorType == NO_FALSE_NEGATIVES {

@@ -19,6 +19,7 @@ package frequencies
 
 import (
 	"encoding/binary"
+	"github.com/apache/datasketches-go/common"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -228,7 +229,7 @@ func TestFreqLongStringSerDe(t *testing.T) {
 	checkEquality(t, sk1, sk2)
 }
 
-func checkEquality(t *testing.T, sk1, sk2 *LongSketch) {
+func checkEquality(t *testing.T, sk1, sk2 *LongsSketch) {
 	assert.Equal(t, sk1.getNumActiveItems(), sk2.getNumActiveItems())
 	assert.Equal(t, sk1.getCurrentMapCapacity(), sk2.getCurrentMapCapacity())
 	assert.Equal(t, sk1.getMaximumError(), sk2.getMaximumError())
@@ -293,7 +294,7 @@ func tryBadMem(t *testing.T, mem []byte, byteOffset, byteValue int) {
 }
 
 func TestFreqLongStringSerDeError(t *testing.T) {
-	//sk1, err := NewLongSketchWithMaxMapSize(8)
+	// sk1, err := NewLongSketchWithMaxMapSize(8)
 	// str1 := sk1.serializeToString()
 	// correct   = "1,10,2,4,0,0,0,4,";
 
@@ -304,5 +305,90 @@ func TestFreqLongStringSerDeError(t *testing.T) {
 
 func tryBadString(t *testing.T, badString string) {
 	_, err := NewLongSketchFromString(badString)
+	assert.Error(t, err)
+}
+
+func TestFreqLongs(t *testing.T) {
+	numSketches := 1
+	n := 2222
+	errorTolerance := 1.0 / 100
+
+	sketches := make([]*LongsSketch, numSketches)
+	for h := 0; h < numSketches; h++ {
+		sketches[h], _ = newFrequencySketch(errorTolerance)
+	}
+
+	prob := .001
+	for i := 0; i < n; i++ {
+		item := randomGeometricDist(prob) + 1
+		for h := 0; h < numSketches; h++ {
+			sketches[h].Update(item)
+		}
+	}
+
+	for h := 0; h < numSketches; h++ {
+		threshold := sketches[h].getMaximumError()
+		rows, err := sketches[h].getFrequentItems(NO_FALSE_NEGATIVES)
+		assert.NoError(t, err)
+		for i := 0; i < len(rows); i++ {
+			assert.True(t, rows[i].getUpperBound() > threshold)
+		}
+
+		rows, err = sketches[h].getFrequentItems(NO_FALSE_POSITIVES)
+		assert.NoError(t, err)
+		assert.Equal(t, len(rows), 0)
+		for i := 0; i < len(rows); i++ {
+			assert.True(t, rows[i].getLowerBound() > threshold)
+		}
+
+		rows, err = sketches[h].getFrequentItems(NO_FALSE_NEGATIVES)
+	}
+}
+
+func newFrequencySketch(eps float64) (*LongsSketch, error) {
+	maxMapSize := common.CeilPowerOf2(int(1.0 / (eps * reversePurgeLongHashMapLoadFactor)))
+	return NewLongSketchWithMaxMapSize(maxMapSize)
+}
+
+func TestUpdateOneTime(t *testing.T) {
+	size := 100
+	errorTolerance := 1.0 / float64(size)
+	//delta := .01
+	numSketches := 1
+	for h := 0; h < numSketches; h++ {
+		sketch, _ := newFrequencySketch(errorTolerance)
+		ub, err := sketch.getUpperBound(13)
+		assert.NoError(t, err)
+		assert.Equal(t, ub, int64(0))
+		lb, err := sketch.getLowerBound(13)
+		assert.NoError(t, err)
+		assert.Equal(t, lb, int64(0))
+		assert.Equal(t, sketch.getMaximumError(), int64(0))
+		est, err := sketch.getEstimate(13)
+		assert.NoError(t, err)
+		assert.Equal(t, est, int64(0))
+		sketch.Update(13)
+		// assert.Equal(t, sketch.getEstimate(13), 1)
+	}
+}
+
+func TestGetInstanceSlice(t *testing.T) {
+	sl := make([]byte, 4)
+	_, err := NewLongSketchFromSlice(sl)
+	assert.Error(t, err)
+}
+
+func TestGetInstanceString(t *testing.T) {
+	_, err := NewLongSketchFromString("")
+	assert.Error(t, err)
+}
+
+func TestUpdateNegative(t *testing.T) {
+	minSize := 1 << _LG_MIN_MAP_SIZE
+	fls, err := NewLongSketchWithMaxMapSize(minSize)
+	assert.NoError(t, err)
+	err = fls.UpdateMany(1, 0)
+	assert.NoError(t, err)
+	err = fls.UpdateMany(1, -1)
 	assert.Error(t, err)
 }

@@ -47,8 +47,8 @@ type iteratorHashMap struct {
 }
 
 const (
-	loadFactor = float64(0.75)
-	driftLimit = 1024 //used only in stress testing
+	reversePurgeLongHashMapLoadFactor = float64(0.75)
+	reversePurgeLongHashMapDriftLimit = 1024 //used only in stress testing
 )
 
 // NewReversePurgeLongHashMap constructs a new reversePurgeLongHashMap.
@@ -61,7 +61,7 @@ func NewReversePurgeLongHashMap(mapSize int) (*reversePurgeLongHashMap, error) {
 	if err != nil {
 		return nil, fmt.Errorf("mapSize: %e", err)
 	}
-	loadThreshold := int(float64(mapSize) * loadFactor)
+	loadThreshold := int(float64(mapSize) * reversePurgeLongHashMapLoadFactor)
 	keys := make([]int64, mapSize)
 	values := make([]int64, mapSize)
 	states := make([]int16, mapSize)
@@ -105,7 +105,7 @@ func (r *reversePurgeLongHashMap) adjustOrPutValue(key int64, adjustAmount int64
 	for r.states[probe] != 0 && r.keys[probe] != key {
 		probe = (probe + 1) & int64(arrayMask)
 		drift++
-		if drift >= driftLimit {
+		if drift >= reversePurgeLongHashMapDriftLimit {
 			panic("drift >= driftLimit")
 		}
 	}
@@ -135,7 +135,7 @@ func (r *reversePurgeLongHashMap) resize(newSize int) error {
 	r.keys = make([]int64, newSize)
 	r.values = make([]int64, newSize)
 	r.states = make([]int16, newSize)
-	r.loadThreshold = int(float64(newSize) * loadFactor)
+	r.loadThreshold = int(float64(newSize) * reversePurgeLongHashMapLoadFactor)
 	r.lgLength = bits.TrailingZeros(uint(newSize))
 	r.numActive = 0
 	err := error(nil)
@@ -234,7 +234,7 @@ func (r *reversePurgeLongHashMap) hashDelete(deleteProbe int) {
 		probe = (probe + 1) & arrayMask
 		drift++
 		//only used for theoretical analysis
-		if drift >= driftLimit {
+		if drift >= reversePurgeLongHashMapDriftLimit {
 			panic("drift >= driftLimit")
 		}
 	}

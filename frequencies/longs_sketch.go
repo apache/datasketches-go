@@ -26,7 +26,7 @@ import (
 	"strings"
 )
 
-type LongSketch struct {
+type LongsSketch struct {
 	// Log2 Maximum length of the arrays internal to the hash map supported by the data
 	// structure.
 	lgMaxMapSize int
@@ -59,13 +59,13 @@ const (
  * map managed by this sketch.
  */
 
-// NewLongSketch returns a new LongSketch with the given lgMaxMapSize and lgCurMapSize.
+// NewLongSketch returns a new LongsSketch with the given lgMaxMapSize and lgCurMapSize.
 // lgMaxMapSize is the log2 of the physical size of the internal hash map managed by this
 // sketch. The maximum capacity of this internal hash map is 0.75 times 2^lgMaxMapSize.
 // Both the ultimate accuracy and size of this sketch are a function of lgMaxMapSize.
 // lgCurMapSize is the log2 of the starting (current) physical size of the internal hash
 // map managed by this sketch.
-func NewLongSketch(lgMaxMapSize int, lgCurMapSize int) (*LongSketch, error) {
+func NewLongSketch(lgMaxMapSize int, lgCurMapSize int) (*LongsSketch, error) {
 	//set initial size of hash map
 	lgMaxMapSize = max(lgMaxMapSize, _LG_MIN_MAP_SIZE)
 	lgCurMapSize = max(lgCurMapSize, _LG_MIN_MAP_SIZE)
@@ -74,10 +74,10 @@ func NewLongSketch(lgMaxMapSize int, lgCurMapSize int) (*LongSketch, error) {
 		return nil, err
 	}
 	curMapCap := hashMap.getCapacity()
-	maxMapCap := int(float64(uint64(1<<lgMaxMapSize)) * loadFactor)
+	maxMapCap := int(float64(uint64(1<<lgMaxMapSize)) * reversePurgeLongHashMapLoadFactor)
 	offset := int64(0)
 	sampleSize := min(_SAMPLE_SIZE, maxMapCap)
-	return &LongSketch{
+	return &LongsSketch{
 		lgMaxMapSize: int(lgMaxMapSize),
 		curMapCap:    curMapCap,
 		offset:       offset,
@@ -86,13 +86,13 @@ func NewLongSketch(lgMaxMapSize int, lgCurMapSize int) (*LongSketch, error) {
 	}, nil
 }
 
-// NewLongSketchWithMaxMapSize constructs a new LongSketch with the given maxMapSize and the
+// NewLongSketchWithMaxMapSize constructs a new LongsSketch with the given maxMapSize and the
 // default initialMapSize (8).
 // maxMapSize determines the physical size of the internal hash map managed by this
 // sketch and must be a power of 2.  The maximum capacity of this internal hash map is
 // 0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are a
 // function of maxMapSize.
-func NewLongSketchWithMaxMapSize(maxMapSize int) (*LongSketch, error) {
+func NewLongSketchWithMaxMapSize(maxMapSize int) (*LongsSketch, error) {
 	log2OfInt, err := common.ExactLog2(maxMapSize)
 	if err != nil {
 		return nil, fmt.Errorf("maxMapSize, %e", err)
@@ -100,7 +100,7 @@ func NewLongSketchWithMaxMapSize(maxMapSize int) (*LongSketch, error) {
 	return NewLongSketch(log2OfInt, _LG_MIN_MAP_SIZE)
 }
 
-func NewLongSketchFromSlice(slc []byte) (*LongSketch, error) {
+func NewLongSketchFromSlice(slc []byte) (*LongsSketch, error) {
 	pre0, err := checkPreambleSize(slc)
 	if err != nil {
 		return nil, err
@@ -173,7 +173,7 @@ func NewLongSketchFromSlice(slc []byte) (*LongSketch, error) {
 	return fls, nil
 }
 
-func NewLongSketchFromString(str string) (*LongSketch, error) {
+func NewLongSketchFromString(str string) (*LongsSketch, error) {
 	if len(str) < 1 {
 		return nil, fmt.Errorf("String is empty")
 	}
@@ -250,7 +250,7 @@ func NewLongSketchFromString(str string) (*LongSketch, error) {
 	return sk, nil
 }
 
-func (s *LongSketch) getEstimate(item int64) (int64, error) {
+func (s *LongsSketch) getEstimate(item int64) (int64, error) {
 	itemCount, err := s.hashMap.get(item)
 	if err != nil {
 		return 0, err
@@ -258,12 +258,12 @@ func (s *LongSketch) getEstimate(item int64) (int64, error) {
 	return itemCount + s.offset, nil
 }
 
-func (s *LongSketch) getLowerBound(item int64) (int64, error) {
+func (s *LongsSketch) getLowerBound(item int64) (int64, error) {
 	// LB = itemCount
 	return s.hashMap.get(item)
 }
 
-func (s *LongSketch) getUpperBound(item int64) (int64, error) {
+func (s *LongsSketch) getUpperBound(item int64) (int64, error) {
 	itemCount, err := s.hashMap.get(item)
 	if err != nil {
 		return 0, err
@@ -271,44 +271,44 @@ func (s *LongSketch) getUpperBound(item int64) (int64, error) {
 	return itemCount + s.offset, nil
 }
 
-func (s *LongSketch) getNumActiveItems() int {
+func (s *LongsSketch) getNumActiveItems() int {
 	return s.hashMap.numActive
 }
 
 // getMaximumMapCapacity returns the maximum number of counters the sketch is configured to
 // support.
-func (s *LongSketch) getMaximumMapCapacity() int {
-	return int(float64(uint64(1<<s.lgMaxMapSize)) * loadFactor)
+func (s *LongsSketch) getMaximumMapCapacity() int {
+	return int(float64(uint64(1<<s.lgMaxMapSize)) * reversePurgeLongHashMapLoadFactor)
 }
 
-func (s *LongSketch) getStorageBytes() int {
+func (s *LongsSketch) getStorageBytes() int {
 	if s.isEmpty() {
 		return 8
 	}
 	return (4 * 8) + (16 * s.getNumActiveItems())
 }
 
-func (s *LongSketch) getCurrentMapCapacity() int {
+func (s *LongsSketch) getCurrentMapCapacity() int {
 	return s.curMapCap
 }
 
-func (s *LongSketch) getMaximumError() int64 {
+func (s *LongsSketch) getMaximumError() int64 {
 	return s.offset
 }
 
-func (s *LongSketch) getStreamLength() int64 {
+func (s *LongsSketch) getStreamLength() int64 {
 	return s.streamWeight
 }
 
-func (s *LongSketch) isEmpty() bool {
+func (s *LongsSketch) isEmpty() bool {
 	return s.getNumActiveItems() == 0
 }
 
-func (s *LongSketch) Update(item int64) error {
+func (s *LongsSketch) Update(item int64) error {
 	return s.UpdateMany(item, 1)
 }
 
-func (s *LongSketch) UpdateMany(item int64, count int64) error {
+func (s *LongsSketch) UpdateMany(item int64, count int64) error {
 	if count == 0 {
 		return nil
 	}
@@ -338,7 +338,7 @@ func (s *LongSketch) UpdateMany(item int64, count int64) error {
 	return nil
 }
 
-func (s *LongSketch) merge(other *LongSketch) (*LongSketch, error) {
+func (s *LongsSketch) merge(other *LongsSketch) (*LongsSketch, error) {
 	if other == nil || other.isEmpty() {
 		return s, nil
 	}
@@ -355,7 +355,7 @@ func (s *LongSketch) merge(other *LongSketch) (*LongSketch, error) {
 	return s, nil
 }
 
-func (s *LongSketch) serializeToString() (string, error) {
+func (s *LongsSketch) serializeToString() (string, error) {
 	var sb strings.Builder
 	//start the string with parameters of the sketch
 	serVer := _SER_VER //0
@@ -373,7 +373,7 @@ func (s *LongSketch) serializeToString() (string, error) {
 	return sb.String(), nil
 }
 
-func (s *LongSketch) toSlice() ([]byte, error) {
+func (s *LongsSketch) toSlice() ([]byte, error) {
 	emtpy := s.isEmpty()
 	activeItems := s.getNumActiveItems()
 	preLongs := 1
@@ -416,7 +416,7 @@ func (s *LongSketch) toSlice() ([]byte, error) {
 	return outArr, nil
 }
 
-func (s *LongSketch) Reset() {
+func (s *LongsSketch) Reset() {
 	hasMap, _ := NewReversePurgeLongHashMap(1 << _LG_MIN_MAP_SIZE)
 	s.curMapCap = hasMap.getCapacity()
 	s.offset = 0
@@ -424,6 +424,20 @@ func (s *LongSketch) Reset() {
 	s.hashMap = hasMap
 }
 
-func (s *LongSketch) getFrequentItems(errorType ErrorType) ([]*Row, error) {
+/*
+  public Row[] getFrequentItems(final long threshold, final ErrorType errorType) {
+    return sortItems(threshold > getMaximumError() ? threshold : getMaximumError(), errorType);
+  }
+*/
+
+func (s *LongsSketch) getFrequentItemsWithThreshold(threshold int64, errorType ErrorType) ([]*Row, error) {
+	finalThreshold := s.getMaximumError()
+	if threshold > finalThreshold {
+		finalThreshold = threshold
+	}
+	return sortItems(s, finalThreshold, errorType)
+}
+
+func (s *LongsSketch) getFrequentItems(errorType ErrorType) ([]*Row, error) {
 	return sortItems(s, s.getMaximumError(), errorType)
 }

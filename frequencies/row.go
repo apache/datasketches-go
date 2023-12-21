@@ -29,7 +29,7 @@ type Row struct {
 	lb   int64
 }
 
-func NewRow(item int64, estimate int64, ub int64, lb int64) *Row {
+func newRow(item int64, estimate int64, ub int64, lb int64) *Row {
 	return &Row{
 		item: item,
 		est:  estimate,
@@ -40,6 +40,10 @@ func NewRow(item int64, estimate int64, ub int64, lb int64) *Row {
 
 func (r *Row) String() string {
 	return fmt.Sprintf("  %20d%20d%20d %d", r.est, r.ub, r.lb, r.item)
+}
+
+func (r *Row) GetItem() int64 {
+	return r.item
 }
 
 func (r *Row) GetEstimate() int64 {
@@ -72,7 +76,7 @@ func sortItems(sk *LongsSketch, threshold int64, errorType ErrorType) ([]*Row, e
 				return nil, err
 			}
 			if ub >= threshold {
-				row := NewRow(iter.getKey(), est, ub, lb)
+				row := newRow(iter.getKey(), est, ub, lb)
 				rowList = append(rowList, row)
 			}
 		}
@@ -91,7 +95,7 @@ func sortItems(sk *LongsSketch, threshold int64, errorType ErrorType) ([]*Row, e
 				return nil, err
 			}
 			if lb >= threshold {
-				row := NewRow(iter.getKey(), est, ub, lb)
+				row := newRow(iter.getKey(), est, ub, lb)
 				rowList = append(rowList, row)
 			}
 		}

@@ -36,12 +36,12 @@ type ErrorType struct {
 	Name string
 }
 
-type ErrorTypes struct {
+type errorTypes struct {
 	NO_FALSE_POSITIVES ErrorType
 	NO_FALSE_NEGATIVES ErrorType
 }
 
-var ErrorTypeEnum = &ErrorTypes{
+var ErrorTypeEnum = &errorTypes{
 	NO_FALSE_POSITIVES: ErrorType{
 		id:   1,
 		Name: "NO_FALSE_POSITIVES",

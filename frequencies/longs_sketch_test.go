@@ -408,9 +408,9 @@ func TestGetFrequentItems1(t *testing.T) {
 	assert.Equal(t, row.item, int64(1))
 	assert.Equal(t, row.lb, int64(1))
 	assert.Equal(t, row.ub, int64(1))
-	newRow := NewRow(row.item, row.est+1, row.ub, row.lb)
+	newRow := newRow(row.item, row.est+1, row.ub, row.lb)
 	assert.NotEqual(t, row, newRow)
-	newRow = NewRow(row.item, row.est, row.ub, row.lb)
+	newRow = newRow(row.item, row.est, row.ub, row.lb)
 	assert.Equal(t, row, newRow)
 
 }

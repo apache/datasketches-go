@@ -28,6 +28,7 @@ const (
 	InverseGolden = float64(0.6180339887498949025)
 )
 
+
 // InvPow2 returns 2^(-e).
 func InvPow2(e int) (float64, error) {
 	if (e | 1024 - e - 1) < 0 {
@@ -49,14 +50,14 @@ func CeilPowerOf2(n int) int {
 }
 
 func ExactLog2(powerOf2 int) (int, error) {
-	if !isPowerOf2(powerOf2) {
+	if !IsPowerOf2(powerOf2) {
 		return 0, fmt.Errorf("argument 'powerOf2' must be a positive power of 2")
 	}
 	return bits.TrailingZeros64(uint64(powerOf2)), nil
 }
 
-// isPowerOf2 returns true if the given number is a power of 2.
-func isPowerOf2(powerOf2 int) bool {
+// IsPowerOf2 returns true if the given number is a power of 2.
+func IsPowerOf2(powerOf2 int) bool {
 	return powerOf2 > 0 && (powerOf2&(powerOf2-1)) == 0
 }
 

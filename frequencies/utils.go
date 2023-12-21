@@ -17,6 +17,11 @@
 
 package frequencies
 
+import (
+	"math"
+	"math/rand"
+)
+
 const (
 	_LG_MIN_MAP_SIZE = 3
 	// This constant is large enough so that computing the median of SAMPLE_SIZE
@@ -25,6 +30,27 @@ const (
 	// true median with high probability.
 	_SAMPLE_SIZE = 1024
 )
+
+type ErrorType struct {
+	id   int
+	Name string
+}
+
+type ErrorTypes struct {
+	NO_FALSE_POSITIVES ErrorType
+	NO_FALSE_NEGATIVES ErrorType
+}
+
+var ErrorTypeEnum = &ErrorTypes{
+	NO_FALSE_POSITIVES: ErrorType{
+		id:   1,
+		Name: "NO_FALSE_POSITIVES",
+	},
+	NO_FALSE_NEGATIVES: ErrorType{
+		id:   2,
+		Name: "NO_FALSE_NEGATIVES",
+	},
+}
 
 // hash returns an index into the hash table.
 // This hash function is taken from the internals of Austin Appleby's MurmurHash3 algorithm.
@@ -37,4 +63,11 @@ func hash(okey int64) int64 {
 	key *= 0xc4ceb9fe1a85ec53
 	key ^= key >> 33
 	return int64(key)
+}
+
+func randomGeometricDist(prob float64) int64 {
+	if prob <= 0.0 || prob >= 1.0 {
+		panic("prob must be in (0, 1)")
+	}
+	return int64(1 + math.Log(rand.Float64())/math.Log(1.0-prob))
 }

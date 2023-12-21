@@ -27,9 +27,9 @@ import (
 )
 
 func TestFrequentItemsStringSerial(t *testing.T) {
-	sketch, err := NewLongSketchWithMaxMapSize(8)
+	sketch, err := NewLongsSketchWithMaxMapSize(8)
 	assert.NoError(t, err)
-	sketch2, err := NewLongSketchWithMaxMapSize(128)
+	sketch2, err := NewLongsSketchWithMaxMapSize(128)
 	assert.NoError(t, err)
 	sketch.UpdateMany(10, 100)
 	sketch.UpdateMany(10, 100)
@@ -37,15 +37,15 @@ func TestFrequentItemsStringSerial(t *testing.T) {
 	sketch.UpdateMany(1000001, 1010230)
 	sketch.UpdateMany(1000002, 1010230)
 
-	ser, err := sketch.serializeToString()
+	ser, err := sketch.ToString()
 	assert.NoError(t, err)
-	newSk0, err := NewLongSketchFromString(ser)
+	newSk0, err := NewLongsSketchFromString(ser)
 	assert.NoError(t, err)
-	newSer0, err := newSk0.serializeToString()
+	newSer0, err := newSk0.ToString()
 	assert.NoError(t, err)
 	assert.Equal(t, ser, newSer0)
-	assert.Equal(t, sketch.getMaximumMapCapacity(), newSk0.getMaximumMapCapacity())
-	assert.Equal(t, sketch.getCurrentMapCapacity(), newSk0.getCurrentMapCapacity())
+	assert.Equal(t, sketch.GetMaximumMapCapacity(), newSk0.GetMaximumMapCapacity())
+	assert.Equal(t, sketch.GetCurrentMapCapacity(), newSk0.GetCurrentMapCapacity())
 
 	sketch2.UpdateMany(190, 12902390)
 	sketch2.UpdateMany(191, 12902390)
@@ -67,44 +67,44 @@ func TestFrequentItemsStringSerial(t *testing.T) {
 	sketch2.UpdateMany(207, 12902390)
 	sketch2.UpdateMany(208, 12902390)
 
-	s2, err := sketch2.serializeToString()
+	s2, err := sketch2.ToString()
 	assert.NoError(t, err)
-	newSk2, err := NewLongSketchFromString(s2)
+	newSk2, err := NewLongsSketchFromString(s2)
 	assert.NoError(t, err)
-	newS2, err := newSk2.serializeToString()
+	newS2, err := newSk2.ToString()
 	assert.NoError(t, err)
 	assert.Equal(t, s2, newS2)
-	assert.Equal(t, sketch2.getMaximumMapCapacity(), newSk2.getMaximumMapCapacity())
-	assert.Equal(t, sketch2.getCurrentMapCapacity(), newSk2.getCurrentMapCapacity())
-	assert.Equal(t, sketch2.getStreamLength(), newSk2.getStreamLength())
+	assert.Equal(t, sketch2.GetMaximumMapCapacity(), newSk2.GetMaximumMapCapacity())
+	assert.Equal(t, sketch2.GetCurrentMapCapacity(), newSk2.GetCurrentMapCapacity())
+	assert.Equal(t, sketch2.GetStreamLength(), newSk2.GetStreamLength())
 
-	mergedSketch, err := sketch.merge(sketch2)
+	mergedSketch, err := sketch.Merge(sketch2)
 	assert.NoError(t, err)
-	ms, err := mergedSketch.serializeToString()
+	ms, err := mergedSketch.ToString()
 	assert.NoError(t, err)
-	newMs, err := NewLongSketchFromString(ms)
+	newMs, err := NewLongsSketchFromString(ms)
 	assert.NoError(t, err)
-	newSMs, err := newMs.serializeToString()
+	newSMs, err := newMs.ToString()
 	assert.NoError(t, err)
 	assert.Equal(t, ms, newSMs)
-	assert.Equal(t, mergedSketch.getMaximumMapCapacity(), newMs.getMaximumMapCapacity())
-	assert.Equal(t, mergedSketch.getCurrentMapCapacity(), newMs.getCurrentMapCapacity())
-	assert.Equal(t, mergedSketch.getStreamLength(), newMs.getStreamLength())
+	assert.Equal(t, mergedSketch.GetMaximumMapCapacity(), newMs.GetMaximumMapCapacity())
+	assert.Equal(t, mergedSketch.GetCurrentMapCapacity(), newMs.GetCurrentMapCapacity())
+	assert.Equal(t, mergedSketch.GetStreamLength(), newMs.GetStreamLength())
 }
 
 func TestFrequentItemsByteSerial(t *testing.T) {
-	sketch, err := NewLongSketchWithMaxMapSize(16)
+	sketch, err := NewLongsSketchWithMaxMapSize(16)
 	assert.NoError(t, err)
-	byteArray0, err := sketch.toSlice()
-	newSk0, err := NewLongSketchFromSlice(byteArray0)
+	byteArray0, err := sketch.ToSlice()
+	newSk0, err := NewLongsSketchFromSlice(byteArray0)
 	assert.NoError(t, err)
-	str0, err := sketch.serializeToString()
+	str0, err := sketch.ToString()
 	assert.NoError(t, err)
-	newStr0, err := newSk0.serializeToString()
+	newStr0, err := newSk0.ToString()
 	assert.NoError(t, err)
 	assert.Equal(t, str0, newStr0)
 
-	sketch2, err := NewLongSketchWithMaxMapSize(128)
+	sketch2, err := NewLongsSketchWithMaxMapSize(128)
 	assert.NoError(t, err)
 	sketch.UpdateMany(10, 100)
 	sketch.UpdateMany(10, 100)
@@ -112,16 +112,16 @@ func TestFrequentItemsByteSerial(t *testing.T) {
 	sketch.UpdateMany(1000001, 1010230)
 	sketch.UpdateMany(1000002, 1010230)
 
-	byteArray1, err := sketch.toSlice()
+	byteArray1, err := sketch.ToSlice()
 	assert.NoError(t, err)
-	newSk1, err := NewLongSketchFromSlice(byteArray1)
+	newSk1, err := NewLongsSketchFromSlice(byteArray1)
 	assert.NoError(t, err)
-	str1, err := sketch.serializeToString()
-	newStr1, err := newSk1.serializeToString()
+	str1, err := sketch.ToString()
+	newStr1, err := newSk1.ToString()
 	assert.NoError(t, err)
 	assert.Equal(t, str1, newStr1)
-	assert.Equal(t, sketch.getMaximumMapCapacity(), newSk1.getMaximumMapCapacity())
-	assert.Equal(t, sketch.getCurrentMapCapacity(), newSk1.getCurrentMapCapacity())
+	assert.Equal(t, sketch.GetMaximumMapCapacity(), newSk1.GetMaximumMapCapacity())
+	assert.Equal(t, sketch.GetCurrentMapCapacity(), newSk1.GetCurrentMapCapacity())
 
 	sketch2.UpdateMany(190, 12902390)
 	sketch2.UpdateMany(191, 12902390)
@@ -143,37 +143,37 @@ func TestFrequentItemsByteSerial(t *testing.T) {
 	sketch2.UpdateMany(207, 12902390)
 	sketch2.UpdateMany(208, 12902390)
 
-	byteArray2, err := sketch2.toSlice()
+	byteArray2, err := sketch2.ToSlice()
 	assert.NoError(t, err)
-	newSk2, err := NewLongSketchFromSlice(byteArray2)
+	newSk2, err := NewLongsSketchFromSlice(byteArray2)
 	assert.NoError(t, err)
-	str2, err := sketch2.serializeToString()
+	str2, err := sketch2.ToString()
 	assert.NoError(t, err)
-	newStr2, err := newSk2.serializeToString()
+	newStr2, err := newSk2.ToString()
 	assert.NoError(t, err)
 	assert.Equal(t, str2, newStr2)
-	assert.Equal(t, sketch2.getMaximumMapCapacity(), newSk2.getMaximumMapCapacity())
-	assert.Equal(t, sketch2.getCurrentMapCapacity(), newSk2.getCurrentMapCapacity())
-	assert.Equal(t, sketch2.getStreamLength(), newSk2.getStreamLength())
+	assert.Equal(t, sketch2.GetMaximumMapCapacity(), newSk2.GetMaximumMapCapacity())
+	assert.Equal(t, sketch2.GetCurrentMapCapacity(), newSk2.GetCurrentMapCapacity())
+	assert.Equal(t, sketch2.GetStreamLength(), newSk2.GetStreamLength())
 
-	mergedSketch, err := sketch.merge(sketch2)
+	mergedSketch, err := sketch.Merge(sketch2)
 	assert.NoError(t, err)
-	byteArray3, err := mergedSketch.toSlice()
+	byteArray3, err := mergedSketch.ToSlice()
 	assert.NoError(t, err)
-	newSk3, err := NewLongSketchFromSlice(byteArray3)
+	newSk3, err := NewLongsSketchFromSlice(byteArray3)
 	assert.NoError(t, err)
-	str3, err := mergedSketch.serializeToString()
+	str3, err := mergedSketch.ToString()
 	assert.NoError(t, err)
-	newStr3, err := newSk3.serializeToString()
+	newStr3, err := newSk3.ToString()
 	assert.NoError(t, err)
 	assert.Equal(t, str3, newStr3)
-	assert.Equal(t, mergedSketch.getMaximumMapCapacity(), newSk3.getMaximumMapCapacity())
-	assert.Equal(t, mergedSketch.getCurrentMapCapacity(), newSk3.getCurrentMapCapacity())
-	assert.Equal(t, mergedSketch.getStreamLength(), newSk3.getStreamLength())
+	assert.Equal(t, mergedSketch.GetMaximumMapCapacity(), newSk3.GetMaximumMapCapacity())
+	assert.Equal(t, mergedSketch.GetCurrentMapCapacity(), newSk3.GetCurrentMapCapacity())
+	assert.Equal(t, mergedSketch.GetStreamLength(), newSk3.GetStreamLength())
 }
 
 func TestFrequentItemsByteResetAndEmptySerial(t *testing.T) {
-	sketch, err := NewLongSketchWithMaxMapSize(16)
+	sketch, err := NewLongsSketchWithMaxMapSize(16)
 	assert.NoError(t, err)
 	sketch.UpdateMany(10, 100)
 	sketch.UpdateMany(10, 100)
@@ -182,22 +182,22 @@ func TestFrequentItemsByteResetAndEmptySerial(t *testing.T) {
 	sketch.UpdateMany(1000002, 1010230)
 	sketch.Reset()
 
-	byteArray0, err := sketch.toSlice()
+	byteArray0, err := sketch.ToSlice()
 	assert.NoError(t, err)
-	newSk0, err := NewLongSketchFromSlice(byteArray0)
+	newSk0, err := NewLongsSketchFromSlice(byteArray0)
 	assert.NoError(t, err)
-	str0, err := sketch.serializeToString()
+	str0, err := sketch.ToString()
 	assert.NoError(t, err)
-	newStr0, err := newSk0.serializeToString()
+	newStr0, err := newSk0.ToString()
 	assert.NoError(t, err)
 	assert.Equal(t, str0, newStr0)
-	assert.Equal(t, sketch.getMaximumMapCapacity(), newSk0.getMaximumMapCapacity())
-	assert.Equal(t, sketch.getCurrentMapCapacity(), newSk0.getCurrentMapCapacity())
+	assert.Equal(t, sketch.GetMaximumMapCapacity(), newSk0.GetMaximumMapCapacity())
+	assert.Equal(t, sketch.GetCurrentMapCapacity(), newSk0.GetCurrentMapCapacity())
 }
 
 func TestFreqLongSliceSerDe(t *testing.T) {
 	minSize := 1 << _LG_MIN_MAP_SIZE
-	sk1, err := NewLongSketchWithMaxMapSize(minSize)
+	sk1, err := NewLongsSketchWithMaxMapSize(minSize)
 	assert.NoError(t, err)
 	sk1.UpdateMany(10, 100)
 	sk1.UpdateMany(10, 100)
@@ -205,9 +205,9 @@ func TestFreqLongSliceSerDe(t *testing.T) {
 	sk1.UpdateMany(1000001, 1010230)
 	sk1.UpdateMany(1000002, 1010230)
 
-	byteArray0, err := sk1.toSlice()
+	byteArray0, err := sk1.ToSlice()
 	assert.NoError(t, err)
-	sk2, err := NewLongSketchFromSlice(byteArray0)
+	sk2, err := NewLongsSketchFromSlice(byteArray0)
 	assert.NoError(t, err)
 
 	checkEquality(t, sk1, sk2)
@@ -215,7 +215,7 @@ func TestFreqLongSliceSerDe(t *testing.T) {
 
 func TestFreqLongStringSerDe(t *testing.T) {
 	minSize := 1 << _LG_MIN_MAP_SIZE
-	sk1, err := NewLongSketchWithMaxMapSize(minSize)
+	sk1, err := NewLongsSketchWithMaxMapSize(minSize)
 	assert.NoError(t, err)
 	sk1.UpdateMany(10, 100)
 	sk1.UpdateMany(10, 100)
@@ -223,29 +223,29 @@ func TestFreqLongStringSerDe(t *testing.T) {
 	sk1.UpdateMany(1000001, 1010230)
 	sk1.UpdateMany(1000002, 1010230)
 
-	str1, err := sk1.serializeToString()
+	str1, err := sk1.ToString()
 	assert.NoError(t, err)
-	sk2, err := NewLongSketchFromString(str1)
+	sk2, err := NewLongsSketchFromString(str1)
 	assert.NoError(t, err)
 
 	checkEquality(t, sk1, sk2)
 }
 
 func checkEquality(t *testing.T, sk1, sk2 *LongsSketch) {
-	assert.Equal(t, sk1.getNumActiveItems(), sk2.getNumActiveItems())
-	assert.Equal(t, sk1.getCurrentMapCapacity(), sk2.getCurrentMapCapacity())
-	assert.Equal(t, sk1.getMaximumError(), sk2.getMaximumError())
-	assert.Equal(t, sk1.getMaximumMapCapacity(), sk2.getMaximumMapCapacity())
-	assert.Equal(t, sk1.getStorageBytes(), sk2.getStorageBytes())
-	assert.Equal(t, sk1.getStreamLength(), sk2.getStreamLength())
-	assert.Equal(t, sk1.isEmpty(), sk2.isEmpty())
+	assert.Equal(t, sk1.GetNumActiveItems(), sk2.GetNumActiveItems())
+	assert.Equal(t, sk1.GetCurrentMapCapacity(), sk2.GetCurrentMapCapacity())
+	assert.Equal(t, sk1.GetMaximumError(), sk2.GetMaximumError())
+	assert.Equal(t, sk1.GetMaximumMapCapacity(), sk2.GetMaximumMapCapacity())
+	assert.Equal(t, sk1.GetStorageBytes(), sk2.GetStorageBytes())
+	assert.Equal(t, sk1.GetStreamLength(), sk2.GetStreamLength())
+	assert.Equal(t, sk1.IsEmpty(), sk2.IsEmpty())
 
 	NFN := ErrorTypeEnum.NO_FALSE_NEGATIVES
 	NFP := ErrorTypeEnum.NO_FALSE_POSITIVES
 
-	rowArr1, err := sk1.getFrequentItems(NFN)
+	rowArr1, err := sk1.GetFrequentItems(NFN)
 	assert.NoError(t, err)
-	rowArr2, err := sk2.getFrequentItems(NFN)
+	rowArr2, err := sk2.GetFrequentItems(NFN)
 	assert.NoError(t, err)
 	assert.Equal(t, len(rowArr1), len(rowArr2))
 	for i := 0; i < len(rowArr1); i++ {
@@ -254,9 +254,9 @@ func checkEquality(t *testing.T, sk1, sk2 *LongsSketch) {
 		assert.Equal(t, s1, s2)
 	}
 
-	rowArr1, err = sk1.getFrequentItems(NFP)
+	rowArr1, err = sk1.GetFrequentItems(NFP)
 	assert.NoError(t, err)
-	rowArr2, err = sk2.getFrequentItems(NFP)
+	rowArr2, err = sk2.GetFrequentItems(NFP)
 	assert.NoError(t, err)
 	assert.Equal(t, len(rowArr1), len(rowArr2))
 	for i := 0; i < len(rowArr1); i++ {
@@ -268,11 +268,11 @@ func checkEquality(t *testing.T, sk1, sk2 *LongsSketch) {
 
 func TestFreqLongSliceSerDeError(t *testing.T) {
 	minSize := 1 << _LG_MIN_MAP_SIZE
-	sk1, err := NewLongSketchWithMaxMapSize(minSize)
+	sk1, err := NewLongsSketchWithMaxMapSize(minSize)
 	assert.NoError(t, err)
 	sk1.Update(1)
 
-	byteArray0, err := sk1.toSlice()
+	byteArray0, err := sk1.ToSlice()
 	pre0 := binary.LittleEndian.Uint64(byteArray0)
 
 	tryBadMem(t, byteArray0, _PREAMBLE_LONGS_BYTE, 2) //Corrupt
@@ -291,13 +291,13 @@ func TestFreqLongSliceSerDeError(t *testing.T) {
 
 func tryBadMem(t *testing.T, mem []byte, byteOffset, byteValue int) {
 	binary.LittleEndian.PutUint64(mem[byteOffset:], uint64(byteValue))
-	_, err := NewLongSketchFromSlice(mem)
+	_, err := NewLongsSketchFromSlice(mem)
 	assert.Error(t, err)
 }
 
 func TestFreqLongStringSerDeError(t *testing.T) {
-	// sk1, err := NewLongSketchWithMaxMapSize(8)
-	// str1 := sk1.serializeToString()
+	// sk1, err := NewLongsSketchWithMaxMapSize(8)
+	// str1 := sk1.ToString()
 	// correct   = "1,10,2,4,0,0,0,4,";
 
 	tryBadString(t, "2,10,2,4,0,0,0,4,")   //bad SerVer of 2
@@ -306,7 +306,7 @@ func TestFreqLongStringSerDeError(t *testing.T) {
 }
 
 func tryBadString(t *testing.T, badString string) {
-	_, err := NewLongSketchFromString(badString)
+	_, err := NewLongsSketchFromString(badString)
 	assert.Error(t, err)
 }
 
@@ -329,27 +329,27 @@ func TestFreqLongs(t *testing.T) {
 	}
 
 	for h := 0; h < numSketches; h++ {
-		threshold := sketches[h].getMaximumError()
-		rows, err := sketches[h].getFrequentItems(ErrorTypeEnum.NO_FALSE_NEGATIVES)
+		threshold := sketches[h].GetMaximumError()
+		rows, err := sketches[h].GetFrequentItems(ErrorTypeEnum.NO_FALSE_NEGATIVES)
 		assert.NoError(t, err)
 		for i := 0; i < len(rows); i++ {
-			assert.True(t, rows[i].getUpperBound() > threshold)
+			assert.True(t, rows[i].GetUpperBound() > threshold)
 		}
 
-		rows, err = sketches[h].getFrequentItems(ErrorTypeEnum.NO_FALSE_POSITIVES)
+		rows, err = sketches[h].GetFrequentItems(ErrorTypeEnum.NO_FALSE_POSITIVES)
 		assert.NoError(t, err)
 		assert.Equal(t, len(rows), 0)
 		for i := 0; i < len(rows); i++ {
-			assert.True(t, rows[i].getLowerBound() > threshold)
+			assert.True(t, rows[i].GetLowerBound() > threshold)
 		}
 
-		rows, err = sketches[h].getFrequentItems(ErrorTypeEnum.NO_FALSE_NEGATIVES)
+		rows, err = sketches[h].GetFrequentItems(ErrorTypeEnum.NO_FALSE_NEGATIVES)
 	}
 }
 
 func newFrequencySketch(eps float64) (*LongsSketch, error) {
 	maxMapSize := common.CeilPowerOf2(int(1.0 / (eps * reversePurgeLongHashMapLoadFactor)))
-	return NewLongSketchWithMaxMapSize(maxMapSize)
+	return NewLongsSketchWithMaxMapSize(maxMapSize)
 }
 
 func TestUpdateOneTime(t *testing.T) {
@@ -359,35 +359,35 @@ func TestUpdateOneTime(t *testing.T) {
 	numSketches := 1
 	for h := 0; h < numSketches; h++ {
 		sketch, _ := newFrequencySketch(errorTolerance)
-		ub, err := sketch.getUpperBound(13)
+		ub, err := sketch.GetUpperBound(13)
 		assert.NoError(t, err)
 		assert.Equal(t, ub, int64(0))
-		lb, err := sketch.getLowerBound(13)
+		lb, err := sketch.GetLowerBound(13)
 		assert.NoError(t, err)
 		assert.Equal(t, lb, int64(0))
-		assert.Equal(t, sketch.getMaximumError(), int64(0))
-		est, err := sketch.getEstimate(13)
+		assert.Equal(t, sketch.GetMaximumError(), int64(0))
+		est, err := sketch.GetEstimate(13)
 		assert.NoError(t, err)
 		assert.Equal(t, est, int64(0))
 		sketch.Update(13)
-		// assert.Equal(t, sketch.getEstimate(13), 1)
+		// assert.Equal(t, sketch.GetEstimate(13), 1)
 	}
 }
 
 func TestGetInstanceSlice(t *testing.T) {
 	sl := make([]byte, 4)
-	_, err := NewLongSketchFromSlice(sl)
+	_, err := NewLongsSketchFromSlice(sl)
 	assert.Error(t, err)
 }
 
 func TestGetInstanceString(t *testing.T) {
-	_, err := NewLongSketchFromString("")
+	_, err := NewLongsSketchFromString("")
 	assert.Error(t, err)
 }
 
 func TestUpdateNegative(t *testing.T) {
 	minSize := 1 << _LG_MIN_MAP_SIZE
-	fls, err := NewLongSketchWithMaxMapSize(minSize)
+	fls, err := NewLongsSketchWithMaxMapSize(minSize)
 	assert.NoError(t, err)
 	err = fls.UpdateMany(1, 0)
 	assert.NoError(t, err)
@@ -397,10 +397,10 @@ func TestUpdateNegative(t *testing.T) {
 
 func TestGetFrequentItems1(t *testing.T) {
 	minSize := 1 << _LG_MIN_MAP_SIZE
-	fls, err := NewLongSketchWithMaxMapSize(minSize)
+	fls, err := NewLongsSketchWithMaxMapSize(minSize)
 	assert.NoError(t, err)
 	fls.Update(1)
-	rowArr, err := fls.getFrequentItems(ErrorTypeEnum.NO_FALSE_POSITIVES)
+	rowArr, err := fls.GetFrequentItems(ErrorTypeEnum.NO_FALSE_POSITIVES)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, rowArr)
 	row := rowArr[0]
@@ -417,44 +417,44 @@ func TestGetFrequentItems1(t *testing.T) {
 
 func TestGetStorageByes(t *testing.T) {
 	minSize := 1 << _LG_MIN_MAP_SIZE
-	fls, err := NewLongSketchWithMaxMapSize(minSize)
+	fls, err := NewLongsSketchWithMaxMapSize(minSize)
 	assert.NoError(t, err)
-	sl, err := fls.toSlice()
+	sl, err := fls.ToSlice()
 	assert.NoError(t, err)
-	assert.Equal(t, len(sl), fls.getStorageBytes())
+	assert.Equal(t, len(sl), fls.GetStorageBytes())
 	err = fls.Update(1)
 	assert.NoError(t, err)
-	sl, err = fls.toSlice()
+	sl, err = fls.ToSlice()
 	assert.NoError(t, err)
-	assert.Equal(t, len(sl), fls.getStorageBytes())
+	assert.Equal(t, len(sl), fls.GetStorageBytes())
 }
 
 func TestDeSerFromString(t *testing.T) {
 	minSize := 1 << _LG_MIN_MAP_SIZE
-	fls, err := NewLongSketchWithMaxMapSize(minSize)
+	fls, err := NewLongsSketchWithMaxMapSize(minSize)
 	assert.NoError(t, err)
-	str, err := fls.serializeToString()
+	str, err := fls.ToString()
 	fmt.Println(str)
 	assert.NoError(t, err)
 	fls.Update(1)
-	str, err = fls.serializeToString()
+	str, err = fls.ToString()
 	assert.NoError(t, err)
 	fmt.Println(str)
 }
 
 func TestMerge(t *testing.T) {
 	minSize := 1 << _LG_MIN_MAP_SIZE
-	fls1, err := NewLongSketchWithMaxMapSize(minSize)
+	fls1, err := NewLongsSketchWithMaxMapSize(minSize)
 	assert.NoError(t, err)
 	var fls2 *LongsSketch
 	fls2 = nil
-	fle, err := fls1.merge(fls2)
+	fle, err := fls1.Merge(fls2)
 	assert.NoError(t, err)
-	assert.True(t, fle.isEmpty())
+	assert.True(t, fle.IsEmpty())
 
-	fls2, err = NewLongSketchWithMaxMapSize(minSize)
+	fls2, err = NewLongsSketchWithMaxMapSize(minSize)
 	assert.NoError(t, err)
-	fle, err = fls1.merge(fls2)
+	fle, err = fls1.Merge(fls2)
 	assert.NoError(t, err)
 }
 
@@ -480,11 +480,11 @@ func TestSortItems(t *testing.T) {
 	}
 
 	for h := 0; h < numSketches; h++ {
-		threshold := sketches[h].getMaximumError()
-		rows, err := sketches[h].getFrequentItems(ErrorTypeEnum.NO_FALSE_NEGATIVES)
+		threshold := sketches[h].GetMaximumError()
+		rows, err := sketches[h].GetFrequentItems(ErrorTypeEnum.NO_FALSE_NEGATIVES)
 		assert.NoError(t, err)
 		for i := 0; i < len(rows); i++ {
-			assert.True(t, rows[i].getUpperBound() > threshold)
+			assert.True(t, rows[i].GetUpperBound() > threshold)
 		}
 		first := rows[0]
 		anItem := first.item
@@ -514,7 +514,7 @@ func TestToString1(t *testing.T) {
 
 func printSketch(t *testing.T, size int, items []int64) {
 	var sb strings.Builder
-	fls, err := NewLongSketchWithMaxMapSize(size)
+	fls, err := NewLongsSketchWithMaxMapSize(size)
 	assert.NoError(t, err)
 	for i := 0; i < len(items); i++ {
 		fls.UpdateMany(int64(i+1), items[i])
@@ -529,7 +529,7 @@ func printSketch(t *testing.T, size int, items []int64) {
 }
 
 func printRows(t *testing.T, fls *LongsSketch, errorType ErrorType) {
-	rows, err := fls.getFrequentItems(errorType)
+	rows, err := fls.GetFrequentItems(errorType)
 	assert.NoError(t, err)
 	fmt.Println(errorType.Name)
 	fmt.Printf("  %20s%20s%20s %s", "Est", "UB", "LB", "Item")
@@ -543,4 +543,53 @@ func printRows(t *testing.T, fls *LongsSketch, errorType ErrorType) {
 		var nullRow *Row
 		assert.NotEqual(t, rows[0], nullRow)
 	}
+}
+
+func TestStringDeserEmptyNotCorrupt(t *testing.T) {
+	size := 1 << _LG_MIN_MAP_SIZE
+	thresh := (size * 3) / 4
+	format := "%6d%10s%s"
+	fls, err := NewLongsSketchWithMaxMapSize(size)
+	assert.NoError(t, err)
+	fmt.Printf("Sketch Size: %d\n", size)
+	for i := 0; i <= thresh; i++ {
+		err := fls.UpdateMany(int64(i+1), 1)
+		assert.NoError(t, err)
+		s, err := fls.ToString()
+		assert.NoError(t, err)
+		fmt.Printf("SER   "+format+"\n", (i + 1), fmt.Sprintf("%t : ", fls.IsEmpty()), s)
+		fls2, err := NewLongsSketchFromString(s)
+		assert.NoError(t, err)
+		fmt.Printf("DESER "+format+"\n", (i + 1), fmt.Sprintf("%t : ", fls2.IsEmpty()), s)
+	}
+}
+
+func TestStringDeserEmptyCorrupt(t *testing.T) {
+	var s strings.Builder
+	s.WriteString("1,")  //serVer
+	s.WriteString("10,") //FamID
+	s.WriteString("3,")  //lgMaxMapSz
+	s.WriteString("0,")  //Empty Flag = false ... corrupted, should be true
+	s.WriteString("7,")  //stream Len so far
+	s.WriteString("1,")  //error offset
+	s.WriteString("0,")  //numActive ...conflict with empty
+	s.WriteString("8,")  //curMapLen
+	_, err := NewLongsSketchFromString(s.String())
+	assert.Error(t, err)
+}
+
+func TestGetEpsilon(t *testing.T) {
+	eps, err := GetEpsilonLongsSketch(1024)
+	assert.NoError(t, err)
+	assert.Equal(t, eps, 3.5/1024)
+
+	_, err = GetEpsilonLongsSketch(1000)
+	assert.Error(t, err)
+}
+
+func TestGetAprioriError(t *testing.T) {
+	eps := 3.5 / 1024
+	apr, err := GetAprioriErrorLongsSketch(1024, 10_000)
+	assert.NoError(t, err)
+	assert.Equal(t, apr, eps*10_000)
 }

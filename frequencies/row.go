@@ -42,15 +42,15 @@ func (r *Row) String() string {
 	return fmt.Sprintf("  %20d%20d%20d %d", r.est, r.ub, r.lb, r.item)
 }
 
-func (r *Row) getEstimate() int64 {
+func (r *Row) GetEstimate() int64 {
 	return r.est
 }
 
-func (r *Row) getUpperBound() int64 {
+func (r *Row) GetUpperBound() int64 {
 	return r.ub
 }
 
-func (r *Row) getLowerBound() int64 {
+func (r *Row) GetLowerBound() int64 {
 	return r.lb
 }
 
@@ -59,15 +59,15 @@ func sortItems(sk *LongsSketch, threshold int64, errorType ErrorType) ([]*Row, e
 	iter := sk.hashMap.iterator()
 	if errorType == ErrorTypeEnum.NO_FALSE_NEGATIVES {
 		for iter.next() {
-			est, err := sk.getEstimate(iter.getKey())
+			est, err := sk.GetEstimate(iter.getKey())
 			if err != nil {
 				return nil, err
 			}
-			ub, err := sk.getUpperBound(iter.getKey())
+			ub, err := sk.GetUpperBound(iter.getKey())
 			if err != nil {
 				return nil, err
 			}
-			lb, err := sk.getLowerBound(iter.getKey())
+			lb, err := sk.GetLowerBound(iter.getKey())
 			if err != nil {
 				return nil, err
 			}
@@ -78,15 +78,15 @@ func sortItems(sk *LongsSketch, threshold int64, errorType ErrorType) ([]*Row, e
 		}
 	} else { //NO_FALSE_POSITIVES
 		for iter.next() {
-			est, err := sk.getEstimate(iter.getKey())
+			est, err := sk.GetEstimate(iter.getKey())
 			if err != nil {
 				return nil, err
 			}
-			ub, err := sk.getUpperBound(iter.getKey())
+			ub, err := sk.GetUpperBound(iter.getKey())
 			if err != nil {
 				return nil, err
 			}
-			lb, err := sk.getLowerBound(iter.getKey())
+			lb, err := sk.GetLowerBound(iter.getKey())
 			if err != nil {
 				return nil, err
 			}

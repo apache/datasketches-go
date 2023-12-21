@@ -513,23 +513,29 @@ func (s *LongsSketch) ToSlice() ([]byte, error) {
 		binary.LittleEndian.PutUint64(outArr, uint64(pre0))
 		return outArr, nil
 	}
-
+	pre := int64(0)
 	pre0 = insertFlags(0, pre0) //Byte 5
 	preArr := make([]int64, preLongs)
 	preArr[0] = pre0
-	preArr[1] = insertActiveItems(int64(activeItems), pre0)
+	preArr[1] = insertActiveItems(int64(activeItems), pre)
 	preArr[2] = s.streamWeight
 	preArr[3] = s.offset
+
 	for i := 0; i < preLongs; i++ {
 		binary.LittleEndian.PutUint64(outArr[i<<3:], uint64(preArr[i]))
 	}
-	//now the active items
+
+	preBytes := preLongs << 3
 	activeValues := s.hashMap.getActiveValues()
+	for i := 0; i < activeItems; i++ {
+		binary.LittleEndian.PutUint64(outArr[preBytes+(i<<3):], uint64(activeValues[i]))
+	}
+
 	activeKeys := s.hashMap.getActiveKeys()
 	for i := 0; i < activeItems; i++ {
-		binary.LittleEndian.PutUint64(outArr[(preLongs+i)<<3:], uint64(activeValues[i]))
-		binary.LittleEndian.PutUint64(outArr[(preLongs+activeItems+i)<<3:], uint64(activeKeys[i]))
+		binary.LittleEndian.PutUint64(outArr[preBytes+((activeItems+i)<<3):], uint64(activeKeys[i]))
 	}
+
 	return outArr, nil
 }
 

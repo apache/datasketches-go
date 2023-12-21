@@ -17,9 +17,23 @@
 
 package frequencies
 
-type ErrorType = int
+type ErrorType struct {
+	id   int
+	Name string
+}
 
-const (
-	NO_FALSE_POSITIVES = ErrorType(1)
-	NO_FALSE_NEGATIVES = ErrorType(2)
-)
+type ErrorTypes struct {
+	NO_FALSE_POSITIVES ErrorType
+	NO_FALSE_NEGATIVES ErrorType
+}
+
+var ErrorTypeEnum = &ErrorTypes{
+	NO_FALSE_POSITIVES: ErrorType{
+		id:   1,
+		Name: "NO_FALSE_POSITIVES",
+	},
+	NO_FALSE_NEGATIVES: ErrorType{
+		id:   2,
+		Name: "NO_FALSE_NEGATIVES",
+	},
+}

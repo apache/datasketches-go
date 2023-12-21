@@ -352,6 +352,19 @@ func (s *reversePurgeLongHashMap) hashProbe(key int64) int {
 	return probe
 }
 
+func (s *reversePurgeLongHashMap) String() string {
+	var sb strings.Builder
+	sb.WriteString("ReversePurgeLongHashMap:\n")
+	sb.WriteString(fmt.Sprintf("  %12s:%11s%20s %s\n", "Index", "States", "Values", "Keys"))
+	for i := 0; i < len(s.keys); i++ {
+		if s.states[i] <= 0 {
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("  %12d:%11d%20d %d\n", i, s.states[i], s.values[i], s.keys[i]))
+	}
+	return sb.String()
+}
+
 func newIterator(keys []int64, values []int64, states []int16, numActive int) *iteratorHashMap {
 	stride := int(uint64(float64(len(keys))*common.InverseGolden) | 1)
 	return &iteratorHashMap{

@@ -22,10 +22,6 @@ import (
 	"sort"
 )
 
-const (
-	hfmt string = "  %20s%20s%20s %s"
-)
-
 type Row struct {
 	item int64
 	est  int64
@@ -33,8 +29,8 @@ type Row struct {
 	lb   int64
 }
 
-func NewRow(item int64, estimate int64, ub int64, lb int64) Row {
-	return Row{
+func NewRow(item int64, estimate int64, ub int64, lb int64) *Row {
+	return &Row{
 		item: item,
 		est:  estimate,
 		ub:   ub,
@@ -43,7 +39,7 @@ func NewRow(item int64, estimate int64, ub int64, lb int64) Row {
 }
 
 func (r *Row) String() string {
-	return fmt.Sprintf("  %20d%20d%20d %d", r.item, r.est, r.ub, r.lb)
+	return fmt.Sprintf("  %20d%20d%20d %d", r.est, r.ub, r.lb, r.item)
 }
 
 func (r *Row) getEstimate() int64 {
@@ -61,7 +57,7 @@ func (r *Row) getLowerBound() int64 {
 func sortItems(sk *LongsSketch, threshold int64, errorType ErrorType) ([]*Row, error) {
 	rowList := make([]*Row, 0)
 	iter := sk.hashMap.iterator()
-	if errorType == NO_FALSE_NEGATIVES {
+	if errorType == ErrorTypeEnum.NO_FALSE_NEGATIVES {
 		for iter.next() {
 			est, err := sk.getEstimate(iter.getKey())
 			if err != nil {
@@ -77,7 +73,7 @@ func sortItems(sk *LongsSketch, threshold int64, errorType ErrorType) ([]*Row, e
 			}
 			if ub >= threshold {
 				row := NewRow(iter.getKey(), est, ub, lb)
-				rowList = append(rowList, &row)
+				rowList = append(rowList, row)
 			}
 		}
 	} else { //NO_FALSE_POSITIVES
@@ -96,13 +92,13 @@ func sortItems(sk *LongsSketch, threshold int64, errorType ErrorType) ([]*Row, e
 			}
 			if lb >= threshold {
 				row := NewRow(iter.getKey(), est, ub, lb)
-				rowList = append(rowList, &row)
+				rowList = append(rowList, row)
 			}
 		}
 	}
 
 	sort.Slice(rowList, func(i, j int) bool {
-		return rowList[i].est < rowList[j].est
+		return rowList[i].est > rowList[j].est
 	})
 
 	return rowList, nil

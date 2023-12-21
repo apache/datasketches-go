@@ -19,8 +19,10 @@ package frequencies
 
 import (
 	"encoding/binary"
+	"fmt"
 	"github.com/apache/datasketches-go/common"
 	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
 )
 
@@ -238,8 +240,8 @@ func checkEquality(t *testing.T, sk1, sk2 *LongsSketch) {
 	assert.Equal(t, sk1.getStreamLength(), sk2.getStreamLength())
 	assert.Equal(t, sk1.isEmpty(), sk2.isEmpty())
 
-	NFN := NO_FALSE_NEGATIVES
-	NFP := NO_FALSE_POSITIVES
+	NFN := ErrorTypeEnum.NO_FALSE_NEGATIVES
+	NFP := ErrorTypeEnum.NO_FALSE_POSITIVES
 
 	rowArr1, err := sk1.getFrequentItems(NFN)
 	assert.NoError(t, err)
@@ -328,20 +330,20 @@ func TestFreqLongs(t *testing.T) {
 
 	for h := 0; h < numSketches; h++ {
 		threshold := sketches[h].getMaximumError()
-		rows, err := sketches[h].getFrequentItems(NO_FALSE_NEGATIVES)
+		rows, err := sketches[h].getFrequentItems(ErrorTypeEnum.NO_FALSE_NEGATIVES)
 		assert.NoError(t, err)
 		for i := 0; i < len(rows); i++ {
 			assert.True(t, rows[i].getUpperBound() > threshold)
 		}
 
-		rows, err = sketches[h].getFrequentItems(NO_FALSE_POSITIVES)
+		rows, err = sketches[h].getFrequentItems(ErrorTypeEnum.NO_FALSE_POSITIVES)
 		assert.NoError(t, err)
 		assert.Equal(t, len(rows), 0)
 		for i := 0; i < len(rows); i++ {
 			assert.True(t, rows[i].getLowerBound() > threshold)
 		}
 
-		rows, err = sketches[h].getFrequentItems(NO_FALSE_NEGATIVES)
+		rows, err = sketches[h].getFrequentItems(ErrorTypeEnum.NO_FALSE_NEGATIVES)
 	}
 }
 
@@ -391,4 +393,154 @@ func TestUpdateNegative(t *testing.T) {
 	assert.NoError(t, err)
 	err = fls.UpdateMany(1, -1)
 	assert.Error(t, err)
+}
+
+func TestGetFrequentItems1(t *testing.T) {
+	minSize := 1 << _LG_MIN_MAP_SIZE
+	fls, err := NewLongSketchWithMaxMapSize(minSize)
+	assert.NoError(t, err)
+	fls.Update(1)
+	rowArr, err := fls.getFrequentItems(ErrorTypeEnum.NO_FALSE_POSITIVES)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, rowArr)
+	row := rowArr[0]
+	assert.Equal(t, row.est, int64(1))
+	assert.Equal(t, row.item, int64(1))
+	assert.Equal(t, row.lb, int64(1))
+	assert.Equal(t, row.ub, int64(1))
+	newRow := NewRow(row.item, row.est+1, row.ub, row.lb)
+	assert.NotEqual(t, row, newRow)
+	newRow = NewRow(row.item, row.est, row.ub, row.lb)
+	assert.Equal(t, row, newRow)
+
+}
+
+func TestGetStorageByes(t *testing.T) {
+	minSize := 1 << _LG_MIN_MAP_SIZE
+	fls, err := NewLongSketchWithMaxMapSize(minSize)
+	assert.NoError(t, err)
+	sl, err := fls.toSlice()
+	assert.NoError(t, err)
+	assert.Equal(t, len(sl), fls.getStorageBytes())
+	err = fls.Update(1)
+	assert.NoError(t, err)
+	sl, err = fls.toSlice()
+	assert.NoError(t, err)
+	assert.Equal(t, len(sl), fls.getStorageBytes())
+}
+
+func TestDeSerFromString(t *testing.T) {
+	minSize := 1 << _LG_MIN_MAP_SIZE
+	fls, err := NewLongSketchWithMaxMapSize(minSize)
+	assert.NoError(t, err)
+	str, err := fls.serializeToString()
+	fmt.Println(str)
+	assert.NoError(t, err)
+	fls.Update(1)
+	str, err = fls.serializeToString()
+	assert.NoError(t, err)
+	fmt.Println(str)
+}
+
+func TestMerge(t *testing.T) {
+	minSize := 1 << _LG_MIN_MAP_SIZE
+	fls1, err := NewLongSketchWithMaxMapSize(minSize)
+	assert.NoError(t, err)
+	var fls2 *LongsSketch
+	fls2 = nil
+	fle, err := fls1.merge(fls2)
+	assert.NoError(t, err)
+	assert.True(t, fle.isEmpty())
+
+	fls2, err = NewLongSketchWithMaxMapSize(minSize)
+	assert.NoError(t, err)
+	fle, err = fls1.merge(fls2)
+	assert.NoError(t, err)
+}
+
+func TestSortItems(t *testing.T) {
+	numSketches := 1
+	n := 2222
+	errorTolerance := 1.0 / 100
+	sketchSize := common.CeilPowerOf2(int(1.0 / (errorTolerance * reversePurgeLongHashMapLoadFactor)))
+	fmt.Printf("sketchSize: %d\n", sketchSize)
+
+	sketches := make([]*LongsSketch, numSketches)
+	for h := 0; h < numSketches; h++ {
+		sketches[h], _ = newFrequencySketch(float64(sketchSize))
+	}
+
+	prob := .001
+	for i := 0; i < n; i++ {
+		item := randomGeometricDist(prob) + 1
+		for h := 0; h < numSketches; h++ {
+			err := sketches[h].Update(item)
+			assert.NoError(t, err)
+		}
+	}
+
+	for h := 0; h < numSketches; h++ {
+		threshold := sketches[h].getMaximumError()
+		rows, err := sketches[h].getFrequentItems(ErrorTypeEnum.NO_FALSE_NEGATIVES)
+		assert.NoError(t, err)
+		for i := 0; i < len(rows); i++ {
+			assert.True(t, rows[i].getUpperBound() > threshold)
+		}
+		first := rows[0]
+		anItem := first.item
+		anEst := first.est
+		aLB := first.lb
+		s := first.String()
+		fmt.Println(s)
+		assert.True(t, anEst >= 0)
+		assert.True(t, aLB >= 0)
+		assert.Equal(t, anItem, anItem) //dummy test
+
+	}
+}
+
+func TestGetAndCheckPreLongs(t *testing.T) {
+	byteArr := make([]byte, 8)
+	byteArr[0] = 2
+	_, err := checkPreambleSize(byteArr)
+	assert.Error(t, err)
+}
+
+func TestToString1(t *testing.T) {
+	size := 1 << _LG_MIN_MAP_SIZE
+	printSketch(t, size, []int64{1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5})
+	printSketch(t, size, []int64{5, 4, 3, 2, 1, 1, 1, 1, 1, 1, 1})
+}
+
+func printSketch(t *testing.T, size int, items []int64) {
+	var sb strings.Builder
+	fls, err := NewLongSketchWithMaxMapSize(size)
+	assert.NoError(t, err)
+	for i := 0; i < len(items); i++ {
+		fls.UpdateMany(int64(i+1), items[i])
+	}
+	sb.WriteString(fmt.Sprintf("Sketch Size: %d\n", size))
+	sb.WriteString(fls.String())
+	fmt.Println(sb.String())
+	printRows(t, fls, ErrorTypeEnum.NO_FALSE_NEGATIVES)
+	fmt.Println("")
+	printRows(t, fls, ErrorTypeEnum.NO_FALSE_POSITIVES)
+	fmt.Println("")
+}
+
+func printRows(t *testing.T, fls *LongsSketch, errorType ErrorType) {
+	rows, err := fls.getFrequentItems(errorType)
+	assert.NoError(t, err)
+	fmt.Println(errorType.Name)
+	fmt.Printf("  %20s%20s%20s %s", "Est", "UB", "LB", "Item")
+	fmt.Print("\n")
+	for i := 0; i < len(rows); i++ {
+		row := rows[i]
+		s2 := row.String()
+		fmt.Println(s2)
+	}
+	if len(rows) > 0 { //check equals null case
+		var nullRow *Row
+		assert.NotEqual(t, rows[0], nullRow)
+	}
 }

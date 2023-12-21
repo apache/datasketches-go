@@ -338,6 +338,18 @@ func (s *LongsSketch) UpdateMany(item int64, count int64) error {
 	return nil
 }
 
+func (s *LongsSketch) String() string {
+	var sb strings.Builder
+	sb.WriteString("FrequentLongsSketch:")
+	sb.WriteString("\n")
+	sb.WriteString("  Stream Length    : " + strconv.FormatInt(s.streamWeight, 10))
+	sb.WriteString("\n")
+	sb.WriteString("  Max Error Offset : " + strconv.FormatInt(s.offset, 10))
+	sb.WriteString("\n")
+	sb.WriteString(s.hashMap.String())
+	return sb.String()
+}
+
 func (s *LongsSketch) merge(other *LongsSketch) (*LongsSketch, error) {
 	if other == nil || other.isEmpty() {
 		return s, nil

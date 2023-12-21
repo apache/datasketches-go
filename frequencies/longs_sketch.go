@@ -72,7 +72,7 @@ func NewLongsSketch(lgMaxMapSize int, lgCurMapSize int) (*LongsSketch, error) {
 	//set initial size of hash map
 	lgMaxMapSize = max(lgMaxMapSize, _LG_MIN_MAP_SIZE)
 	lgCurMapSize = max(lgCurMapSize, _LG_MIN_MAP_SIZE)
-	hashMap, err := NewReversePurgeLongHashMap(1 << lgCurMapSize)
+	hashMap, err := newReversePurgeLongHashMap(1 << lgCurMapSize)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func NewLongsSketch(lgMaxMapSize int, lgCurMapSize int) (*LongsSketch, error) {
 	offset := int64(0)
 	sampleSize := min(_SAMPLE_SIZE, maxMapCap)
 	return &LongsSketch{
-		lgMaxMapSize: int(lgMaxMapSize),
+		lgMaxMapSize: lgMaxMapSize,
 		curMapCap:    curMapCap,
 		offset:       offset,
 		sampleSize:   sampleSize,
@@ -125,17 +125,17 @@ func NewLongsSketchFromSlice(slc []byte) (*LongsSketch, error) {
 	preLongsEq1 := preLongs == 1
 	preLongsEqMax := preLongs == maxPreLongs
 	if !preLongsEq1 && !preLongsEqMax {
-		return nil, fmt.Errorf("Possible Corruption: PreLongs must be 1 or %d: %d", maxPreLongs, preLongs)
+		return nil, fmt.Errorf("possible Corruption: PreLongs must be 1 or %d: %d", maxPreLongs, preLongs)
 	}
 	if serVer != _SER_VER {
-		return nil, fmt.Errorf("Possible Corruption: Ser Ver must be %d: %d", _SER_VER, serVer)
+		return nil, fmt.Errorf("possible Corruption: Ser Ver must be %d: %d", _SER_VER, serVer)
 	}
 	actFamID := common.FamilyEnum.Frequency.Id
 	if familyID != actFamID {
-		return nil, fmt.Errorf("Possible Corruption: FamilyID must be %d: %d", actFamID, familyID)
+		return nil, fmt.Errorf("possible Corruption: FamilyID must be %d: %d", actFamID, familyID)
 	}
 	if empty && !preLongsEq1 {
-		return nil, fmt.Errorf("Possible Corruption: Empty Flag set incorrectly: %t", preLongsEq1)
+		return nil, fmt.Errorf("possible Corruption: Empty Flag set incorrectly: %t", preLongsEq1)
 	}
 	if empty {
 		return NewLongsSketch(lgMaxMapSize, _LG_MIN_MAP_SIZE)
@@ -159,7 +159,7 @@ func NewLongsSketchFromSlice(slc []byte) (*LongsSketch, error) {
 	countArray := make([]int64, activeItems)
 	reqBytes := preBytes + 2*activeItems*8 //count Arr + Items Arr
 	if len(slc) < reqBytes {
-		return nil, fmt.Errorf("Possible Corruption: Insufficient bytes in array: %d, %d", len(slc), reqBytes)
+		return nil, fmt.Errorf("possible Corruption: Insufficient bytes in array: %d, %d", len(slc), reqBytes)
 	}
 	for i := 0; i < activeItems; i++ {
 		countArray[i] = int64(binary.LittleEndian.Uint64(slc[preBytes+(i<<3):]))
@@ -173,10 +173,12 @@ func NewLongsSketchFromSlice(slc []byte) (*LongsSketch, error) {
 	}
 
 	// UpdateMany the sketch
-	for i := 0; i < activeItems; i++ {
-		fls.UpdateMany(itemArray[i], countArray[i])
+	for i := 0; i < activeItems && err == nil; i++ {
+		err = fls.UpdateMany(itemArray[i], countArray[i])
 	}
-
+	if err != nil {
+		return nil, err
+	}
 	fls.streamWeight = preArr[2] //override streamWeight due to updating
 	return fls, nil
 }
@@ -187,7 +189,7 @@ func NewLongsSketchFromSlice(slc []byte) (*LongsSketch, error) {
 // str is a string representation of a sketch of this class.
 func NewLongsSketchFromString(str string) (*LongsSketch, error) {
 	if len(str) < 1 {
-		return nil, fmt.Errorf("String is empty")
+		return nil, errors.New("string is empty")
 	}
 	// Remove trailing comma if present
 	// as this will cause a problem with the split
@@ -196,7 +198,7 @@ func NewLongsSketchFromString(str string) (*LongsSketch, error) {
 	}
 	tokens := strings.Split(str, ",")
 	if len(tokens) < (strPreambleTokens + 2) {
-		return nil, fmt.Errorf("String not long enough: %d", len(tokens))
+		return nil, fmt.Errorf("string not long enough: %d", len(tokens))
 	}
 	serVe, err := strconv.ParseInt(tokens[0], 10, 32)
 	if err != nil {
@@ -235,10 +237,10 @@ func NewLongsSketchFromString(str string) (*LongsSketch, error) {
 
 	//checks
 	if serVe != _SER_VER {
-		return nil, fmt.Errorf("Possible Corruption: Bad SerVer: %d", serVe)
+		return nil, fmt.Errorf("possible Corruption: Bad SerVer: %d", serVe)
 	}
 	if famID != int64(common.FamilyEnum.Frequency.Id) {
-		return nil, fmt.Errorf("Possible Corruption: Bad Family: %d", famID)
+		return nil, fmt.Errorf("possible Corruption: Bad Family: %d", famID)
 	}
 	empty := flags > 0
 	if !empty && (numActive == 0) {
@@ -246,7 +248,7 @@ func NewLongsSketchFromString(str string) (*LongsSketch, error) {
 	}
 	numTokens := int64(len(tokens))
 	if (2 * numActive) != (numTokens - strPreambleTokens - 2) {
-		return nil, fmt.Errorf("Possible Corruption: Incorrect # of tokens: %d, numActive: %d", numTokens, numActive)
+		return nil, fmt.Errorf("possible Corruption: Incorrect # of tokens: %d, numActive: %d", numTokens, numActive)
 	}
 	//    if ((2 * numActive) != (numTokens - STR_PREAMBLE_TOKENS - 2)) {
 	sk, err := NewLongsSketch(int(lgMax), int(lgCur))
@@ -422,7 +424,7 @@ func (s *LongsSketch) UpdateMany(item int64, count int64) error {
 		return nil
 	}
 	if count < 0 {
-		return fmt.Errorf("count may not be negative")
+		return errors.New("count may not be negative")
 	}
 	s.streamWeight += count
 	err := s.hashMap.adjustOrPutValue(item, count)
@@ -434,13 +436,16 @@ func (s *LongsSketch) UpdateMany(item int64, count int64) error {
 		// Over the threshold, we need to do something
 		if s.hashMap.lgLength < s.lgMaxMapSize {
 			// Below tgt size, we can grow
-			s.hashMap.resize(2 * len(s.hashMap.keys))
+			err = s.hashMap.resize(2 * len(s.hashMap.keys))
+			if err != nil {
+				return err
+			}
 			s.curMapCap = s.hashMap.getCapacity()
 		} else {
 			// At tgt size, must purge
 			s.offset += s.hashMap.purge(s.sampleSize)
 			if s.GetNumActiveItems() > s.GetMaximumMapCapacity() {
-				return fmt.Errorf("purge did not reduce active items")
+				return errors.New("purge did not reduce active items")
 			}
 		}
 	}
@@ -526,12 +531,18 @@ func (s *LongsSketch) ToSlice() ([]byte, error) {
 	}
 
 	preBytes := preLongs << 3
-	activeValues := s.hashMap.getActiveValues()
+	activeValues, err := s.hashMap.getActiveValues()
+	if err != nil {
+		return nil, err
+	}
 	for i := 0; i < activeItems; i++ {
 		binary.LittleEndian.PutUint64(outArr[preBytes+(i<<3):], uint64(activeValues[i]))
 	}
 
-	activeKeys := s.hashMap.getActiveKeys()
+	activeKeys, err := s.hashMap.getActiveKeys()
+	if err != nil {
+		return nil, err
+	}
 	for i := 0; i < activeItems; i++ {
 		binary.LittleEndian.PutUint64(outArr[preBytes+((activeItems+i)<<3):], uint64(activeKeys[i]))
 	}
@@ -541,7 +552,7 @@ func (s *LongsSketch) ToSlice() ([]byte, error) {
 
 // Reset resets this sketch to a virgin state.
 func (s *LongsSketch) Reset() {
-	hasMap, _ := NewReversePurgeLongHashMap(1 << _LG_MIN_MAP_SIZE)
+	hasMap, _ := newReversePurgeLongHashMap(1 << _LG_MIN_MAP_SIZE)
 	s.curMapCap = hasMap.getCapacity()
 	s.offset = 0
 	s.streamWeight = 0

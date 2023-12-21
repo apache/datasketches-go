@@ -18,6 +18,7 @@
 package frequencies
 
 import (
+	"errors"
 	"fmt"
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/thetacommon"
@@ -51,12 +52,12 @@ const (
 	reversePurgeLongHashMapDriftLimit = 1024 //used only in stress testing
 )
 
-// NewReversePurgeLongHashMap constructs a new reversePurgeLongHashMap.
+// newReversePurgeLongHashMap constructs a new reversePurgeLongHashMap.
 // It will create arrays of length mapSize, which must be a power of two.
 // This restriction was made to ensure fast hashing.
 // The member loadThreshold is then set to the largest value that
 // will not overload the hash table.
-func NewReversePurgeLongHashMap(mapSize int) (*reversePurgeLongHashMap, error) {
+func newReversePurgeLongHashMap(mapSize int) (*reversePurgeLongHashMap, error) {
 	lgLength, err := common.ExactLog2(mapSize)
 	if err != nil {
 		return nil, fmt.Errorf("mapSize: %e", err)
@@ -80,7 +81,7 @@ func (r *reversePurgeLongHashMap) get(key int64) (int64, error) {
 		if r.keys[probe] == key {
 			return r.values[probe], nil
 		}
-		return 0, fmt.Errorf("key not found")
+		return 0, errors.New("key not found")
 	}
 	return 0, nil
 }
@@ -106,14 +107,14 @@ func (r *reversePurgeLongHashMap) adjustOrPutValue(key int64, adjustAmount int64
 		probe = (probe + 1) & int64(arrayMask)
 		drift++
 		if drift >= reversePurgeLongHashMapDriftLimit {
-			panic("drift >= driftLimit")
+			return errors.New("drift >= driftLimit")
 		}
 	}
 	//found either an empty slot or the key
 	if r.states[probe] == 0 { //found empty slot
 		// adding the key and value to the table
 		if r.numActive > r.loadThreshold {
-			return fmt.Errorf("numActive >= loadThreshold")
+			return errors.New("numActive >= loadThreshold")
 		}
 		r.keys[probe] = key
 		r.values[probe] = adjustAmount
@@ -121,7 +122,7 @@ func (r *reversePurgeLongHashMap) adjustOrPutValue(key int64, adjustAmount int64
 		r.numActive++
 	} else { //found the key, adjust the value
 		if r.keys[probe] != key {
-			panic("keys[probe] != key")
+			return errors.New("keys[probe] != key")
 		}
 		r.values[probe] += adjustAmount
 	}
@@ -212,7 +213,7 @@ func (r *reversePurgeLongHashMap) keepOnlyPositiveCounts() {
 	}
 }
 
-func (r *reversePurgeLongHashMap) hashDelete(deleteProbe int) {
+func (r *reversePurgeLongHashMap) hashDelete(deleteProbe int) error {
 	// Looks ahead in the table to search for another item to move to this location.
 	// If none are found, the status is changed
 	r.states[deleteProbe] = 0 //mark as empty
@@ -235,15 +236,16 @@ func (r *reversePurgeLongHashMap) hashDelete(deleteProbe int) {
 		drift++
 		//only used for theoretical analysis
 		if drift >= reversePurgeLongHashMapDriftLimit {
-			panic("drift >= driftLimit")
+			return errors.New("drift >= driftLimit")
 		}
 	}
+	return nil
 }
 
 func deserializeReversePurgeLongHashMapFromString(string string) (*reversePurgeLongHashMap, error) {
 	tokens := strings.Split(string, ",")
 	if len(tokens) < 2 {
-		panic("len(tokens) < 2")
+		return nil, errors.New("len(tokens) < 2")
 	}
 	numActive, err := strconv.Atoi(tokens[0])
 	if err != nil {
@@ -253,7 +255,7 @@ func deserializeReversePurgeLongHashMapFromString(string string) (*reversePurgeL
 	if err != nil {
 		return nil, err
 	}
-	table, err := NewReversePurgeLongHashMap(length)
+	table, err := newReversePurgeLongHashMap(length)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +282,7 @@ func deserializeFromStringArray(tokens []string) (*reversePurgeLongHashMap, erro
 	ignore := strPreambleTokens
 	numActive, _ := strconv.ParseUint(tokens[ignore], 10, 32)
 	length, _ := strconv.ParseUint(tokens[ignore+1], 10, 32)
-	hashMap, err := NewReversePurgeLongHashMap(int(length))
+	hashMap, err := newReversePurgeLongHashMap(int(length))
 	if err != nil {
 		return nil, err
 	}
@@ -303,9 +305,9 @@ func deserializeFromStringArray(tokens []string) (*reversePurgeLongHashMap, erro
 	return hashMap, nil
 }
 
-func (r *reversePurgeLongHashMap) getActiveValues() []int64 {
+func (r *reversePurgeLongHashMap) getActiveValues() ([]int64, error) {
 	if r.numActive == 0 {
-		return nil
+		return nil, nil
 	}
 	returnValues := make([]int64, r.numActive)
 	j := 0
@@ -316,14 +318,14 @@ func (r *reversePurgeLongHashMap) getActiveValues() []int64 {
 		}
 	}
 	if j != r.numActive {
-		panic("j != r.numActive")
+		return nil, errors.New("j != r.numActive")
 	}
-	return returnValues
+	return returnValues, nil
 }
 
-func (r *reversePurgeLongHashMap) getActiveKeys() []int64 {
+func (r *reversePurgeLongHashMap) getActiveKeys() ([]int64, error) {
 	if r.numActive == 0 {
-		return nil
+		return nil, nil
 	}
 	returnValues := make([]int64, r.numActive)
 	j := 0
@@ -334,9 +336,9 @@ func (r *reversePurgeLongHashMap) getActiveKeys() []int64 {
 		}
 	}
 	if j != r.numActive {
-		panic("j != r.numActive")
+		return nil, errors.New("j != r.numActive")
 	}
-	return returnValues
+	return returnValues, nil
 }
 
 func (s *reversePurgeLongHashMap) iterator() *iteratorHashMap {

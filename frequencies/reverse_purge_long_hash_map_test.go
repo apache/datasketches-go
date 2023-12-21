@@ -23,7 +23,7 @@ import (
 )
 
 func TestHashMapSerial(t *testing.T) {
-	mp, err := NewReversePurgeLongHashMap(8)
+	mp, err := newReversePurgeLongHashMap(8)
 	assert.NoError(t, err)
 	mp.adjustOrPutValue(10, 15)
 	mp.adjustOrPutValue(10, 5)

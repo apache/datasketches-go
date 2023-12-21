@@ -19,7 +19,7 @@ package frequencies
 
 import (
 	"encoding/binary"
-	"fmt"
+	"errors"
 )
 
 const (
@@ -42,13 +42,13 @@ const (
 
 func checkPreambleSize(preamble []byte) (int64, error) {
 	if len(preamble) < 8 {
-		return 0, fmt.Errorf("preamble is too small")
+		return 0, errors.New("preamble is too small")
 	}
 	pre0 := int64(binary.LittleEndian.Uint64(preamble))
 	preLongs := int(pre0 & 0x3F)
 	required := max(preLongs<<3, 8)
 	if len(preamble) < required {
-		return 0, fmt.Errorf("preamble is too small")
+		return 0, errors.New("preamble is too small")
 	}
 	return pre0, nil
 }

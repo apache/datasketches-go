@@ -20,8 +20,7 @@ package frequencies
 import (
 	"errors"
 	"fmt"
-	"github.com/apache/datasketches-go/common"
-	"github.com/apache/datasketches-go/thetacommon"
+	"github.com/apache/datasketches-go/internal"
 	"math/bits"
 	"strconv"
 	"strings"
@@ -58,7 +57,7 @@ const (
 // The member loadThreshold is then set to the largest value that
 // will not overload the hash table.
 func newReversePurgeLongHashMap(mapSize int) (*reversePurgeLongHashMap, error) {
-	lgLength, err := common.ExactLog2(mapSize)
+	lgLength, err := internal.ExactLog2(mapSize)
 	if err != nil {
 		return nil, fmt.Errorf("mapSize: %e", err)
 	}
@@ -161,7 +160,7 @@ func (r *reversePurgeLongHashMap) purge(sampleSize int) int64 {
 		i++
 	}
 
-	val := thetacommon.QuickSelect(samples, 0, numSamples-1, limit/2)
+	val := internal.QuickSelect(samples, 0, numSamples-1, limit/2)
 	r.adjustAllValuesBy(-1 * val)
 	r.keepOnlyPositiveCounts()
 	return val
@@ -368,7 +367,7 @@ func (s *reversePurgeLongHashMap) String() string {
 }
 
 func newIterator(keys []int64, values []int64, states []int16, numActive int) *iteratorHashMap {
-	stride := int(uint64(float64(len(keys))*common.InverseGolden) | 1)
+	stride := int(uint64(float64(len(keys))*internal.InverseGolden) | 1)
 	return &iteratorHashMap{
 		keys_:      keys,
 		values_:    values,

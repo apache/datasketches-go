@@ -19,9 +19,8 @@ package hll
 
 import (
 	"encoding/binary"
+	"github.com/apache/datasketches-go/internal"
 	"math"
-
-	"github.com/apache/datasketches-go/common"
 )
 
 const (
@@ -169,16 +168,16 @@ func computeLgArr(byteArr []byte, couponCount int, lgConfigK int) (int, error) {
 	if curMode == curModeList {
 		return lgInitListSize, nil
 	}
-	ceilPwr2 := common.CeilPowerOf2(couponCount)
+	ceilPwr2 := internal.CeilPowerOf2(couponCount)
 	if (resizeDenom * couponCount) > (resizeNumber * ceilPwr2) {
 		ceilPwr2 <<= 1
 	}
 	if curMode == curModeSet {
-		v, err := common.ExactLog2(ceilPwr2)
+		v, err := internal.ExactLog2(ceilPwr2)
 		return max(lgInitSetSize, v), err
 	}
 	//only used for HLL4
-	v, err := common.ExactLog2(ceilPwr2)
+	v, err := internal.ExactLog2(ceilPwr2)
 	return max(lgAuxArrInts[lgConfigK], v), err
 
 }

@@ -19,7 +19,7 @@ package hll
 
 import (
 	"fmt"
-	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal"
 )
 
 type Union interface {
@@ -303,13 +303,13 @@ func checkRebuildCurMinNumKxQ(sketch HllSketch) error {
 		}
 		if v > 0 {
 			if v < 32 {
-				inv, err := common.InvPow2(v)
+				inv, err := internal.InvPow2(v)
 				if err != nil {
 					return err
 				}
 				kxq0 += inv - 1.0
 			} else {
-				inv, err := common.InvPow2(v)
+				inv, err := internal.InvPow2(v)
 				if err != nil {
 					return err
 				}

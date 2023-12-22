@@ -19,8 +19,7 @@ package hll
 
 import (
 	"fmt"
-
-	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal"
 )
 
 // hll6ArrayImpl Uses 6 bits per slot in a packed byte array
@@ -128,7 +127,7 @@ func get6Bit(arr []byte, offsetBytes int, slotNo int) int {
 	startBit := slotNo * 6
 	shift := startBit & 0x7
 	byteIdx := (startBit >> 3) + offsetBytes
-	return (common.GetShortLE(arr, byteIdx) >> shift) & 0x3F
+	return (internal.GetShortLE(arr, byteIdx) >> shift) & 0x3F
 }
 
 func put6Bit(arr []byte, offsetBytes int, slotNo int, newValue int) {
@@ -136,9 +135,9 @@ func put6Bit(arr []byte, offsetBytes int, slotNo int, newValue int) {
 	shift := startBit & 0x7
 	byteIdx := (startBit >> 3) + offsetBytes
 	valShifted := (newValue & 0x3F) << shift
-	curMasked := common.GetShortLE(arr, byteIdx) & (^(valMask6 << shift))
+	curMasked := internal.GetShortLE(arr, byteIdx) & (^(valMask6 << shift))
 	insert := curMasked | valShifted
-	common.PutShortLE(arr, byteIdx, insert)
+	internal.PutShortLE(arr, byteIdx, insert)
 }
 
 func convertToHll6(srcAbsHllArr hllArray) (hllSketchBase, error) {
@@ -191,7 +190,7 @@ func (h *hll6Iterator) nextValid() bool {
 	for h.index+1 < h.lengthPairs {
 		h.index++
 		h.bitOffset += 6
-		tmp := common.GetShortLE(h.hll.hllByteArr, h.bitOffset/8)
+		tmp := internal.GetShortLE(h.hll.hllByteArr, h.bitOffset/8)
 		h.value = (tmp >> ((h.bitOffset % 8) & 0x7)) & valMask6
 		if h.value != empty {
 			return true
@@ -201,7 +200,7 @@ func (h *hll6Iterator) nextValid() bool {
 }
 
 func (h *hll6Iterator) getValue() (int, error) {
-	tmp := common.GetShortLE(h.hll.hllByteArr, h.bitOffset/8)
+	tmp := internal.GetShortLE(h.hll.hllByteArr, h.bitOffset/8)
 	shift := (h.bitOffset % 8) & 0x7
 	return (tmp >> shift) & valMask6, nil
 }

@@ -19,15 +19,15 @@ package frequencies
 
 import (
 	"fmt"
-	"github.com/apache/datasketches-go/common/testutils"
+	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
 )
 
 func TestGenerateGoBinariesForCompatibilityTestingLongsSketch(t *testing.T) {
-	if len(os.Getenv(testutils.DSketchTestGenerateGo)) == 0 {
-		t.Skipf("%s not set", testutils.DSketchTestGenerateGo)
+	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
+		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
 	}
 
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
@@ -48,12 +48,12 @@ func TestGenerateGoBinariesForCompatibilityTestingLongsSketch(t *testing.T) {
 		} else {
 			assert.Equal(t, sk.GetMaximumError(), int64(0))
 		}
-		err = os.MkdirAll(testutils.GoPath, os.ModePerm)
+		err = os.MkdirAll(internal.GoPath, os.ModePerm)
 		assert.NoError(t, err)
 
 		slc, err := sk.ToSlice()
 		assert.NoError(t, err)
-		err = os.WriteFile(fmt.Sprintf("%s/frequent_long_n%d_go.sk", testutils.GoPath, n), slc, 0644)
+		err = os.WriteFile(fmt.Sprintf("%s/frequent_long_n%d_go.sk", internal.GoPath, n), slc, 0644)
 		if err != nil {
 			t.Errorf("err != nil")
 		}
@@ -61,13 +61,13 @@ func TestGenerateGoBinariesForCompatibilityTestingLongsSketch(t *testing.T) {
 }
 
 func TestGoCompat(t *testing.T) {
-	if len(os.Getenv(testutils.DSketchTestCrossGo)) == 0 {
-		t.Skipf("%s not set", testutils.DSketchTestCrossGo)
+	if len(os.Getenv(internal.DSketchTestCrossGo)) == 0 {
+		t.Skipf("%s not set", internal.DSketchTestCrossGo)
 	}
 
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	for _, n := range nArr {
-		bytes, err := os.ReadFile(fmt.Sprintf("%s/frequent_long_n%d_go.sk", testutils.GoPath, n))
+		bytes, err := os.ReadFile(fmt.Sprintf("%s/frequent_long_n%d_go.sk", internal.GoPath, n))
 		assert.NoError(t, err)
 		sketch, err := NewLongsSketchFromSlice(bytes)
 		if err != nil {
@@ -89,13 +89,13 @@ func TestGoCompat(t *testing.T) {
 }
 
 func TestJavaCompat(t *testing.T) {
-	if len(os.Getenv(testutils.DSketchTestCrossJava)) == 0 {
-		t.Skipf("%s not set", testutils.DSketchTestCrossJava)
+	if len(os.Getenv(internal.DSketchTestCrossJava)) == 0 {
+		t.Skipf("%s not set", internal.DSketchTestCrossJava)
 	}
 
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	for _, n := range nArr {
-		bytes, err := os.ReadFile(fmt.Sprintf("%s/frequent_long_n%d_java.sk", testutils.JavaPath, n))
+		bytes, err := os.ReadFile(fmt.Sprintf("%s/frequent_long_n%d_java.sk", internal.JavaPath, n))
 		assert.NoError(t, err)
 		sketch, err := NewLongsSketchFromSlice(bytes)
 		if err != nil {
@@ -117,13 +117,13 @@ func TestJavaCompat(t *testing.T) {
 }
 
 func TestCppCompat(t *testing.T) {
-	if len(os.Getenv(testutils.DSketchTestCrossCpp)) == 0 {
-		t.Skipf("%s not set", testutils.DSketchTestCrossCpp)
+	if len(os.Getenv(internal.DSketchTestCrossCpp)) == 0 {
+		t.Skipf("%s not set", internal.DSketchTestCrossCpp)
 	}
 
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	for _, n := range nArr {
-		bytes, err := os.ReadFile(fmt.Sprintf("%s/frequent_long_n%d_cpp.sk", testutils.CppPath, n))
+		bytes, err := os.ReadFile(fmt.Sprintf("%s/frequent_long_n%d_cpp.sk", internal.CppPath, n))
 		assert.NoError(t, err)
 		sketch, err := NewLongsSketchFromSlice(bytes)
 		if err != nil {

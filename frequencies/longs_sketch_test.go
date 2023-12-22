@@ -20,7 +20,7 @@ package frequencies
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
@@ -348,7 +348,7 @@ func TestFreqLongs(t *testing.T) {
 }
 
 func newFrequencySketch(eps float64) (*LongsSketch, error) {
-	maxMapSize := common.CeilPowerOf2(int(1.0 / (eps * reversePurgeLongHashMapLoadFactor)))
+	maxMapSize := internal.CeilPowerOf2(int(1.0 / (eps * reversePurgeLongHashMapLoadFactor)))
 	return NewLongsSketchWithMaxMapSize(maxMapSize)
 }
 
@@ -462,7 +462,7 @@ func TestSortItems(t *testing.T) {
 	numSketches := 1
 	n := 2222
 	errorTolerance := 1.0 / 100
-	sketchSize := common.CeilPowerOf2(int(1.0 / (errorTolerance * reversePurgeLongHashMapLoadFactor)))
+	sketchSize := internal.CeilPowerOf2(int(1.0 / (errorTolerance * reversePurgeLongHashMapLoadFactor)))
 	fmt.Printf("sketchSize: %d\n", sketchSize)
 
 	sketches := make([]*LongsSketch, numSketches)

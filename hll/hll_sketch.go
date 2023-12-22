@@ -20,10 +20,10 @@ package hll
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/apache/datasketches-go/internal"
 	"math/bits"
 	"unsafe"
 
-	"github.com/apache/datasketches-go/thetacommon"
 	"github.com/twmb/murmur3"
 )
 
@@ -316,5 +316,5 @@ func (h *hllSketchImpl) GetSerializationVersion() int {
 }
 
 func (h *hllSketchImpl) hash(bs []byte) (uint64, uint64) {
-	return murmur3.SeedSum128(thetacommon.DEFAULT_UPDATE_SEED, thetacommon.DEFAULT_UPDATE_SEED, bs)
+	return murmur3.SeedSum128(internal.DEFAULT_UPDATE_SEED, internal.DEFAULT_UPDATE_SEED, bs)
 }

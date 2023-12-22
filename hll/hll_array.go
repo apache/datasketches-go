@@ -19,7 +19,7 @@ package hll
 
 import (
 	"fmt"
-	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal"
 )
 
 type hllArray interface {
@@ -274,14 +274,14 @@ func (a *hllArrayImpl) hipAndKxQIncrementalUpdate(oldValue int, newValue int) er
 func (a *hllArrayImpl) incrementalUpdateKxQ(oldValue int, newValue int, kxq0 float64, kxq1 float64) error {
 	//update kxq0 and kxq1; subtract first, then add.
 	if oldValue < 32 {
-		v, err := common.InvPow2(oldValue)
+		v, err := internal.InvPow2(oldValue)
 		if err != nil {
 			return err
 		}
 		kxq0 -= v
 		a.kxq0 = kxq0
 	} else {
-		v, err := common.InvPow2(oldValue)
+		v, err := internal.InvPow2(oldValue)
 		if err != nil {
 			return err
 		}
@@ -289,14 +289,14 @@ func (a *hllArrayImpl) incrementalUpdateKxQ(oldValue int, newValue int, kxq0 flo
 		a.kxq1 = kxq1
 	}
 	if newValue < 32 {
-		v, err := common.InvPow2(newValue)
+		v, err := internal.InvPow2(newValue)
 		if err != nil {
 			return err
 		}
 		kxq0 += v
 		a.kxq0 = kxq0
 	} else {
-		v, err := common.InvPow2(newValue)
+		v, err := internal.InvPow2(newValue)
 		if err != nil {
 			return err
 		}

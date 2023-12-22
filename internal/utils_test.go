@@ -15,15 +15,14 @@
  * limitations under the License.
  */
 
-package common
+package internal
 
-// GetShortLE gets a short value from a byte array in little endian format.
-func GetShortLE(array []byte, offset int) int {
-	return int(array[offset]&0xFF) | (int(array[offset+1]&0xFF) << 8)
-}
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
 
-// PutShortLE puts a short value into a byte array in little endian format.
-func PutShortLE(array []byte, offset int, value int) {
-	array[offset] = byte(value)
-	array[offset+1] = byte(value >> 8)
+func TestInvPow2(t *testing.T) {
+	_, err := InvPow2(0)
+	assert.NoError(t, err)
 }

@@ -19,7 +19,7 @@ package hll
 
 import (
 	"fmt"
-	"github.com/apache/datasketches-go/common/testutils"
+	"github.com/apache/datasketches-go/internal"
 	"os"
 	"testing"
 
@@ -28,8 +28,8 @@ import (
 
 // Run me manually for generation
 func TestGenerateGoFiles(t *testing.T) {
-	if len(os.Getenv(testutils.DSketchTestGenerateGo)) == 0 {
-		t.Skipf("%s not set", testutils.DSketchTestGenerateGo)
+	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
+		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
 	}
 
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
@@ -46,35 +46,35 @@ func TestGenerateGoFiles(t *testing.T) {
 			assert.NoError(t, hll6.UpdateUInt64(uint64(i)))
 			assert.NoError(t, hll8.UpdateUInt64(uint64(i)))
 		}
-		err = os.MkdirAll(testutils.GoPath, os.ModePerm)
+		err = os.MkdirAll(internal.GoPath, os.ModePerm)
 		assert.NoError(t, err)
 
 		sl4, err := hll4.ToCompactSlice()
 		assert.NoError(t, err)
-		err = os.WriteFile(fmt.Sprintf("%s/hll4_n%d_go.sk", testutils.GoPath, n), sl4, 0644)
+		err = os.WriteFile(fmt.Sprintf("%s/hll4_n%d_go.sk", internal.GoPath, n), sl4, 0644)
 		assert.NoError(t, err)
 
 		sl6, err := hll6.ToCompactSlice()
 		assert.NoError(t, err)
-		err = os.WriteFile(fmt.Sprintf("%s/hll6_n%d_go.sk", testutils.GoPath, n), sl6, 0644)
+		err = os.WriteFile(fmt.Sprintf("%s/hll6_n%d_go.sk", internal.GoPath, n), sl6, 0644)
 		assert.NoError(t, err)
 
 		sl8, err := hll8.ToCompactSlice()
 		assert.NoError(t, err)
-		err = os.WriteFile(fmt.Sprintf("%s/hll8_n%d_go.sk", testutils.GoPath, n), sl8, 0644)
+		err = os.WriteFile(fmt.Sprintf("%s/hll8_n%d_go.sk", internal.GoPath, n), sl8, 0644)
 		assert.NoError(t, err)
 	}
 }
 
 func TestJavaCompat(t *testing.T) {
-	if len(os.Getenv(testutils.DSketchTestCrossJava)) == 0 {
-		t.Skipf("%s not set", testutils.DSketchTestCrossJava)
+	if len(os.Getenv(internal.DSketchTestCrossJava)) == 0 {
+		t.Skipf("%s not set", internal.DSketchTestCrossJava)
 	}
 
 	t.Run("Java Hll4", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll4_n%d_java.sk", testutils.JavaPath, n))
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll4_n%d_java.sk", internal.JavaPath, n))
 			assert.NoError(t, err)
 			sketch, err := DeserializeHllSketch(bytes, true)
 			if err != nil {
@@ -91,7 +91,7 @@ func TestJavaCompat(t *testing.T) {
 	t.Run("Java Hll6", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll6_n%d_java.sk", testutils.JavaPath, n))
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll6_n%d_java.sk", internal.JavaPath, n))
 			assert.NoError(t, err)
 
 			sketch, err := DeserializeHllSketch(bytes, true)
@@ -109,7 +109,7 @@ func TestJavaCompat(t *testing.T) {
 	t.Run("Java Hll8", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll8_n%d_java.sk", testutils.JavaPath, n))
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll8_n%d_java.sk", internal.JavaPath, n))
 			assert.NoError(t, err)
 			sketch, err := DeserializeHllSketch(bytes, true)
 			if err != nil {
@@ -125,14 +125,14 @@ func TestJavaCompat(t *testing.T) {
 }
 
 func TestCppCompat(t *testing.T) {
-	if len(os.Getenv(testutils.DSketchTestCrossCpp)) == 0 {
-		t.Skipf("%s not set", testutils.DSketchTestCrossCpp)
+	if len(os.Getenv(internal.DSketchTestCrossCpp)) == 0 {
+		t.Skipf("%s not set", internal.DSketchTestCrossCpp)
 	}
 
 	t.Run("Cpp Hll4", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll4_n%d_cpp.sk", testutils.CppPath, n))
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll4_n%d_cpp.sk", internal.CppPath, n))
 			assert.NoError(t, err)
 			sketch, err := DeserializeHllSketch(bytes, true)
 			if err != nil {
@@ -149,7 +149,7 @@ func TestCppCompat(t *testing.T) {
 	t.Run("Cpp Hll6", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll6_n%d_cpp.sk", testutils.CppPath, n))
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll6_n%d_cpp.sk", internal.CppPath, n))
 			assert.NoError(t, err)
 
 			sketch, err := DeserializeHllSketch(bytes, true)
@@ -167,7 +167,7 @@ func TestCppCompat(t *testing.T) {
 	t.Run("Cpp Hll8", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll8_n%d_cpp.sk", testutils.CppPath, n))
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll8_n%d_cpp.sk", internal.CppPath, n))
 			assert.NoError(t, err)
 			sketch, err := DeserializeHllSketch(bytes, true)
 			if err != nil {
@@ -183,14 +183,14 @@ func TestCppCompat(t *testing.T) {
 }
 
 func TestGoCompat(t *testing.T) {
-	if len(os.Getenv(testutils.DSketchTestCrossGo)) == 0 {
-		t.Skipf("%s not set", testutils.DSketchTestCrossGo)
+	if len(os.Getenv(internal.DSketchTestCrossGo)) == 0 {
+		t.Skipf("%s not set", internal.DSketchTestCrossGo)
 	}
 
 	t.Run("Go Hll4", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll4_n%d_go.sk", testutils.GoPath, n))
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll4_n%d_go.sk", internal.GoPath, n))
 			assert.NoError(t, err)
 
 			sketch, err := DeserializeHllSketch(bytes, true)
@@ -208,7 +208,7 @@ func TestGoCompat(t *testing.T) {
 	t.Run("Go Hll6", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll6_n%d_go.sk", testutils.GoPath, n))
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll6_n%d_go.sk", internal.GoPath, n))
 			assert.NoError(t, err)
 
 			sketch, err := DeserializeHllSketch(bytes, true)
@@ -226,7 +226,7 @@ func TestGoCompat(t *testing.T) {
 	t.Run("Go Hll8", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll8_n%d_go.sk", testutils.GoPath, n))
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll8_n%d_go.sk", internal.GoPath, n))
 			assert.NoError(t, err)
 
 			sketch, err := DeserializeHllSketch(bytes, true)

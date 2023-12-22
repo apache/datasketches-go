@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package thetacommon
+package internal
 
 func QuickSelect(arr []int64, lo int, hi int, pivot int) int64 {
 	for hi > 0 {

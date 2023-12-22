@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -14,19 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:alpine
-ENV CGO_ENABLED=0
-
-WORKDIR /github.com/apache/datasketches-go/
-COPY go.mod .
-COPY go.sum .
-COPY main.go .
-COPY common ./common
-COPY thetacommon ./thetacommon
-COPY hll ./hll
-
-
-RUN go mod download
-RUN go build -v ./...
-
-CMD ["go", "test", "-v", "./..."]
+pushd "$(dirname ${BASH_SOURCE:0})"
+trap popd EXIT
+docker build  -t datasketch-go-tester -f ./Dockerfile ../ && docker run -t datasketch-go-tester

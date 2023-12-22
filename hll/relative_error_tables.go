@@ -17,7 +17,9 @@
 
 package hll
 
-import "github.com/apache/datasketches-go/common"
+import (
+	"github.com/apache/datasketches-go/internal"
+)
 
 var hipLB = //sd 1, 2, 3
 []float64{  //Q(.84134), Q(.97725), Q(.99865) respectively
@@ -76,7 +78,7 @@ var nonHipUB = //sd 1, 2, 3
 
 func getRelErrKLT12(upperBound bool, oooFlag bool, lgK int, stdDev int) float64 {
 	idx := ((lgK - 4) * 3) + (stdDev - 1)
-	sw := (2 * common.BoolToInt(oooFlag)) + common.BoolToInt(upperBound)
+	sw := (2 * internal.BoolToInt(oooFlag)) + internal.BoolToInt(upperBound)
 	var f float64
 	switch sw {
 	case 0:

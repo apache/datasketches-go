@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package common
+package internal
 
 import (
 	"fmt"
@@ -28,6 +28,33 @@ const (
 	InverseGolden = float64(0.6180339887498949025)
 )
 
+const (
+	DEFAULT_UPDATE_SEED = uint64(9001)
+)
+
+const (
+	DSketchTestGenerateGo = "DSKETCH_TEST_GENERATE_GO"
+	DSketchTestCrossJava  = "DSKETCH_TEST_CROSS_JAVA"
+	DSketchTestCrossCpp   = "DSKETCH_TEST_CROSS_CPP"
+	DSketchTestCrossGo    = "DSKETCH_TEST_CROSS_GO"
+)
+
+const (
+	JavaPath = "../serialization_test_data/java_generated_files"
+	CppPath  = "../serialization_test_data/cpp_generated_files"
+	GoPath   = "../serialization_test_data/go_generated_files"
+)
+
+// GetShortLE gets a short value from a byte array in little endian format.
+func GetShortLE(array []byte, offset int) int {
+	return int(array[offset]&0xFF) | (int(array[offset+1]&0xFF) << 8)
+}
+
+// PutShortLE puts a short value into a byte array in little endian format.
+func PutShortLE(array []byte, offset int, value int) {
+	array[offset] = byte(value)
+	array[offset+1] = byte(value >> 8)
+}
 
 // InvPow2 returns 2^(-e).
 func InvPow2(e int) (float64, error) {

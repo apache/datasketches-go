@@ -19,9 +19,8 @@ package hll
 
 import (
 	"fmt"
-	"math"
-
 	"github.com/apache/datasketches-go/common"
+	"math"
 )
 
 const (

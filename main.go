@@ -15,4 +15,4 @@
  * limitations under the License.
  */
 
-package datatasketches_go
+package datatasketches

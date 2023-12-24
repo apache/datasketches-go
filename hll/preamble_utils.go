@@ -19,8 +19,9 @@ package hll
 
 import (
 	"encoding/binary"
-	"github.com/apache/datasketches-go/internal"
 	"math"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 const (

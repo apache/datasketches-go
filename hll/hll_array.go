@@ -19,11 +19,12 @@ package hll
 
 import (
 	"fmt"
+
 	"github.com/apache/datasketches-go/internal"
 )
 
 type hllArray interface {
-	hllSketchBase
+	hllSketchStateI
 
 	getAuxHashMap() *auxHashMap
 	getAuxStart() int

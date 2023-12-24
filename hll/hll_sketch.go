@@ -20,69 +20,102 @@ package hll
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/apache/datasketches-go/internal"
 	"math/bits"
 	"unsafe"
 
+	"github.com/apache/datasketches-go/internal"
 	"github.com/twmb/murmur3"
 )
 
 type HllSketch interface {
-	publiclyUpdatable
-	estimableSketch
-	configuredSketch
-	toSliceSketch
-	privatelyUpdatable
-	iterableSketch
-	CopyAs(tgtHllType TgtHllType) (HllSketch, error)
+	// Copy returns a clone of this sketch.
 	Copy() (HllSketch, error)
-	IsEstimationMode() bool
-	GetSerializationVersion() int
-}
 
-type publiclyUpdatable interface {
+	// CopyAs returns a clone of this sketch with the specified TgtHllType.
+	//
+	//   - tgtHllType, the TgtHllType enum
+	CopyAs(tgtHllType TgtHllType) (HllSketch, error)
+
+	// GetCompositeEstimate is less accurate than GetEstimate method and is automatically used
+	// when the sketch has gone through union operations where the more accurate HIP estimator
+	// cannot be used
+	// This is made public only for error characterization  software that exists in separate package and is not
+	// intended for normal use.
+	GetCompositeEstimate() (float64, error)
+
+	// GetEstimate returns the cardinality estimate
+	GetEstimate() (float64, error)
+
+	// UpdateUInt64 present the given unsigned 64-bit integer as a potential unique item.
 	UpdateUInt64(datum uint64) error
+
+	// UpdateInt64 present the given signed 64-bit integer as a potential unique item.
 	UpdateInt64(datum int64) error
+
+	// UpdateSlice present the given byte slice as a potential unique item.
 	UpdateSlice(datum []byte) error
+
+	// UpdateString present the given string as a potential unique item.
 	UpdateString(datum string) error
+
+	// Reset resets the sketch to empty, but does not change the configured values of lgConfigK and tgtHllType.
 	Reset() error
+
+	// GetLowerBound gets the approximate lower error bound given the specifified numbers of standard deviations.
+	//
+	//   - numStdDev, this must be an integer between 1 and 3, inclusive.
+	GetLowerBound(numStdDev int) (float64, error)
+
+	// GetUpperBound gets the approximate upper error bound given the specified number of standard deviations.
+	//
+	//   - numStdDev, this must be an integer between 1 and 3, inclusive.
+	GetUpperBound(numStdDev int) (float64, error)
+
+	// IsEmpty returns true if the sketch is empty.
+	IsEmpty() bool
+
+	// GetLgConfigK returns the lgConfigK of the sketch.
+	GetLgConfigK() int
+
+	// GetTgtHllType returns the TgtHllType of the sketch.
+	GetTgtHllType() TgtHllType
+
+	// GetCurMode returns the current mode of the sketch: LIST, SET, HLL.
+	GetCurMode() curMode
+
+	// GetUpdatableSerializationBytes gets the size in bytes of the current sketch when serialized using
+	// ToUpdatableSlice.
+	GetUpdatableSerializationBytes() int
+
+	// ToCompactSlice serializes the sketch to a slice, compacting data structures
+	// where feasible to eliminate unused storage in the serialized image.
+	ToCompactSlice() ([]byte, error)
+
+	// ToUpdatableSlice serializes the sketch as a byte slice in an updatable form.
+	// The updatable form is larger than the compact form.
+	ToUpdatableSlice() ([]byte, error)
+
+	GetSerializationVersion() int
+
+	couponUpdate(coupon int) (hllSketchStateI, error)
+	iterator() pairIterator
 }
 
-type estimableSketch interface {
+type hllSketchStateI interface {
 	GetCompositeEstimate() (float64, error)
 	GetEstimate() (float64, error)
 	GetHipEstimate() (float64, error)
 	GetLowerBound(numStdDev int) (float64, error)
 	GetUpperBound(numStdDev int) (float64, error)
 	IsEmpty() bool
-}
 
-type configuredSketch interface {
 	GetLgConfigK() int
 	GetTgtHllType() TgtHllType
 	GetCurMode() curMode
-}
 
-type toSliceSketch interface {
 	GetUpdatableSerializationBytes() int
 	ToCompactSlice() ([]byte, error)
 	ToUpdatableSlice() ([]byte, error)
-}
-
-type privatelyUpdatable interface {
-	couponUpdate(coupon int) (hllSketchBase, error)
-}
-
-type iterableSketch interface {
-	iterator() pairIterator
-}
-
-type hllSketchBase interface {
-	estimableSketch
-	configuredSketch
-	toSliceSketch
-	privatelyUpdatable
-	iterableSketch
 
 	getMemDataStart() int
 	getPreInts() int
@@ -91,16 +124,33 @@ type hllSketchBase interface {
 
 	putOutOfOrder(oooFlag bool)
 	putRebuildCurMinNumKxQFlag(rebuildCurMinNumKxQFlag bool)
-	copyAs(tgtHllType TgtHllType) (hllSketchBase, error)
-	copy() (hllSketchBase, error)
+	copyAs(tgtHllType TgtHllType) (hllSketchStateI, error)
+	copy() (hllSketchStateI, error)
 	mergeTo(dest HllSketch) error
+
+	couponUpdate(coupon int) (hllSketchStateI, error)
+	iterator() pairIterator
 }
 
-type hllSketchImpl struct { // extends BaseHllSketch
-	sketch  hllSketchBase
+type hllSketchState struct { // extends BaseHllSketch
+	sketch  hllSketchStateI
 	scratch [8]byte
 }
 
+func newHllSketchState(coupon hllSketchStateI) HllSketch {
+	return &hllSketchState{
+		sketch:  coupon,
+		scratch: [8]byte{},
+	}
+}
+
+// NewHllSketch constructs a new sketch with the type of HLL sketch to configure
+//
+//   - lgConfigK, the Log2 of K for the target HLL sketch. This value must be
+//
+// between 4 and 21 inclusively.
+//
+//   - tgtHllType. the desired HLL type.
 func NewHllSketch(lgConfigK int, tgtHllType TgtHllType) (HllSketch, error) {
 	lgK := lgConfigK
 	lgK, err := checkLgK(lgK)
@@ -111,10 +161,13 @@ func NewHllSketch(lgConfigK int, tgtHllType TgtHllType) (HllSketch, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newHllSketchImpl(&couponList), nil
+	return newHllSketchState(&couponList), nil
 }
 
-func NewHllSketchDefault(lgConfigK int) (HllSketch, error) {
+// NewHllSketchWithLgK constructs a new on-heap sketch with the default tgtHllType.
+//
+//   - lgConfigK, the Log2 of K for the target HLL sketch. This value must be between 4 and 21 inclusively.
+func NewHllSketchWithLgK(lgConfigK int) (HllSketch, error) {
 	lgK, err := checkLgK(lgConfigK)
 	if err != nil {
 		return nil, err
@@ -123,29 +176,32 @@ func NewHllSketchDefault(lgConfigK int) (HllSketch, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newHllSketchImpl(&couponList), nil
+	return newHllSketchState(&couponList), nil
 }
 
-func DeserializeHllSketch(byteArray []byte, checkRebuild bool) (HllSketch, error) {
-	if len(byteArray) < 8 {
-		return nil, fmt.Errorf("input array too small: %d", len(byteArray))
+// DeserializeHllSketch deserialize a given byte slice, which must be a valid HllSketch image and may have data.
+//
+//   - bytes, the given byte slice, this slice is not modified and is not retained by the sketch
+func DeserializeHllSketch(bytes []byte, checkRebuild bool) (HllSketch, error) {
+	if len(bytes) < 8 {
+		return nil, fmt.Errorf("input array too small: %d", len(bytes))
 	}
-	curMode, err := checkPreamble(byteArray)
+	curMode, err := checkPreamble(bytes)
 	if err != nil {
 		return nil, err
 	}
 	if curMode == curModeHll {
-		tgtHllType := extractTgtHllType(byteArray)
+		tgtHllType := extractTgtHllType(bytes)
 		if tgtHllType == TgtHllTypeHll4 {
-			sk, err := deserializeHll4(byteArray)
+			sk, err := deserializeHll4(bytes)
 			if err != nil {
 				return nil, err
 			}
-			return newHllSketchImpl(sk), nil
+			return newHllSketchState(sk), nil
 		} else if tgtHllType == TgtHllTypeHll6 {
-			return newHllSketchImpl(deserializeHll6(byteArray)), nil
+			return newHllSketchState(deserializeHll6(bytes)), nil
 		} else {
-			a := newHllSketchImpl(deserializeHll8(byteArray))
+			a := newHllSketchState(deserializeHll8(bytes))
 			if checkRebuild {
 				err := checkRebuildCurMinNumKxQ(a)
 				if err != nil {
@@ -155,62 +211,71 @@ func DeserializeHllSketch(byteArray []byte, checkRebuild bool) (HllSketch, error
 			return a, nil
 		}
 	} else if curMode == curModeList {
-		cp, err := deserializeCouponList(byteArray)
+		cp, err := deserializeCouponList(bytes)
 		if err != nil {
 			return nil, err
 		}
-		return newHllSketchImpl(cp), nil
+		return newHllSketchState(cp), nil
 	} else {
-		chs, err := deserializeCouponHashSet(byteArray)
+		chs, err := deserializeCouponHashSet(bytes)
 		if err != nil {
 			return nil, err
 		}
-		return newHllSketchImpl(chs), nil
+		return newHllSketchState(chs), nil
 	}
 }
 
-func newHllSketchImpl(coupon hllSketchBase) HllSketch {
-	return &hllSketchImpl{
-		sketch:  coupon,
-		scratch: [8]byte{},
+func (h *hllSketchState) Copy() (HllSketch, error) {
+	sketch, err := h.sketch.copy()
+	if err != nil {
+		return nil, err
 	}
+	return newHllSketchState(sketch), nil
 }
 
-func (h *hllSketchImpl) GetEstimate() (float64, error) {
-	return h.sketch.GetEstimate()
+func (h *hllSketchState) CopyAs(tgtHllType TgtHllType) (HllSketch, error) {
+	sketch, err := h.sketch.copyAs(tgtHllType)
+	if err != nil {
+		return nil, err
+	}
+	return newHllSketchState(sketch), nil
 }
 
-func (h *hllSketchImpl) GetCompositeEstimate() (float64, error) {
+func (h *hllSketchState) GetCompositeEstimate() (float64, error) {
 	return h.sketch.GetCompositeEstimate()
 }
 
-func (h *hllSketchImpl) GetHipEstimate() (float64, error) {
+func (h *hllSketchState) GetEstimate() (float64, error) {
+	return h.sketch.GetEstimate()
+}
+
+func (h *hllSketchState) GetHipEstimate() (float64, error) {
 	return h.sketch.GetHipEstimate()
 }
 
-func (h *hllSketchImpl) GetUpperBound(numStdDev int) (float64, error) {
+func (h *hllSketchState) GetUpperBound(numStdDev int) (float64, error) {
 	return h.sketch.GetUpperBound(numStdDev)
 }
 
-func (h *hllSketchImpl) GetLowerBound(numStdDev int) (float64, error) {
+func (h *hllSketchState) GetLowerBound(numStdDev int) (float64, error) {
 	return h.sketch.GetLowerBound(numStdDev)
 }
 
-func (h *hllSketchImpl) GetUpdatableSerializationBytes() int {
+func (h *hllSketchState) GetUpdatableSerializationBytes() int {
 	return h.sketch.GetUpdatableSerializationBytes()
 }
 
-func (h *hllSketchImpl) UpdateUInt64(datum uint64) error {
+func (h *hllSketchState) UpdateUInt64(datum uint64) error {
 	binary.LittleEndian.PutUint64(h.scratch[:], datum)
 	_, err := h.couponUpdate(coupon(h.hash(h.scratch[:])))
 	return err
 }
 
-func (h *hllSketchImpl) UpdateInt64(datum int64) error {
+func (h *hllSketchState) UpdateInt64(datum int64) error {
 	return h.UpdateUInt64(uint64(datum))
 }
 
-func (h *hllSketchImpl) UpdateSlice(datum []byte) error {
+func (h *hllSketchState) UpdateSlice(datum []byte) error {
 	if len(datum) == 0 {
 		return nil
 	}
@@ -218,36 +283,36 @@ func (h *hllSketchImpl) UpdateSlice(datum []byte) error {
 	return err
 }
 
-func (h *hllSketchImpl) UpdateString(datum string) error {
+func (h *hllSketchState) UpdateString(datum string) error {
 	// get a slice to the string data (avoiding a copy to heap)
 	return h.UpdateSlice(unsafe.Slice(unsafe.StringData(datum), len(datum)))
 }
 
-func (h *hllSketchImpl) IsEmpty() bool {
+func (h *hllSketchState) IsEmpty() bool {
 	return h.sketch.IsEmpty()
 }
 
-func (h *hllSketchImpl) ToCompactSlice() ([]byte, error) {
+func (h *hllSketchState) ToCompactSlice() ([]byte, error) {
 	return h.sketch.ToCompactSlice()
 }
 
-func (h *hllSketchImpl) ToUpdatableSlice() ([]byte, error) {
+func (h *hllSketchState) ToUpdatableSlice() ([]byte, error) {
 	return h.sketch.ToUpdatableSlice()
 }
 
-func (h *hllSketchImpl) GetLgConfigK() int {
+func (h *hllSketchState) GetLgConfigK() int {
 	return h.sketch.GetLgConfigK()
 }
 
-func (h *hllSketchImpl) GetTgtHllType() TgtHllType {
+func (h *hllSketchState) GetTgtHllType() TgtHllType {
 	return h.sketch.GetTgtHllType()
 }
 
-func (h *hllSketchImpl) GetCurMode() curMode {
+func (h *hllSketchState) GetCurMode() curMode {
 	return h.sketch.GetCurMode()
 }
 
-func (h *hllSketchImpl) Reset() error {
+func (h *hllSketchState) Reset() error {
 	lgK, err := checkLgK(h.sketch.GetLgConfigK())
 	if err != nil {
 		return err
@@ -260,7 +325,7 @@ func (h *hllSketchImpl) Reset() error {
 	return nil
 }
 
-func (h *hllSketchImpl) iterator() pairIterator {
+func (h *hllSketchState) iterator() pairIterator {
 	return h.sketch.iterator()
 }
 
@@ -271,7 +336,7 @@ func coupon(hashLo uint64, hashHi uint64) int {
 	return int((value << keyBits26) | addr26)
 }
 
-func (h *hllSketchImpl) couponUpdate(coupon int) (hllSketchBase, error) {
+func (h *hllSketchState) couponUpdate(coupon int) (hllSketchStateI, error) {
 	if (coupon >> keyBits26) == empty {
 		return h.sketch, nil
 	}
@@ -280,41 +345,19 @@ func (h *hllSketchImpl) couponUpdate(coupon int) (hllSketchBase, error) {
 	return h.sketch, err
 }
 
-func (h *hllSketchImpl) putRebuildCurMinNumKxQFlag(rebuildCurMinNumKxQFlag bool) {
+func (h *hllSketchState) putRebuildCurMinNumKxQFlag(rebuildCurMinNumKxQFlag bool) {
 	h.sketch.putRebuildCurMinNumKxQFlag(rebuildCurMinNumKxQFlag)
 }
 
-func (h *hllSketchImpl) mergeTo(dest HllSketch) error {
+func (h *hllSketchState) mergeTo(dest HllSketch) error {
 	return h.sketch.mergeTo(dest)
 }
 
-func (h *hllSketchImpl) CopyAs(tgtHllType TgtHllType) (HllSketch, error) {
-	sketch, err := h.sketch.copyAs(tgtHllType)
-	if err != nil {
-		return nil, err
-	}
-	return newHllSketchImpl(sketch), nil
-}
-
-func (h *hllSketchImpl) Copy() (HllSketch, error) {
-	sketch, err := h.sketch.copy()
-	if err != nil {
-		return nil, err
-	}
-	return newHllSketchImpl(sketch), nil
-}
-
-// IsEstimationMode returns true for all sketches in this package.
-// Hll family of sketches and operators is always estimating, even for very small values.
-func (h *hllSketchImpl) IsEstimationMode() bool {
-	return true
-}
-
 // GetSerializationVersion returns the serialization version used by this sketch.
-func (h *hllSketchImpl) GetSerializationVersion() int {
+func (h *hllSketchState) GetSerializationVersion() int {
 	return serVer
 }
 
-func (h *hllSketchImpl) hash(bs []byte) (uint64, uint64) {
+func (h *hllSketchState) hash(bs []byte) (uint64, uint64) {
 	return murmur3.SeedSum128(internal.DEFAULT_UPDATE_SEED, internal.DEFAULT_UPDATE_SEED, bs)
 }

@@ -19,6 +19,7 @@ package hll
 
 import (
 	"fmt"
+
 	"github.com/apache/datasketches-go/internal"
 )
 
@@ -38,7 +39,7 @@ func (h *hll6ArrayImpl) iterator() pairIterator {
 	return &a
 }
 
-func (h *hll6ArrayImpl) copyAs(tgtHllType TgtHllType) (hllSketchBase, error) {
+func (h *hll6ArrayImpl) copyAs(tgtHllType TgtHllType) (hllSketchStateI, error) {
 	if tgtHllType == h.tgtHllType {
 		return h.copy()
 	}
@@ -51,7 +52,7 @@ func (h *hll6ArrayImpl) copyAs(tgtHllType TgtHllType) (hllSketchBase, error) {
 	return nil, fmt.Errorf("cannot convert to TgtHllType id: %d", int(tgtHllType))
 }
 
-func (h *hll6ArrayImpl) copy() (hllSketchBase, error) {
+func (h *hll6ArrayImpl) copy() (hllSketchStateI, error) {
 	return &hll6ArrayImpl{
 		hllArrayImpl: h.copyCommon(),
 	}, nil
@@ -93,7 +94,7 @@ func deserializeHll6(byteArray []byte) hllArray {
 	return hll6
 }
 
-func (h *hll6ArrayImpl) couponUpdate(coupon int) (hllSketchBase, error) {
+func (h *hll6ArrayImpl) couponUpdate(coupon int) (hllSketchStateI, error) {
 	newValue := coupon >> keyBits26
 	configKmask := (1 << h.lgConfigK) - 1
 	slotNo := coupon & configKmask
@@ -140,7 +141,7 @@ func put6Bit(arr []byte, offsetBytes int, slotNo int, newValue int) {
 	internal.PutShortLE(arr, byteIdx, insert)
 }
 
-func convertToHll6(srcAbsHllArr hllArray) (hllSketchBase, error) {
+func convertToHll6(srcAbsHllArr hllArray) (hllSketchStateI, error) {
 	lgConfigK := srcAbsHllArr.GetLgConfigK()
 	hll6Array := newHll6Array(lgConfigK)
 	hll6Array.putOutOfOrder(srcAbsHllArr.isOutOfOrder())

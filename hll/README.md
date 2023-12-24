@@ -16,11 +16,11 @@ The CPC sketch and HLL share similar use cases, but the CPC sketch is about 30 t
 A new HLL sketch is created with a simple constructor:
 
     lgK := 12 // This is log-base2 of k, so k = 4096. lgK can be from 4 to 21
-    sketch := NewHllSketch(lgK) // TgtHllType_HLL_4 is the default
+    sketch := NewHllSketch(lgK) // TgtHllTypeHll4 is the default
     // OR
-    sketch := NewHllSketch(lgK, TgtHllType_HLL_6)
+    sketch := NewHllSketch(lgK, TgtHllTypeHll6)
     // OR
-    sketch := NewHllSketch(lgK, TgtHllType_HLL_8)
+    sketch := NewHllSketch(lgK, TgtHllTypeHll8)
 
 
 All three different sketch types are targets in that the sketches start out in a warm-up mode that is small in size and gradually grows as needed until the full HLL array is allocated. 

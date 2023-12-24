@@ -19,8 +19,9 @@ package hll
 
 import (
 	"fmt"
-	"github.com/apache/datasketches-go/common"
 	"math"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 const (
@@ -61,11 +62,69 @@ const (
 	curModeHll  curMode = 2
 )
 
+/**
+ * Specifies the target type of HLL sketch to be created. It is a target in that the actual
+ * allocation of the HLL array is deferred until sufficient number of items have been received by
+ * the warm-up phases.
+ *
+ * <p>These three target types are isomorphic representations of the same underlying HLL algorithm.
+ * Thus, given the same value of <i>lgConfigK</i> and the same input, all three HLL target types
+ * will produce identical estimates and have identical error distributions.</p>
+ *
+ * <p>The memory (and also the serialization) of the sketch during this early warmup phase starts
+ * out very small (8 bytes, when empty) and then grows in increments of 4 bytes as required
+ * until the full HLL array is allocated.  This transition point occurs at about 10% of K for
+ * sketches where lgConfigK is &gt; 8.</p>
+ *
+ * <ul>
+ * <li><b>HLL 8</b> This uses an 8-bit byte per HLL bucket. It is generally the
+ * fastest in terms of update time, but has the largest storage footprint of about
+ * <i>K</i> bytes.</li>
+ *
+ * <li><b>HLL 6</b> This uses a 6-bit field per HLL bucket. It is the generally the next fastest
+ * in terms of update time with a storage footprint of about <i>3/4 * K</i> bytes.</li>
+ *
+ * <li><b>HLL 4</b> This uses a 4-bit field per HLL bucket and for large counts may require
+ * the use of a small internal auxiliary array for storing statistical exceptions, which are rare.
+ * For the values of <i>lgConfigK &gt; 13</i> (<i>K</i> = 8192),
+ * this additional array adds about 3% to the overall storage. It is generally the slowest in
+ * terms of update time, but has the smallest storage footprint of about
+ * <i>K/2 * 1.03</i> bytes.</li>
+ * </ul>
+ * @author Lee Rhodes
+ */
+
+// Specifies the target type of HLL sketch to be created. It is a target in that the actual
+// allocation of the HLL array is deferred until sufficient number of items have been received by
+// the warm-up phases.
+//
+// These three target types are isomorphic representations of the same underlying HLL algorithm.
+// Thus, given the same value of <i>lgConfigK</i> and the same input, all three HLL target types
+// will produce identical estimates and have identical error distributions.
+//
+// The memory (and also the serialization) of the sketch during this early warmup phase starts
+// out very small (8 bytes, when empty) and then grows in increments of 4 bytes as required
+// until the full HLL array is allocated.  This transition point occurs at about 10% of K for
+// sketches where lgConfigK is > 8.
+//
+//   - Hll 8 This uses an 8-bit byte per HLL bucket. It is generally the
+//     fastest in terms of update time, but has the largest storage footprint of about
+//     K bytes.
+//
+//   - Hll 6 This uses a 6-bit field per HLL bucket. It is the generally the next fastest
+//     in terms of update time with a storage footprint of about 3/4 * K bytes.
+//
+//   - Hll 4 This uses a 4-bit field per HLL bucket and for large counts may require
+//     the use of a small internal auxiliary array for storing statistical exceptions, which are rare.
+//     For the values of lgConfigK > 13 (K = 8192),
+//     this additional array adds about 3% to the overall storage. It is generally the slowest in
+//     terms of update time, but has the smallest storage footprint of about
+//     K/2 * 1.03 bytes.
 const (
-	TgtHllTypeHll4    TgtHllType = 0
-	TgtHllTypeHll6    TgtHllType = 1
-	TgtHllTypeHll8    TgtHllType = 2
-	TgtHllTypeDefault            = TgtHllTypeHll4
+	TgtHllTypeHll4    = TgtHllType(0)
+	TgtHllTypeHll6    = TgtHllType(1)
+	TgtHllTypeHll8    = TgtHllType(2)
+	TgtHllTypeDefault = TgtHllTypeHll4
 )
 
 var (
@@ -127,7 +186,7 @@ func checkPreamble(preamble []byte) (curMode, error) {
 	famId := extractFamilyID(preamble)
 	curMode := extractCurMode(preamble)
 
-	if famId != common.FamilyEnum.HLL.Id {
+	if famId != internal.FamilyEnum.HLL.Id {
 		return 0, fmt.Errorf("possible Corruption: Invalid Family: %d", famId)
 	}
 	if serVer != 1 {

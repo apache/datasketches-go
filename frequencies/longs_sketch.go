@@ -21,11 +21,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/apache/datasketches-go/common"
-	"github.com/apache/datasketches-go/internal"
 	"math/bits"
 	"strconv"
 	"strings"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 type LongsSketch struct {
@@ -114,7 +114,7 @@ func NewLongsSketchFromSlice(slc []byte) (*LongsSketch, error) {
 	if err != nil {
 		return nil, err
 	}
-	maxPreLongs := common.FamilyEnum.Frequency.MaxPreLongs
+	maxPreLongs := internal.FamilyEnum.Frequency.MaxPreLongs
 	preLongs := extractPreLongs(pre0)
 	serVer := extractSerVer(pre0)
 	familyID := extractFamilyID(pre0)
@@ -131,7 +131,7 @@ func NewLongsSketchFromSlice(slc []byte) (*LongsSketch, error) {
 	if serVer != _SER_VER {
 		return nil, fmt.Errorf("possible Corruption: Ser Ver must be %d: %d", _SER_VER, serVer)
 	}
-	actFamID := common.FamilyEnum.Frequency.Id
+	actFamID := internal.FamilyEnum.Frequency.Id
 	if familyID != actFamID {
 		return nil, fmt.Errorf("possible Corruption: FamilyID must be %d: %d", actFamID, familyID)
 	}
@@ -240,7 +240,7 @@ func NewLongsSketchFromString(str string) (*LongsSketch, error) {
 	if serVe != _SER_VER {
 		return nil, fmt.Errorf("possible Corruption: Bad SerVer: %d", serVe)
 	}
-	if famID != int64(common.FamilyEnum.Frequency.Id) {
+	if famID != int64(internal.FamilyEnum.Frequency.Id) {
 		return nil, fmt.Errorf("possible Corruption: Bad Family: %d", famID)
 	}
 	empty := flags > 0
@@ -353,7 +353,7 @@ func (s *LongsSketch) GetUpperBound(item int64) (int64, error) {
 // threshold to include items in the result list
 // errorType determines whether no false positives or no false negatives are desired.
 // an array of frequent items
-func (s *LongsSketch) GetFrequentItemsWithThreshold(threshold int64, errorType ErrorType) ([]*Row, error) {
+func (s *LongsSketch) GetFrequentItemsWithThreshold(threshold int64, errorType errorType) ([]*Row, error) {
 	finalThreshold := s.GetMaximumError()
 	if threshold > finalThreshold {
 		finalThreshold = threshold
@@ -366,7 +366,7 @@ func (s *LongsSketch) GetFrequentItemsWithThreshold(threshold int64, errorType E
 // This is the same as GetFrequentItemsWithThreshold(getMaximumError(), errorType)
 //
 // errorType determines whether no false positives or no false negatives are desired.
-func (s *LongsSketch) GetFrequentItems(errorType ErrorType) ([]*Row, error) {
+func (s *LongsSketch) GetFrequentItems(errorType errorType) ([]*Row, error) {
 	return sortItems(s, s.GetMaximumError(), errorType)
 }
 
@@ -481,7 +481,7 @@ func (s *LongsSketch) ToString() (string, error) {
 	var sb strings.Builder
 	//start the string with parameters of the sketch
 	serVer := _SER_VER //0
-	famID := common.FamilyEnum.Frequency.Id
+	famID := internal.FamilyEnum.Frequency.Id
 	lgMaxMapSz := s.lgMaxMapSize
 	flags := 0
 	if s.hashMap.numActive == 0 {
@@ -502,18 +502,18 @@ func (s *LongsSketch) ToSlice() ([]byte, error) {
 	preLongs := 1
 	outBytes := 8
 	if !emtpy {
-		preLongs = common.FamilyEnum.Frequency.MaxPreLongs //4
-		outBytes = (preLongs + (2 * activeItems)) << 3     //2 because both keys and values are longs
+		preLongs = internal.FamilyEnum.Frequency.MaxPreLongs //4
+		outBytes = (preLongs + (2 * activeItems)) << 3       //2 because both keys and values are longs
 	}
 	outArr := make([]byte, outBytes)
 
 	//build first preLong empty or not
 	pre0 := int64(0)
-	pre0 = insertPreLongs(int64(preLongs), pre0)                       //Byte 0
-	pre0 = insertSerVer(_SER_VER, pre0)                                //Byte 1
-	pre0 = insertFamilyID(int64(common.FamilyEnum.Frequency.Id), pre0) //Byte 2
-	pre0 = insertLgMaxMapSize(int64(s.lgMaxMapSize), pre0)             //Byte 3
-	pre0 = insertLgCurMapSize(int64(s.hashMap.lgLength), pre0)         //Byte 4
+	pre0 = insertPreLongs(int64(preLongs), pre0)                         //Byte 0
+	pre0 = insertSerVer(_SER_VER, pre0)                                  //Byte 1
+	pre0 = insertFamilyID(int64(internal.FamilyEnum.Frequency.Id), pre0) //Byte 2
+	pre0 = insertLgMaxMapSize(int64(s.lgMaxMapSize), pre0)               //Byte 3
+	pre0 = insertLgCurMapSize(int64(s.hashMap.lgLength), pre0)           //Byte 4
 	if emtpy {
 		pre0 = insertFlags(_EMPTY_FLAG_MASK, pre0) //Byte 5
 		binary.LittleEndian.PutUint64(outArr, uint64(pre0))

@@ -29,10 +29,10 @@ import (
 )
 
 type LongsSketch struct {
-	// Log2 Maximum length of the arrays internal to the hash map supported by the data
+	// Log2 Maximum length of the arrays internal to the hashFn map supported by the data
 	// structure.
 	lgMaxMapSize int
-	// The current number of counters supported by the hash map.
+	// The current number of counters supported by the hashFn map.
 	curMapCap int //the threshold to purge
 	// Tracks the total of decremented counts.
 	offset int64
@@ -53,24 +53,24 @@ const (
  * Construct this sketch with parameter lgMapMapSize and lgCurMapSize. This internal
  * constructor is used when deserializing the sketch.
  *
- * @param lgMaxMapSize Log2 of the physical size of the internal hash map managed by this
- * sketch. The maximum capacity of this internal hash map is 0.75 times 2^lgMaxMapSize.
+ * @param lgMaxMapSize Log2 of the physical size of the internal hashFn map managed by this
+ * sketch. The maximum capacity of this internal hashFn map is 0.75 times 2^lgMaxMapSize.
  * Both the ultimate accuracy and size of this sketch are a function of lgMaxMapSize.
  *
- * @param lgCurMapSize Log2 of the starting (current) physical size of the internal hash
+ * @param lgCurMapSize Log2 of the starting (current) physical size of the internal hashFn
  * map managed by this sketch.
  */
 
 // NewLongsSketch returns a new LongsSketch with the given lgMaxMapSize and lgCurMapSize.
 //
-// lgMaxMapSize is the log2 of the physical size of the internal hash map managed by this
-// sketch. The maximum capacity of this internal hash map is 0.75 times 2^lgMaxMapSize.
+// lgMaxMapSize is the log2 of the physical size of the internal hashFn map managed by this
+// sketch. The maximum capacity of this internal hashFn map is 0.75 times 2^lgMaxMapSize.
 // Both the ultimate accuracy and size of this sketch are a function of lgMaxMapSize.
 //
-// lgCurMapSize is the log2 of the starting (current) physical size of the internal hash
+// lgCurMapSize is the log2 of the starting (current) physical size of the internal hashFn
 // map managed by this sketch.
 func NewLongsSketch(lgMaxMapSize int, lgCurMapSize int) (*LongsSketch, error) {
-	//set initial size of hash map
+	//set initial size of hashFn map
 	lgMaxMapSize = max(lgMaxMapSize, _LG_MIN_MAP_SIZE)
 	lgCurMapSize = max(lgCurMapSize, _LG_MIN_MAP_SIZE)
 	hashMap, err := newReversePurgeLongHashMap(1 << lgCurMapSize)
@@ -93,8 +93,8 @@ func NewLongsSketch(lgMaxMapSize int, lgCurMapSize int) (*LongsSketch, error) {
 // NewLongsSketchWithMaxMapSize constructs a new LongsSketch with the given maxMapSize and the
 // default initialMapSize (8).
 //
-// maxMapSize determines the physical size of the internal hash map managed by this
-// sketch and must be a power of 2.  The maximum capacity of this internal hash map is
+// maxMapSize determines the physical size of the internal hashFn map managed by this
+// sketch and must be a power of 2.  The maximum capacity of this internal hashFn map is
 // 0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are a
 // function of maxMapSize.
 func NewLongsSketchWithMaxMapSize(maxMapSize int) (*LongsSketch, error) {

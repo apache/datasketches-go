@@ -23,8 +23,10 @@ import (
 )
 
 const (
+	// _LG_MIN_MAP_SIZE constant controle the size of the initial data structure for the
+	// frequencies sketches and its value is somewhat arbitrary.
 	_LG_MIN_MAP_SIZE = 3
-	// This constant is large enough so that computing the median of SAMPLE_SIZE
+	// _SAMPLE_SIZE constant is large enough so that computing the median of SAMPLE_SIZE
 	// randomly selected entries from a list of numbers and outputting
 	// the empirical median will give a constant-factor approximation to the
 	// true median with high probability.
@@ -52,10 +54,14 @@ var ErrorTypeEnum = &errorTypes{
 	},
 }
 
-// hash returns an index into the hash table.
-// This hash function is taken from the internals of Austin Appleby's MurmurHash3 algorithm.
+type ItemHasher[C comparable] interface {
+	Hash(item C) uint64
+}
+
+// hashFn returns an index into the hashFn table.
+// This hashFn function is taken from the internals of Austin Appleby's MurmurHash3 algorithm.
 // It is also used by the Trove for Java libraries.
-func hash(okey int64) int64 {
+func hashFn(okey int64) int64 {
 	key := uint64(okey)
 	key ^= key >> 33
 	key *= 0xff51afd7ed558ccd

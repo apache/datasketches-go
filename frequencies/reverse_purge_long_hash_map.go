@@ -56,7 +56,7 @@ const (
 // It will create arrays of length mapSize, which must be a power of two.
 // This restriction was made to ensure fast hashing.
 // The member loadThreshold is then set to the largest value that
-// will not overload the hash table.
+// will not overload the hashFn table.
 func newReversePurgeLongHashMap(mapSize int) (*reversePurgeLongHashMap, error) {
 	lgLength, err := internal.ExactLog2(mapSize)
 	if err != nil {
@@ -86,7 +86,7 @@ func (r *reversePurgeLongHashMap) get(key int64) (int64, error) {
 	return 0, nil
 }
 
-// getCapacity returns the current capacity of the hash map (i.e., max number of keys that can be stored).
+// getCapacity returns the current capacity of the hashFn map (i.e., max number of keys that can be stored).
 func (r *reversePurgeLongHashMap) getCapacity() int {
 	return r.loadThreshold
 }
@@ -100,7 +100,7 @@ func (r *reversePurgeLongHashMap) getCapacity() int {
 func (r *reversePurgeLongHashMap) adjustOrPutValue(key int64, adjustAmount int64) error {
 	var (
 		arrayMask = len(r.keys) - 1
-		probe     = hash(key) & int64(arrayMask)
+		probe     = hashFn(key) & int64(arrayMask)
 		drift     = 1
 	)
 	for r.states[probe] != 0 && r.keys[probe] != key {
@@ -347,7 +347,7 @@ func (s *reversePurgeLongHashMap) iterator() *iteratorHashMap {
 
 func (s *reversePurgeLongHashMap) hashProbe(key int64) int {
 	arrayMask := len(s.keys) - 1
-	probe := int(hash(key)) & arrayMask
+	probe := int(hashFn(key)) & arrayMask
 	for s.states[probe] > 0 && s.keys[probe] != key {
 		probe = (probe + 1) & arrayMask
 	}

@@ -54,10 +54,6 @@ var ErrorTypeEnum = &errorTypes{
 	},
 }
 
-type ItemHasher[C comparable] interface {
-	Hash(item C) uint64
-}
-
 // hashFn returns an index into the hashFn table.
 // This hashFn function is taken from the internals of Austin Appleby's MurmurHash3 algorithm.
 // It is also used by the Trove for Java libraries.

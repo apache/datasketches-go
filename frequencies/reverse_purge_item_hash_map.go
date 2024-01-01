@@ -20,6 +20,7 @@ package frequencies
 import (
 	"fmt"
 	"github.com/apache/datasketches-go/internal"
+	"math/bits"
 )
 
 type reversePurgeItemHashMap[C comparable] struct {
@@ -65,9 +66,10 @@ func (r *reversePurgeItemHashMap[C]) getCapacity() int {
 }
 
 func (r *reversePurgeItemHashMap[C]) get(key C) (int64, error) {
-	//if key == nil {
-	//	return 0, nil
-	//}
+	if isNil(key) {
+		return 0, nil
+	}
+
 	probe := r.hashProbe(key)
 	if r.states[probe] > 0 {
 		if r.keys[probe] != key {
@@ -87,4 +89,138 @@ func (r *reversePurgeItemHashMap[C]) hashProbe(key C) int {
 		probe = probe + 1&arrayMask
 	}
 	return int(probe)
+}
+
+func (r *reversePurgeItemHashMap[C]) adjustOrPutValue(key C, adjustAmount int64) error {
+	arrayMask := len(r.keys) - 1
+	probe := r.hashProbe(key) & arrayMask
+	drift := 1
+	for r.states[probe] != 0 && r.keys[probe] != key {
+		probe = (probe + 1) & arrayMask
+		drift++
+		//only used for theoretical analysis
+		//assert drift < DRIFT_LIMIT : "drift: " + drift + " >= DRIFT_LIMIT";
+	}
+
+	if r.states[probe] == 0 {
+		// adding the key to the table the value
+		if r.numActive >= r.loadThreshold {
+			return fmt.Errorf("numActive: %d >= loadThreshold: %d", r.numActive, r.loadThreshold)
+		}
+		r.keys[probe] = key
+		r.values[probe] = adjustAmount
+		r.states[probe] = int16(drift)
+		r.numActive++
+	} else {
+		// adjusting the value of an existing key
+		if r.keys[probe] != key {
+			return fmt.Errorf("key not found")
+		}
+		r.values[probe] += adjustAmount
+	}
+	return nil
+}
+
+func (r *reversePurgeItemHashMap[C]) resize(newSize int) error {
+	oldKeys := r.keys
+	oldValues := r.values
+	oldStates := r.states
+	r.keys = make([]C, newSize)
+	r.values = make([]int64, newSize)
+	r.states = make([]int16, newSize)
+	r.loadThreshold = int(float64(newSize) * reversePurgeItemHashMapLoadFactor)
+	r.lgLength = bits.TrailingZeros64(uint64(newSize))
+	r.numActive = 0
+	for i := 0; i < len(oldKeys); i++ {
+		if oldStates[i] > 0 {
+			err := r.adjustOrPutValue(oldKeys[i], oldValues[i])
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (r *reversePurgeItemHashMap[C]) isActive(probe int) bool {
+	return r.states[probe] > 0
+}
+
+func (r *reversePurgeItemHashMap[C]) purge(sampleSize int) int64 {
+	limit := min(sampleSize, r.numActive)
+	numSamples := 0
+	i := 0
+	samples := make([]int64, limit)
+	for numSamples < limit {
+		if r.isActive(i) {
+			samples[numSamples] = r.values[i]
+			numSamples++
+		}
+		i++
+	}
+	val := internal.QuickSelect(samples, 0, numSamples-1, limit/2)
+	r.adjustAllValuesBy(-1 * val)
+	r.keepOnlyPositiveCounts()
+	return val
+}
+
+func (r *reversePurgeItemHashMap[C]) adjustAllValuesBy(adjustAmount int64) {
+	for i := len(r.values); i > 0; {
+		i--
+		r.values[i] += adjustAmount
+	}
+}
+
+func (r *reversePurgeItemHashMap[C]) keepOnlyPositiveCounts() {
+	// Starting from the back, find the first empty cell,
+	//  which establishes the high end of a cluster.
+	firstProbe := len(r.states) - 1
+	for r.states[firstProbe] > 0 {
+		firstProbe--
+	}
+	// firstProbe keeps track of this point.
+	// When we find the next non-empty cell, we know we are at the high end of a cluster
+	// Work towards the front; delete any non-positive entries.
+	for probe := firstProbe; probe > 0; {
+		probe--
+		if r.states[probe] > 0 && r.values[probe] <= 0 {
+			r.hashDelete(probe) //does the work of deletion and moving higher items towards the front.
+			r.numActive--
+		}
+	}
+	// now work on the first cluster that was skipped.
+	for probe := len(r.states); probe > firstProbe; {
+		probe--
+		if r.states[probe] > 0 && r.values[probe] <= 0 {
+			r.hashDelete(probe)
+			r.numActive--
+		}
+	}
+}
+
+func (r *reversePurgeItemHashMap[C]) hashDelete(deleteProbe int) {
+	// Looks ahead in the table to search for another
+	// item to move to this location
+	// if none are found, the status is changed
+	r.states[deleteProbe] = 0 //mark as empty
+	drift := 1
+	arrayMask := len(r.keys) - 1
+	probe := (deleteProbe + drift) & arrayMask //map length must be a power of 2
+	// advance until you find a free location replacing locations as needed
+	for r.states[probe] != 0 {
+		if r.states[probe] > int16(drift) {
+			// move current element
+			r.keys[deleteProbe] = r.keys[probe]
+			r.values[deleteProbe] = r.values[probe]
+			r.states[deleteProbe] = int16(r.states[probe] - int16(drift))
+			// marking this location as deleted
+			r.states[probe] = 0
+			drift = 0
+			deleteProbe = probe
+		}
+		probe = (probe + 1) & arrayMask
+		drift++
+		//only used for theoretical analysis
+		//assert drift < DRIFT_LIMIT : "drift: " + drift + " >= DRIFT_LIMIT";
+	}
 }

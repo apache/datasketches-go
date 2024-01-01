@@ -17,7 +17,10 @@
 
 package frequencies
 
-import "github.com/apache/datasketches-go/internal"
+import (
+	"fmt"
+	"github.com/apache/datasketches-go/internal"
+)
 
 type ItemsSketch[C comparable] struct {
 	// Log2 Maximum length of the arrays internal to the hashFn map supported by the data
@@ -97,6 +100,41 @@ func (i *ItemsSketch[C]) GetNumActiveItems() int {
 // GetStreamLength returns the sum of the frequencies in the stream seen so far by the sketch.
 func (i *ItemsSketch[C]) GetStreamLength() int64 {
 	return i.streamWeight
+}
+
+func (i *ItemsSketch[C]) Update(item C) error {
+	return i.UpdateMany(item, 1)
+}
+
+func (i *ItemsSketch[C]) UpdateMany(item C, count int) error {
+	if isNil(item) || count == 0 {
+		return nil
+	}
+	if count < 0 {
+		return fmt.Errorf("count may not be negative")
+	}
+
+	i.streamWeight += int64(count)
+	err := i.hashMap.adjustOrPutValue(item, int64(count))
+	if err != nil {
+		return err
+	}
+
+	if i.GetNumActiveItems() > i.curMapCap { //over the threshold, we need to do something
+		if i.hashMap.lgLength < i.lgMaxMapSize { //below tgt size, we can grow
+			err := i.hashMap.resize(2 * len(i.hashMap.keys))
+			if err != nil {
+				return err
+			}
+			i.curMapCap = i.hashMap.getCapacity()
+		} else {
+			i.offset += i.hashMap.purge(i.sampleSize)
+			if i.GetNumActiveItems() > i.hashMap.getCapacity() {
+				return fmt.Errorf("purge did not reduce active items")
+			}
+		}
+	}
+	return nil
 }
 
 // GetLowerBound gets the guaranteed lower bound frequency of the given item, which can never be

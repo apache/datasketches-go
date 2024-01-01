@@ -48,3 +48,29 @@ func TestEmpty(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, ub, int64(0))
 }
+
+type StringPointerHasher struct {
+}
+
+func (h StringPointerHasher) Hash(item *string) uint64 {
+	datum := unsafe.Slice(unsafe.StringData(*item), len(*item))
+	return murmur3.SeedSum64(internal.DEFAULT_UPDATE_SEED, datum[:])
+}
+
+func TestNilInput(t *testing.T) {
+	h := StringPointerHasher{}
+	sketch, err := NewItemsSketchWithMaxMapSize[*string](1<<_LG_MIN_MAP_SIZE, h)
+	assert.NoError(t, err)
+	err = sketch.Update(nil)
+	assert.NoError(t, err)
+	assert.True(t, sketch.IsEmpty())
+	assert.Equal(t, sketch.GetNumActiveItems(), 0)
+	assert.Equal(t, sketch.GetStreamLength(), int64(0))
+	lb, err := sketch.GetLowerBound(nil)
+	assert.NoError(t, err)
+	assert.Equal(t, lb, int64(0))
+	ub, err := sketch.GetUpperBound(nil)
+	assert.NoError(t, err)
+	assert.Equal(t, ub, int64(0))
+
+}

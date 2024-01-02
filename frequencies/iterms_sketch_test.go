@@ -27,25 +27,76 @@ import (
 	"github.com/twmb/murmur3"
 )
 
-type StringHasher struct {
+type StringItemsSketchOp struct {
 }
 
-func (h StringHasher) Hash(item string) uint64 {
+func (h StringItemsSketchOp) Hash(item string) uint64 {
 	datum := unsafe.Slice(unsafe.StringData(item), len(item))
 	return murmur3.SeedSum64(internal.DEFAULT_UPDATE_SEED, datum[:])
 }
 
-type IntHasher struct {
+func (h StringItemsSketchOp) SerializeOneToSlice(item string) []byte {
+	// TODO fix me
+	return []byte(item)
+}
+
+func (h StringItemsSketchOp) SerializeManyToSlice(item []string) []byte {
+	// TODO fix me
+	out := make([]byte, 0, len(item)*8)
+	for _, s := range item {
+		out = append(out, h.SerializeOneToSlice(s)...)
+	}
+	return out
+}
+
+type StringPointerHasher struct {
+}
+
+func (h StringPointerHasher) Hash(item *string) uint64 {
+	datum := unsafe.Slice(unsafe.StringData(*item), len(*item))
+	return murmur3.SeedSum64(internal.DEFAULT_UPDATE_SEED, datum[:])
+}
+
+func (h StringPointerHasher) SerializeOneToSlice(item *string) []byte {
+	// TODO fix me
+	return []byte(*item)
+}
+
+func (h StringPointerHasher) SerializeManyToSlice(item []*string) []byte {
+	// TODO fix me
+	out := make([]byte, 0, len(item)*8)
+	for _, s := range item {
+		out = append(out, h.SerializeOneToSlice(s)...)
+	}
+	return out
+}
+
+type IntItemsSketchOp struct {
 	scratch [8]byte
 }
 
-func (h IntHasher) Hash(item int) uint64 {
+func (h IntItemsSketchOp) Hash(item int) uint64 {
 	binary.LittleEndian.PutUint64(h.scratch[:], uint64(item))
 	return murmur3.SeedSum64(internal.DEFAULT_UPDATE_SEED, h.scratch[:])
 }
 
+func (h IntItemsSketchOp) SerializeOneToSlice(item int) []byte {
+	out := make([]byte, 8)
+	binary.LittleEndian.PutUint64(out, uint64(item))
+	return out
+}
+
+func (h IntItemsSketchOp) SerializeManyToSlice(item []int) []byte {
+	// TODO fix me
+	out := make([]byte, 0, len(item)*8)
+	for _, s := range item {
+		out = append(out, h.SerializeOneToSlice(s)...)
+	}
+	return out
+}
+
 func TestEmpty(t *testing.T) {
-	h := StringHasher{}
+	h := StringItemsSketchOp{}
 	sketch, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, h)
 	assert.NoError(t, err)
 	assert.True(t, sketch.IsEmpty())
@@ -57,14 +108,6 @@ func TestEmpty(t *testing.T) {
 	ub, err := sketch.GetUpperBound("a")
 	assert.NoError(t, err)
 	assert.Equal(t, ub, int64(0))
-}
-
-type StringPointerHasher struct {
-}
-
-func (h StringPointerHasher) Hash(item *string) uint64 {
-	datum := unsafe.Slice(unsafe.StringData(*item), len(*item))
-	return murmur3.SeedSum64(internal.DEFAULT_UPDATE_SEED, datum[:])
 }
 
 func TestNilInput(t *testing.T) {
@@ -86,7 +129,7 @@ func TestNilInput(t *testing.T) {
 }
 
 func TestOneItem(t *testing.T) {
-	sketch, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringHasher{})
+	sketch, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
 	assert.NoError(t, err)
 	err = sketch.Update("a")
 	assert.NoError(t, err)
@@ -102,7 +145,7 @@ func TestOneItem(t *testing.T) {
 }
 
 func TestSeveralItem(t *testing.T) {
-	sketch, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringHasher{})
+	sketch, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
 	assert.NoError(t, err)
 	err = sketch.Update("a")
 	assert.NoError(t, err)
@@ -151,7 +194,7 @@ func TestSeveralItem(t *testing.T) {
 }
 
 func TestEstimationMode(t *testing.T) {
-	sketch, err := NewItemsSketchWithMaxMapSize[int](1<<_LG_MIN_MAP_SIZE, IntHasher{})
+	sketch, err := NewItemsSketchWithMaxMapSize[int](1<<_LG_MIN_MAP_SIZE, IntItemsSketchOp{})
 	assert.NoError(t, err)
 	err = sketch.UpdateMany(1, 10)
 	assert.NoError(t, err)
@@ -208,5 +251,23 @@ func TestEstimationMode(t *testing.T) {
 		}
 		assert.Equal(t, count, 2)
 	}
-
 }
+
+func TestSerializeStringDeserializeEmpty(t *testing.T) {
+	_, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
+	assert.NoError(t, err)
+	//bytes, err := sketch1.ToSlice()
+}
+
+/*
+  @Test
+  public void serializeStringDeserializeEmpty() {
+    ItemsSketch<String> sketch1 = new ItemsSketch<>(1 << LG_MIN_MAP_SIZE);
+    byte[] bytes = sketch1.toByteArray(new ArrayOfStringsSerDe());
+    ItemsSketch<String> sketch2 =
+        ItemsSketch.getInstance(Memory.wrap(bytes), new ArrayOfStringsSerDe());
+    Assert.assertTrue(sketch2.isEmpty());
+    Assert.assertEquals(sketch2.getNumActiveItems(), 0);
+    Assert.assertEquals(sketch2.getStreamLength(), 0);
+  }
+*/

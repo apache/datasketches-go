@@ -40,8 +40,10 @@ type ItemsSketch[C comparable] struct {
 	hashMap *reversePurgeItemHashMap[C]
 }
 
-type ItemSketchHasher[C comparable] interface {
+type ItemSketchOp[C comparable] interface {
 	Hash(item C) uint64
+	SerializeOneToSlice(item C) []byte
+	SerializeManyToSlice(item []C) []byte
 }
 
 // NewItemsSketch constructs a new ItemsSketch with the given parameters.
@@ -52,7 +54,7 @@ type ItemSketchHasher[C comparable] interface {
 //     Both the ultimate accuracy and size of this sketch are functions of lgMaxMapSize.
 //   - lgCurMapSize, log2 of the starting (current) physical size of the internal hashFn
 //     map managed by this sketch.
-func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, hasher ItemSketchHasher[C]) (*ItemsSketch[C], error) {
+func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, hasher ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	lgMaxMapSz := max(lgMaxMapSize, _LG_MIN_MAP_SIZE)
 	lgCurMapSz := max(lgCurMapSize, _LG_MIN_MAP_SIZE)
 	hashMap, err := newReversePurgeItemHashMap[C](1<<lgCurMapSz, hasher)
@@ -80,7 +82,7 @@ func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, hasher Ite
 //     sketch and must be a power of 2. The maximum capacity of this internal hashFn map is
 //     0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are
 //     functions of maxMapSize.
-func NewItemsSketchWithMaxMapSize[C comparable](maxMapSize int, hasher ItemSketchHasher[C]) (*ItemsSketch[C], error) {
+func NewItemsSketchWithMaxMapSize[C comparable](maxMapSize int, hasher ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	maxMapSz, err := internal.ExactLog2(maxMapSize)
 	if err != nil {
 		return nil, err

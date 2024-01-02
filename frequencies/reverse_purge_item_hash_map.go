@@ -30,7 +30,7 @@ type reversePurgeItemHashMap[C comparable] struct {
 	values        []int64
 	states        []int16
 	numActive     int
-	hasher        ItemSketchHasher[C]
+	hasher        ItemSketchOp[C]
 }
 
 type iteratorItemHashMap[C comparable] struct {
@@ -56,7 +56,7 @@ const (
 //   - mapSize, This determines the number of cells in the arrays underlying the
 //     HashMap implementation and must be a power of 2.
 //     The hashFn table will be expected to store reversePurgeItemHashMapLoadFactor * mapSize (key, value) pairs.
-func newReversePurgeItemHashMap[C comparable](mapSize int, hasher ItemSketchHasher[C]) (*reversePurgeItemHashMap[C], error) {
+func newReversePurgeItemHashMap[C comparable](mapSize int, hasher ItemSketchOp[C]) (*reversePurgeItemHashMap[C], error) {
 	lgLength, err := internal.ExactLog2(mapSize)
 	if err != nil {
 		return nil, err

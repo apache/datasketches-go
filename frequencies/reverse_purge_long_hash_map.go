@@ -36,7 +36,7 @@ type reversePurgeLongHashMap struct {
 	numActive     int
 }
 
-type iteratorHashMap struct {
+type iteratorLongHashMap struct {
 	keys_      []int64
 	values_    []int64
 	states_    []int16
@@ -341,8 +341,8 @@ func (r *reversePurgeLongHashMap) getActiveKeys() ([]int64, error) {
 	return returnValues, nil
 }
 
-func (s *reversePurgeLongHashMap) iterator() *iteratorHashMap {
-	return newIterator(s.keys, s.values, s.states, s.numActive)
+func (s *reversePurgeLongHashMap) iterator() *iteratorLongHashMap {
+	return newIteratorLong(s.keys, s.values, s.states, s.numActive)
 }
 
 func (s *reversePurgeLongHashMap) hashProbe(key int64) int {
@@ -367,9 +367,9 @@ func (s *reversePurgeLongHashMap) String() string {
 	return sb.String()
 }
 
-func newIterator(keys []int64, values []int64, states []int16, numActive int) *iteratorHashMap {
+func newIteratorLong(keys []int64, values []int64, states []int16, numActive int) *iteratorLongHashMap {
 	stride := int(uint64(float64(len(keys))*internal.InverseGolden) | 1)
-	return &iteratorHashMap{
+	return &iteratorLongHashMap{
 		keys_:      keys,
 		values_:    values,
 		states_:    states,
@@ -381,7 +381,7 @@ func newIterator(keys []int64, values []int64, states []int16, numActive int) *i
 	}
 }
 
-func (i *iteratorHashMap) next() bool {
+func (i *iteratorLongHashMap) next() bool {
 	i.i_ = (i.i_ + i.stride_) & i.mask_
 	for i.count_ < i.numActive_ {
 		if i.states_[i.i_] > 0 {
@@ -393,10 +393,10 @@ func (i *iteratorHashMap) next() bool {
 	return false
 }
 
-func (i *iteratorHashMap) getKey() int64 {
+func (i *iteratorLongHashMap) getKey() int64 {
 	return i.keys_[i.i_]
 }
 
-func (i *iteratorHashMap) getValue() int64 {
+func (i *iteratorLongHashMap) getValue() int64 {
 	return i.values_[i.i_]
 }

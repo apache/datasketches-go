@@ -74,3 +74,68 @@ func TestNilInput(t *testing.T) {
 	assert.Equal(t, ub, int64(0))
 
 }
+
+func TestOneItem(t *testing.T) {
+	sketch, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringHasher{})
+	assert.NoError(t, err)
+	err = sketch.Update("a")
+	assert.NoError(t, err)
+	assert.False(t, sketch.IsEmpty())
+	assert.Equal(t, sketch.GetNumActiveItems(), 1)
+	assert.Equal(t, sketch.GetStreamLength(), int64(1))
+	est, err := sketch.GetEstimate("a")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(1))
+	lb, err := sketch.GetLowerBound("a")
+	assert.NoError(t, err)
+	assert.Equal(t, lb, int64(1))
+}
+
+func TestSeveralItem(t *testing.T) {
+	sketch, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringHasher{})
+	assert.NoError(t, err)
+	err = sketch.Update("a")
+	assert.NoError(t, err)
+	err = sketch.Update("b")
+	assert.NoError(t, err)
+	err = sketch.Update("c")
+	assert.NoError(t, err)
+	err = sketch.Update("d")
+	assert.NoError(t, err)
+	err = sketch.Update("b")
+	assert.NoError(t, err)
+	err = sketch.Update("c")
+	assert.NoError(t, err)
+	err = sketch.Update("b")
+	assert.NoError(t, err)
+	assert.False(t, sketch.IsEmpty())
+	assert.Equal(t, sketch.GetNumActiveItems(), 4)
+	assert.Equal(t, sketch.GetStreamLength(), int64(7))
+	est, err := sketch.GetEstimate("a")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(1))
+	est, err = sketch.GetEstimate("b")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(3))
+	est, err = sketch.GetEstimate("c")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(2))
+	est, err = sketch.GetEstimate("d")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(1))
+
+	items, err := sketch.GetFrequentItems(ErrorTypeEnum.NoFalsePositives)
+	assert.NoError(t, err)
+	assert.Equal(t, len(items), 4)
+
+	items, err = sketch.GetFrequentItemsWithThreshold(3, ErrorTypeEnum.NoFalsePositives)
+	assert.NoError(t, err)
+	assert.Equal(t, len(items), 1)
+	assert.Equal(t, items[0].item, "b")
+
+	sketch.Reset()
+	assert.True(t, sketch.IsEmpty())
+	assert.Equal(t, sketch.GetNumActiveItems(), 0)
+	assert.Equal(t, sketch.GetStreamLength(), int64(0))
+
+}

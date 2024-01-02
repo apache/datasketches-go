@@ -19,7 +19,6 @@ package frequencies
 
 import (
 	"fmt"
-	"sort"
 )
 
 type Row struct {
@@ -29,8 +28,24 @@ type Row struct {
 	lb   int64
 }
 
+type RowItem[C comparable] struct {
+	item C
+	est  int64
+	ub   int64
+	lb   int64
+}
+
 func newRow(item int64, estimate int64, ub int64, lb int64) *Row {
 	return &Row{
+		item: item,
+		est:  estimate,
+		ub:   ub,
+		lb:   lb,
+	}
+}
+
+func newRowItem[C comparable](item C, estimate int64, ub int64, lb int64) *RowItem[C] {
+	return &RowItem[C]{
 		item: item,
 		est:  estimate,
 		ub:   ub,
@@ -58,52 +73,22 @@ func (r *Row) GetLowerBound() int64 {
 	return r.lb
 }
 
-func sortItems(sk *LongsSketch, threshold int64, errorType errorType) ([]*Row, error) {
-	rowList := make([]*Row, 0)
-	iter := sk.hashMap.iterator()
-	if errorType == ErrorTypeEnum.NoFalseNegatives {
-		for iter.next() {
-			est, err := sk.GetEstimate(iter.getKey())
-			if err != nil {
-				return nil, err
-			}
-			ub, err := sk.GetUpperBound(iter.getKey())
-			if err != nil {
-				return nil, err
-			}
-			lb, err := sk.GetLowerBound(iter.getKey())
-			if err != nil {
-				return nil, err
-			}
-			if ub >= threshold {
-				row := newRow(iter.getKey(), est, ub, lb)
-				rowList = append(rowList, row)
-			}
-		}
-	} else { //NO_FALSE_POSITIVES
-		for iter.next() {
-			est, err := sk.GetEstimate(iter.getKey())
-			if err != nil {
-				return nil, err
-			}
-			ub, err := sk.GetUpperBound(iter.getKey())
-			if err != nil {
-				return nil, err
-			}
-			lb, err := sk.GetLowerBound(iter.getKey())
-			if err != nil {
-				return nil, err
-			}
-			if lb >= threshold {
-				row := newRow(iter.getKey(), est, ub, lb)
-				rowList = append(rowList, row)
-			}
-		}
-	}
+func (r *RowItem[C]) String() string {
+	return fmt.Sprintf("  %20d%20d%20d %v", r.est, r.ub, r.lb, r.item)
+}
 
-	sort.Slice(rowList, func(i, j int) bool {
-		return rowList[i].est > rowList[j].est
-	})
+func (r *RowItem[C]) GetItem() C {
+	return r.item
+}
 
-	return rowList, nil
+func (r *RowItem[C]) GetEstimate() int64 {
+	return r.est
+}
+
+func (r *RowItem[C]) GetUpperBound() int64 {
+	return r.ub
+}
+
+func (r *RowItem[C]) GetLowerBound() int64 {
+	return r.lb
 }

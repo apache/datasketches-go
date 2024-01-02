@@ -20,6 +20,7 @@ package frequencies
 import (
 	"fmt"
 	"github.com/apache/datasketches-go/internal"
+	"sort"
 )
 
 type ItemsSketch[C comparable] struct {
@@ -87,6 +88,18 @@ func NewItemsSketchWithMaxMapSize[C comparable](maxMapSize int, hasher ItemSketc
 	return NewItemsSketch[C](maxMapSz, _LG_MIN_MAP_SIZE, hasher)
 }
 
+func (i *ItemsSketch[C]) Reset() error {
+	hashMap, err := newReversePurgeItemHashMap[C](1<<_LG_MIN_MAP_SIZE, i.hashMap.hasher)
+	if err != nil {
+		return err
+	}
+	i.hashMap = hashMap
+	i.curMapCap = hashMap.getCapacity()
+	i.offset = 0
+	i.streamWeight = 0
+	return nil
+}
+
 // IsEmpty returns true if this sketch is empty.
 func (i *ItemsSketch[C]) IsEmpty() bool {
 	return i.GetNumActiveItems() == 0
@@ -137,6 +150,16 @@ func (i *ItemsSketch[C]) UpdateMany(item C, count int) error {
 	return nil
 }
 
+func (i *ItemsSketch[C]) GetEstimate(item C) (int64, error) {
+	// If item is tracked:
+	// Estimate = itemCount + offset; Otherwise it is 0.
+	v, err := i.hashMap.get(item)
+	if v > 0 {
+		return v + i.offset, err
+	}
+	return 0, err
+}
+
 // GetLowerBound gets the guaranteed lower bound frequency of the given item, which can never be
 // negative.
 //
@@ -152,4 +175,70 @@ func (i *ItemsSketch[C]) GetUpperBound(item C) (int64, error) {
 	// UB = itemCount + offset
 	v, err := i.hashMap.get(item)
 	return v + i.offset, err
+}
+
+func (i *ItemsSketch[C]) GetMaximumError() int64 {
+	return i.offset
+}
+
+func (i *ItemsSketch[C]) GetFrequentItems(errorType errorType) ([]*RowItem[C], error) {
+	return i.sortItems(i.GetMaximumError(), errorType)
+}
+
+func (i *ItemsSketch[C]) GetFrequentItemsWithThreshold(threshold int64, errorType errorType) ([]*RowItem[C], error) {
+	finalThreshold := i.GetMaximumError()
+	if threshold > finalThreshold {
+		finalThreshold = threshold
+	}
+	return i.sortItems(finalThreshold, errorType)
+}
+
+func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*RowItem[C], error) {
+	rowList := make([]*RowItem[C], 0)
+	iter := i.hashMap.iterator()
+	if errorType == ErrorTypeEnum.NoFalseNegatives {
+		for iter.next() {
+			est, err := i.GetEstimate(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			ub, err := i.GetUpperBound(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			lb, err := i.GetLowerBound(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			if ub >= threshold {
+				row := newRowItem[C](iter.getKey(), est, ub, lb)
+				rowList = append(rowList, row)
+			}
+		}
+	} else { //NO_FALSE_POSITIVES
+		for iter.next() {
+			est, err := i.GetEstimate(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			ub, err := i.GetUpperBound(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			lb, err := i.GetLowerBound(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			if lb >= threshold {
+				row := newRowItem[C](iter.getKey(), est, ub, lb)
+				rowList = append(rowList, row)
+			}
+		}
+	}
+
+	sort.Slice(rowList, func(i, j int) bool {
+		return rowList[i].est > rowList[j].est
+	})
+
+	return rowList, nil
 }

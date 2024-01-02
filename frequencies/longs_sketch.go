@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"math/bits"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -358,7 +359,7 @@ func (s *LongsSketch) GetFrequentItemsWithThreshold(threshold int64, errorType e
 	if threshold > finalThreshold {
 		finalThreshold = threshold
 	}
-	return sortItems(s, finalThreshold, errorType)
+	return s.sortItems(finalThreshold, errorType)
 }
 
 // GetFrequentItems returns an array of Rows that include frequent items, estimates, upper and
@@ -367,7 +368,7 @@ func (s *LongsSketch) GetFrequentItemsWithThreshold(threshold int64, errorType e
 //
 // errorType determines whether no false positives or no false negatives are desired.
 func (s *LongsSketch) GetFrequentItems(errorType errorType) ([]*Row, error) {
-	return sortItems(s, s.GetMaximumError(), errorType)
+	return s.sortItems(s.GetMaximumError(), errorType)
 }
 
 // GetNumActiveItems returns the number of active items in the sketch.
@@ -570,4 +571,54 @@ func (s *LongsSketch) String() string {
 	sb.WriteString("\n")
 	sb.WriteString(s.hashMap.String())
 	return sb.String()
+}
+
+func (s *LongsSketch) sortItems(threshold int64, errorType errorType) ([]*Row, error) {
+	rowList := make([]*Row, 0)
+	iter := s.hashMap.iterator()
+	if errorType == ErrorTypeEnum.NoFalseNegatives {
+		for iter.next() {
+			est, err := s.GetEstimate(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			ub, err := s.GetUpperBound(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			lb, err := s.GetLowerBound(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			if ub >= threshold {
+				row := newRow(iter.getKey(), est, ub, lb)
+				rowList = append(rowList, row)
+			}
+		}
+	} else { //NO_FALSE_POSITIVES
+		for iter.next() {
+			est, err := s.GetEstimate(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			ub, err := s.GetUpperBound(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			lb, err := s.GetLowerBound(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			if lb >= threshold {
+				row := newRow(iter.getKey(), est, ub, lb)
+				rowList = append(rowList, row)
+			}
+		}
+	}
+
+	sort.Slice(rowList, func(i, j int) bool {
+		return rowList[i].est > rowList[j].est
+	})
+
+	return rowList, nil
 }

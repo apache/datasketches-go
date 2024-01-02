@@ -33,6 +33,17 @@ type reversePurgeItemHashMap[C comparable] struct {
 	hasher        ItemSketchHasher[C]
 }
 
+type iteratorItemHashMap[C comparable] struct {
+	keys_      []C
+	values_    []int64
+	states_    []int16
+	numActive_ int
+	stride_    int
+	mask_      int
+	i_         int
+	count_     int
+}
+
 const (
 	reversePurgeItemHashMapLoadFactor = float64(0.75)
 )
@@ -81,12 +92,16 @@ func (r *reversePurgeItemHashMap[C]) get(key C) (int64, error) {
 	return 0, nil
 }
 
+func (r *reversePurgeItemHashMap[C]) iterator() *iteratorItemHashMap[C] {
+	return newIteratorItems(r.keys, r.values, r.states, r.numActive)
+}
+
 func (r *reversePurgeItemHashMap[C]) hashProbe(key C) int {
 	arrayMask := uint64(len(r.keys) - 1)
 
 	probe := r.hasher.Hash(key) & arrayMask
 	for r.states[probe] > 0 && r.keys[probe] != key {
-		probe = probe + 1&arrayMask
+		probe = (probe + 1) & arrayMask
 	}
 	return int(probe)
 }
@@ -212,7 +227,7 @@ func (r *reversePurgeItemHashMap[C]) hashDelete(deleteProbe int) {
 			// move current element
 			r.keys[deleteProbe] = r.keys[probe]
 			r.values[deleteProbe] = r.values[probe]
-			r.states[deleteProbe] = int16(r.states[probe] - int16(drift))
+			r.states[deleteProbe] = r.states[probe] - int16(drift)
 			// marking this location as deleted
 			r.states[probe] = 0
 			drift = 0
@@ -223,4 +238,38 @@ func (r *reversePurgeItemHashMap[C]) hashDelete(deleteProbe int) {
 		//only used for theoretical analysis
 		//assert drift < DRIFT_LIMIT : "drift: " + drift + " >= DRIFT_LIMIT";
 	}
+}
+
+func newIteratorItems[C comparable](keys []C, values []int64, states []int16, numActive int) *iteratorItemHashMap[C] {
+	stride := int(uint64(float64(len(keys))*internal.InverseGolden) | 1)
+	return &iteratorItemHashMap[C]{
+		keys_:      keys,
+		values_:    values,
+		states_:    states,
+		numActive_: numActive,
+
+		stride_: stride,
+		mask_:   len(keys) - 1,
+		i_:      -stride,
+	}
+}
+
+func (i *iteratorItemHashMap[C]) next() bool {
+	i.i_ = (i.i_ + i.stride_) & i.mask_
+	for i.count_ < i.numActive_ {
+		if i.states_[i.i_] > 0 {
+			i.count_++
+			return true
+		}
+		i.i_ = (i.i_ + i.stride_) & i.mask_
+	}
+	return false
+}
+
+func (i *iteratorItemHashMap[C]) getKey() C {
+	return i.keys_[i.i_]
+}
+
+func (i *iteratorItemHashMap[C]) getValue() int64 {
+	return i.values_[i.i_]
 }

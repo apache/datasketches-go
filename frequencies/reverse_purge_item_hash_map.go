@@ -108,7 +108,7 @@ func (r *reversePurgeItemHashMap[C]) hashProbe(key C) int {
 
 func (r *reversePurgeItemHashMap[C]) adjustOrPutValue(key C, adjustAmount int64) error {
 	arrayMask := len(r.keys) - 1
-	probe := r.hashProbe(key) & arrayMask
+	probe := int(r.hasher.Hash(key) & uint64(arrayMask))
 	drift := 1
 	for r.states[probe] != 0 && r.keys[probe] != key {
 		probe = (probe + 1) & arrayMask
@@ -119,7 +119,7 @@ func (r *reversePurgeItemHashMap[C]) adjustOrPutValue(key C, adjustAmount int64)
 
 	if r.states[probe] == 0 {
 		// adding the key to the table the value
-		if r.numActive >= r.loadThreshold {
+		if r.numActive > r.loadThreshold {
 			return fmt.Errorf("numActive: %d >= loadThreshold: %d", r.numActive, r.loadThreshold)
 		}
 		r.keys[probe] = key

@@ -18,6 +18,7 @@
 package frequencies
 
 import (
+	"encoding/binary"
 	"testing"
 	"unsafe"
 
@@ -32,6 +33,15 @@ type StringHasher struct {
 func (h StringHasher) Hash(item string) uint64 {
 	datum := unsafe.Slice(unsafe.StringData(item), len(item))
 	return murmur3.SeedSum64(internal.DEFAULT_UPDATE_SEED, datum[:])
+}
+
+type IntHasher struct {
+	scratch [8]byte
+}
+
+func (h IntHasher) Hash(item int) uint64 {
+	binary.LittleEndian.PutUint64(h.scratch[:], uint64(item))
+	return murmur3.SeedSum64(internal.DEFAULT_UPDATE_SEED, h.scratch[:])
 }
 
 func TestEmpty(t *testing.T) {
@@ -133,9 +143,70 @@ func TestSeveralItem(t *testing.T) {
 	assert.Equal(t, len(items), 1)
 	assert.Equal(t, items[0].item, "b")
 
-	sketch.Reset()
+	err = sketch.Reset()
+	assert.NoError(t, err)
 	assert.True(t, sketch.IsEmpty())
 	assert.Equal(t, sketch.GetNumActiveItems(), 0)
 	assert.Equal(t, sketch.GetStreamLength(), int64(0))
+}
+
+func TestEstimationMode(t *testing.T) {
+	sketch, err := NewItemsSketchWithMaxMapSize[int](1<<_LG_MIN_MAP_SIZE, IntHasher{})
+	assert.NoError(t, err)
+	err = sketch.UpdateMany(1, 10)
+	assert.NoError(t, err)
+	err = sketch.Update(2)
+	assert.NoError(t, err)
+	err = sketch.Update(3)
+	assert.NoError(t, err)
+	err = sketch.Update(4)
+	assert.NoError(t, err)
+	err = sketch.Update(5)
+	assert.NoError(t, err)
+	err = sketch.Update(6)
+	assert.NoError(t, err)
+	err = sketch.UpdateMany(7, 15)
+	assert.NoError(t, err)
+	err = sketch.Update(8)
+	assert.NoError(t, err)
+	err = sketch.Update(9)
+	assert.NoError(t, err)
+	err = sketch.Update(10)
+	assert.NoError(t, err)
+	err = sketch.Update(11)
+	assert.NoError(t, err)
+	err = sketch.Update(12)
+	assert.NoError(t, err)
+
+	assert.False(t, sketch.IsEmpty())
+	assert.Equal(t, sketch.GetStreamLength(), int64(35))
+
+	{
+		items, err := sketch.GetFrequentItems(ErrorTypeEnum.NoFalsePositives)
+		assert.NoError(t, err)
+		assert.Equal(t, len(items), 2)
+		// only 2 items (1 and 7) should have counts more than 1
+		count := 0
+		for _, item := range items {
+			if item.GetLowerBound() > 1 {
+				count++
+			}
+		}
+		assert.Equal(t, count, 2)
+	}
+
+	{
+		items, err := sketch.GetFrequentItems(ErrorTypeEnum.NoFalseNegatives)
+		assert.NoError(t, err)
+		assert.True(t, len(items) >= 2)
+		// only 2 items (1 and 7) should have counts more than 5
+		count := 0
+		for _, item := range items {
+			if item.GetLowerBound() > 5 {
+				count++
+			}
+		}
+		assert.Equal(t, count, 2)
+	}
 
 }

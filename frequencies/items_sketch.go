@@ -18,6 +18,7 @@
 package frequencies
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/apache/datasketches-go/internal"
 	"sort"
@@ -44,6 +45,7 @@ type ItemSketchOp[C comparable] interface {
 	Hash(item C) uint64
 	SerializeOneToSlice(item C) []byte
 	SerializeManyToSlice(item []C) []byte
+	DeserializeManyFromSlice(slc []byte, offset int, length int) []C
 }
 
 // NewItemsSketch constructs a new ItemsSketch with the given parameters.
@@ -54,10 +56,10 @@ type ItemSketchOp[C comparable] interface {
 //     Both the ultimate accuracy and size of this sketch are functions of lgMaxMapSize.
 //   - lgCurMapSize, log2 of the starting (current) physical size of the internal hashFn
 //     map managed by this sketch.
-func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, hasher ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, operations ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	lgMaxMapSz := max(lgMaxMapSize, _LG_MIN_MAP_SIZE)
 	lgCurMapSz := max(lgCurMapSize, _LG_MIN_MAP_SIZE)
-	hashMap, err := newReversePurgeItemHashMap[C](1<<lgCurMapSz, hasher)
+	hashMap, err := newReversePurgeItemHashMap[C](1<<lgCurMapSz, operations)
 	if err != nil {
 		return nil, err
 	}
@@ -82,16 +84,85 @@ func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, hasher Ite
 //     sketch and must be a power of 2. The maximum capacity of this internal hashFn map is
 //     0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are
 //     functions of maxMapSize.
-func NewItemsSketchWithMaxMapSize[C comparable](maxMapSize int, hasher ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewItemsSketchWithMaxMapSize[C comparable](maxMapSize int, operations ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	maxMapSz, err := internal.ExactLog2(maxMapSize)
 	if err != nil {
 		return nil, err
 	}
-	return NewItemsSketch[C](maxMapSz, _LG_MIN_MAP_SIZE, hasher)
+	return NewItemsSketch[C](maxMapSz, _LG_MIN_MAP_SIZE, operations)
+}
+
+func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C]) (*ItemsSketch[C], error) {
+	pre0, err := checkPreambleSize(slc) //make sure preamble will fit
+	maxPreLongs := internal.FamilyEnum.Frequency.MaxPreLongs
+
+	preLongs := extractPreLongs(pre0)                     //Byte 0
+	serVer := extractSerVer(pre0)                         //Byte 1
+	familyID := extractFamilyID(pre0)                     //Byte 2
+	lgMaxMapSize := extractLgMaxMapSize(pre0)             //Byte 3
+	lgCurMapSize := extractLgCurMapSize(pre0)             //Byte 4
+	empty := (extractFlags(pre0) & _EMPTY_FLAG_MASK) != 0 //Byte 5
+
+	// Checks
+	preLongsEq1 := (preLongs == 1) //Byte 0
+	preLongsEqMax := (preLongs == maxPreLongs)
+	if !preLongsEq1 && !preLongsEqMax {
+		return nil, fmt.Errorf("possible corruption: preLongs must be 1 or %d: %d", maxPreLongs, preLongs)
+	}
+	if serVer != _SER_VER { //Byte 1
+		return nil, fmt.Errorf("possible corruption: ser ver must be %d: %d", _SER_VER, serVer)
+	}
+	actFamID := internal.FamilyEnum.Frequency.Id //Byte 2
+	if familyID != actFamID {
+		return nil, fmt.Errorf("possible corruption: familyID must be %d: %d", actFamID, familyID)
+	}
+	if empty && !preLongsEq1 { //Byte 5 and Byte 0
+		return nil, fmt.Errorf("(preLongs == 1) ^ empty == true")
+	}
+	if empty {
+		return NewItemsSketchWithMaxMapSize[C](1<<_LG_MIN_MAP_SIZE, operations)
+	}
+	// Get full preamble
+	preArr := make([]int64, preLongs)
+	for j := 0; j < preLongs; j++ {
+		preArr[j] = int64(binary.LittleEndian.Uint64(slc[j<<3:]))
+	}
+
+	fis, err := NewItemsSketch[C](int(lgMaxMapSize), int(lgCurMapSize), operations)
+	if err != nil {
+		return nil, err
+	}
+	fis.streamWeight = 0 // update after
+	fis.offset = preArr[3]
+
+	preBytes := preLongs << 3
+	activeItems := extractActiveItems(preArr[1])
+
+	// Get countArray
+	countArray := make([]int64, activeItems)
+	reqBytes := preBytes + activeItems*8 // count Arr only
+	if len(slc) < reqBytes {
+		return nil, fmt.Errorf("possible Corruption: Insufficient bytes in array: %d, %d", len(slc), reqBytes)
+	}
+	for j := 0; j < activeItems; j++ {
+		countArray[j] = int64(binary.LittleEndian.Uint64(slc[preBytes+j<<3:]))
+	}
+	// Get itemArray
+	itemsOffset := preBytes + (8 * activeItems)
+	itemArray := operations.DeserializeManyFromSlice(slc[itemsOffset:], 0, activeItems)
+	// update the sketch
+	for j := 0; j < activeItems; j++ {
+		err := fis.UpdateMany(itemArray[j], int(countArray[j]))
+		if err != nil {
+			return nil, err
+		}
+	}
+	fis.streamWeight = preArr[2] // override streamWeight due to updating
+	return fis, nil
 }
 
 func (i *ItemsSketch[C]) Reset() error {
-	hashMap, err := newReversePurgeItemHashMap[C](1<<_LG_MIN_MAP_SIZE, i.hashMap.hasher)
+	hashMap, err := newReversePurgeItemHashMap[C](1<<_LG_MIN_MAP_SIZE, i.hashMap.operations)
 	if err != nil {
 		return err
 	}
@@ -193,6 +264,55 @@ func (i *ItemsSketch[C]) GetFrequentItemsWithThreshold(threshold int64, errorTyp
 		finalThreshold = threshold
 	}
 	return i.sortItems(finalThreshold, errorType)
+}
+
+func (i *ItemsSketch[C]) ToSlice() []byte {
+	preLongs := 0
+	outBytes := 0
+	empty := i.IsEmpty()
+	activeItems := i.GetNumActiveItems()
+	bytes := make([]byte, 0)
+	if empty {
+		preLongs = 1
+		outBytes = 8
+	} else {
+		preLongs = internal.FamilyEnum.Frequency.MaxPreLongs
+		bytes = i.hashMap.operations.SerializeManyToSlice(i.hashMap.getActiveKeys())
+		outBytes = ((preLongs + activeItems) << 3) + len(bytes)
+	}
+
+	outArr := make([]byte, outBytes)
+	pre0 := int64(0)
+	pre0 = insertPreLongs(int64(preLongs), pre0)                         //Byte 0
+	pre0 = insertSerVer(_SER_VER, pre0)                                  //Byte 1
+	pre0 = insertFamilyID(int64(internal.FamilyEnum.Frequency.Id), pre0) //Byte 2
+	pre0 = insertLgMaxMapSize(int64(i.lgMaxMapSize), pre0)               //Byte 3
+	pre0 = insertLgCurMapSize(int64(i.hashMap.lgLength), pre0)           //Byte 4
+	if empty {
+		pre0 = insertFlags(_EMPTY_FLAG_MASK, pre0) //Byte 5
+	} else {
+		pre0 = insertFlags(0, pre0) //Byte 5
+	}
+
+	if empty {
+		binary.LittleEndian.PutUint64(outArr, uint64(pre0))
+	} else {
+		pre := int64(0)
+		preArr := make([]int64, preLongs)
+		preArr[0] = pre0
+		preArr[1] = insertActiveItems(int64(activeItems), pre)
+		preArr[2] = int64(i.streamWeight)
+		preArr[3] = int64(i.offset)
+		for j := 0; j < preLongs; j++ {
+			binary.LittleEndian.PutUint64(outArr[j<<3:], uint64(preArr[j]))
+		}
+		preBytes := preLongs << 3
+		for j := 0; j < activeItems; j++ {
+			binary.LittleEndian.PutUint64(outArr[preBytes+j<<3:], uint64(i.hashMap.getActiveValues()[j]))
+		}
+		copy(outArr[preBytes+(activeItems<<3):], bytes)
+	}
+	return outArr
 }
 
 func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*RowItem[C], error) {

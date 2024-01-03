@@ -497,7 +497,7 @@ func (s *LongsSketch) ToString() (string, error) {
 }
 
 // ToSlice returns a slice representation of this sketch
-func (s *LongsSketch) ToSlice() ([]byte, error) {
+func (s *LongsSketch) ToSlice() []byte {
 	emtpy := s.IsEmpty()
 	activeItems := s.GetNumActiveItems()
 	preLongs := 1
@@ -518,7 +518,7 @@ func (s *LongsSketch) ToSlice() ([]byte, error) {
 	if emtpy {
 		pre0 = insertFlags(_EMPTY_FLAG_MASK, pre0) //Byte 5
 		binary.LittleEndian.PutUint64(outArr, uint64(pre0))
-		return outArr, nil
+		return outArr
 	}
 	pre := int64(0)
 	pre0 = insertFlags(0, pre0) //Byte 5
@@ -533,23 +533,17 @@ func (s *LongsSketch) ToSlice() ([]byte, error) {
 	}
 
 	preBytes := preLongs << 3
-	activeValues, err := s.hashMap.getActiveValues()
-	if err != nil {
-		return nil, err
-	}
+	activeValues := s.hashMap.getActiveValues()
 	for i := 0; i < activeItems; i++ {
 		binary.LittleEndian.PutUint64(outArr[preBytes+(i<<3):], uint64(activeValues[i]))
 	}
 
-	activeKeys, err := s.hashMap.getActiveKeys()
-	if err != nil {
-		return nil, err
-	}
+	activeKeys := s.hashMap.getActiveKeys()
 	for i := 0; i < activeItems; i++ {
 		binary.LittleEndian.PutUint64(outArr[preBytes+((activeItems+i)<<3):], uint64(activeKeys[i]))
 	}
 
-	return outArr, nil
+	return outArr
 }
 
 // Reset resets this sketch to a virgin state.

@@ -30,7 +30,7 @@ type reversePurgeItemHashMap[C comparable] struct {
 	values        []int64
 	states        []int16
 	numActive     int
-	hasher        ItemSketchOp[C]
+	operations    ItemSketchOp[C]
 }
 
 type iteratorItemHashMap[C comparable] struct {
@@ -56,7 +56,7 @@ const (
 //   - mapSize, This determines the number of cells in the arrays underlying the
 //     HashMap implementation and must be a power of 2.
 //     The hashFn table will be expected to store reversePurgeItemHashMapLoadFactor * mapSize (key, value) pairs.
-func newReversePurgeItemHashMap[C comparable](mapSize int, hasher ItemSketchOp[C]) (*reversePurgeItemHashMap[C], error) {
+func newReversePurgeItemHashMap[C comparable](mapSize int, operations ItemSketchOp[C]) (*reversePurgeItemHashMap[C], error) {
 	lgLength, err := internal.ExactLog2(mapSize)
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func newReversePurgeItemHashMap[C comparable](mapSize int, hasher ItemSketchOp[C
 		make([]int64, mapSize),
 		make([]int16, mapSize),
 		0,
-		hasher,
+		operations,
 	}, nil
 }
 
@@ -99,7 +99,7 @@ func (r *reversePurgeItemHashMap[C]) iterator() *iteratorItemHashMap[C] {
 func (r *reversePurgeItemHashMap[C]) hashProbe(key C) int {
 	arrayMask := uint64(len(r.keys) - 1)
 
-	probe := r.hasher.Hash(key) & arrayMask
+	probe := r.operations.Hash(key) & arrayMask
 	for r.states[probe] > 0 && r.keys[probe] != key {
 		probe = (probe + 1) & arrayMask
 	}
@@ -108,7 +108,7 @@ func (r *reversePurgeItemHashMap[C]) hashProbe(key C) int {
 
 func (r *reversePurgeItemHashMap[C]) adjustOrPutValue(key C, adjustAmount int64) error {
 	arrayMask := len(r.keys) - 1
-	probe := int(r.hasher.Hash(key) & uint64(arrayMask))
+	probe := int(r.operations.Hash(key) & uint64(arrayMask))
 	drift := 1
 	for r.states[probe] != 0 && r.keys[probe] != key {
 		probe = (probe + 1) & arrayMask
@@ -238,6 +238,32 @@ func (r *reversePurgeItemHashMap[C]) hashDelete(deleteProbe int) {
 		//only used for theoretical analysis
 		//assert drift < DRIFT_LIMIT : "drift: " + drift + " >= DRIFT_LIMIT";
 	}
+}
+
+func (r *reversePurgeItemHashMap[C]) getActiveKeys() []C {
+	if r.numActive == 0 {
+		return nil
+	}
+	returnKeys := make([]C, 0, r.numActive)
+	for i := 0; i < len(r.keys); i++ {
+		if r.isActive(i) {
+			returnKeys = append(returnKeys, r.keys[i])
+		}
+	}
+	return returnKeys
+}
+
+func (r *reversePurgeItemHashMap[C]) getActiveValues() []int64 {
+	if r.numActive == 0 {
+		return nil
+	}
+	returnValues := make([]int64, 0, r.numActive)
+	for i := 0; i < len(r.values); i++ {
+		if r.isActive(i) {
+			returnValues = append(returnValues, r.values[i])
+		}
+	}
+	return returnValues
 }
 
 func newIteratorItems[C comparable](keys []C, values []int64, states []int16, numActive int) *iteratorItemHashMap[C] {

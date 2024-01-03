@@ -52,8 +52,7 @@ func TestGenerateGoBinariesForCompatibilityTestingLongsSketch(t *testing.T) {
 		err = os.MkdirAll(internal.GoPath, os.ModePerm)
 		assert.NoError(t, err)
 
-		slc, err := sk.ToSlice()
-		assert.NoError(t, err)
+		slc := sk.ToSlice()
 		err = os.WriteFile(fmt.Sprintf("%s/frequent_long_n%d_go.sk", internal.GoPath, n), slc, 0644)
 		if err != nil {
 			t.Errorf("err != nil")

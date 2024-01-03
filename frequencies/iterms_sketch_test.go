@@ -36,39 +36,67 @@ func (h StringItemsSketchOp) Hash(item string) uint64 {
 }
 
 func (h StringItemsSketchOp) SerializeOneToSlice(item string) []byte {
-	// TODO fix me
-	return []byte(item)
+	panic("not implemented")
 }
 
 func (h StringItemsSketchOp) SerializeManyToSlice(item []string) []byte {
-	// TODO fix me
-	out := make([]byte, 0, len(item)*8)
-	for _, s := range item {
-		out = append(out, h.SerializeOneToSlice(s)...)
+	if len(item) == 0 {
+		return []byte{}
 	}
-	return out
+	totalBytes := 0
+	numItems := len(item)
+	serialized2DArray := make([][]byte, numItems)
+	for i := 0; i < numItems; i++ {
+		serialized2DArray[i] = []byte(item[i])
+		totalBytes += len(serialized2DArray[i]) + 4
+	}
+	bytesOut := make([]byte, totalBytes)
+	offset := 0
+	for i := 0; i < numItems; i++ {
+		utf8len := len(serialized2DArray[i])
+		binary.LittleEndian.PutUint32(bytesOut[offset:], uint32(utf8len))
+		offset += 4
+		copy(bytesOut[offset:], serialized2DArray[i])
+		offset += utf8len
+	}
+	return bytesOut
 }
 
-type StringPointerHasher struct {
+func (h StringItemsSketchOp) DeserializeManyFromSlice(slc []byte, offset int, length int) []string {
+	if length == 0 {
+		return []string{}
+	}
+	array := make([]string, length)
+	offsetBytes := offset
+	for i := 0; i < length; i++ {
+		strLength := int(binary.LittleEndian.Uint32(slc[offsetBytes:]))
+		offsetBytes += 4
+		utf8Bytes := make([]byte, strLength)
+		copy(utf8Bytes, slc[offsetBytes:])
+		offsetBytes += strLength
+		array[i] = string(utf8Bytes)
+	}
+	return array
 }
 
-func (h StringPointerHasher) Hash(item *string) uint64 {
+type StringPointerSketchOp struct {
+}
+
+func (h StringPointerSketchOp) Hash(item *string) uint64 {
 	datum := unsafe.Slice(unsafe.StringData(*item), len(*item))
 	return murmur3.SeedSum64(internal.DEFAULT_UPDATE_SEED, datum[:])
 }
 
-func (h StringPointerHasher) SerializeOneToSlice(item *string) []byte {
-	// TODO fix me
-	return []byte(*item)
+func (h StringPointerSketchOp) SerializeOneToSlice(item *string) []byte {
+	panic("not implemented")
 }
 
-func (h StringPointerHasher) SerializeManyToSlice(item []*string) []byte {
-	// TODO fix me
-	out := make([]byte, 0, len(item)*8)
-	for _, s := range item {
-		out = append(out, h.SerializeOneToSlice(s)...)
-	}
-	return out
+func (h StringPointerSketchOp) SerializeManyToSlice(item []*string) []byte {
+	panic("not implemented")
+}
+
+func (h StringPointerSketchOp) DeserializeManyFromSlice(slc []byte, offset int, length int) []*string {
+	panic("not implemented")
 }
 
 type IntItemsSketchOp struct {
@@ -81,18 +109,15 @@ func (h IntItemsSketchOp) Hash(item int) uint64 {
 }
 
 func (h IntItemsSketchOp) SerializeOneToSlice(item int) []byte {
-	out := make([]byte, 8)
-	binary.LittleEndian.PutUint64(out, uint64(item))
-	return out
+	panic("not implemented")
 }
 
 func (h IntItemsSketchOp) SerializeManyToSlice(item []int) []byte {
-	// TODO fix me
-	out := make([]byte, 0, len(item)*8)
-	for _, s := range item {
-		out = append(out, h.SerializeOneToSlice(s)...)
-	}
-	return out
+	panic("not implemented")
+}
+
+func (h IntItemsSketchOp) DeserializeManyFromSlice(slc []byte, offset int, length int) []int {
+	panic("not implemented")
 }
 
 func TestEmpty(t *testing.T) {
@@ -111,7 +136,7 @@ func TestEmpty(t *testing.T) {
 }
 
 func TestNilInput(t *testing.T) {
-	h := StringPointerHasher{}
+	h := StringPointerSketchOp{}
 	sketch, err := NewItemsSketchWithMaxMapSize[*string](1<<_LG_MIN_MAP_SIZE, h)
 	assert.NoError(t, err)
 	err = sketch.Update(nil)
@@ -254,20 +279,51 @@ func TestEstimationMode(t *testing.T) {
 }
 
 func TestSerializeStringDeserializeEmpty(t *testing.T) {
-	_, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
+	sketch1, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
 	assert.NoError(t, err)
-	//bytes, err := sketch1.ToSlice()
+	bytes := sketch1.ToSlice()
+	sketch2, err := NewItemsSketchFromSlice[string](bytes, StringItemsSketchOp{})
+	assert.NoError(t, err)
+	assert.True(t, sketch2.IsEmpty())
+	assert.Equal(t, sketch2.GetNumActiveItems(), 0)
+	assert.Equal(t, sketch2.GetStreamLength(), int64(0))
 }
 
-/*
-  @Test
-  public void serializeStringDeserializeEmpty() {
-    ItemsSketch<String> sketch1 = new ItemsSketch<>(1 << LG_MIN_MAP_SIZE);
-    byte[] bytes = sketch1.toByteArray(new ArrayOfStringsSerDe());
-    ItemsSketch<String> sketch2 =
-        ItemsSketch.getInstance(Memory.wrap(bytes), new ArrayOfStringsSerDe());
-    Assert.assertTrue(sketch2.isEmpty());
-    Assert.assertEquals(sketch2.getNumActiveItems(), 0);
-    Assert.assertEquals(sketch2.getStreamLength(), 0);
-  }
-*/
+func TestSerializeDeserializeUtf8Strings(t *testing.T) {
+	sketch1, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
+	assert.NoError(t, err)
+	err = sketch1.Update("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	assert.NoError(t, err)
+	err = sketch1.Update("bbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+	assert.NoError(t, err)
+	err = sketch1.Update("ccccccccccccccccccccccccccccc")
+	assert.NoError(t, err)
+	err = sketch1.Update("ddddddddddddddddddddddddddddd")
+	assert.NoError(t, err)
+
+	bytes := sketch1.ToSlice()
+	sketch2, err := NewItemsSketchFromSlice[string](bytes, StringItemsSketchOp{})
+	assert.NoError(t, err)
+	err = sketch2.Update("bbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+	assert.NoError(t, err)
+	err = sketch2.Update("ccccccccccccccccccccccccccccc")
+	assert.NoError(t, err)
+	err = sketch2.Update("bbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+	assert.NoError(t, err)
+
+	assert.False(t, sketch2.IsEmpty())
+	assert.Equal(t, sketch2.GetNumActiveItems(), 4)
+	assert.Equal(t, sketch2.GetStreamLength(), int64(7))
+	est, err := sketch2.GetEstimate("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(1))
+	est, err = sketch2.GetEstimate("bbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(3))
+	est, err = sketch2.GetEstimate("ccccccccccccccccccccccccccccc")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(2))
+	est, err = sketch2.GetEstimate("ddddddddddddddddddddddddddddd")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(1))
+}

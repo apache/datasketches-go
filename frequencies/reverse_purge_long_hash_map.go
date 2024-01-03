@@ -305,40 +305,30 @@ func deserializeFromStringArray(tokens []string) (*reversePurgeLongHashMap, erro
 	return hashMap, nil
 }
 
-func (r *reversePurgeLongHashMap) getActiveValues() ([]int64, error) {
+func (r *reversePurgeLongHashMap) getActiveValues() []int64 {
 	if r.numActive == 0 {
-		return nil, nil
+		return nil
 	}
-	returnValues := make([]int64, r.numActive)
-	j := 0
+	returnValues := make([]int64, 0, r.numActive)
 	for i := 0; i < len(r.values); i++ {
 		if r.states[i] > 0 { //isActive
-			returnValues[j] = r.values[i]
-			j++
+			returnValues = append(returnValues, r.values[i])
 		}
 	}
-	if j != r.numActive {
-		return nil, errors.New("j != r.numActive")
-	}
-	return returnValues, nil
+	return returnValues
 }
 
-func (r *reversePurgeLongHashMap) getActiveKeys() ([]int64, error) {
+func (r *reversePurgeLongHashMap) getActiveKeys() []int64 {
 	if r.numActive == 0 {
-		return nil, nil
+		return nil
 	}
-	returnValues := make([]int64, r.numActive)
-	j := 0
+	returnValues := make([]int64, 0, r.numActive)
 	for i := 0; i < len(r.keys); i++ {
 		if r.states[i] > 0 { //isActive
-			returnValues[j] = r.keys[i]
-			j++
+			returnValues = append(returnValues, r.keys[i])
 		}
 	}
-	if j != r.numActive {
-		return nil, errors.New("j != r.numActive")
-	}
-	return returnValues, nil
+	return returnValues
 }
 
 func (s *reversePurgeLongHashMap) iterator() *iteratorLongHashMap {

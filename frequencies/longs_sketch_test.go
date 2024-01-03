@@ -96,7 +96,7 @@ func TestFrequentItemsStringSerial(t *testing.T) {
 func TestFrequentItemsByteSerial(t *testing.T) {
 	sketch, err := NewLongsSketchWithMaxMapSize(16)
 	assert.NoError(t, err)
-	byteArray0, err := sketch.ToSlice()
+	byteArray0 := sketch.ToSlice()
 	newSk0, err := NewLongsSketchFromSlice(byteArray0)
 	assert.NoError(t, err)
 	str0, err := sketch.ToString()
@@ -113,8 +113,7 @@ func TestFrequentItemsByteSerial(t *testing.T) {
 	sketch.UpdateMany(1000001, 1010230)
 	sketch.UpdateMany(1000002, 1010230)
 
-	byteArray1, err := sketch.ToSlice()
-	assert.NoError(t, err)
+	byteArray1 := sketch.ToSlice()
 	newSk1, err := NewLongsSketchFromSlice(byteArray1)
 	assert.NoError(t, err)
 	str1, err := sketch.ToString()
@@ -144,8 +143,7 @@ func TestFrequentItemsByteSerial(t *testing.T) {
 	sketch2.UpdateMany(207, 12902390)
 	sketch2.UpdateMany(208, 12902390)
 
-	byteArray2, err := sketch2.ToSlice()
-	assert.NoError(t, err)
+	byteArray2 := sketch2.ToSlice()
 	newSk2, err := NewLongsSketchFromSlice(byteArray2)
 	assert.NoError(t, err)
 	str2, err := sketch2.ToString()
@@ -159,8 +157,7 @@ func TestFrequentItemsByteSerial(t *testing.T) {
 
 	mergedSketch, err := sketch.Merge(sketch2)
 	assert.NoError(t, err)
-	byteArray3, err := mergedSketch.ToSlice()
-	assert.NoError(t, err)
+	byteArray3 := mergedSketch.ToSlice()
 	newSk3, err := NewLongsSketchFromSlice(byteArray3)
 	assert.NoError(t, err)
 	str3, err := mergedSketch.ToString()
@@ -183,8 +180,7 @@ func TestFrequentItemsByteResetAndEmptySerial(t *testing.T) {
 	sketch.UpdateMany(1000002, 1010230)
 	sketch.Reset()
 
-	byteArray0, err := sketch.ToSlice()
-	assert.NoError(t, err)
+	byteArray0 := sketch.ToSlice()
 	newSk0, err := NewLongsSketchFromSlice(byteArray0)
 	assert.NoError(t, err)
 	str0, err := sketch.ToString()
@@ -206,8 +202,7 @@ func TestFreqLongSliceSerDe(t *testing.T) {
 	sk1.UpdateMany(1000001, 1010230)
 	sk1.UpdateMany(1000002, 1010230)
 
-	byteArray0, err := sk1.ToSlice()
-	assert.NoError(t, err)
+	byteArray0 := sk1.ToSlice()
 	sk2, err := NewLongsSketchFromSlice(byteArray0)
 	assert.NoError(t, err)
 
@@ -273,7 +268,7 @@ func TestFreqLongSliceSerDeError(t *testing.T) {
 	assert.NoError(t, err)
 	sk1.Update(1)
 
-	byteArray0, err := sk1.ToSlice()
+	byteArray0 := sk1.ToSlice()
 	pre0 := binary.LittleEndian.Uint64(byteArray0)
 
 	tryBadMem(t, byteArray0, _PREAMBLE_LONGS_BYTE, 2) //Corrupt
@@ -420,13 +415,11 @@ func TestGetStorageByes(t *testing.T) {
 	minSize := 1 << _LG_MIN_MAP_SIZE
 	fls, err := NewLongsSketchWithMaxMapSize(minSize)
 	assert.NoError(t, err)
-	sl, err := fls.ToSlice()
-	assert.NoError(t, err)
+	sl := fls.ToSlice()
 	assert.Equal(t, len(sl), fls.GetStorageBytes())
 	err = fls.Update(1)
 	assert.NoError(t, err)
-	sl, err = fls.ToSlice()
-	assert.NoError(t, err)
+	sl = fls.ToSlice()
 	assert.Equal(t, len(sl), fls.GetStorageBytes())
 }
 

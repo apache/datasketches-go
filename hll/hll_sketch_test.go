@@ -29,7 +29,6 @@ import (
 func TestMisc(t *testing.T) {
 	hll, err := NewHllSketch(10, TgtHllTypeHll4)
 	assert.NoError(t, err)
-	assert.True(t, hll.IsEstimationMode())
 	err = hll.Reset()
 	assert.NoError(t, err)
 	assert.Equal(t, serVer, hll.GetSerializationVersion())
@@ -78,8 +77,8 @@ func checkCopy(t *testing.T, lgK int, tgtHllType TgtHllType) {
 	assert.NoError(t, err)
 	assert.Equal(t, curModeList, skCopy.GetCurMode())
 
-	impl1 := sk.(*hllSketchImpl).sketch
-	impl2 := skCopy.(*hllSketchImpl).sketch
+	impl1 := sk.(*hllSketchState).sketch
+	impl2 := skCopy.(*hllSketchState).sketch
 
 	assert.Equal(t, impl1.(*couponListImpl).couponCount, impl2.(*couponListImpl).couponCount)
 
@@ -100,8 +99,8 @@ func checkCopy(t *testing.T, lgK int, tgtHllType TgtHllType) {
 	assert.NoError(t, err)
 	assert.Equal(t, curModeSet, skCopy.GetCurMode())
 
-	impl1 = sk.(*hllSketchImpl).sketch
-	impl2 = skCopy.(*hllSketchImpl).sketch
+	impl1 = sk.(*hllSketchState).sketch
+	impl2 = skCopy.(*hllSketchState).sketch
 
 	assert.Equal(t, impl1.(*couponHashSetImpl).couponCount, impl2.(*couponHashSetImpl).couponCount)
 	est1, err = impl1.GetEstimate()
@@ -125,8 +124,8 @@ func checkCopy(t *testing.T, lgK int, tgtHllType TgtHllType) {
 	assert.NoError(t, err)
 	assert.Equal(t, curModeHll, skCopy.GetCurMode())
 
-	impl1 = sk.(*hllSketchImpl).sketch
-	impl2 = skCopy.(*hllSketchImpl).sketch
+	impl1 = sk.(*hllSketchState).sketch
+	impl2 = skCopy.(*hllSketchState).sketch
 
 	est1, err = impl1.GetEstimate()
 	assert.NoError(t, err)

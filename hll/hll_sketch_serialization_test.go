@@ -19,10 +19,10 @@ package hll
 
 import (
 	"fmt"
-	"github.com/apache/datasketches-go/internal"
 	"os"
 	"testing"
 
+	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
 )
 

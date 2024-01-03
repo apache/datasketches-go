@@ -58,10 +58,10 @@ func (r *Row) GetLowerBound() int64 {
 	return r.lb
 }
 
-func sortItems(sk *LongsSketch, threshold int64, errorType ErrorType) ([]*Row, error) {
+func sortItems(sk *LongsSketch, threshold int64, errorType errorType) ([]*Row, error) {
 	rowList := make([]*Row, 0)
 	iter := sk.hashMap.iterator()
-	if errorType == ErrorTypeEnum.NO_FALSE_NEGATIVES {
+	if errorType == ErrorTypeEnum.NoFalseNegatives {
 		for iter.next() {
 			est, err := sk.GetEstimate(iter.getKey())
 			if err != nil {

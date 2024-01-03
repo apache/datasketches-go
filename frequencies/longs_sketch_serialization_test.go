@@ -19,10 +19,11 @@ package frequencies
 
 import (
 	"fmt"
-	"github.com/apache/datasketches-go/internal"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/apache/datasketches-go/internal"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGenerateGoBinariesForCompatibilityTestingLongsSketch(t *testing.T) {

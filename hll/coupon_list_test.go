@@ -26,7 +26,7 @@ import (
 func TestCouponIterator(t *testing.T) {
 	lgK := 4
 	n := 7
-	sk, err := NewHllSketchDefault(lgK)
+	sk, err := NewHllSketchWithLgK(lgK)
 	assert.NoError(t, err)
 	for i := 0; i < n; i++ {
 		assert.NoError(t, sk.UpdateInt64(int64(i)))
@@ -41,7 +41,7 @@ func TestCouponIterator(t *testing.T) {
 }
 
 func TestCouponDuplicatesAndMisc(t *testing.T) {
-	sk, err := NewHllSketchDefault(8)
+	sk, err := NewHllSketchWithLgK(8)
 	assert.NoError(t, err)
 	for i := 1; i <= 7; i++ {
 		assert.NoError(t, sk.UpdateInt64(int64(i)))
@@ -51,10 +51,10 @@ func TestCouponDuplicatesAndMisc(t *testing.T) {
 	est, err := sk.GetCompositeEstimate()
 	assert.NoError(t, err)
 	assert.InDelta(t, est, 7.0, 7*.01)
-	est, err = sk.GetHipEstimate()
+	est, err = sk.(*hllSketchState).sketch.GetHipEstimate()
 	assert.NoError(t, err)
 	assert.InDelta(t, est, 7.0, 7*.01)
-	sk.(*hllSketchImpl).putRebuildCurMinNumKxQFlag(false) //dummy
+	sk.(*hllSketchState).putRebuildCurMinNumKxQFlag(false) //dummy
 
 	assert.NoError(t, sk.UpdateInt64(8))
 	assert.NoError(t, sk.UpdateInt64(8))
@@ -62,7 +62,7 @@ func TestCouponDuplicatesAndMisc(t *testing.T) {
 	est, err = sk.GetCompositeEstimate()
 	assert.NoError(t, err)
 	assert.InDelta(t, est, 8.0, 8*.01)
-	est, err = sk.GetHipEstimate()
+	est, err = sk.(*hllSketchState).GetHipEstimate()
 	assert.NoError(t, err)
 	assert.InDelta(t, est, 8.0, 8*.01)
 
@@ -84,7 +84,7 @@ func TestToCouponSliceDeserialize(t *testing.T) {
 }
 
 func toCouponSliceDeserialize(t *testing.T, lgK int) {
-	sk1, err := NewHllSketchDefault(lgK)
+	sk1, err := NewHllSketchWithLgK(lgK)
 	assert.NoError(t, err)
 
 	u := 7
@@ -96,7 +96,7 @@ func toCouponSliceDeserialize(t *testing.T, lgK int) {
 		assert.NoError(t, sk1.UpdateInt64(int64(i)))
 	}
 
-	_, isCoupon := sk1.(*hllSketchImpl).sketch.(hllCoupon)
+	_, isCoupon := sk1.(*hllSketchState).sketch.(hllCoupon)
 	assert.True(t, isCoupon)
 
 	est1, err := sk1.GetEstimate()

@@ -31,22 +31,22 @@ const (
 	_SAMPLE_SIZE = 1024
 )
 
-type ErrorType struct {
+type errorType struct {
 	id   int
 	Name string
 }
 
 type errorTypes struct {
-	NO_FALSE_POSITIVES ErrorType
-	NO_FALSE_NEGATIVES ErrorType
+	NoFalsePositives errorType
+	NoFalseNegatives errorType
 }
 
 var ErrorTypeEnum = &errorTypes{
-	NO_FALSE_POSITIVES: ErrorType{
+	NoFalsePositives: errorType{
 		id:   1,
 		Name: "NO_FALSE_POSITIVES",
 	},
-	NO_FALSE_NEGATIVES: ErrorType{
+	NoFalseNegatives: errorType{
 		id:   2,
 		Name: "NO_FALSE_NEGATIVES",
 	},

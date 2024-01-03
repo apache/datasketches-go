@@ -61,7 +61,7 @@ func (c *couponListImpl) ToUpdatableSlice() ([]byte, error) {
 
 // couponUpdate updates the couponListImpl with the given coupon.
 // it returns the updated couponListImpl or a newly promoted couponHashSetImpl.
-func (c *couponListImpl) couponUpdate(coupon int) (hllSketchBase, error) {
+func (c *couponListImpl) couponUpdate(coupon int) (hllSketchStateI, error) {
 	length := 1 << c.lgCouponArrInts
 	for i := 0; i < length; i++ {
 		couponAtIdx := c.couponIntArr[i]
@@ -98,7 +98,7 @@ func (c *couponListImpl) getPreInts() int {
 	return listPreInts
 }
 
-func (c *couponListImpl) copyAs(tgtHllType TgtHllType) (hllSketchBase, error) {
+func (c *couponListImpl) copyAs(tgtHllType TgtHllType) (hllSketchStateI, error) {
 	newC := &couponListImpl{
 		hllSketchConfig: newHllSketchConfig(c.lgConfigK, tgtHllType, curModeList),
 		hllCouponState:  newHllCouponState(c.lgCouponArrInts, c.couponCount, make([]int, len(c.couponIntArr))),
@@ -108,7 +108,7 @@ func (c *couponListImpl) copyAs(tgtHllType TgtHllType) (hllSketchBase, error) {
 	return newC, nil
 }
 
-func (c *couponListImpl) copy() (hllSketchBase, error) {
+func (c *couponListImpl) copy() (hllSketchStateI, error) {
 	return c.copyAs(c.tgtHllType)
 }
 
@@ -142,7 +142,7 @@ func promoteListToHll(src *couponListImpl) (hllArray, error) {
 }
 
 // promoteListToSet move coupons to a couponHashSetImpl from couponListImpl
-func promoteListToSet(c *couponListImpl) (hllSketchBase, error) {
+func promoteListToSet(c *couponListImpl) (hllSketchStateI, error) {
 	couponCount := c.getCouponCount()
 	arr := c.couponIntArr
 	chSet, err := newCouponHashSet(c.lgConfigK, c.tgtHllType)

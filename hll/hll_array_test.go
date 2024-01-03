@@ -96,20 +96,20 @@ func toArraySliceDeserialize(t *testing.T, lgK int, tgtHllType TgtHllType, u int
 	for i := 0; i < u; i++ {
 		assert.NoError(t, sk1.UpdateInt64(int64(i)))
 	}
-	_, isArray := sk1.(*hllSketchImpl).sketch.(hllArray)
+	_, isArray := sk1.(*hllSketchState).sketch.(hllArray)
 	assert.True(t, isArray)
 
 	// Update
 	est1, err := sk1.GetEstimate()
 	assert.NoError(t, err)
 	assert.InDelta(t, est1, u, float64(u)*.03)
-	est, err := sk1.GetHipEstimate()
+	est, err := sk1.(*hllSketchState).GetHipEstimate()
 	assert.NoError(t, err)
 	assert.Equal(t, est, est1, 0.0)
 
 	// misc
-	sk1.(*hllSketchImpl).putRebuildCurMinNumKxQFlag(true)
-	sk1.(*hllSketchImpl).putRebuildCurMinNumKxQFlag(false)
+	sk1.(*hllSketchState).putRebuildCurMinNumKxQFlag(true)
+	sk1.(*hllSketchState).putRebuildCurMinNumKxQFlag(false)
 
 	sl1, err := sk1.ToCompactSlice()
 	assert.NoError(t, err)

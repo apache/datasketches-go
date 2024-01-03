@@ -36,7 +36,7 @@ func (h *hll8ArrayImpl) iterator() pairIterator {
 	return &a
 }
 
-func (h *hll8ArrayImpl) copyAs(tgtHllType TgtHllType) (hllSketchBase, error) {
+func (h *hll8ArrayImpl) copyAs(tgtHllType TgtHllType) (hllSketchStateI, error) {
 	if tgtHllType == h.tgtHllType {
 		return h.copy()
 	}
@@ -49,7 +49,7 @@ func (h *hll8ArrayImpl) copyAs(tgtHllType TgtHllType) (hllSketchBase, error) {
 	return nil, fmt.Errorf("cannot convert to TgtHllType id: %d", int(tgtHllType))
 }
 
-func (h *hll8ArrayImpl) copy() (hllSketchBase, error) {
+func (h *hll8ArrayImpl) copy() (hllSketchStateI, error) {
 	return &hll8ArrayImpl{
 		hllArrayImpl: h.copyCommon(),
 	}, nil
@@ -91,7 +91,7 @@ func deserializeHll8(byteArray []byte) hllArray {
 	return hll8
 }
 
-func convertToHll8(srcAbsHllArr hllArray) (hllSketchBase, error) {
+func convertToHll8(srcAbsHllArr hllArray) (hllSketchStateI, error) {
 	lgConfigK := srcAbsHllArr.GetLgConfigK()
 	hll8Array := newHll8Array(lgConfigK)
 	hll8Array.putOutOfOrder(srcAbsHllArr.isOutOfOrder())
@@ -120,7 +120,7 @@ func convertToHll8(srcAbsHllArr hllArray) (hllSketchBase, error) {
 	return hll8Array, nil
 }
 
-func (h *hll8ArrayImpl) couponUpdate(coupon int) (hllSketchBase, error) {
+func (h *hll8ArrayImpl) couponUpdate(coupon int) (hllSketchStateI, error) {
 	newValue := coupon >> keyBits26
 	configKmask := (1 << h.lgConfigK) - 1
 	slotNo := coupon & configKmask

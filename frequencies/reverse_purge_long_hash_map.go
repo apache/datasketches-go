@@ -20,10 +20,11 @@ package frequencies
 import (
 	"errors"
 	"fmt"
-	"github.com/apache/datasketches-go/internal"
 	"math/bits"
 	"strconv"
 	"strings"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 type reversePurgeLongHashMap struct {

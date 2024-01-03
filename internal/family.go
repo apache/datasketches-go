@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package common
+package internal
 
 type family struct {
 	Id          int

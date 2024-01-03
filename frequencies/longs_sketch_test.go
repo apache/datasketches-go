@@ -20,10 +20,11 @@ package frequencies
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/apache/datasketches-go/internal"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+
+	"github.com/apache/datasketches-go/internal"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFrequentItemsStringSerial(t *testing.T) {
@@ -240,8 +241,8 @@ func checkEquality(t *testing.T, sk1, sk2 *LongsSketch) {
 	assert.Equal(t, sk1.GetStreamLength(), sk2.GetStreamLength())
 	assert.Equal(t, sk1.IsEmpty(), sk2.IsEmpty())
 
-	NFN := ErrorTypeEnum.NO_FALSE_NEGATIVES
-	NFP := ErrorTypeEnum.NO_FALSE_POSITIVES
+	NFN := ErrorTypeEnum.NoFalseNegatives
+	NFP := ErrorTypeEnum.NoFalsePositives
 
 	rowArr1, err := sk1.GetFrequentItems(NFN)
 	assert.NoError(t, err)
@@ -330,20 +331,20 @@ func TestFreqLongs(t *testing.T) {
 
 	for h := 0; h < numSketches; h++ {
 		threshold := sketches[h].GetMaximumError()
-		rows, err := sketches[h].GetFrequentItems(ErrorTypeEnum.NO_FALSE_NEGATIVES)
+		rows, err := sketches[h].GetFrequentItems(ErrorTypeEnum.NoFalseNegatives)
 		assert.NoError(t, err)
 		for i := 0; i < len(rows); i++ {
 			assert.True(t, rows[i].GetUpperBound() > threshold)
 		}
 
-		rows, err = sketches[h].GetFrequentItems(ErrorTypeEnum.NO_FALSE_POSITIVES)
+		rows, err = sketches[h].GetFrequentItems(ErrorTypeEnum.NoFalsePositives)
 		assert.NoError(t, err)
 		assert.Equal(t, len(rows), 0)
 		for i := 0; i < len(rows); i++ {
 			assert.True(t, rows[i].GetLowerBound() > threshold)
 		}
 
-		rows, err = sketches[h].GetFrequentItems(ErrorTypeEnum.NO_FALSE_NEGATIVES)
+		rows, err = sketches[h].GetFrequentItems(ErrorTypeEnum.NoFalseNegatives)
 	}
 }
 
@@ -400,7 +401,7 @@ func TestGetFrequentItems1(t *testing.T) {
 	fls, err := NewLongsSketchWithMaxMapSize(minSize)
 	assert.NoError(t, err)
 	fls.Update(1)
-	rowArr, err := fls.GetFrequentItems(ErrorTypeEnum.NO_FALSE_POSITIVES)
+	rowArr, err := fls.GetFrequentItems(ErrorTypeEnum.NoFalsePositives)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, rowArr)
 	row := rowArr[0]
@@ -481,7 +482,7 @@ func TestSortItems(t *testing.T) {
 
 	for h := 0; h < numSketches; h++ {
 		threshold := sketches[h].GetMaximumError()
-		rows, err := sketches[h].GetFrequentItems(ErrorTypeEnum.NO_FALSE_NEGATIVES)
+		rows, err := sketches[h].GetFrequentItems(ErrorTypeEnum.NoFalseNegatives)
 		assert.NoError(t, err)
 		for i := 0; i < len(rows); i++ {
 			assert.True(t, rows[i].GetUpperBound() > threshold)
@@ -522,13 +523,13 @@ func printSketch(t *testing.T, size int, items []int64) {
 	sb.WriteString(fmt.Sprintf("Sketch Size: %d\n", size))
 	sb.WriteString(fls.String())
 	fmt.Println(sb.String())
-	printRows(t, fls, ErrorTypeEnum.NO_FALSE_NEGATIVES)
+	printRows(t, fls, ErrorTypeEnum.NoFalseNegatives)
 	fmt.Println("")
-	printRows(t, fls, ErrorTypeEnum.NO_FALSE_POSITIVES)
+	printRows(t, fls, ErrorTypeEnum.NoFalsePositives)
 	fmt.Println("")
 }
 
-func printRows(t *testing.T, fls *LongsSketch, errorType ErrorType) {
+func printRows(t *testing.T, fls *LongsSketch, errorType errorType) {
 	rows, err := fls.GetFrequentItems(errorType)
 	assert.NoError(t, err)
 	fmt.Println(errorType.Name)

@@ -18,7 +18,7 @@
 package hll
 
 type hllCoupon interface {
-	hllSketchBase
+	hllSketchStateI
 
 	getCouponCount() int
 	getCouponIntArr() []int
@@ -105,14 +105,14 @@ func mergeCouponTo(from hllCoupon, dest HllSketch) error {
 		intArrFrom = from.getCouponIntArr()
 		arrLen     = len(intArrFrom)
 		err        error
-		sk         hllSketchBase
+		sk         hllSketchStateI
 	)
 
 	for i := 0; i < arrLen && err == nil; i++ {
 		pair := intArrFrom[i]
 		if pair != empty {
-			sk, err = dest.(*hllSketchImpl).sketch.couponUpdate(pair)
-			dest.(*hllSketchImpl).sketch = sk
+			sk, err = dest.(*hllSketchState).sketch.couponUpdate(pair)
+			dest.(*hllSketchState).sketch = sk
 		}
 	}
 	return err

@@ -65,7 +65,7 @@ func (h *hll4ArrayImpl) GetUpdatableSerializationBytes() int {
 	return hllByteArrStart + h.getHllByteArrBytes() + auxBytes
 }
 
-func (h *hll4ArrayImpl) copyAs(tgtHllType TgtHllType) (hllSketchBase, error) {
+func (h *hll4ArrayImpl) copyAs(tgtHllType TgtHllType) (hllSketchStateI, error) {
 	if tgtHllType == h.tgtHllType {
 		return h.copy()
 	}
@@ -78,7 +78,7 @@ func (h *hll4ArrayImpl) copyAs(tgtHllType TgtHllType) (hllSketchBase, error) {
 	return nil, fmt.Errorf("cannot convert to TgtHllType id: %d ", int(tgtHllType))
 }
 
-func (h *hll4ArrayImpl) copy() (hllSketchBase, error) {
+func (h *hll4ArrayImpl) copy() (hllSketchStateI, error) {
 	return &hll4ArrayImpl{
 		hllArrayImpl: h.copyCommon(),
 	}, nil
@@ -125,7 +125,7 @@ func deserializeHll4(byteArray []byte) (hllArray, error) {
 	return hll4, nil
 }
 
-func convertToHll4(srcAbsHllArr hllArray) (hllSketchBase, error) {
+func convertToHll4(srcAbsHllArr hllArray) (hllSketchStateI, error) {
 	lgConfigK := srcAbsHllArr.GetLgConfigK()
 	hll4Array := newHll4Array(lgConfigK)
 	hll4Array.putOutOfOrder(srcAbsHllArr.isOutOfOrder())
@@ -174,7 +174,7 @@ func convertToHll4(srcAbsHllArr hllArray) (hllSketchBase, error) {
 }
 
 // couponUpdate updates the Hll4Array with the given coupon and returns the updated Hll4Array.
-func (h *hll4ArrayImpl) couponUpdate(coupon int) (hllSketchBase, error) {
+func (h *hll4ArrayImpl) couponUpdate(coupon int) (hllSketchStateI, error) {
 	newValue := coupon >> keyBits26
 	configKmask := (1 << h.lgConfigK) - 1
 	slotNo := coupon & configKmask

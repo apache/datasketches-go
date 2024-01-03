@@ -60,7 +60,7 @@ func (c *couponHashSetImpl) ToUpdatableSlice() ([]byte, error) {
 }
 
 // couponUpdate updates the couponHashSetImpl with the given coupon.
-func (c *couponHashSetImpl) couponUpdate(coupon int) (hllSketchBase, error) {
+func (c *couponHashSetImpl) couponUpdate(coupon int) (hllSketchStateI, error) {
 	index, err := findCoupon(c.couponIntArr, c.lgCouponArrInts, coupon)
 	if err != nil {
 		return nil, err
@@ -92,7 +92,7 @@ func (c *couponHashSetImpl) getPreInts() int {
 	return hashSetPreInts
 }
 
-func (c *couponHashSetImpl) copyAs(tgtHllType TgtHllType) (hllSketchBase, error) {
+func (c *couponHashSetImpl) copyAs(tgtHllType TgtHllType) (hllSketchStateI, error) {
 	newC := &couponHashSetImpl{
 		hllSketchConfig: newHllSketchConfig(c.lgConfigK, tgtHllType, curModeSet),
 		hllCouponState:  newHllCouponState(c.lgCouponArrInts, c.couponCount, make([]int, len(c.couponIntArr))),
@@ -102,7 +102,7 @@ func (c *couponHashSetImpl) copyAs(tgtHllType TgtHllType) (hllSketchBase, error)
 	return newC, nil
 }
 
-func (c *couponHashSetImpl) copy() (hllSketchBase, error) {
+func (c *couponHashSetImpl) copy() (hllSketchStateI, error) {
 	return c.copyAs(c.tgtHllType)
 }
 

@@ -19,6 +19,7 @@ package frequencies
 
 import (
 	"encoding/binary"
+	"strconv"
 	"testing"
 	"unsafe"
 
@@ -326,4 +327,12 @@ func TestSerializeDeserializeUtf8Strings(t *testing.T) {
 	est, err = sketch2.GetEstimate("ddddddddddddddddddddddddddddd")
 	assert.NoError(t, err)
 	assert.Equal(t, est, int64(1))
+}
+
+func TestResize(t *testing.T) {
+	sketch1, err := NewItemsSketchWithMaxMapSize[string](2<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
+	for i := 0; i < 32; i++ {
+		err = sketch1.UpdateMany(strconv.Itoa(i), i*i)
+		assert.NoError(t, err)
+	}
 }

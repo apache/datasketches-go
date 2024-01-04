@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/apache/datasketches-go/internal"
 	"math/bits"
+	"strings"
 )
 
 type reversePurgeItemHashMap[C comparable] struct {
@@ -72,10 +73,6 @@ func newReversePurgeItemHashMap[C comparable](mapSize int, operations ItemSketch
 	}, nil
 }
 
-func (r *reversePurgeItemHashMap[C]) getCapacity() int {
-	return r.loadThreshold
-}
-
 func (r *reversePurgeItemHashMap[C]) get(key C) (int64, error) {
 	if isNil(key) {
 		return 0, nil
@@ -92,20 +89,16 @@ func (r *reversePurgeItemHashMap[C]) get(key C) (int64, error) {
 	return 0, nil
 }
 
-func (r *reversePurgeItemHashMap[C]) iterator() *iteratorItemHashMap[C] {
-	return newIteratorItems(r.keys, r.values, r.states, r.numActive)
+func (r *reversePurgeItemHashMap[C]) getCapacity() int {
+	return r.loadThreshold
 }
 
-func (r *reversePurgeItemHashMap[C]) hashProbe(key C) int {
-	arrayMask := uint64(len(r.keys) - 1)
-
-	probe := r.operations.Hash(key) & arrayMask
-	for r.states[probe] > 0 && r.keys[probe] != key {
-		probe = (probe + 1) & arrayMask
-	}
-	return int(probe)
-}
-
+// adjustOrPutValue adjusts the value associated with the given key.
+// Increments the value mapped to the key if the key is present in the map. Otherwise,
+// the key is inserted with the putAmount.
+//
+// key the key of the value to increment
+// adjustAmount the amount by which to increment the value
 func (r *reversePurgeItemHashMap[C]) adjustOrPutValue(key C, adjustAmount int64) error {
 	arrayMask := len(r.keys) - 1
 	probe := int(r.operations.Hash(key) & uint64(arrayMask))
@@ -157,17 +150,13 @@ func (r *reversePurgeItemHashMap[C]) resize(newSize int) error {
 	return nil
 }
 
-func (r *reversePurgeItemHashMap[C]) isActive(probe int) bool {
-	return r.states[probe] > 0
-}
-
 func (r *reversePurgeItemHashMap[C]) purge(sampleSize int) int64 {
 	limit := min(sampleSize, r.numActive)
 	numSamples := 0
 	i := 0
 	samples := make([]int64, limit)
 	for numSamples < limit {
-		if r.isActive(i) {
+		if r.states[i] > 0 { //isActive
 			samples[numSamples] = r.values[i]
 			numSamples++
 		}
@@ -179,6 +168,11 @@ func (r *reversePurgeItemHashMap[C]) purge(sampleSize int) int64 {
 	return val
 }
 
+// TODO
+// serializeToString
+
+// adjustAllValuesBy adjust amount value by which to shift all values. Only keys corresponding to positive
+// values are retained.
 func (r *reversePurgeItemHashMap[C]) adjustAllValuesBy(adjustAmount int64) {
 	for i := len(r.values); i > 0; {
 		i--
@@ -240,18 +234,9 @@ func (r *reversePurgeItemHashMap[C]) hashDelete(deleteProbe int) {
 	}
 }
 
-func (r *reversePurgeItemHashMap[C]) getActiveKeys() []C {
-	if r.numActive == 0 {
-		return nil
-	}
-	returnKeys := make([]C, 0, r.numActive)
-	for i := 0; i < len(r.keys); i++ {
-		if r.isActive(i) {
-			returnKeys = append(returnKeys, r.keys[i])
-		}
-	}
-	return returnKeys
-}
+// TODO
+// deserializeReversePurgeItemHashMapFromString
+// deserializeFromStringArray
 
 func (r *reversePurgeItemHashMap[C]) getActiveValues() []int64 {
 	if r.numActive == 0 {
@@ -259,11 +244,51 @@ func (r *reversePurgeItemHashMap[C]) getActiveValues() []int64 {
 	}
 	returnValues := make([]int64, 0, r.numActive)
 	for i := 0; i < len(r.values); i++ {
-		if r.isActive(i) {
+		if r.states[i] > 0 { //isActive
 			returnValues = append(returnValues, r.values[i])
 		}
 	}
 	return returnValues
+}
+
+func (r *reversePurgeItemHashMap[C]) getActiveKeys() []C {
+	if r.numActive == 0 {
+		return nil
+	}
+	returnKeys := make([]C, 0, r.numActive)
+	for i := 0; i < len(r.keys); i++ {
+		if r.states[i] > 0 { //isActive
+			returnKeys = append(returnKeys, r.keys[i])
+		}
+	}
+	return returnKeys
+}
+
+func (r *reversePurgeItemHashMap[C]) iterator() *iteratorItemHashMap[C] {
+	return newIteratorItems(r.keys, r.values, r.states, r.numActive)
+}
+
+func (r *reversePurgeItemHashMap[C]) hashProbe(key C) int {
+	arrayMask := uint64(len(r.keys) - 1)
+
+	probe := r.operations.Hash(key) & arrayMask
+	for r.states[probe] > 0 && r.keys[probe] != key {
+		probe = (probe + 1) & arrayMask
+	}
+	return int(probe)
+}
+
+func (s *reversePurgeItemHashMap[C]) String() string {
+	var sb strings.Builder
+	sb.WriteString("ReversePurgeItemHashMap:\n")
+	sb.WriteString(fmt.Sprintf("  %12s:%11s%20s %s\n", "Index", "States", "Values", "Keys"))
+	for i := 0; i < len(s.keys); i++ {
+		if s.states[i] <= 0 {
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("  %12d:%11d%20d %v\n", i, s.states[i], s.values[i], s.keys[i]))
+	}
+	return sb.String()
 }
 
 func newIteratorItems[C comparable](keys []C, values []int64, states []int16, numActive int) *iteratorItemHashMap[C] {

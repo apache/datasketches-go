@@ -104,21 +104,39 @@ type IntItemsSketchOp struct {
 	scratch [8]byte
 }
 
-func (h IntItemsSketchOp) Hash(item int) uint64 {
+func (h IntItemsSketchOp) Hash(item int64) uint64 {
 	binary.LittleEndian.PutUint64(h.scratch[:], uint64(item))
 	return murmur3.SeedSum64(internal.DEFAULT_UPDATE_SEED, h.scratch[:])
 }
 
-func (h IntItemsSketchOp) SerializeOneToSlice(item int) []byte {
+func (h IntItemsSketchOp) SerializeOneToSlice(item int64) []byte {
 	panic("not implemented")
 }
 
-func (h IntItemsSketchOp) SerializeManyToSlice(item []int) []byte {
-	panic("not implemented")
+func (h IntItemsSketchOp) SerializeManyToSlice(item []int64) []byte {
+	if len(item) == 0 {
+		return []byte{}
+	}
+	bytes := make([]byte, 8*len(item))
+	offset := 0
+	for i := 0; i < len(item); i++ {
+		binary.LittleEndian.PutUint64(bytes[offset:], uint64(item[i]))
+		offset += 8
+	}
+	return bytes
 }
 
-func (h IntItemsSketchOp) DeserializeManyFromSlice(slc []byte, offset int, length int) []int {
-	panic("not implemented")
+func (h IntItemsSketchOp) DeserializeManyFromSlice(slc []byte, offset int, length int) []int64 {
+	if length == 0 {
+		return []int64{}
+	}
+	array := make([]int64, 0, length)
+	offsetBytes := offset
+	for i := 0; i < length; i++ {
+		array = append(array, int64(binary.LittleEndian.Uint64(slc[offsetBytes:])))
+		offsetBytes += 8
+	}
+	return array
 }
 
 func TestEmpty(t *testing.T) {
@@ -220,7 +238,7 @@ func TestSeveralItem(t *testing.T) {
 }
 
 func TestEstimationMode(t *testing.T) {
-	sketch, err := NewItemsSketchWithMaxMapSize[int](1<<_LG_MIN_MAP_SIZE, IntItemsSketchOp{})
+	sketch, err := NewItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, IntItemsSketchOp{})
 	assert.NoError(t, err)
 	err = sketch.UpdateMany(1, 10)
 	assert.NoError(t, err)
@@ -325,6 +343,36 @@ func TestSerializeDeserializeUtf8Strings(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, est, int64(2))
 	est, err = sketch2.GetEstimate("ddddddddddddddddddddddddddddd")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(1))
+}
+
+func TestSerializeDeserializeLong(t *testing.T) {
+	sketch1, err := NewItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, IntItemsSketchOp{})
+	sketch1.Update(1)
+	sketch1.Update(2)
+	sketch1.Update(3)
+	sketch1.Update(4)
+
+	bytes := sketch1.ToSlice()
+	sketch2, err := NewItemsSketchFromSlice[int64](bytes, IntItemsSketchOp{})
+	sketch2.Update(2)
+	sketch2.Update(3)
+	sketch2.Update(2)
+
+	assert.False(t, sketch2.IsEmpty())
+	assert.Equal(t, sketch2.GetNumActiveItems(), 4)
+	assert.Equal(t, sketch2.GetStreamLength(), int64(7))
+	est, err := sketch2.GetEstimate(1)
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(1))
+	est, err = sketch2.GetEstimate(2)
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(3))
+	est, err = sketch2.GetEstimate(3)
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(2))
+	est, err = sketch2.GetEstimate(4)
 	assert.NoError(t, err)
 	assert.Equal(t, est, int64(1))
 }

@@ -22,13 +22,15 @@ import (
 	"fmt"
 	"github.com/apache/datasketches-go/internal"
 	"sort"
+	"strconv"
+	"strings"
 )
 
 type ItemsSketch[C comparable] struct {
-	// Log2 Maximum length of the arrays internal to the hashFn map supported by the data
+	// Log2 Maximum length of the arrays internal to the hash map supported by the data
 	// structure.
 	lgMaxMapSize int
-	// The current number of counters supported by the hashFn map.
+	// The current number of counters supported by the hash map.
 	curMapCap int //the threshold to purge
 	// Tracks the total of decremented counts.
 	offset int64
@@ -51,8 +53,8 @@ type ItemSketchOp[C comparable] interface {
 // NewItemsSketch constructs a new ItemsSketch with the given parameters.
 // this internal constructor is used when deserializing the sketch.
 //
-//   - lgMaxMapSize, log2 of the physical size of the internal hashFn map managed by this
-//     sketch. The maximum capacity of this internal hashFn map is 0.75 times 2^lgMaxMapSize.
+//   - lgMaxMapSize, log2 of the physical size of the internal hash map managed by this
+//     sketch. The maximum capacity of this internal hash map is 0.75 times 2^lgMaxMapSize.
 //     Both the ultimate accuracy and size of this sketch are functions of lgMaxMapSize.
 //   - lgCurMapSize, log2 of the starting (current) physical size of the internal hashFn
 //     map managed by this sketch.
@@ -80,8 +82,8 @@ func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, operations
 // NewItemsSketchWithMaxMapSize constructs a new ItemsSketch with the given maxMapSize and the default
 // initialMapSize (8).
 //
-//   - maxMapSize, Determines the physical size of the internal hashFn map managed by this
-//     sketch and must be a power of 2. The maximum capacity of this internal hashFn map is
+//   - maxMapSize, Determines the physical size of the internal hash map managed by this
+//     sketch and must be a power of 2. The maximum capacity of this internal hash map is
 //     0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are
 //     functions of maxMapSize.
 func NewItemsSketchWithMaxMapSize[C comparable](maxMapSize int, operations ItemSketchOp[C]) (*ItemsSketch[C], error) {
@@ -92,6 +94,13 @@ func NewItemsSketchWithMaxMapSize[C comparable](maxMapSize int, operations ItemS
 	return NewItemsSketch[C](maxMapSz, _LG_MIN_MAP_SIZE, operations)
 }
 
+// NewItemsSketchFromSlice constructs a new ItemsSketch with the given maxMapSize and the
+// default initialMapSize (8).
+//
+// maxMapSize determines the physical size of the internal hashmap managed by this
+// sketch and must be a power of 2.  The maximum capacity of this internal hash map is
+// 0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are a
+// function of maxMapSize.
 func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	pre0, err := checkPreambleSize(slc) //make sure preamble will fit
 	maxPreLongs := internal.FamilyEnum.Frequency.MaxPreLongs
@@ -161,21 +170,79 @@ func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C
 	return fis, nil
 }
 
-func (i *ItemsSketch[C]) Reset() error {
-	hashMap, err := newReversePurgeItemHashMap[C](1<<_LG_MIN_MAP_SIZE, i.hashMap.operations)
-	if err != nil {
-		return err
+// TODO
+// GetAprioriErrorLongsSketch
+// GetCurrentMapCapacity
+// GetEpsilonLongsSketch
+//
+
+// GetEstimate gets the estimate of the frequency of the given item.
+// Note: The true frequency of an item would be the sum of the counts as a result of the
+// two update functions.
+//
+// item is the given item
+//
+// return the estimate of the frequency of the given item
+func (i *ItemsSketch[C]) GetEstimate(item C) (int64, error) {
+	// If item is tracked:
+	// Estimate = itemCount + offset; Otherwise it is 0.
+	v, err := i.hashMap.get(item)
+	if v > 0 {
+		return v + i.offset, err
 	}
-	i.hashMap = hashMap
-	i.curMapCap = hashMap.getCapacity()
-	i.offset = 0
-	i.streamWeight = 0
-	return nil
+	return 0, err
 }
 
-// IsEmpty returns true if this sketch is empty.
-func (i *ItemsSketch[C]) IsEmpty() bool {
-	return i.GetNumActiveItems() == 0
+// GetLowerBound gets the guaranteed lower bound frequency of the given item, which can never be
+// negative.
+//
+//   - item, the given item.
+func (i *ItemsSketch[C]) GetLowerBound(item C) (int64, error) {
+	return i.hashMap.get(item)
+}
+
+// GetUpperBound gets the guaranteed upper bound frequency of the given item.
+//
+//   - item, the given item.
+func (i *ItemsSketch[C]) GetUpperBound(item C) (int64, error) {
+	// UB = itemCount + offset
+	v, err := i.hashMap.get(item)
+	return v + i.offset, err
+}
+
+// GetFrequentItemsWithThreshold returns an array of RowItem that include frequent items, estimates, upper and
+// lower bounds given a threshold and an ErrorCondition. If the threshold is lower than
+// getMaximumError(), then getMaximumError() will be used instead.
+//
+// The method first examines all active items in the sketch (items that have a counter).
+//
+// If errorType = NO_FALSE_NEGATIVES, this will include an item in the result list if
+// GetUpperBound(item) > threshold. There will be no false negatives, i.e., no Type II error.
+// There may be items in the set with true frequencies less than the threshold (false positives).
+//
+// If errorType = NO_FALSE_POSITIVES, this will include an item in the result list if
+// GetLowerBound(item) > threshold. There will be no false positives, i.e., no Type I error.
+// There may be items omitted from the set with true frequencies greater than the threshold
+// (false negatives). This is a subset of the NO_FALSE_NEGATIVES case.
+//
+// threshold to include items in the result list
+// errorType determines whether no false positives or no false negatives are desired.
+// an array of frequent items
+func (i *ItemsSketch[C]) GetFrequentItemsWithThreshold(threshold int64, errorType errorType) ([]*RowItem[C], error) {
+	finalThreshold := i.GetMaximumError()
+	if threshold > finalThreshold {
+		finalThreshold = threshold
+	}
+	return i.sortItems(finalThreshold, errorType)
+}
+
+// GetFrequentItems returns an array of Row that include frequent items, estimates, upper and
+// lower bounds given an ErrorCondition and the default threshold.
+// This is the same as GetFrequentItemsWithThreshold(getMaximumError(), errorType)
+//
+// errorType determines whether no false positives or no false negatives are desired.
+func (i *ItemsSketch[C]) GetFrequentItems(errorType errorType) ([]*RowItem[C], error) {
+	return i.sortItems(i.GetMaximumError(), errorType)
 }
 
 // GetNumActiveItems returns the number of active items in the sketch.
@@ -183,15 +250,39 @@ func (i *ItemsSketch[C]) GetNumActiveItems() int {
 	return i.hashMap.numActive
 }
 
+// GetMaximumError return an upper bound on the maximum error of GetEstimate(item) for any item.
+// This is equivalent to the maximum distance between the upper bound and the lower bound
+// for any item.
+func (i *ItemsSketch[C]) GetMaximumError() int64 {
+	return i.offset
+}
+
+// TODO
+// GetMaximumMapCapacity
+
 // GetStreamLength returns the sum of the frequencies in the stream seen so far by the sketch.
 func (i *ItemsSketch[C]) GetStreamLength() int64 {
 	return i.streamWeight
 }
 
+// IsEmpty returns true if this sketch is empty.
+func (i *ItemsSketch[C]) IsEmpty() bool {
+	return i.GetNumActiveItems() == 0
+}
+
+// Update this sketch with an item and a frequency count of one.
+//
+// item for which the frequency should be increased.
 func (i *ItemsSketch[C]) Update(item C) error {
 	return i.UpdateMany(item, 1)
 }
 
+// UpdateMany update this sketch with an item and a positive frequency count (or weight).
+//
+// Item for which the frequency should be increased. The item can be any long value
+// and is only used by the sketch to determine uniqueness.
+// count the amount by which the frequency of the item should be increased.
+// A count of zero is a no-op, and a negative count will throw an exception.
 func (i *ItemsSketch[C]) UpdateMany(item C, count int) error {
 	if isNil(item) || count == 0 {
 		return nil
@@ -223,49 +314,11 @@ func (i *ItemsSketch[C]) UpdateMany(item C, count int) error {
 	return nil
 }
 
-func (i *ItemsSketch[C]) GetEstimate(item C) (int64, error) {
-	// If item is tracked:
-	// Estimate = itemCount + offset; Otherwise it is 0.
-	v, err := i.hashMap.get(item)
-	if v > 0 {
-		return v + i.offset, err
-	}
-	return 0, err
-}
+// TODO
+// Merge
+// ToString
 
-// GetLowerBound gets the guaranteed lower bound frequency of the given item, which can never be
-// negative.
-//
-//   - item, the given item.
-func (i *ItemsSketch[C]) GetLowerBound(item C) (int64, error) {
-	return i.hashMap.get(item)
-}
-
-// GetUpperBound gets the guaranteed upper bound frequency of the given item.
-//
-//   - item, the given item.
-func (i *ItemsSketch[C]) GetUpperBound(item C) (int64, error) {
-	// UB = itemCount + offset
-	v, err := i.hashMap.get(item)
-	return v + i.offset, err
-}
-
-func (i *ItemsSketch[C]) GetMaximumError() int64 {
-	return i.offset
-}
-
-func (i *ItemsSketch[C]) GetFrequentItems(errorType errorType) ([]*RowItem[C], error) {
-	return i.sortItems(i.GetMaximumError(), errorType)
-}
-
-func (i *ItemsSketch[C]) GetFrequentItemsWithThreshold(threshold int64, errorType errorType) ([]*RowItem[C], error) {
-	finalThreshold := i.GetMaximumError()
-	if threshold > finalThreshold {
-		finalThreshold = threshold
-	}
-	return i.sortItems(finalThreshold, errorType)
-}
-
+// ToSlice returns a slice representation of this sketch
 func (i *ItemsSketch[C]) ToSlice() []byte {
 	preLongs := 0
 	outBytes := 0
@@ -313,6 +366,31 @@ func (i *ItemsSketch[C]) ToSlice() []byte {
 		copy(outArr[preBytes+(activeItems<<3):], bytes)
 	}
 	return outArr
+}
+
+// Reset resets this sketch to a virgin state.
+func (i *ItemsSketch[C]) Reset() error {
+	hashMap, err := newReversePurgeItemHashMap[C](1<<_LG_MIN_MAP_SIZE, i.hashMap.operations)
+	if err != nil {
+		return err
+	}
+	i.hashMap = hashMap
+	i.curMapCap = hashMap.getCapacity()
+	i.offset = 0
+	i.streamWeight = 0
+	return nil
+}
+
+func (s *ItemsSketch[C]) String() string {
+	var sb strings.Builder
+	sb.WriteString("FrequentItemsSketch:")
+	sb.WriteString("\n")
+	sb.WriteString("  Stream Length    : " + strconv.FormatInt(s.streamWeight, 10))
+	sb.WriteString("\n")
+	sb.WriteString("  Max Error Offset : " + strconv.FormatInt(s.offset, 10))
+	sb.WriteString("\n")
+	sb.WriteString(s.hashMap.String())
+	return sb.String()
 }
 
 func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*RowItem[C], error) {

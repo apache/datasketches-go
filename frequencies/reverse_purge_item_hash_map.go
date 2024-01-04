@@ -100,11 +100,14 @@ func (r *reversePurgeItemHashMap[C]) getCapacity() int {
 // key the key of the value to increment
 // adjustAmount the amount by which to increment the value
 func (r *reversePurgeItemHashMap[C]) adjustOrPutValue(key C, adjustAmount int64) error {
-	arrayMask := len(r.keys) - 1
-	probe := int(r.operations.Hash(key) & uint64(arrayMask))
-	drift := 1
+	var (
+		arrayMask = len(r.keys) - 1
+		probe     = r.operations.Hash(key) & uint64(arrayMask)
+		drift     = 1
+	)
+
 	for r.states[probe] != 0 && r.keys[probe] != key {
-		probe = (probe + 1) & arrayMask
+		probe = (probe + 1) & uint64(arrayMask)
 		drift++
 		//only used for theoretical analysis
 		//assert drift < DRIFT_LIMIT : "drift: " + drift + " >= DRIFT_LIMIT";

@@ -548,3 +548,11 @@ func TestItemGetAprioriError(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, apr, eps*10_000)
 }
+
+func BenchmarkItemSketch(b *testing.B) {
+	sketch, err := NewItemsSketch[int64](128, 8, IntItemsSketchOp{})
+	assert.NoError(b, err)
+	for i := 0; i < b.N; i++ {
+		sketch.Update(int64(i))
+	}
+}

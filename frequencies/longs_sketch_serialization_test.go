@@ -33,7 +33,7 @@ func TestGenerateGoBinariesForCompatibilityTestingLongsSketch(t *testing.T) {
 
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	for _, n := range nArr {
-		sk, err := NewLongsSketchWithMaxMapSize(64)
+		sk, err := NewFrequencyLongsSketchWithMaxMapSize(64)
 		assert.NoError(t, err)
 		for i := 1; i <= n; i++ {
 			err = sk.Update(int64(i))

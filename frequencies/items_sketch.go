@@ -24,7 +24,7 @@ import (
 	"sort"
 )
 
-type ItemsSketch[C comparable] struct {
+type FrequencyItemsSketch[C comparable] struct {
 	// Log2 Maximum length of the arrays internal to the hashFn map supported by the data
 	// structure.
 	lgMaxMapSize int
@@ -41,14 +41,14 @@ type ItemsSketch[C comparable] struct {
 	hashMap *reversePurgeItemHashMap[C]
 }
 
-type ItemSketchOp[C comparable] interface {
+type FrequencyItemSketchOp[C comparable] interface {
 	Hash(item C) uint64
 	SerializeOneToSlice(item C) []byte
 	SerializeManyToSlice(item []C) []byte
 	DeserializeManyFromSlice(slc []byte, offset int, length int) []C
 }
 
-// NewItemsSketch constructs a new ItemsSketch with the given parameters.
+// NewFrequencyItemsSketch constructs a new FrequencyItemsSketch with the given parameters.
 // this internal constructor is used when deserializing the sketch.
 //
 //   - lgMaxMapSize, log2 of the physical size of the internal hashFn map managed by this
@@ -56,7 +56,7 @@ type ItemSketchOp[C comparable] interface {
 //     Both the ultimate accuracy and size of this sketch are functions of lgMaxMapSize.
 //   - lgCurMapSize, log2 of the starting (current) physical size of the internal hashFn
 //     map managed by this sketch.
-func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, operations ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewFrequencyItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, operations FrequencyItemSketchOp[C]) (*FrequencyItemsSketch[C], error) {
 	lgMaxMapSz := max(lgMaxMapSize, _LG_MIN_MAP_SIZE)
 	lgCurMapSz := max(lgCurMapSize, _LG_MIN_MAP_SIZE)
 	hashMap, err := newReversePurgeItemHashMap[C](1<<lgCurMapSz, operations)
@@ -68,7 +68,7 @@ func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, operations
 	offset := int64(0)
 	sampleSize := min(_SAMPLE_SIZE, maxMapCap)
 
-	return &ItemsSketch[C]{
+	return &FrequencyItemsSketch[C]{
 		lgMaxMapSize: lgMaxMapSz,
 		curMapCap:    curMapCap,
 		offset:       offset,
@@ -77,22 +77,22 @@ func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, operations
 	}, nil
 }
 
-// NewItemsSketchWithMaxMapSize constructs a new ItemsSketch with the given maxMapSize and the default
+// NewFrequencyItemsSketchWithMaxMapSize constructs a new FrequencyItemsSketch with the given maxMapSize and the default
 // initialMapSize (8).
 //
 //   - maxMapSize, Determines the physical size of the internal hashFn map managed by this
 //     sketch and must be a power of 2. The maximum capacity of this internal hashFn map is
 //     0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are
 //     functions of maxMapSize.
-func NewItemsSketchWithMaxMapSize[C comparable](maxMapSize int, operations ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewFrequencyItemsSketchWithMaxMapSize[C comparable](maxMapSize int, operations FrequencyItemSketchOp[C]) (*FrequencyItemsSketch[C], error) {
 	maxMapSz, err := internal.ExactLog2(maxMapSize)
 	if err != nil {
 		return nil, err
 	}
-	return NewItemsSketch[C](maxMapSz, _LG_MIN_MAP_SIZE, operations)
+	return NewFrequencyItemsSketch[C](maxMapSz, _LG_MIN_MAP_SIZE, operations)
 }
 
-func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, operations FrequencyItemSketchOp[C]) (*FrequencyItemsSketch[C], error) {
 	pre0, err := checkPreambleSize(slc) //make sure preamble will fit
 	maxPreLongs := internal.FamilyEnum.Frequency.MaxPreLongs
 
@@ -120,7 +120,7 @@ func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C
 		return nil, fmt.Errorf("(preLongs == 1) ^ empty == true")
 	}
 	if empty {
-		return NewItemsSketchWithMaxMapSize[C](1<<_LG_MIN_MAP_SIZE, operations)
+		return NewFrequencyItemsSketchWithMaxMapSize[C](1<<_LG_MIN_MAP_SIZE, operations)
 	}
 	// Get full preamble
 	preArr := make([]int64, preLongs)
@@ -128,7 +128,7 @@ func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C
 		preArr[j] = int64(binary.LittleEndian.Uint64(slc[j<<3:]))
 	}
 
-	fis, err := NewItemsSketch[C](int(lgMaxMapSize), int(lgCurMapSize), operations)
+	fis, err := NewFrequencyItemsSketch[C](int(lgMaxMapSize), int(lgCurMapSize), operations)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +161,7 @@ func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C
 	return fis, nil
 }
 
-func (i *ItemsSketch[C]) Reset() error {
+func (i *FrequencyItemsSketch[C]) Reset() error {
 	hashMap, err := newReversePurgeItemHashMap[C](1<<_LG_MIN_MAP_SIZE, i.hashMap.operations)
 	if err != nil {
 		return err
@@ -174,25 +174,25 @@ func (i *ItemsSketch[C]) Reset() error {
 }
 
 // IsEmpty returns true if this sketch is empty.
-func (i *ItemsSketch[C]) IsEmpty() bool {
+func (i *FrequencyItemsSketch[C]) IsEmpty() bool {
 	return i.GetNumActiveItems() == 0
 }
 
 // GetNumActiveItems returns the number of active items in the sketch.
-func (i *ItemsSketch[C]) GetNumActiveItems() int {
+func (i *FrequencyItemsSketch[C]) GetNumActiveItems() int {
 	return i.hashMap.numActive
 }
 
 // GetStreamLength returns the sum of the frequencies in the stream seen so far by the sketch.
-func (i *ItemsSketch[C]) GetStreamLength() int64 {
+func (i *FrequencyItemsSketch[C]) GetStreamLength() int64 {
 	return i.streamWeight
 }
 
-func (i *ItemsSketch[C]) Update(item C) error {
+func (i *FrequencyItemsSketch[C]) Update(item C) error {
 	return i.UpdateMany(item, 1)
 }
 
-func (i *ItemsSketch[C]) UpdateMany(item C, count int) error {
+func (i *FrequencyItemsSketch[C]) UpdateMany(item C, count int) error {
 	if isNil(item) || count == 0 {
 		return nil
 	}
@@ -223,7 +223,7 @@ func (i *ItemsSketch[C]) UpdateMany(item C, count int) error {
 	return nil
 }
 
-func (i *ItemsSketch[C]) GetEstimate(item C) (int64, error) {
+func (i *FrequencyItemsSketch[C]) GetEstimate(item C) (int64, error) {
 	// If item is tracked:
 	// Estimate = itemCount + offset; Otherwise it is 0.
 	v, err := i.hashMap.get(item)
@@ -237,28 +237,28 @@ func (i *ItemsSketch[C]) GetEstimate(item C) (int64, error) {
 // negative.
 //
 //   - item, the given item.
-func (i *ItemsSketch[C]) GetLowerBound(item C) (int64, error) {
+func (i *FrequencyItemsSketch[C]) GetLowerBound(item C) (int64, error) {
 	return i.hashMap.get(item)
 }
 
 // GetUpperBound gets the guaranteed upper bound frequency of the given item.
 //
 //   - item, the given item.
-func (i *ItemsSketch[C]) GetUpperBound(item C) (int64, error) {
+func (i *FrequencyItemsSketch[C]) GetUpperBound(item C) (int64, error) {
 	// UB = itemCount + offset
 	v, err := i.hashMap.get(item)
 	return v + i.offset, err
 }
 
-func (i *ItemsSketch[C]) GetMaximumError() int64 {
+func (i *FrequencyItemsSketch[C]) GetMaximumError() int64 {
 	return i.offset
 }
 
-func (i *ItemsSketch[C]) GetFrequentItems(errorType errorType) ([]*RowItem[C], error) {
+func (i *FrequencyItemsSketch[C]) GetFrequentItems(errorType errorType) ([]*RowItem[C], error) {
 	return i.sortItems(i.GetMaximumError(), errorType)
 }
 
-func (i *ItemsSketch[C]) GetFrequentItemsWithThreshold(threshold int64, errorType errorType) ([]*RowItem[C], error) {
+func (i *FrequencyItemsSketch[C]) GetFrequentItemsWithThreshold(threshold int64, errorType errorType) ([]*RowItem[C], error) {
 	finalThreshold := i.GetMaximumError()
 	if threshold > finalThreshold {
 		finalThreshold = threshold
@@ -266,7 +266,7 @@ func (i *ItemsSketch[C]) GetFrequentItemsWithThreshold(threshold int64, errorTyp
 	return i.sortItems(finalThreshold, errorType)
 }
 
-func (i *ItemsSketch[C]) ToSlice() []byte {
+func (i *FrequencyItemsSketch[C]) ToSlice() []byte {
 	preLongs := 0
 	outBytes := 0
 	empty := i.IsEmpty()
@@ -315,7 +315,7 @@ func (i *ItemsSketch[C]) ToSlice() []byte {
 	return outArr
 }
 
-func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*RowItem[C], error) {
+func (i *FrequencyItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*RowItem[C], error) {
 	rowList := make([]*RowItem[C], 0)
 	iter := i.hashMap.iterator()
 	if errorType == ErrorTypeEnum.NoFalseNegatives {

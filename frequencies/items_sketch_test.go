@@ -123,7 +123,7 @@ func (h IntItemsSketchOp) DeserializeManyFromSlice(slc []byte, offset int, lengt
 
 func TestEmpty(t *testing.T) {
 	h := StringItemsSketchOp{}
-	sketch, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, h)
+	sketch, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, h)
 	assert.NoError(t, err)
 	assert.True(t, sketch.IsEmpty())
 	assert.Equal(t, sketch.GetNumActiveItems(), 0)
@@ -138,7 +138,7 @@ func TestEmpty(t *testing.T) {
 
 func TestNilInput(t *testing.T) {
 	h := StringPointerSketchOp{}
-	sketch, err := NewItemsSketchWithMaxMapSize[*string](1<<_LG_MIN_MAP_SIZE, h)
+	sketch, err := NewFrequencyItemsSketchWithMaxMapSize[*string](1<<_LG_MIN_MAP_SIZE, h)
 	assert.NoError(t, err)
 	err = sketch.Update(nil)
 	assert.NoError(t, err)
@@ -155,7 +155,7 @@ func TestNilInput(t *testing.T) {
 }
 
 func TestOneItem(t *testing.T) {
-	sketch, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
+	sketch, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
 	assert.NoError(t, err)
 	err = sketch.Update("a")
 	assert.NoError(t, err)
@@ -171,7 +171,7 @@ func TestOneItem(t *testing.T) {
 }
 
 func TestSeveralItem(t *testing.T) {
-	sketch, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
+	sketch, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
 	assert.NoError(t, err)
 	err = sketch.Update("a")
 	assert.NoError(t, err)
@@ -220,7 +220,7 @@ func TestSeveralItem(t *testing.T) {
 }
 
 func TestEstimationMode(t *testing.T) {
-	sketch, err := NewItemsSketchWithMaxMapSize[int](1<<_LG_MIN_MAP_SIZE, IntItemsSketchOp{})
+	sketch, err := NewFrequencyItemsSketchWithMaxMapSize[int](1<<_LG_MIN_MAP_SIZE, IntItemsSketchOp{})
 	assert.NoError(t, err)
 	err = sketch.UpdateMany(1, 10)
 	assert.NoError(t, err)
@@ -280,10 +280,10 @@ func TestEstimationMode(t *testing.T) {
 }
 
 func TestSerializeStringDeserializeEmpty(t *testing.T) {
-	sketch1, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
+	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
 	assert.NoError(t, err)
 	bytes := sketch1.ToSlice()
-	sketch2, err := NewItemsSketchFromSlice[string](bytes, StringItemsSketchOp{})
+	sketch2, err := NewFrequencyItemsSketchFromSlice[string](bytes, StringItemsSketchOp{})
 	assert.NoError(t, err)
 	assert.True(t, sketch2.IsEmpty())
 	assert.Equal(t, sketch2.GetNumActiveItems(), 0)
@@ -291,7 +291,7 @@ func TestSerializeStringDeserializeEmpty(t *testing.T) {
 }
 
 func TestSerializeDeserializeUtf8Strings(t *testing.T) {
-	sketch1, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
+	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
 	assert.NoError(t, err)
 	err = sketch1.Update("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	assert.NoError(t, err)
@@ -303,7 +303,7 @@ func TestSerializeDeserializeUtf8Strings(t *testing.T) {
 	assert.NoError(t, err)
 
 	bytes := sketch1.ToSlice()
-	sketch2, err := NewItemsSketchFromSlice[string](bytes, StringItemsSketchOp{})
+	sketch2, err := NewFrequencyItemsSketchFromSlice[string](bytes, StringItemsSketchOp{})
 	assert.NoError(t, err)
 	err = sketch2.Update("bbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 	assert.NoError(t, err)
@@ -330,7 +330,7 @@ func TestSerializeDeserializeUtf8Strings(t *testing.T) {
 }
 
 func TestResize(t *testing.T) {
-	sketch1, err := NewItemsSketchWithMaxMapSize[string](2<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
+	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](2<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
 	for i := 0; i < 32; i++ {
 		err = sketch1.UpdateMany(strconv.Itoa(i), i*i)
 		assert.NoError(t, err)

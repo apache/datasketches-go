@@ -168,8 +168,16 @@ func (r *reversePurgeItemHashMap[C]) purge(sampleSize int) int64 {
 	return val
 }
 
-// TODO
-// serializeToString
+func (r *reversePurgeItemHashMap[C]) serializeToString() string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("%d,%d,", r.numActive, len(r.keys)))
+	for i := 0; i < len(r.keys); i++ {
+		if r.states[i] != 0 {
+			sb.WriteString(fmt.Sprintf("%v,%d,", r.keys[i], r.values[i]))
+		}
+	}
+	return sb.String()
+}
 
 // adjustAllValuesBy adjust amount value by which to shift all values. Only keys corresponding to positive
 // values are retained.
@@ -233,10 +241,6 @@ func (r *reversePurgeItemHashMap[C]) hashDelete(deleteProbe int) {
 		//assert drift < DRIFT_LIMIT : "drift: " + drift + " >= DRIFT_LIMIT";
 	}
 }
-
-// TODO
-// deserializeReversePurgeItemHashMapFromString
-// deserializeFromStringArray
 
 func (r *reversePurgeItemHashMap[C]) getActiveValues() []int64 {
 	if r.numActive == 0 {

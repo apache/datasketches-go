@@ -380,7 +380,171 @@ func TestSerializeDeserializeLong(t *testing.T) {
 func TestResize(t *testing.T) {
 	sketch1, err := NewItemsSketchWithMaxMapSize[string](2<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
 	for i := 0; i < 32; i++ {
-		err = sketch1.UpdateMany(strconv.Itoa(i), i*i)
+		err = sketch1.UpdateMany(strconv.Itoa(i), int64(i*i))
 		assert.NoError(t, err)
 	}
+}
+
+func TestMergeExact(t *testing.T) {
+	sketch1, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
+	assert.NoError(t, err)
+	err = sketch1.Update("a")
+	assert.NoError(t, err)
+	err = sketch1.Update("b")
+	assert.NoError(t, err)
+	err = sketch1.Update("c")
+	assert.NoError(t, err)
+	err = sketch1.Update("d")
+	assert.NoError(t, err)
+
+	sketch2, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
+	assert.NoError(t, err)
+	err = sketch2.Update("b")
+	assert.NoError(t, err)
+	err = sketch2.Update("c")
+	assert.NoError(t, err)
+	err = sketch2.Update("b")
+	assert.NoError(t, err)
+
+	_, err = sketch1.Merge(sketch2)
+	assert.NoError(t, err)
+	assert.False(t, sketch1.IsEmpty())
+	assert.Equal(t, sketch1.GetNumActiveItems(), 4)
+	assert.Equal(t, sketch1.GetStreamLength(), int64(7))
+	est, err := sketch1.GetEstimate("a")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(1))
+	est, err = sketch1.GetEstimate("b")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(3))
+	est, err = sketch1.GetEstimate("c")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(2))
+	est, err = sketch1.GetEstimate("d")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(1))
+}
+
+func TestNullMapReturns(t *testing.T) {
+	map1, err := newReversePurgeItemHashMap[int64](1<<_LG_MIN_MAP_SIZE, IntItemsSketchOp{})
+	assert.NoError(t, err)
+	assert.Nil(t, map1.getActiveKeys())
+	assert.Nil(t, map1.getActiveValues())
+}
+
+func TestMisc(t *testing.T) {
+	sk1, err := NewItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, IntItemsSketchOp{})
+	assert.NoError(t, err)
+	assert.Equal(t, sk1.GetCurrentMapCapacity(), 6)
+	est, err := sk1.GetEstimate(1)
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(0))
+	sk2, err := NewItemsSketchWithMaxMapSize[int64](8, IntItemsSketchOp{})
+	assert.NoError(t, err)
+	_, err = sk1.Merge(sk2)
+	assert.NoError(t, err)
+	_, err = sk1.Merge(nil)
+	assert.NoError(t, err)
+	err = sk1.Update(1)
+	assert.NoError(t, err)
+	rows, err := sk1.GetFrequentItems(ErrorTypeEnum.NoFalseNegatives)
+	assert.NoError(t, err)
+	row := rows[0]
+	assert.Equal(t, row.GetItem(), int64(1))
+	assert.Equal(t, row.GetEstimate(), int64(1))
+	assert.Equal(t, row.GetUpperBound(), int64(1))
+	s := row.String()
+	t.Log(s)
+	var nullRow *RowItem[int64]
+	assert.NotEqual(t, row, nullRow)
+}
+
+func TestToString(t *testing.T) {
+	sk, err := NewItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, IntItemsSketchOp{})
+	assert.NoError(t, err)
+	err = sk.Update(1)
+	t.Log(sk.ToString())
+}
+
+func TestFrequentItems1(t *testing.T) {
+	fis, err := NewItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, IntItemsSketchOp{})
+	assert.NoError(t, err)
+	fis.Update(1)
+	rows, err := fis.GetFrequentItems(ErrorTypeEnum.NoFalsePositives)
+	assert.NoError(t, err)
+	row := rows[0]
+	assert.NotNil(t, row)
+	assert.Equal(t, row.GetItem(), int64(1))
+	assert.Equal(t, row.GetEstimate(), int64(1))
+	assert.Equal(t, row.GetUpperBound(), int64(1))
+	newRow := newRowItem[int64](row.GetItem(), row.GetEstimate()+1, row.GetUpperBound(), row.GetLowerBound())
+	assert.NotEqual(t, row, newRow)
+	newRow = newRowItem[int64](row.GetItem(), row.GetEstimate(), row.GetUpperBound(), row.GetLowerBound())
+	assert.Equal(t, row, newRow)
+}
+
+func TestUpdateExceptions(t *testing.T) {
+	sk1, err := NewItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, IntItemsSketchOp{})
+	assert.NoError(t, err)
+	err = sk1.UpdateMany(1, -1)
+	assert.Error(t, err)
+}
+
+func TestMemExceptions(t *testing.T) {
+	sk1, err := NewItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, IntItemsSketchOp{})
+	assert.NoError(t, err)
+	sk1.Update(1)
+	bytes := sk1.ToSlice()
+	pre0 := binary.LittleEndian.Uint64(bytes)
+	//Now start corrupting
+	tryBadMem(t, bytes, _PREAMBLE_LONGS_BYTE, 2) //Corrupt
+	binary.LittleEndian.PutUint64(bytes, pre0)   //restore
+
+	tryBadMem(t, bytes, _SER_VER_BYTE, 2)      //Corrupt
+	binary.LittleEndian.PutUint64(bytes, pre0) //restore
+
+	tryBadMem(t, bytes, _FAMILY_BYTE, 2)       //Corrupt
+	binary.LittleEndian.PutUint64(bytes, pre0) //restore
+
+	tryBadMem(t, bytes, _FLAGS_BYTE, 4)        //Corrupt to true
+	binary.LittleEndian.PutUint64(bytes, pre0) //restore
+}
+
+func TestOneItemUtf8(t *testing.T) {
+	sketch1, err := NewItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, StringItemsSketchOp{})
+	assert.NoError(t, err)
+	err = sketch1.Update("\u5fb5")
+	assert.NoError(t, err)
+	assert.False(t, sketch1.IsEmpty())
+	assert.Equal(t, sketch1.GetNumActiveItems(), 1)
+	assert.Equal(t, sketch1.GetStreamLength(), int64(1))
+	est, err := sketch1.GetEstimate("\u5fb5")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(1))
+
+	bytes := sketch1.ToSlice()
+	sketch2, err := NewItemsSketchFromSlice[string](bytes, StringItemsSketchOp{})
+	assert.NoError(t, err)
+	assert.False(t, sketch2.IsEmpty())
+	assert.Equal(t, sketch2.GetNumActiveItems(), 1)
+	assert.Equal(t, sketch2.GetStreamLength(), int64(1))
+	est, err = sketch2.GetEstimate("\u5fb5")
+	assert.NoError(t, err)
+	assert.Equal(t, est, int64(1))
+}
+
+func TestItemGetEpsilon(t *testing.T) {
+	esp, err := GetEpsilonItemsSketch(1024)
+	assert.NoError(t, err)
+	assert.Equal(t, esp, 3.5/1024)
+
+	_, err = GetEpsilonItemsSketch(1000)
+	assert.Error(t, err)
+}
+
+func TestItemGetAprioriError(t *testing.T) {
+	eps := 3.5 / 1024
+	apr, err := GetAprioriErrorItemsSketch(1024, 10_000)
+	assert.NoError(t, err)
+	assert.Equal(t, apr, eps*10_000)
 }

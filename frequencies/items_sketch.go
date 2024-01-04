@@ -19,6 +19,7 @@ package frequencies
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"github.com/apache/datasketches-go/internal"
 	"sort"
@@ -161,7 +162,7 @@ func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C
 	itemArray := operations.DeserializeManyFromSlice(slc[itemsOffset:], 0, activeItems)
 	// update the sketch
 	for j := 0; j < activeItems; j++ {
-		err := fis.UpdateMany(itemArray[j], int(countArray[j]))
+		err := fis.UpdateMany(itemArray[j], countArray[j])
 		if err != nil {
 			return nil, err
 		}
@@ -170,11 +171,34 @@ func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C
 	return fis, nil
 }
 
-// TODO
-// GetAprioriErrorLongsSketch
-// GetCurrentMapCapacity
-// GetEpsilonLongsSketch
+// GetAprioriErrorItemsSketch returns the estimated a priori error given the maxMapSize for the sketch and the
+// estimatedTotalStreamWeight.
 //
+// maxMapSize is the planned map size to be used when constructing this sketch.
+// estimatedTotalStreamWeight is the estimated total stream weight.
+func GetAprioriErrorItemsSketch(maxMapSize int, estimatedTotalStreamWeight int64) (float64, error) {
+	epsilon, err := GetEpsilonLongsSketch(maxMapSize)
+	if err != nil {
+		return 0, err
+	}
+	return epsilon * float64(estimatedTotalStreamWeight), nil
+}
+
+// GetCurrentMapCapacity returns the current number of counters the sketch is configured to support.
+func (i *ItemsSketch[C]) GetCurrentMapCapacity() int {
+	return i.curMapCap
+}
+
+// GetEpsilonItemsSketch returns epsilon used to compute a priori error.
+// This is just the value 3.5 / maxMapSize.
+//
+// maxMapSize is the planned map size to be used when constructing this sketch.
+func GetEpsilonItemsSketch(maxMapSize int) (float64, error) {
+	if !internal.IsPowerOf2(maxMapSize) {
+		return 0, errors.New("maxMapSize is not a power of 2")
+	}
+	return 3.5 / float64(maxMapSize), nil
+}
 
 // GetEstimate gets the estimate of the frequency of the given item.
 // Note: The true frequency of an item would be the sum of the counts as a result of the
@@ -257,8 +281,11 @@ func (i *ItemsSketch[C]) GetMaximumError() int64 {
 	return i.offset
 }
 
-// TODO
-// GetMaximumMapCapacity
+// GetMaximumMapCapacity returns the maximum number of counters the sketch is configured to
+// support.
+func (i *ItemsSketch[C]) GetMaximumMapCapacity() int {
+	return int(float64(uint64(1<<i.lgMaxMapSize)) * reversePurgeItemHashMapLoadFactor)
+}
 
 // GetStreamLength returns the sum of the frequencies in the stream seen so far by the sketch.
 func (i *ItemsSketch[C]) GetStreamLength() int64 {
@@ -283,7 +310,7 @@ func (i *ItemsSketch[C]) Update(item C) error {
 // and is only used by the sketch to determine uniqueness.
 // count the amount by which the frequency of the item should be increased.
 // A count of zero is a no-op, and a negative count will throw an exception.
-func (i *ItemsSketch[C]) UpdateMany(item C, count int) error {
+func (i *ItemsSketch[C]) UpdateMany(item C, count int64) error {
 	if isNil(item) || count == 0 {
 		return nil
 	}
@@ -291,8 +318,8 @@ func (i *ItemsSketch[C]) UpdateMany(item C, count int) error {
 		return fmt.Errorf("count may not be negative")
 	}
 
-	i.streamWeight += int64(count)
-	err := i.hashMap.adjustOrPutValue(item, int64(count))
+	i.streamWeight += count
+	err := i.hashMap.adjustOrPutValue(item, count)
 	if err != nil {
 		return err
 	}
@@ -306,7 +333,7 @@ func (i *ItemsSketch[C]) UpdateMany(item C, count int) error {
 			i.curMapCap = i.hashMap.getCapacity()
 		} else {
 			i.offset += i.hashMap.purge(i.sampleSize)
-			if i.GetNumActiveItems() > i.hashMap.getCapacity() {
+			if i.GetNumActiveItems() > i.GetMaximumMapCapacity() {
 				return fmt.Errorf("purge did not reduce active items")
 			}
 		}
@@ -314,9 +341,49 @@ func (i *ItemsSketch[C]) UpdateMany(item C, count int) error {
 	return nil
 }
 
-// TODO
-// Merge
-// ToString
+// Merge merges the other sketch into this one. The other sketch may be of a different size.
+//
+// other sketch of this class
+//
+// return a sketch whose estimates are within the guarantees of the largest error tolerance
+// of the two merged sketches.
+func (i *ItemsSketch[C]) Merge(other *ItemsSketch[C]) (*ItemsSketch[C], error) {
+	if other == nil || other.IsEmpty() {
+		return i, nil
+	}
+
+	streamLen := i.streamWeight + other.streamWeight //capture before merge
+	iter := other.hashMap.iterator()
+
+	for iter.next() {
+		err := i.UpdateMany(iter.getKey(), iter.getValue())
+		if err != nil {
+			return nil, err
+		}
+	}
+	i.offset += other.offset
+	i.streamWeight = streamLen //corrected streamWeight
+	return i, nil
+}
+
+// ToString returns a String representation of this sketch
+func (i *ItemsSketch[C]) ToString() (string, error) {
+	var sb strings.Builder
+	//start the string with parameters of the sketch
+	serVer := _SER_VER //0
+	famID := internal.FamilyEnum.Frequency.Id
+	lgMaxMapSz := i.lgMaxMapSize
+	flags := 0
+	if i.hashMap.numActive == 0 {
+		flags = _EMPTY_FLAG_MASK
+	}
+	_, err := fmt.Fprintf(&sb, "%d,%d,%d,%d,%d,%d,", serVer, famID, lgMaxMapSz, flags, i.streamWeight, i.offset)
+	if err != nil {
+		return "", err
+	}
+	sb.WriteString(i.hashMap.serializeToString()) //numActive, curMaplen, key[i], value[i], ...
+	return sb.String(), nil
+}
 
 // ToSlice returns a slice representation of this sketch
 func (i *ItemsSketch[C]) ToSlice() []byte {
@@ -381,15 +448,15 @@ func (i *ItemsSketch[C]) Reset() error {
 	return nil
 }
 
-func (s *ItemsSketch[C]) String() string {
+func (i *ItemsSketch[C]) String() string {
 	var sb strings.Builder
 	sb.WriteString("FrequentItemsSketch:")
 	sb.WriteString("\n")
-	sb.WriteString("  Stream Length    : " + strconv.FormatInt(s.streamWeight, 10))
+	sb.WriteString("  Stream Length    : " + strconv.FormatInt(i.streamWeight, 10))
 	sb.WriteString("\n")
-	sb.WriteString("  Max Error Offset : " + strconv.FormatInt(s.offset, 10))
+	sb.WriteString("  Max Error Offset : " + strconv.FormatInt(i.offset, 10))
 	sb.WriteString("\n")
-	sb.WriteString(s.hashMap.String())
+	sb.WriteString(i.hashMap.String())
 	return sb.String()
 }
 

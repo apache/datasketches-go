@@ -36,7 +36,7 @@ type reversePurgeLongHashMap struct {
 	numActive     int
 }
 
-type iteratorHashMap struct {
+type iteratorLongHashMap struct {
 	keys_      []int64
 	values_    []int64
 	states_    []int16
@@ -56,7 +56,7 @@ const (
 // It will create arrays of length mapSize, which must be a power of two.
 // This restriction was made to ensure fast hashing.
 // The member loadThreshold is then set to the largest value that
-// will not overload the hash table.
+// will not overload the hashFn table.
 func newReversePurgeLongHashMap(mapSize int) (*reversePurgeLongHashMap, error) {
 	lgLength, err := internal.ExactLog2(mapSize)
 	if err != nil {
@@ -86,7 +86,7 @@ func (r *reversePurgeLongHashMap) get(key int64) (int64, error) {
 	return 0, nil
 }
 
-// getCapacity returns the current capacity of the hash map (i.e., max number of keys that can be stored).
+// getCapacity returns the current capacity of the hashFn map (i.e., max number of keys that can be stored).
 func (r *reversePurgeLongHashMap) getCapacity() int {
 	return r.loadThreshold
 }
@@ -100,7 +100,7 @@ func (r *reversePurgeLongHashMap) getCapacity() int {
 func (r *reversePurgeLongHashMap) adjustOrPutValue(key int64, adjustAmount int64) error {
 	var (
 		arrayMask = len(r.keys) - 1
-		probe     = hash(key) & int64(arrayMask)
+		probe     = hashFn(key) & int64(arrayMask)
 		drift     = 1
 	)
 	for r.states[probe] != 0 && r.keys[probe] != key {
@@ -305,49 +305,39 @@ func deserializeFromStringArray(tokens []string) (*reversePurgeLongHashMap, erro
 	return hashMap, nil
 }
 
-func (r *reversePurgeLongHashMap) getActiveValues() ([]int64, error) {
+func (r *reversePurgeLongHashMap) getActiveValues() []int64 {
 	if r.numActive == 0 {
-		return nil, nil
+		return nil
 	}
-	returnValues := make([]int64, r.numActive)
-	j := 0
+	returnValues := make([]int64, 0, r.numActive)
 	for i := 0; i < len(r.values); i++ {
 		if r.states[i] > 0 { //isActive
-			returnValues[j] = r.values[i]
-			j++
+			returnValues = append(returnValues, r.values[i])
 		}
 	}
-	if j != r.numActive {
-		return nil, errors.New("j != r.numActive")
-	}
-	return returnValues, nil
+	return returnValues
 }
 
-func (r *reversePurgeLongHashMap) getActiveKeys() ([]int64, error) {
+func (r *reversePurgeLongHashMap) getActiveKeys() []int64 {
 	if r.numActive == 0 {
-		return nil, nil
+		return nil
 	}
-	returnValues := make([]int64, r.numActive)
-	j := 0
+	returnValues := make([]int64, 0, r.numActive)
 	for i := 0; i < len(r.keys); i++ {
 		if r.states[i] > 0 { //isActive
-			returnValues[j] = r.keys[i]
-			j++
+			returnValues = append(returnValues, r.keys[i])
 		}
 	}
-	if j != r.numActive {
-		return nil, errors.New("j != r.numActive")
-	}
-	return returnValues, nil
+	return returnValues
 }
 
-func (s *reversePurgeLongHashMap) iterator() *iteratorHashMap {
-	return newIterator(s.keys, s.values, s.states, s.numActive)
+func (s *reversePurgeLongHashMap) iterator() *iteratorLongHashMap {
+	return newIteratorLong(s.keys, s.values, s.states, s.numActive)
 }
 
 func (s *reversePurgeLongHashMap) hashProbe(key int64) int {
 	arrayMask := len(s.keys) - 1
-	probe := int(hash(key)) & arrayMask
+	probe := int(hashFn(key)) & arrayMask
 	for s.states[probe] > 0 && s.keys[probe] != key {
 		probe = (probe + 1) & arrayMask
 	}
@@ -367,9 +357,9 @@ func (s *reversePurgeLongHashMap) String() string {
 	return sb.String()
 }
 
-func newIterator(keys []int64, values []int64, states []int16, numActive int) *iteratorHashMap {
+func newIteratorLong(keys []int64, values []int64, states []int16, numActive int) *iteratorLongHashMap {
 	stride := int(uint64(float64(len(keys))*internal.InverseGolden) | 1)
-	return &iteratorHashMap{
+	return &iteratorLongHashMap{
 		keys_:      keys,
 		values_:    values,
 		states_:    states,
@@ -381,7 +371,7 @@ func newIterator(keys []int64, values []int64, states []int16, numActive int) *i
 	}
 }
 
-func (i *iteratorHashMap) next() bool {
+func (i *iteratorLongHashMap) next() bool {
 	i.i_ = (i.i_ + i.stride_) & i.mask_
 	for i.count_ < i.numActive_ {
 		if i.states_[i.i_] > 0 {
@@ -393,10 +383,10 @@ func (i *iteratorHashMap) next() bool {
 	return false
 }
 
-func (i *iteratorHashMap) getKey() int64 {
+func (i *iteratorLongHashMap) getKey() int64 {
 	return i.keys_[i.i_]
 }
 
-func (i *iteratorHashMap) getValue() int64 {
+func (i *iteratorLongHashMap) getValue() int64 {
 	return i.values_[i.i_]
 }

@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"math/bits"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -49,25 +50,13 @@ const (
 	strPreambleTokens = 6
 )
 
-/**
- * Construct this sketch with parameter lgMapMapSize and lgCurMapSize. This internal
- * constructor is used when deserializing the sketch.
- *
- * @param lgMaxMapSize Log2 of the physical size of the internal hash map managed by this
- * sketch. The maximum capacity of this internal hash map is 0.75 times 2^lgMaxMapSize.
- * Both the ultimate accuracy and size of this sketch are a function of lgMaxMapSize.
- *
- * @param lgCurMapSize Log2 of the starting (current) physical size of the internal hash
- * map managed by this sketch.
- */
-
 // NewLongsSketch returns a new LongsSketch with the given lgMaxMapSize and lgCurMapSize.
 //
 // lgMaxMapSize is the log2 of the physical size of the internal hash map managed by this
 // sketch. The maximum capacity of this internal hash map is 0.75 times 2^lgMaxMapSize.
 // Both the ultimate accuracy and size of this sketch are a function of lgMaxMapSize.
 //
-// lgCurMapSize is the log2 of the starting (current) physical size of the internal hash
+// lgCurMapSize is the log2 of the starting (current) physical size of the internal hashFn
 // map managed by this sketch.
 func NewLongsSketch(lgMaxMapSize int, lgCurMapSize int) (*LongsSketch, error) {
 	//set initial size of hash map
@@ -295,7 +284,7 @@ func GetEpsilonLongsSketch(maxMapSize int) (float64, error) {
 }
 
 // GetEstimate gets the estimate of the frequency of the given item.
-// Note: The true frequency of a item would be the sum of the counts as a result of the
+// Note: The true frequency of an item would be the sum of the counts as a result of the
 // two update functions.
 //
 // item is the given item
@@ -335,7 +324,7 @@ func (s *LongsSketch) GetUpperBound(item int64) (int64, error) {
 	return itemCount + s.offset, nil
 }
 
-// GetFrequentItemsWithThreshold returns an array of Rows that include frequent items, estimates, upper and
+// GetFrequentItemsWithThreshold returns an array of Row that include frequent items, estimates, upper and
 // lower bounds given a threshold and an ErrorCondition. If the threshold is lower than
 // getMaximumError(), then getMaximumError() will be used instead.
 //
@@ -358,16 +347,16 @@ func (s *LongsSketch) GetFrequentItemsWithThreshold(threshold int64, errorType e
 	if threshold > finalThreshold {
 		finalThreshold = threshold
 	}
-	return sortItems(s, finalThreshold, errorType)
+	return s.sortItems(finalThreshold, errorType)
 }
 
-// GetFrequentItems returns an array of Rows that include frequent items, estimates, upper and
+// GetFrequentItems returns an array of Row that include frequent items, estimates, upper and
 // lower bounds given an ErrorCondition and the default threshold.
 // This is the same as GetFrequentItemsWithThreshold(getMaximumError(), errorType)
 //
 // errorType determines whether no false positives or no false negatives are desired.
 func (s *LongsSketch) GetFrequentItems(errorType errorType) ([]*Row, error) {
-	return sortItems(s, s.GetMaximumError(), errorType)
+	return s.sortItems(s.GetMaximumError(), errorType)
 }
 
 // GetNumActiveItems returns the number of active items in the sketch.
@@ -407,19 +396,19 @@ func (s *LongsSketch) IsEmpty() bool {
 	return s.GetNumActiveItems() == 0
 }
 
-// Update update this sketch with an item and a frequency count of one.
+// Update this sketch with an item and a frequency count of one.
 //
 // item for which the frequency should be increased.
 func (s *LongsSketch) Update(item int64) error {
 	return s.UpdateMany(item, 1)
 }
 
-// UpdateMany update this sketch with a item and a positive frequency count (or weight).
+// UpdateMany this sketch with an item and a positive frequency count (or weight).
 //
-// item for which the frequency should be increased. The item can be any long value
+// Item for which the frequency should be increased. The item can be any long value
 // and is only used by the sketch to determine uniqueness.
 // count the amount by which the frequency of the item should be increased.
-// An count of zero is a no-op, and a negative count will throw an exception.
+// A count of zero is a no-op, and a negative count will throw an exception.
 func (s *LongsSketch) UpdateMany(item int64, count int64) error {
 	if count == 0 {
 		return nil
@@ -496,7 +485,7 @@ func (s *LongsSketch) ToString() (string, error) {
 }
 
 // ToSlice returns a slice representation of this sketch
-func (s *LongsSketch) ToSlice() ([]byte, error) {
+func (s *LongsSketch) ToSlice() []byte {
 	emtpy := s.IsEmpty()
 	activeItems := s.GetNumActiveItems()
 	preLongs := 1
@@ -517,7 +506,7 @@ func (s *LongsSketch) ToSlice() ([]byte, error) {
 	if emtpy {
 		pre0 = insertFlags(_EMPTY_FLAG_MASK, pre0) //Byte 5
 		binary.LittleEndian.PutUint64(outArr, uint64(pre0))
-		return outArr, nil
+		return outArr
 	}
 	pre := int64(0)
 	pre0 = insertFlags(0, pre0) //Byte 5
@@ -532,23 +521,17 @@ func (s *LongsSketch) ToSlice() ([]byte, error) {
 	}
 
 	preBytes := preLongs << 3
-	activeValues, err := s.hashMap.getActiveValues()
-	if err != nil {
-		return nil, err
-	}
+	activeValues := s.hashMap.getActiveValues()
 	for i := 0; i < activeItems; i++ {
 		binary.LittleEndian.PutUint64(outArr[preBytes+(i<<3):], uint64(activeValues[i]))
 	}
 
-	activeKeys, err := s.hashMap.getActiveKeys()
-	if err != nil {
-		return nil, err
-	}
+	activeKeys := s.hashMap.getActiveKeys()
 	for i := 0; i < activeItems; i++ {
 		binary.LittleEndian.PutUint64(outArr[preBytes+((activeItems+i)<<3):], uint64(activeKeys[i]))
 	}
 
-	return outArr, nil
+	return outArr
 }
 
 // Reset resets this sketch to a virgin state.
@@ -570,4 +553,54 @@ func (s *LongsSketch) String() string {
 	sb.WriteString("\n")
 	sb.WriteString(s.hashMap.String())
 	return sb.String()
+}
+
+func (s *LongsSketch) sortItems(threshold int64, errorType errorType) ([]*Row, error) {
+	rowList := make([]*Row, 0)
+	iter := s.hashMap.iterator()
+	if errorType == ErrorTypeEnum.NoFalseNegatives {
+		for iter.next() {
+			est, err := s.GetEstimate(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			ub, err := s.GetUpperBound(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			lb, err := s.GetLowerBound(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			if ub >= threshold {
+				row := newRow(iter.getKey(), est, ub, lb)
+				rowList = append(rowList, row)
+			}
+		}
+	} else { //NO_FALSE_POSITIVES
+		for iter.next() {
+			est, err := s.GetEstimate(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			ub, err := s.GetUpperBound(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			lb, err := s.GetLowerBound(iter.getKey())
+			if err != nil {
+				return nil, err
+			}
+			if lb >= threshold {
+				row := newRow(iter.getKey(), est, ub, lb)
+				rowList = append(rowList, row)
+			}
+		}
+	}
+
+	sort.Slice(rowList, func(i, j int) bool {
+		return rowList[i].est > rowList[j].est
+	})
+
+	return rowList, nil
 }

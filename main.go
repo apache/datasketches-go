@@ -15,4 +15,9 @@
  * limitations under the License.
  */
 
+// Package datatasketches is the parent package for all sketch families and common code areas.
+//
+// The Sketching Core Library provides a range of stochastic streaming algorithms that are
+// particularly useful when integrating this technology into systems that must deal with massive
+// data. The library is designed to be easy to use, highly performant, and memory efficient.
 package datatasketches

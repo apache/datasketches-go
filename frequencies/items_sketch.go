@@ -15,8 +15,7 @@
  * limitations under the License.
  */
 
-<<<<<<< Updated upstream
-=======
+
 // Package frequencies is dedicated to streaming algorithms that enable estimation of the
 // frequency of occurrence of items in a weighted multiset stream of items.
 // If the frequency distribution of items is sufficiently skewed, these algorithms are very
@@ -25,7 +24,6 @@
 // bounds that can be returned by the sketch.
 //
 // These algorithms are sometimes referred to as "TopN" algorithms.
->>>>>>> Stashed changes
 package frequencies
 
 import (

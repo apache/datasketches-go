@@ -19,7 +19,7 @@
 // cardinality of a stream of items.
 //
 // HllSketch and Union are the public facing classes of this high performance implementation of Phillipe Flajolet's
-// HyperLogLog algorithm[1] but with significantly improved error behavior and important features that can be
+// HyperLogLog algorithm but with significantly improved error behavior and important features that can be
 // essential for large production systems that must handle massive data.
 package hll
 

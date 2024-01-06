@@ -486,11 +486,11 @@ func (s *LongsSketch) ToString() (string, error) {
 
 // ToSlice returns a slice representation of this sketch
 func (s *LongsSketch) ToSlice() []byte {
-	emtpy := s.IsEmpty()
+	empty := s.IsEmpty()
 	activeItems := s.GetNumActiveItems()
 	preLongs := 1
 	outBytes := 8
-	if !emtpy {
+	if !empty {
 		preLongs = internal.FamilyEnum.Frequency.MaxPreLongs //4
 		outBytes = (preLongs + (2 * activeItems)) << 3       //2 because both keys and values are longs
 	}
@@ -503,7 +503,7 @@ func (s *LongsSketch) ToSlice() []byte {
 	pre0 = insertFamilyID(int64(internal.FamilyEnum.Frequency.Id), pre0) //Byte 2
 	pre0 = insertLgMaxMapSize(int64(s.lgMaxMapSize), pre0)               //Byte 3
 	pre0 = insertLgCurMapSize(int64(s.hashMap.lgLength), pre0)           //Byte 4
-	if emtpy {
+	if empty {
 		pre0 = insertFlags(_EMPTY_FLAG_MASK, pre0) //Byte 5
 		binary.LittleEndian.PutUint64(outArr, uint64(pre0))
 		return outArr

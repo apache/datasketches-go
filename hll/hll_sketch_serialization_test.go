@@ -172,3 +172,85 @@ func TestCppCompat(t *testing.T) {
 		}
 	})
 }
+
+func TestGoCompat(t *testing.T) {
+	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+	for _, n := range nArr {
+		hll4, err := NewHllSketch(defaultLgK, TgtHllTypeHll4)
+		assert.NoError(t, err)
+		hll6, err := NewHllSketch(defaultLgK, TgtHllTypeHll6)
+		assert.NoError(t, err)
+		hll8, err := NewHllSketch(defaultLgK, TgtHllTypeHll8)
+		assert.NoError(t, err)
+
+		for i := 0; i < n; i++ {
+			assert.NoError(t, hll4.UpdateUInt64(uint64(i)))
+			assert.NoError(t, hll6.UpdateUInt64(uint64(i)))
+			assert.NoError(t, hll8.UpdateUInt64(uint64(i)))
+		}
+
+		{
+			sl4, err := hll4.ToCompactSlice()
+			assert.NoError(t, err)
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll4_n%d_java.sk", internal.JavaPath, n))
+			assert.NoError(t, err)
+			assert.Equal(t, bytes, sl4)
+		}
+
+		{
+			sl6, err := hll6.ToCompactSlice()
+			assert.NoError(t, err)
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll6_n%d_java.sk", internal.JavaPath, n))
+			assert.NoError(t, err)
+			assert.Equal(t, bytes, sl6)
+		}
+
+		{
+			sl8, err := hll8.ToCompactSlice()
+			assert.NoError(t, err)
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll8_n%d_java.sk", internal.JavaPath, n))
+			assert.NoError(t, err)
+			assert.Equal(t, bytes, sl8)
+		}
+
+		{
+			sl4, err := hll4.ToCompactSlice()
+			assert.NoError(t, err)
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll4_n%d_cpp.sk", internal.CppPath, n))
+			assert.NoError(t, err)
+			assert.Equal(t, bytes, sl4)
+		}
+
+		{
+			sl6, err := hll6.ToCompactSlice()
+			assert.NoError(t, err)
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll6_n%d_cpp.sk", internal.CppPath, n))
+			assert.NoError(t, err)
+
+			// clear compact flag for C++ sketches when in HLL mode tgt6
+			// as that flag is irrelevant but set in this case
+			if extractCurMode(bytes) == curModeHll {
+				bytes[5] = clearCompactFlag(bytes[5])
+			}
+			assert.Equal(t, bytes, sl6, "n: %d", n)
+		}
+
+		{
+			sl8, err := hll8.ToCompactSlice()
+			assert.NoError(t, err)
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll8_n%d_cpp.sk", internal.CppPath, n))
+			assert.NoError(t, err)
+
+			// clear compact flag for C++ sketches when in HLL mode tgt8
+			// as that flag is irrelevant but set in this case
+			if extractCurMode(bytes) == curModeHll {
+				bytes[5] = clearCompactFlag(bytes[5])
+			}
+			assert.Equal(t, bytes, sl8)
+		}
+	}
+}
+
+func clearCompactFlag(flags byte) byte {
+	return flags & ^(uint8(1) << 3)
+}

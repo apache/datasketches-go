@@ -34,9 +34,6 @@ const (
 
 const (
 	DSketchTestGenerateGo = "DSKETCH_TEST_GENERATE_GO"
-	DSketchTestCrossJava  = "DSKETCH_TEST_CROSS_JAVA"
-	DSketchTestCrossCpp   = "DSKETCH_TEST_CROSS_CPP"
-	DSketchTestCrossGo    = "DSKETCH_TEST_CROSS_GO"
 )
 
 const (

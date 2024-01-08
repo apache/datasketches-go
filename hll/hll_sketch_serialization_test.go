@@ -26,7 +26,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Run me manually for generation
 func TestGenerateGoFiles(t *testing.T) {
 	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
 		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
@@ -67,10 +66,6 @@ func TestGenerateGoFiles(t *testing.T) {
 }
 
 func TestJavaCompat(t *testing.T) {
-	if len(os.Getenv(internal.DSketchTestCrossJava)) == 0 {
-		t.Skipf("%s not set", internal.DSketchTestCrossJava)
-	}
-
 	t.Run("Java Hll4", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
@@ -125,10 +120,6 @@ func TestJavaCompat(t *testing.T) {
 }
 
 func TestCppCompat(t *testing.T) {
-	if len(os.Getenv(internal.DSketchTestCrossCpp)) == 0 {
-		t.Skipf("%s not set", internal.DSketchTestCrossCpp)
-	}
-
 	t.Run("Cpp Hll4", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
@@ -183,61 +174,83 @@ func TestCppCompat(t *testing.T) {
 }
 
 func TestGoCompat(t *testing.T) {
-	if len(os.Getenv(internal.DSketchTestCrossGo)) == 0 {
-		t.Skipf("%s not set", internal.DSketchTestCrossGo)
+	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+	for _, n := range nArr {
+		hll4, err := NewHllSketch(defaultLgK, TgtHllTypeHll4)
+		assert.NoError(t, err)
+		hll6, err := NewHllSketch(defaultLgK, TgtHllTypeHll6)
+		assert.NoError(t, err)
+		hll8, err := NewHllSketch(defaultLgK, TgtHllTypeHll8)
+		assert.NoError(t, err)
+
+		for i := 0; i < n; i++ {
+			assert.NoError(t, hll4.UpdateUInt64(uint64(i)))
+			assert.NoError(t, hll6.UpdateUInt64(uint64(i)))
+			assert.NoError(t, hll8.UpdateUInt64(uint64(i)))
+		}
+
+		{
+			sl4, err := hll4.ToCompactSlice()
+			assert.NoError(t, err)
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll4_n%d_java.sk", internal.JavaPath, n))
+			assert.NoError(t, err)
+			assert.Equal(t, bytes, sl4)
+		}
+
+		{
+			sl6, err := hll6.ToCompactSlice()
+			assert.NoError(t, err)
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll6_n%d_java.sk", internal.JavaPath, n))
+			assert.NoError(t, err)
+			assert.Equal(t, bytes, sl6)
+		}
+
+		{
+			sl8, err := hll8.ToCompactSlice()
+			assert.NoError(t, err)
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll8_n%d_java.sk", internal.JavaPath, n))
+			assert.NoError(t, err)
+			assert.Equal(t, bytes, sl8)
+		}
+
+		{
+			sl4, err := hll4.ToCompactSlice()
+			assert.NoError(t, err)
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll4_n%d_cpp.sk", internal.CppPath, n))
+			assert.NoError(t, err)
+			assert.Equal(t, bytes, sl4)
+		}
+
+		{
+			sl6, err := hll6.ToCompactSlice()
+			assert.NoError(t, err)
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll6_n%d_cpp.sk", internal.CppPath, n))
+			assert.NoError(t, err)
+
+			// clear compact flag for C++ sketches when in HLL mode tgt6
+			// as that flag is irrelevant but set in this case
+			if extractCurMode(bytes) == curModeHll {
+				bytes[5] = clearCompactFlag(bytes[5])
+			}
+			assert.Equal(t, bytes, sl6, "n: %d", n)
+		}
+
+		{
+			sl8, err := hll8.ToCompactSlice()
+			assert.NoError(t, err)
+			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll8_n%d_cpp.sk", internal.CppPath, n))
+			assert.NoError(t, err)
+
+			// clear compact flag for C++ sketches when in HLL mode tgt8
+			// as that flag is irrelevant but set in this case
+			if extractCurMode(bytes) == curModeHll {
+				bytes[5] = clearCompactFlag(bytes[5])
+			}
+			assert.Equal(t, bytes, sl8)
+		}
 	}
+}
 
-	t.Run("Go Hll4", func(t *testing.T) {
-		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
-		for _, n := range nArr {
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll4_n%d_go.sk", internal.GoPath, n))
-			assert.NoError(t, err)
-
-			sketch, err := DeserializeHllSketch(bytes, true)
-			if err != nil {
-				return
-			}
-
-			assert.Equal(t, 12, sketch.GetLgConfigK())
-			est, err := sketch.GetEstimate()
-			assert.NoError(t, err)
-			assert.InDelta(t, n, est, float64(n)*0.02)
-		}
-	})
-
-	t.Run("Go Hll6", func(t *testing.T) {
-		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
-		for _, n := range nArr {
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll6_n%d_go.sk", internal.GoPath, n))
-			assert.NoError(t, err)
-
-			sketch, err := DeserializeHllSketch(bytes, true)
-			if err != nil {
-				return
-			}
-
-			assert.Equal(t, 12, sketch.GetLgConfigK())
-			est, err := sketch.GetEstimate()
-			assert.NoError(t, err)
-			assert.InDelta(t, n, est, float64(n)*0.02)
-		}
-	})
-
-	t.Run("Go Hll8", func(t *testing.T) {
-		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
-		for _, n := range nArr {
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll8_n%d_go.sk", internal.GoPath, n))
-			assert.NoError(t, err)
-
-			sketch, err := DeserializeHllSketch(bytes, true)
-			if err != nil {
-				return
-			}
-
-			assert.Equal(t, 12, sketch.GetLgConfigK())
-			est, err := sketch.GetEstimate()
-			assert.NoError(t, err)
-			assert.InDelta(t, n, est, float64(n)*0.02)
-		}
-	})
+func clearCompactFlag(flags byte) byte {
+	return flags & ^(uint8(1) << 3)
 }

@@ -20,8 +20,8 @@ ENV CGO_ENABLED=0
 WORKDIR /github.com/apache/datasketches-go/
 COPY go.mod .
 COPY go.sum .
+COPY serialization_test_data ./serialization_test_data
 COPY internal ./internal
-COPY common ./common
 COPY hll ./hll
 COPY frequencies ./frequencies
 

@@ -19,6 +19,7 @@ package kll
 
 import (
 	"errors"
+	"github.com/apache/datasketches-go/internal"
 	"sort"
 )
 
@@ -53,7 +54,10 @@ func newItemsSketchSortedView[C comparable](sketch *ItemsSketch[C]) (*itemsSketc
 	}
 	if !sketch.IsLevelZeroSorted() {
 		subSlice := srcQuantiles[srcLevels[0]:srcLevels[1]]
-		sort.Slice(subSlice, sketch.itemsSketchOp.lessFn(subSlice))
+		lessFn := sketch.itemsSketchOp.lessFn()
+		sort.Slice(subSlice, func(a, b int) bool {
+			return lessFn(subSlice[a], subSlice[b])
+		})
 	}
 	numQuantiles := srcLevels[srcNumLevels] - srcLevels[0]
 
@@ -72,52 +76,34 @@ func (s *itemsSketchSortedView[C]) GetRank(item C, inclusive bool) (float64, err
 	if s.totalN == 0 {
 		return 0, errors.New("empty sketch")
 	}
-	panic("TODO itemsSketchSortedView GetRank")
-	/*
-	   if (entries_.empty()) throw std::runtime_error("operation is undefined for an empty sketch");
-	   auto it = inclusive ?
-	       std::upper_bound(entries_.begin(), entries_.end(), Entry(ref_helper(item), 0), compare_pairs_by_first(comparator_))
-	     : std::lower_bound(entries_.begin(), entries_.end(), Entry(ref_helper(item), 0), compare_pairs_by_first(comparator_));
-	   // we need item just before
-	   if (it == entries_.begin()) return 0;
-	   --it;
-	   return static_cast<double>(it->second) / total_weight_;
-	*/
+	length := len(s.quantiles)
+	crit := internal.InequalityLT
+	if inclusive {
+		crit = internal.InequalityLE
+	}
+	index := internal.FindWithInequality(s.quantiles, 0, length-1, item, crit, s.itemsSketchOp.lessFn())
+	if index == -1 {
+		return 0, nil //EXCLUSIVE (LT) case: quantile <= minQuantile; INCLUSIVE (LE) case: quantile < minQuantile
+	}
+	return float64(s.cumWeights[index]) / float64(s.totalN), nil
 }
 
-/*
-  @Override
-  public double getRank(final T quantile, final QuantileSearchCriteria searchCrit) {
-    if (isEmpty()) { throw new SketchesArgumentException(EMPTY_MSG); }
-    final int len = quantiles.length;
-    final Inequality crit = (searchCrit == INCLUSIVE) ? Inequality.LE : Inequality.LT;
-    final int index = find(quantiles,  0, len - 1, quantile, crit, comparator);
-    if (index == -1) {
-      return 0; //EXCLUSIVE (LT) case: quantile <= minQuantile; INCLUSIVE (LE) case: quantile < minQuantile
-    }
-    return (double)cumWeights[index] / totalN;
-  }
-
-*/
-
-func (s *itemsSketchSortedView[C]) GetQuantile(item float64, inclusive bool) (C, error) {
+func (s *itemsSketchSortedView[C]) GetQuantile(rank float64, inclusive bool) (C, error) {
 	if s.totalN == 0 {
 		return s.itemsSketchOp.identity(), errors.New("empty sketch")
 	}
-	panic("TODO itemsSketchSortedView GetQuantile")
+	err := checkNormalizedRankBounds(rank)
+	if err != nil {
+		return s.itemsSketchOp.identity(), err
+	}
+	index := s.getQuantileIndex(rank, inclusive)
+	return s.quantiles[index], nil
+	/*
+	   QuantilesUtil.checkNormalizedRankBounds(rank);
+	   final int index = getQuantileIndex(rank, searchCrit);
+	   return quantiles[index];
+	*/
 }
-
-/*
-auto quantiles_sorted_view<T, C, A>::get_quantile(double rank, bool inclusive) const -> quantile_return_type {
-  if (entries_.empty()) throw std::runtime_error("operation is undefined for an empty sketch");
-  uint64_t weight = static_cast<uint64_t>(inclusive ? std::ceil(rank * total_weight_) : rank * total_weight_);
-  auto it = inclusive ?
-      std::lower_bound(entries_.begin(), entries_.end(), make_dummy_entry<T>(weight), compare_pairs_by_second())
-    : std::upper_bound(entries_.begin(), entries_.end(), make_dummy_entry<T>(weight), compare_pairs_by_second());
-  if (it == entries_.end()) return deref_helper(entries_[entries_.size() - 1].first);
-  return deref_helper(it->first);
-}
-*/
 
 func (s *itemsSketchSortedView[C]) GetPMF(splitPoints []C, size uint32, inclusive bool) ([]float64, error) {
 	if s.totalN == 0 {
@@ -139,12 +125,51 @@ auto quantiles_sorted_view<T, C, A>::get_PMF(const T* split_points, uint32_t siz
 
 */
 
+func (s *itemsSketchSortedView[C]) GetCDF(splitPoints []C, size uint32, inclusive bool) ([]float64, error) {
+	if s.totalN == 0 {
+		return nil, errors.New("empty sketch")
+	}
+	panic("TODO itemsSketchSortedView GetCDF")
+}
+
+/*
+  public double[] getCDF(final T[] splitPoints, final QuantileSearchCriteria searchCrit) {
+    if (isEmpty()) { throw new SketchesArgumentException(EMPTY_MSG); }
+    GenericSortedView.validateItems(splitPoints, comparator);
+    final int len = splitPoints.length + 1;
+    final double[] buckets = new double[len];
+    for (int i = 0; i < len - 1; i++) {
+      buckets[i] = getRank(splitPoints[i], searchCrit);
+    }
+    buckets[len - 1] = 1.0;
+    return buckets;
+  }
+*/
+
+func (s *itemsSketchSortedView[C]) getQuantileIndex(rank float64, inclusive bool) int {
+	length := len(s.quantiles)
+	naturalRank := getNaturalRank(rank, s.totalN, inclusive)
+	crit := internal.InequalityGE
+	if inclusive {
+		crit = internal.InequalityGT
+	}
+	index := internal.FindWithInequality(s.cumWeights, 0, length-1, naturalRank, crit, func(a, b int64) bool {
+		return a < b
+	})
+	if index == -1 {
+		return length - 1
+	}
+	return index
+}
+
 func populateFromSketch[C comparable](srcQuantiles []C, levels []uint32, numLevels uint8, numQuantiles uint32, itemsSketchOp ItemSketchOp[C]) ([]C, []int64) {
 	quantiles := make([]C, numQuantiles)
 	cumWeights := make([]int64, numQuantiles)
 	myLevels := make([]uint32, numLevels+1)
 	offset := levels[0]
-	copy(srcQuantiles, quantiles[offset:offset+numQuantiles])
+	for i := uint32(0); i < numQuantiles; i++ {
+		quantiles[i] = srcQuantiles[i+offset]
+	}
 	srcLevel := uint8(0)
 	dstLevel := uint8(0)
 	weight := int64(1)
@@ -205,9 +230,9 @@ func tandemMerge[C comparable](quantilesSrc []C, weightsSrc []int64, quantilesDs
 	iSrc2 := fromIndex2
 	iDst := fromIndex1
 
-	lessFn := itemsSketchOp.lessFn(quantilesSrc)
+	lessFn := itemsSketchOp.lessFn()
 	for iSrc1 < toIndex1 && iSrc2 < toIndex2 {
-		if lessFn(int(iSrc1), int(iSrc2)) {
+		if lessFn(quantilesSrc[iSrc1], quantilesSrc[iSrc2]) {
 			quantilesDst[iDst] = quantilesSrc[iSrc1]
 			weightsDst[iDst] = weightsSrc[iSrc1]
 			iSrc1++

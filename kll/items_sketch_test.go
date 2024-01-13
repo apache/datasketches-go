@@ -18,56 +18,35 @@
 package kll
 
 import (
+	"github.com/apache/datasketches-go/common"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
-type floatItemsSketchOp struct {
+type stringItemsSketchOp struct {
 }
 
-func (f floatItemsSketchOp) identity() float64 {
-	return 0
+func (f stringItemsSketchOp) identity() string {
+	return ""
 }
 
-func (f floatItemsSketchOp) lessFn(list []float64) lessFn[float64] {
-	return func(a int, b int) bool {
-		return list[a] < list[b]
+func (f stringItemsSketchOp) lessFn() common.LessFn[string] {
+	return func(a string, b string) bool {
+		return a < b
 	}
 }
 
 func TestItemsSketchKLimits(t *testing.T) {
-	_, err := NewItemsSketch[float64](uint16(_MIN_K), floatItemsSketchOp{})
+	_, err := NewItemsSketch[string](uint16(_MIN_K), stringItemsSketchOp{})
 	assert.NoError(t, err)
-	_, err = NewItemsSketch[float64](uint16(_MAX_K), floatItemsSketchOp{})
+	_, err = NewItemsSketch[string](uint16(_MAX_K), stringItemsSketchOp{})
 	assert.NoError(t, err)
-	_, err = NewItemsSketch[float64](uint16(_MIN_K-1), floatItemsSketchOp{})
+	_, err = NewItemsSketch[string](uint16(_MIN_K-1), stringItemsSketchOp{})
 	assert.Error(t, err)
 }
 
-/*
-  SECTION("empty") {
-    kll_float_sketch sketch(200, std::less<float>(), 0);
-    REQUIRE(sketch.is_empty());
-    REQUIRE_FALSE(sketch.is_estimation_mode());
-    REQUIRE(sketch.get_n() == 0);
-    REQUIRE(sketch.get_num_retained() == 0);
-    REQUIRE_THROWS_AS(sketch.get_min_item(), std::runtime_error);
-    REQUIRE_THROWS_AS(sketch.get_max_item(), std::runtime_error);
-    REQUIRE_THROWS_AS(sketch.get_rank(0), std::runtime_error);
-    REQUIRE_THROWS_AS(sketch.get_quantile(0.5), std::runtime_error);
-    const float split_points[1] {0};
-    REQUIRE_THROWS_AS(sketch.get_PMF(split_points, 1), std::runtime_error);
-    REQUIRE_THROWS_AS(sketch.get_CDF(split_points, 1), std::runtime_error);
-
-    for (auto pair: sketch) {
-      unused(pair); // to suppress "unused" warning
-      FAIL("should be no iterations over an empty sketch");
-    }
-  }
-*/
-
 func TestItemsSketchEmpty(t *testing.T) {
-	sketch, err := NewItemsSketch[float64](200, floatItemsSketchOp{})
+	sketch, err := NewItemsSketch[string](200, stringItemsSketchOp{})
 	assert.NoError(t, err)
 	assert.True(t, sketch.IsEmpty())
 	assert.False(t, sketch.IsEstimationMode())
@@ -77,11 +56,121 @@ func TestItemsSketchEmpty(t *testing.T) {
 	assert.Error(t, err)
 	_, err = sketch.GetMaxItem()
 	assert.Error(t, err)
-	_, err = sketch.GetRank(0, true)
+	_, err = sketch.GetRank("", true)
 	assert.Error(t, err)
 	_, err = sketch.GetQuantile(0.5, true)
 	assert.Error(t, err)
-	splitPoints := []float64{0}
+	splitPoints := []string{""}
 	_, err = sketch.GetPMF(splitPoints, 1, true)
 	assert.Error(t, err)
+	_, err = sketch.GetCDF(splitPoints, 1, true)
+	assert.Error(t, err)
+}
+
+func TestItemsSketchBadQuantile(t *testing.T) {
+	sketch, err := NewItemsSketch[string](200, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	sketch.Update("") // has to be non-empty to reach the check
+	_, err = sketch.GetQuantile(-1, true)
+	assert.Error(t, err)
+}
+
+func TestItemsSketchOneValue(t *testing.T) {
+	sketch, err := NewItemsSketch[string](200, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	sketch.Update("A")
+	assert.False(t, sketch.IsEmpty())
+	assert.Equal(t, uint64(1), sketch.GetN())
+	assert.Equal(t, uint32(1), sketch.GetNumRetained())
+	v, err := sketch.GetRank("A", false)
+	assert.Equal(t, float64(0), v)
+	v, err = sketch.GetRank("B", false)
+	assert.Equal(t, float64(1), v)
+	v, err = sketch.GetRank("A", false)
+	assert.Equal(t, float64(0), v)
+	v, err = sketch.GetRank("B", false)
+	assert.Equal(t, float64(1), v)
+	v, err = sketch.GetRank("@", true)
+	assert.Equal(t, float64(0), v)
+	v, err = sketch.GetRank("A", true)
+	assert.Equal(t, float64(1), v)
+	s, err := sketch.GetMinItem()
+	assert.Equal(t, "A", s)
+	s, err = sketch.GetMaxItem()
+	assert.Equal(t, "A", s)
+	s, err = sketch.GetQuantile(0.5, false)
+	assert.Equal(t, "A", s)
+	s, err = sketch.GetQuantile(0.5, true)
+	assert.Equal(t, "A", s)
+}
+
+func TestItemsSketchTenValues(t *testing.T) {
+	tenStr := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"}
+	sketch, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	strLen := len(tenStr)
+	dblStrLen := float64(strLen)
+	for i := 1; i <= strLen; i++ {
+		sketch.Update(tenStr[i-1])
+	}
+	assert.False(t, sketch.IsEmpty())
+	assert.Equal(t, uint64(strLen), sketch.GetN())
+	assert.Equal(t, uint32(strLen), sketch.GetNumRetained())
+	for i := 1; i <= strLen; i++ {
+		v, err := sketch.GetRank(tenStr[i-1], false)
+		assert.Equal(t, float64(i-1)/dblStrLen, v, "i: %d", i)
+		assert.NoError(t, err, "i: %d", i)
+		v, err = sketch.GetRank(tenStr[i-1], true)
+		assert.Equal(t, float64(i)/dblStrLen, v)
+		assert.NoError(t, err)
+	}
+	//qArr := tenStr
+	//rOut, err := sketch.GetRanks(qArr, false) //inclusive
+	//assert.NoError(t, err)
+	//for i := 0; i < len(qArr); i++ {
+	//	assert.Equal(t, float64(i+1)/dblStrLen, rOut[i])
+	//}
+	//rOut, err = sketch.GetRanks(qArr, true) //inclusive
+	//assert.NoError(t, err)
+	//for i := 0; i < len(qArr); i++ {
+	//	assert.Equal(t, float64(i+1)/dblStrLen, rOut[i])
+	//}
+	//
+	//for i := 0; i <= strLen; i++ {
+	//	rank := float64(i) / dblStrLen
+	//	var q string
+	//	if rank == 1.0 {
+	//		q = tenStr[i-1]
+	//	} else {
+	//		q = tenStr[i]
+	//	}
+	//	s, err := sketch.GetQuantile(rank, false)
+	//	assert.Equal(t, q, s)
+	//	assert.NoError(t, err)
+	//	if rank == 0 {
+	//		q = tenStr[i]
+	//	} else {
+	//		q = tenStr[i-1]
+	//	}
+	//	s, err = sketch.GetQuantile(rank, true)
+	//	assert.Equal(t, q, s)
+	//	assert.NoError(t, err)
+	//}
+	//
+	//{
+	//	// getQuantile() and getQuantiles() equivalence EXCLUSIVE
+	//	quantiles := sketch.GetQuantiles([]float64{0, 0.1, 0.2, 0.3, 0.4, 0.5,
+	//		0.6, 0.7, 0.8, 0.9, 1.0}, false)
+	//	for i := 0; i <= 10; i++ {
+	//		assert.Equal(t, tenStr[i], quantiles[i])
+	//	}
+	//}
+	//{
+	//	// getQuantile() and getQuantiles() equivalence INCLUSIVE
+	//	quantiles := sketch.GetQuantiles([]float64{0, 0.1, 0.2, 0.3, 0.4, 0.5,
+	//		0.6, 0.7, 0.8, 0.9, 1}, true)
+	//	for i := 0; i <= 10; i++ {
+	//		assert.Equal(t, tenStr[i], quantiles[i])
+	//	}
+	//}
 }

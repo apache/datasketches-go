@@ -20,7 +20,6 @@ package frequencies
 import (
 	"math"
 	"math/rand"
-	"reflect"
 )
 
 const (
@@ -66,19 +65,6 @@ func hashFn(okey int64) int64 {
 	key *= 0xc4ceb9fe1a85ec53
 	key ^= key >> 33
 	return int64(key)
-}
-
-func isNil[T any](t T) bool {
-	v := reflect.ValueOf(t)
-	kind := v.Kind()
-	// Must be one of these types to be nillable
-	return (kind == reflect.Ptr ||
-		kind == reflect.Interface ||
-		kind == reflect.Slice ||
-		kind == reflect.Map ||
-		kind == reflect.Chan ||
-		kind == reflect.Func) &&
-		v.IsNil()
 }
 
 func randomGeometricDist(prob float64) int64 {

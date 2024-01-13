@@ -19,13 +19,13 @@ package kll
 
 import (
 	"fmt"
+	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal"
 )
-
-type lessFn[C comparable] func(int, int) bool
 
 type ItemSketchOp[C comparable] interface {
 	identity() C
-	lessFn(list []C) lessFn[C]
+	lessFn() common.LessFn[C]
 }
 
 type ItemsSketch[C comparable] struct {
@@ -49,6 +49,14 @@ const (
 	_DEFAULT_M = uint8(8)
 	_MIN_K     = uint16(_DEFAULT_M)
 	_MAX_K     = (1 << 16) - 1
+)
+
+var (
+	powersOfThree = []uint64{1, 3, 9, 27, 81, 243, 729, 2187, 6561, 19683, 59049, 177147, 531441,
+		1594323, 4782969, 14348907, 43046721, 129140163, 387420489, 1162261467,
+		3486784401, 10460353203, 31381059609, 94143178827, 282429536481,
+		847288609443, 2541865828329, 7625597484987, 22876792454961, 68630377364883,
+		205891132094649}
 )
 
 func NewItemsSketch[C comparable](k uint16, itemSketchOp ItemSketchOp[C]) (*ItemsSketch[C], error) {
@@ -164,6 +172,22 @@ func (s *ItemsSketch[C]) GetPMF(splitPoints []C, size uint32, inclusive bool) ([
 	return s.sortedView.GetPMF(splitPoints, size, inclusive)
 }
 
+func (s *ItemsSketch[C]) GetCDF(splitPoints []C, size uint32, inclusive bool) ([]float64, error) {
+	if s.IsEmpty() {
+		return nil, fmt.Errorf("operation is undefined for an empty sketch")
+	}
+	err := s.setupSortedView()
+	if err != nil {
+		return nil, err
+	}
+	return s.sortedView.GetCDF(splitPoints, size, inclusive)
+}
+
+func (s *ItemsSketch[C]) Update(item C) {
+	s.updateItem(item, s.itemsSketchOp.lessFn())
+	s.sortedView = nil
+}
+
 func (s *ItemsSketch[C]) setupSortedView() error {
 	if s.sortedView == nil {
 		sView, err := newItemsSketchSortedView[C](s)
@@ -174,3 +198,189 @@ func (s *ItemsSketch[C]) setupSortedView() error {
 	}
 	return nil
 }
+
+func (s *ItemsSketch[C]) updateItem(item C, lessFn common.LessFn[C]) {
+	if internal.IsNil(item) {
+		return
+	}
+	if s.IsEmpty() {
+		s.minItem = &item
+		s.maxItem = &item
+	} else {
+		if lessFn(item, *s.maxItem) {
+			s.maxItem = &item
+		}
+		if lessFn(*s.maxItem, item) {
+			s.maxItem = &item
+		}
+	}
+	level0space := s.levels[0]
+	if level0space == 0 {
+		s.compressWhileUpdatingSketch()
+		level0space = s.levels[0]
+	}
+	s.n++
+	s.isLevelZeroSorted = false
+	nextPos := level0space - 1
+	s.levels[0] = nextPos
+	s.items[nextPos] = item
+}
+
+func (s *ItemsSketch[C]) compressWhileUpdatingSketch() {
+	level := findLevelToCompact(s.k, s.m, s.numLevels, s.levels)
+	if level == s.numLevels-1 {
+		//The level to compact is the top level, thus we need to add a level.
+		//Be aware that this operation grows the items array,
+		//shifts the items data and the level boundaries of the data,
+		//and grows the levels array and increments numLevels_.
+		//s.addEmptyTopLevelToCompletelyFullSketch()
+	}
+	panic("TODO compressWhileUpdatingSketch")
+}
+
+/*
+ private static <T> void compressWhileUpdatingSketch(final KllItemsSketch<T> itmSk) {
+    final int level =
+        findLevelToCompact(itmSk.getK(), itmSk.getM(), itmSk.getNumLevels(), itmSk.levelsArr);
+    if (level == itmSk.getNumLevels() - 1) {
+      //The level to compact is the top level, thus we need to add a level.
+      //Be aware that this operation grows the items array,
+      //shifts the items data and the level boundaries of the data,
+      //and grows the levels array and increments numLevels_.
+      KllHelper.addEmptyTopLevelToCompletelyFullSketch(itmSk);
+    }
+    //after this point, the levelsArray will not be expanded, only modified.
+    final int[] myLevelsArr = itmSk.levelsArr;
+    final int rawBeg = myLevelsArr[level];
+    final int rawEnd = myLevelsArr[level + 1];
+    // +2 is OK because we already added a new top level if necessary
+    final int popAbove = myLevelsArr[level + 2] - rawEnd;
+    final int rawPop = rawEnd - rawBeg;
+    final boolean oddPop = isOdd(rawPop);
+    final int adjBeg = oddPop ? rawBeg + 1 : rawBeg;
+    final int adjPop = oddPop ? rawPop - 1 : rawPop;
+    final int halfAdjPop = adjPop / 2;
+
+    //the following is specific to generic Items
+    final Object[] myItemsArr = itmSk.getTotalItemsArray();
+    if (level == 0) { // level zero might not be sorted, so we must sort it if we wish to compact it
+      Arrays.sort((T[])myItemsArr, adjBeg, adjBeg + adjPop, itmSk.comparator);
+    }
+    if (popAbove == 0) {
+      KllItemsHelper.randomlyHalveUpItems(myItemsArr, adjBeg, adjPop, KllSketch.random);
+    } else {
+      KllItemsHelper.randomlyHalveDownItems(myItemsArr, adjBeg, adjPop, KllSketch.random);
+      KllItemsHelper.mergeSortedItemsArrays(
+          myItemsArr, adjBeg, halfAdjPop,
+          myItemsArr, rawEnd, popAbove,
+          myItemsArr, adjBeg + halfAdjPop, itmSk.comparator);
+    }
+
+    int newIndex = myLevelsArr[level + 1] - halfAdjPop;  // adjust boundaries of the level above
+    itmSk.setLevelsArrayAt(level + 1, newIndex);
+
+    if (oddPop) {
+      itmSk.setLevelsArrayAt(level, myLevelsArr[level + 1] - 1); // the current level now contains one item
+      myItemsArr[myLevelsArr[level]] = myItemsArr[rawBeg];  // namely this leftover guy
+    } else {
+      itmSk.setLevelsArrayAt(level, myLevelsArr[level + 1]); // the current level is now empty
+    }
+
+    // verify that we freed up halfAdjPop array slots just below the current level
+    assert myLevelsArr[level] == rawBeg + halfAdjPop;
+
+    // finally, we need to shift up the data in the levels below
+    // so that the freed-up space can be used by level zero
+    if (level > 0) {
+      final int amount = rawBeg - myLevelsArr[0];
+      System.arraycopy(myItemsArr, myLevelsArr[0], myItemsArr, myLevelsArr[0] + halfAdjPop, amount);
+    }
+    for (int lvl = 0; lvl < level; lvl++) {
+      newIndex = myLevelsArr[lvl] + halfAdjPop; //adjust boundary
+      itmSk.setLevelsArrayAt(lvl, newIndex);
+    }
+    itmSk.setItemsArray(myItemsArr);
+  }
+*/
+
+func findLevelToCompact(k uint16, m uint8, numLevels uint8, levels []uint32) uint8 {
+	level := uint8(0)
+	for {
+		pop := levels[level+1] - levels[level]
+		cap := levelCapacity(k, numLevels, level, m)
+		if pop >= cap {
+			return level
+		}
+		level++
+	}
+}
+
+/*
+  static int findLevelToCompact(final int k, final int m, final int numLevels, final int[] levels) {
+    int level = 0;
+    while (true) {
+      assert level < numLevels;
+      final int pop = levels[level + 1] - levels[level];
+      final int cap = KllHelper.levelCapacity(k, numLevels, level, m);
+      if (pop >= cap) {
+        return level;
+      }
+      level++;
+    }
+  }
+*/
+
+func levelCapacity(k uint16, numLevels uint8, level uint8, m uint8) uint32 {
+	depth := numLevels - level - 1
+	return max(uint32(m), intCapAux(k, depth))
+}
+
+/*
+  static int levelCapacity(final int k, final int numLevels, final int level, final int m) {
+    assert (k <= (1 << 29));
+    assert (numLevels >= 1) && (numLevels <= 61);
+    assert (level >= 0) && (level < numLevels);
+    final int depth = numLevels - level - 1; //depth is # levels from the top level (= 0)
+    return (int) Math.max(m, intCapAux(k, depth));
+  }
+*/
+
+func intCapAux(k uint16, depth uint8) uint32 {
+	if depth <= 30 {
+		return intCapAuxAux(k, depth)
+	}
+	half := depth / 2
+	rest := depth - half
+	tmp := intCapAuxAux(k, half)
+	return intCapAuxAux(uint16(tmp), rest)
+}
+
+/*
+  private static long intCapAux(final int k, final int depth) {
+    if (depth <= 30) { return intCapAuxAux(k, depth); }
+    final int half = depth / 2;
+    final int rest = depth - half;
+    final long tmp = intCapAuxAux(k, half);
+    return intCapAuxAux(tmp, rest);
+  }
+*/
+
+func intCapAuxAux(k uint16, depth uint8) uint32 {
+	twok := uint64(k << 1)                        // for rounding at the end, pre-multiply by 2 here, divide by 2 during rounding.
+	tmp := (twok << depth) / powersOfThree[depth] //2k* (2/3)^depth. 2k also keeps the fraction larger.
+	result := (tmp + 1) >> 1                      // (tmp + 1)/2. If odd, round up. This guarantees an integer.
+	if result <= uint64(k) {
+		return uint32(result)
+	}
+	return uint32(k)
+}
+
+/*
+  private static long intCapAuxAux(final long k, final int depth) {
+    final long twok = k << 1; // for rounding at the end, pre-multiply by 2 here, divide by 2 during rounding.
+    final long tmp = ((twok << depth) / powersOfThree[depth]); //2k* (2/3)^depth. 2k also keeps the fraction larger.
+    final long result = ((tmp + 1L) >>> 1); // (tmp + 1)/2. If odd, round up. This guarantees an integer.
+    assert (result <= k);
+    return result;
+  }
+*/

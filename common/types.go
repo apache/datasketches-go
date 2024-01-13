@@ -15,40 +15,6 @@
  * limitations under the License.
  */
 
-package kll
+package common
 
-import (
-	"errors"
-	"math"
-)
-
-const (
-	tailRoundingFactor = 1e7
-)
-
-func convertToCumulative(array []int64) int64 {
-	subtotal := int64(0)
-	for i := range array {
-		subtotal += array[i]
-		array[i] = subtotal
-	}
-	return subtotal
-}
-
-func getNaturalRank(normalizedRank float64, totalN uint64, inclusive bool) int64 {
-	naturalRank := normalizedRank * float64(totalN)
-	if totalN <= tailRoundingFactor {
-		naturalRank = math.Round(naturalRank*tailRoundingFactor) / tailRoundingFactor
-	}
-	if inclusive {
-		return int64(math.Ceil(naturalRank))
-	}
-	return int64(math.Floor(naturalRank))
-}
-
-func checkNormalizedRankBounds(rank float64) error {
-	if rank < 0 || rank > 1 {
-		return errors.New("rank must be between 0 and 1 inclusive")
-	}
-	return nil
-}
+type LessFn[C comparable] func(C, C) bool

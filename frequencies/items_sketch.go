@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-
 // Package frequencies is dedicated to streaming algorithms that enable estimation of the
 // frequency of occurrence of items in a weighted multiset stream of items.
 // If the frequency distribution of items is sufficiently skewed, these algorithms are very
@@ -320,7 +319,7 @@ func (i *ItemsSketch[C]) Update(item C) error {
 // count the amount by which the frequency of the item should be increased.
 // A count of zero is a no-op, and a negative count will throw an exception.
 func (i *ItemsSketch[C]) UpdateMany(item C, count int64) error {
-	if isNil(item) || count == 0 {
+	if internal.IsNil(item) || count == 0 {
 		return nil
 	}
 	if count < 0 {

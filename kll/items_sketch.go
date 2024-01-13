@@ -134,17 +134,36 @@ func (s *ItemsSketch[C]) GetRank(item C, inclusive bool) (float64, error) {
 	return s.sortedView.GetRank(item, inclusive)
 }
 
-/*
-template<typename T, typename C, typename A>
-auto kll_sketch<T, C, A>::get_quantile(double rank, bool inclusive) const -> quantile_return_type {
-  if (is_empty()) throw std::runtime_error("operation is undefined for an empty sketch");
-  if ((rank < 0.0) || (rank > 1.0)) {
-    throw std::invalid_argument("normalized rank cannot be less than zero or greater than 1.0");
-  }
-  // may have a side effect of sorting level zero if needed
-  setup_sorted_view();
-  return sorted_view_->get_quantile(rank, inclusive);
+func (s *ItemsSketch[C]) GetRanks(item []C, inclusive bool) ([]float64, error) {
+	if s.IsEmpty() {
+		return nil, fmt.Errorf("operation is undefined for an empty sketch")
+	}
+	err := s.setupSortedView()
+	if err != nil {
+		return nil, err
+	}
+	ranks := make([]float64, len(item))
+	for i := range item {
+		ranks[i], err = s.sortedView.GetRank(item[i], inclusive)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ranks, nil
 }
+
+/*
+  @Override
+  public double[] getRanks(final T[] quantiles, final QuantileSearchCriteria searchCrit) {
+    if (isEmpty()) { throw new SketchesArgumentException(EMPTY_MSG); }
+    refreshSortedView();
+    final int len = quantiles.length;
+    final double[] ranks = new double[len];
+    for (int i = 0; i < len; i++) {
+      ranks[i] = kllItemsSV.getRank(quantiles[i], searchCrit);
+    }
+    return ranks;
+  }
 */
 
 func (s *ItemsSketch[C]) GetQuantile(rank float64, inclusive bool) (C, error) {
@@ -159,6 +178,24 @@ func (s *ItemsSketch[C]) GetQuantile(rank float64, inclusive bool) (C, error) {
 		return s.itemsSketchOp.identity(), err
 	}
 	return s.sortedView.GetQuantile(rank, inclusive)
+}
+
+func (s *ItemsSketch[C]) GetQuantiles(ranks []float64, inclusive bool) ([]C, error) {
+	if s.IsEmpty() {
+		return nil, fmt.Errorf("operation is undefined for an empty sketch")
+	}
+	err := s.setupSortedView()
+	if err != nil {
+		return nil, err
+	}
+	quantiles := make([]C, len(ranks))
+	for i := range ranks {
+		quantiles[i], err = s.sortedView.GetQuantile(ranks[i], inclusive)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return quantiles, nil
 }
 
 func (s *ItemsSketch[C]) GetPMF(splitPoints []C, size uint32, inclusive bool) ([]float64, error) {

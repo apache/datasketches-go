@@ -124,53 +124,58 @@ func TestItemsSketchTenValues(t *testing.T) {
 		assert.Equal(t, float64(i)/dblStrLen, v)
 		assert.NoError(t, err)
 	}
-	//qArr := tenStr
-	//rOut, err := sketch.GetRanks(qArr, false) //inclusive
-	//assert.NoError(t, err)
-	//for i := 0; i < len(qArr); i++ {
-	//	assert.Equal(t, float64(i+1)/dblStrLen, rOut[i])
-	//}
-	//rOut, err = sketch.GetRanks(qArr, true) //inclusive
-	//assert.NoError(t, err)
-	//for i := 0; i < len(qArr); i++ {
-	//	assert.Equal(t, float64(i+1)/dblStrLen, rOut[i])
-	//}
-	//
-	//for i := 0; i <= strLen; i++ {
-	//	rank := float64(i) / dblStrLen
-	//	var q string
-	//	if rank == 1.0 {
-	//		q = tenStr[i-1]
-	//	} else {
-	//		q = tenStr[i]
-	//	}
-	//	s, err := sketch.GetQuantile(rank, false)
-	//	assert.Equal(t, q, s)
-	//	assert.NoError(t, err)
-	//	if rank == 0 {
-	//		q = tenStr[i]
-	//	} else {
-	//		q = tenStr[i-1]
-	//	}
-	//	s, err = sketch.GetQuantile(rank, true)
-	//	assert.Equal(t, q, s)
-	//	assert.NoError(t, err)
-	//}
-	//
-	//{
-	//	// getQuantile() and getQuantiles() equivalence EXCLUSIVE
-	//	quantiles := sketch.GetQuantiles([]float64{0, 0.1, 0.2, 0.3, 0.4, 0.5,
-	//		0.6, 0.7, 0.8, 0.9, 1.0}, false)
-	//	for i := 0; i <= 10; i++ {
-	//		assert.Equal(t, tenStr[i], quantiles[i])
-	//	}
-	//}
-	//{
-	//	// getQuantile() and getQuantiles() equivalence INCLUSIVE
-	//	quantiles := sketch.GetQuantiles([]float64{0, 0.1, 0.2, 0.3, 0.4, 0.5,
-	//		0.6, 0.7, 0.8, 0.9, 1}, true)
-	//	for i := 0; i <= 10; i++ {
-	//		assert.Equal(t, tenStr[i], quantiles[i])
-	//	}
-	//}
+	qArr := tenStr
+	rOut, err := sketch.GetRanks(qArr, true) //inclusive
+	assert.NoError(t, err)
+	for i := 0; i < len(qArr); i++ {
+		assert.Equal(t, float64(i+1)/dblStrLen, rOut[i])
+	}
+	rOut, err = sketch.GetRanks(qArr, false) //exclusive
+	assert.NoError(t, err)
+	for i := 0; i < len(qArr); i++ {
+		assert.Equal(t, float64(i)/dblStrLen, rOut[i])
+	}
+
+	for i := 0; i <= strLen; i++ {
+		rank := float64(i) / dblStrLen
+		var q string
+		if rank == 1.0 {
+			q = tenStr[i-1]
+		} else {
+			q = tenStr[i]
+		}
+		s, err := sketch.GetQuantile(rank, false)
+		assert.Equal(t, q, s, "i: %d", i)
+		assert.NoError(t, err)
+		if rank == 0 {
+			q = tenStr[i]
+		} else {
+			q = tenStr[i-1]
+		}
+		s, err = sketch.GetQuantile(rank, true)
+		assert.Equal(t, q, s)
+		assert.NoError(t, err)
+	}
+
+	{
+		// getQuantile() and getQuantiles() equivalence EXCLUSIVE
+		quantiles, err := sketch.GetQuantiles([]float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}, false)
+		assert.NoError(t, err)
+		for i := 0; i <= 10; i++ {
+			q, err := sketch.GetQuantile(float64(i)/10.0, false)
+			assert.NoError(t, err)
+			assert.Equal(t, q, quantiles[i])
+		}
+	}
+
+	{
+		// getQuantile() and getQuantiles() equivalence INCLUSIVE
+		quantiles, err := sketch.GetQuantiles([]float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}, true)
+		assert.NoError(t, err)
+		for i := 0; i <= 10; i++ {
+			q, err := sketch.GetQuantile(float64(i)/10.0, true)
+			assert.NoError(t, err)
+			assert.Equal(t, q, quantiles[i])
+		}
+	}
 }

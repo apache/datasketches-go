@@ -91,15 +91,15 @@ func resolve[C comparable](arr []C, lo int, hi int, v C, crit Inequality, lessFn
 
 	case InequalityGE:
 		if lo == hi {
-			if lessFn(arr[lo], v) || v == arr[lo] {
+			if lessFn(v, arr[lo]) || v == arr[lo] {
 				result = lo
 			} else {
 				result = -1
 			}
 		} else {
-			if lessFn(arr[lo], v) || v == arr[lo] {
+			if lessFn(v, arr[lo]) || v == arr[lo] {
 				result = lo
-			} else if lessFn(arr[hi], v) || v == arr[hi] {
+			} else if lessFn(v, arr[hi]) || v == arr[hi] {
 				result = hi
 			} else {
 				result = -1
@@ -107,15 +107,15 @@ func resolve[C comparable](arr []C, lo int, hi int, v C, crit Inequality, lessFn
 		}
 	case InequalityGT:
 		if lo == hi {
-			if lessFn(arr[lo], v) {
+			if lessFn(v, arr[lo]) {
 				result = lo
 			} else {
 				result = -1
 			}
 		} else {
-			if lessFn(arr[lo], v) {
+			if lessFn(v, arr[lo]) {
 				result = lo
-			} else if lessFn(arr[hi], v) {
+			} else if lessFn(v, arr[hi]) {
 				result = hi
 			} else {
 				result = -1

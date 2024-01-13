@@ -149,9 +149,9 @@ func (s *itemsSketchSortedView[C]) GetCDF(splitPoints []C, size uint32, inclusiv
 func (s *itemsSketchSortedView[C]) getQuantileIndex(rank float64, inclusive bool) int {
 	length := len(s.quantiles)
 	naturalRank := getNaturalRank(rank, s.totalN, inclusive)
-	crit := internal.InequalityGE
+	crit := internal.InequalityGT
 	if inclusive {
-		crit = internal.InequalityGT
+		crit = internal.InequalityGE
 	}
 	index := internal.FindWithInequality(s.cumWeights, 0, length-1, naturalRank, crit, func(a, b int64) bool {
 		return a < b

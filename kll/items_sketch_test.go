@@ -37,7 +37,8 @@ func (f stringItemsSketchOp) lessFn() common.LessFn[string] {
 }
 
 const (
-	PMF_EPS_FOR_K_256 = 0.013 // PMF rank error (epsilon) for k=256
+	PMF_EPS_FOR_K_256       = 0.013 // PMF rank error (epsilon) for k=256
+	NUMERIC_NOISE_TOLERANCE = 1e-6
 )
 
 func TestItemsSketch_KLimits(t *testing.T) {
@@ -241,5 +242,52 @@ func TestItemsSketch_ManyValuesEstimationMode(T *testing.T) {
 		assert.Equal(T, quantile, reverseQuantiles[1000-i])
 		assert.True(T, previousQuantile <= quantile)
 		previousQuantile = quantile
+	}
+}
+
+func TestItemsSketch_GetRankGetCdfGetPmfConsistency(t *testing.T) {
+	sketch, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	n := 1000
+	digits := numDigits(n)
+	quantiles := make([]string, n)
+	for i := 0; i < n; i++ {
+		str := intToFixedLengthString(i, digits)
+		sketch.Update(str)
+		quantiles[i] = str
+	}
+	{ //EXCLUSIVE
+		ranks, err := sketch.GetCDF(quantiles, false)
+		assert.NoError(t, err)
+		pmf, err := sketch.GetPMF(quantiles, false)
+		assert.NoError(t, err)
+		sumPmf := 0.0
+		for i := 0; i < n; i++ {
+			r, err := sketch.GetRank(quantiles[i], false)
+			assert.NoError(t, err)
+			assert.InDelta(t, ranks[i], r, NUMERIC_NOISE_TOLERANCE)
+			sumPmf += pmf[i]
+			assert.InDelta(t, ranks[i], sumPmf, NUMERIC_NOISE_TOLERANCE)
+		}
+		sumPmf += pmf[n]
+		assert.InDelta(t, sumPmf, 1.0, NUMERIC_NOISE_TOLERANCE)
+		assert.InDelta(t, ranks[n], 1.0, NUMERIC_NOISE_TOLERANCE)
+	}
+	{ // INCLUSIVE (default)
+		ranks, err := sketch.GetCDF(quantiles, true)
+		assert.NoError(t, err)
+		pmf, err := sketch.GetPMF(quantiles, true)
+		assert.NoError(t, err)
+		sumPmf := 0.0
+		for i := 0; i < n; i++ {
+			r, err := sketch.GetRank(quantiles[i], true)
+			assert.NoError(t, err)
+			assert.InDelta(t, ranks[i], r, NUMERIC_NOISE_TOLERANCE)
+			sumPmf += pmf[i]
+			assert.InDelta(t, ranks[i], sumPmf, NUMERIC_NOISE_TOLERANCE)
+		}
+		sumPmf += pmf[n]
+		assert.InDelta(t, sumPmf, 1.0, NUMERIC_NOISE_TOLERANCE)
+		assert.InDelta(t, ranks[n], 1.0, NUMERIC_NOISE_TOLERANCE)
 	}
 }

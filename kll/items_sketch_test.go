@@ -36,7 +36,11 @@ func (f stringItemsSketchOp) lessFn() common.LessFn[string] {
 	}
 }
 
-func TestItemsSketchKLimits(t *testing.T) {
+const (
+	PMF_EPS_FOR_K_256 = 0.013 // PMF rank error (epsilon) for k=256
+)
+
+func TestItemsSketch_KLimits(t *testing.T) {
 	_, err := NewItemsSketch[string](uint16(_MIN_K), stringItemsSketchOp{})
 	assert.NoError(t, err)
 	_, err = NewItemsSketch[string](uint16(_MAX_K), stringItemsSketchOp{})
@@ -45,7 +49,7 @@ func TestItemsSketchKLimits(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestItemsSketchEmpty(t *testing.T) {
+func TestItemsSketch_Empty(t *testing.T) {
 	sketch, err := NewItemsSketch[string](200, stringItemsSketchOp{})
 	assert.NoError(t, err)
 	assert.True(t, sketch.IsEmpty())
@@ -67,7 +71,7 @@ func TestItemsSketchEmpty(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestItemsSketchBadQuantile(t *testing.T) {
+func TestItemsSketch_BadQuantile(t *testing.T) {
 	sketch, err := NewItemsSketch[string](200, stringItemsSketchOp{})
 	assert.NoError(t, err)
 	sketch.Update("") // has to be non-empty to reach the check
@@ -75,7 +79,7 @@ func TestItemsSketchBadQuantile(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestItemsSketchOneValue(t *testing.T) {
+func TestItemsSketch_OneValue(t *testing.T) {
 	sketch, err := NewItemsSketch[string](200, stringItemsSketchOp{})
 	assert.NoError(t, err)
 	sketch.Update("A")
@@ -104,7 +108,7 @@ func TestItemsSketchOneValue(t *testing.T) {
 	assert.Equal(t, "A", s)
 }
 
-func TestItemsSketchTenValues(t *testing.T) {
+func TestItemsSketch_TenValues(t *testing.T) {
 	tenStr := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"}
 	sketch, err := NewItemsSketch[string](20, stringItemsSketchOp{})
 	assert.NoError(t, err)
@@ -179,3 +183,78 @@ func TestItemsSketchTenValues(t *testing.T) {
 		}
 	}
 }
+
+func TestItemsSketch_ManyValuesEstimationMode(T *testing.T) {
+	sketch, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	assert.NoError(T, err)
+	n := 1_000_000
+	digits := numDigits(n)
+
+	for i := 1; i <= n; i++ {
+		// i == 201
+		sketch.Update(intToFixedLengthString(i, digits))
+		assert.Equal(T, uint64(i), sketch.GetN())
+	}
+
+	lastItem := sketch.items[len(sketch.items)-1]
+	assert.NotNil(T, lastItem)
+	// test getRank
+	for i := 1; i <= 1; i++ {
+		trueRank := float64(i) / float64(n)
+		s := intToFixedLengthString(i, digits)
+		r, err := sketch.GetRank(s, true)
+		assert.InDelta(T, trueRank, r, PMF_EPS_FOR_K_256)
+		assert.NoError(T, err)
+	}
+}
+
+/*
+
+  @Test
+  public void manyValuesEstimationMode() {
+    final KllItemsSketch<String> sketch = KllItemsSketch.newHeapInstance(Comparator.naturalOrder(), serDe);
+    final int n = 1_000_000;
+    final int digits = Util.numDigits(n);
+
+    for (int i = 1; i <= n; i++) {
+      sketch.update(Util.intToFixedLengthString(i, digits));
+      assertEquals(sketch.getN(), i);
+    }
+
+    // test getRank
+    for (int i = 1; i <= n; i++) {
+      final double trueRank = (double) i / n;
+      String s = Util.intToFixedLengthString(i, digits);
+      double r = sketch.getRank(s);
+      assertEquals(r, trueRank, PMF_EPS_FOR_K_256, "for value " + s);
+    }
+
+    // test getPMF
+    String s = Util.intToFixedLengthString(n/2, digits);
+    final double[] pmf = sketch.getPMF(new String[] {s}); // split at median
+    assertEquals(pmf.length, 2);
+    assertEquals(pmf[0], 0.5, PMF_EPS_FOR_K_256);
+    assertEquals(pmf[1], 0.5, PMF_EPS_FOR_K_256);
+
+    assertEquals(sketch.getMinItem(), Util.intToFixedLengthString(1, digits));
+    assertEquals(sketch.getMaxItem(), Util.intToFixedLengthString(n, digits));
+
+ // check at every 0.1 percentage point
+    final double[] fractions = new double[1001];
+    final double[] reverseFractions = new double[1001]; // check that ordering doesn't matter
+    for (int i = 0; i <= 1000; i++) {
+      fractions[i] = (double) i / 1000;
+      reverseFractions[1000 - i] = fractions[i];
+    }
+    final String[] quantiles = sketch.getQuantiles(fractions);
+    final String[] reverseQuantiles = sketch.getQuantiles(reverseFractions);
+    String previousQuantile = "";
+    for (int i = 0; i <= 1000; i++) {
+      final String quantile = sketch.getQuantile(fractions[i]);
+      assertEquals(quantile, quantiles[i]);
+      assertEquals(quantile, reverseQuantiles[1000 - i]);
+      assertTrue(Util.le(previousQuantile, quantile, Comparator.naturalOrder()));
+      previousQuantile = quantile;
+    }
+  }
+*/

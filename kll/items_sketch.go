@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
+	"sort"
 )
 
 type ItemSketchOp[C comparable] interface {
@@ -225,6 +226,12 @@ func (s *ItemsSketch[C]) Update(item C) {
 	s.sortedView = nil
 }
 
+func (s *ItemsSketch[C]) getLevelsArray() []uint32 {
+	levels := make([]uint32, len(s.levels))
+	copy(levels, s.levels)
+	return levels
+}
+
 func (s *ItemsSketch[C]) setupSortedView() error {
 	if s.sortedView == nil {
 		sView, err := newItemsSketchSortedView[C](s)
@@ -270,117 +277,142 @@ func (s *ItemsSketch[C]) compressWhileUpdatingSketch() {
 		//Be aware that this operation grows the items array,
 		//shifts the items data and the level boundaries of the data,
 		//and grows the levels array and increments numLevels_.
-		//s.addEmptyTopLevelToCompletelyFullSketch()
+		s.addEmptyTopLevelToCompletelyFullSketch()
 	}
-	panic("TODO compressWhileUpdatingSketch")
+	myLevelsArr := s.levels
+	rawBeg := myLevelsArr[level]
+	rawEnd := myLevelsArr[level+1]
+	// +2 is OK because we already added a new top level if necessary
+	popAbove := myLevelsArr[level+2] - rawEnd
+	rawPop := rawEnd - rawBeg
+	oddPop := rawPop%2 == 1
+	adjBeg := rawBeg
+	if oddPop {
+		adjBeg++
+	}
+	adjPop := rawPop
+	if oddPop {
+		adjPop--
+	}
+	halfAdjPop := adjPop / 2
+
+	//the following is specific to generic Items
+	myItemsArr := s.GetTotalItemsArray()
+	if level == 0 { // level zero might not be sorted, so we must sort it if we wish to compact it
+		lessFn := s.itemsSketchOp.lessFn()
+		tmpSlice := myItemsArr[adjBeg : adjBeg+adjPop]
+		sort.Slice(tmpSlice, func(a, b int) bool {
+			return lessFn(tmpSlice[a], tmpSlice[b])
+		})
+	}
+	if popAbove == 0 {
+		randomlyHalveUpItems(myItemsArr, adjBeg, adjPop)
+	} else {
+		randomlyHalveDownItems(myItemsArr, adjBeg, adjPop)
+		mergeSortedItemsArrays(
+			myItemsArr, adjBeg, halfAdjPop,
+			myItemsArr, rawEnd, popAbove,
+			myItemsArr, adjBeg+halfAdjPop, s.itemsSketchOp.lessFn())
+	}
+	newIndex := myLevelsArr[level+1] - halfAdjPop // adjust boundaries of the level above
+	s.levels[level+1] = newIndex
+
+	if oddPop {
+		s.levels[level] = myLevelsArr[level+1] - 1          // the current level now contains one item
+		myItemsArr[myLevelsArr[level]] = myItemsArr[rawBeg] // namely this leftover guy
+	} else {
+		s.levels[level] = myLevelsArr[level+1] // the current level is now empty
+	}
+
+	if level > 0 {
+		amount := rawBeg - myLevelsArr[0] // adjust boundary
+
+		for i := amount; i > 0; i-- {
+			// Start from the end as we are shifting to the right,
+			// failing to do so will corrupt the items array.
+			tgtInx := myLevelsArr[0] + halfAdjPop + i - 1
+			stcInx := myLevelsArr[0] + i - 1
+			myItemsArr[tgtInx] = myItemsArr[stcInx]
+		}
+	}
+	for lvl := uint8(0); lvl < level; lvl++ {
+		newIndex = myLevelsArr[lvl] + halfAdjPop //adjust boundary
+		s.levels[lvl] = newIndex
+	}
+	s.items = myItemsArr
 }
 
-/*
- private static <T> void compressWhileUpdatingSketch(final KllItemsSketch<T> itmSk) {
-    final int level =
-        findLevelToCompact(itmSk.getK(), itmSk.getM(), itmSk.getNumLevels(), itmSk.levelsArr);
-    if (level == itmSk.getNumLevels() - 1) {
-      //The level to compact is the top level, thus we need to add a level.
-      //Be aware that this operation grows the items array,
-      //shifts the items data and the level boundaries of the data,
-      //and grows the levels array and increments numLevels_.
-      KllHelper.addEmptyTopLevelToCompletelyFullSketch(itmSk);
-    }
-    //after this point, the levelsArray will not be expanded, only modified.
-    final int[] myLevelsArr = itmSk.levelsArr;
-    final int rawBeg = myLevelsArr[level];
-    final int rawEnd = myLevelsArr[level + 1];
-    // +2 is OK because we already added a new top level if necessary
-    final int popAbove = myLevelsArr[level + 2] - rawEnd;
-    final int rawPop = rawEnd - rawBeg;
-    final boolean oddPop = isOdd(rawPop);
-    final int adjBeg = oddPop ? rawBeg + 1 : rawBeg;
-    final int adjPop = oddPop ? rawPop - 1 : rawPop;
-    final int halfAdjPop = adjPop / 2;
+func (s *ItemsSketch[C]) addEmptyTopLevelToCompletelyFullSketch() {
+	myCurLevelsArr := s.getLevelsArray()
+	myCurNumLevels := s.numLevels
+	myCurTotalItemsCapacity := myCurLevelsArr[myCurNumLevels]
 
-    //the following is specific to generic Items
-    final Object[] myItemsArr = itmSk.getTotalItemsArray();
-    if (level == 0) { // level zero might not be sorted, so we must sort it if we wish to compact it
-      Arrays.sort((T[])myItemsArr, adjBeg, adjBeg + adjPop, itmSk.comparator);
-    }
-    if (popAbove == 0) {
-      KllItemsHelper.randomlyHalveUpItems(myItemsArr, adjBeg, adjPop, KllSketch.random);
-    } else {
-      KllItemsHelper.randomlyHalveDownItems(myItemsArr, adjBeg, adjPop, KllSketch.random);
-      KllItemsHelper.mergeSortedItemsArrays(
-          myItemsArr, adjBeg, halfAdjPop,
-          myItemsArr, rawEnd, popAbove,
-          myItemsArr, adjBeg + halfAdjPop, itmSk.comparator);
-    }
+	myCurItemsArr := s.GetTotalItemsArray()
+	minItem := s.minItem
+	maxItem := s.maxItem
 
-    int newIndex = myLevelsArr[level + 1] - halfAdjPop;  // adjust boundaries of the level above
-    itmSk.setLevelsArrayAt(level + 1, newIndex);
+	deltaItemsCap := levelCapacity(s.k, myCurNumLevels+1, 0, s.m)
+	myNewTotalItemsCapacity := myCurTotalItemsCapacity + deltaItemsCap
 
-    if (oddPop) {
-      itmSk.setLevelsArrayAt(level, myLevelsArr[level + 1] - 1); // the current level now contains one item
-      myItemsArr[myLevelsArr[level]] = myItemsArr[rawBeg];  // namely this leftover guy
-    } else {
-      itmSk.setLevelsArrayAt(level, myLevelsArr[level + 1]); // the current level is now empty
-    }
+	// Check if growing the levels arr if required.
+	// Note that merging MIGHT over-grow levels_, in which case we might not have to grow it
+	growLevelsArr := len(myCurLevelsArr) < int(myCurNumLevels+2)
 
-    // verify that we freed up halfAdjPop array slots just below the current level
-    assert myLevelsArr[level] == rawBeg + halfAdjPop;
+	var (
+		myNewLevelsArr []uint32
+		myNewNumLevels uint8
+	)
 
-    // finally, we need to shift up the data in the levels below
-    // so that the freed-up space can be used by level zero
-    if (level > 0) {
-      final int amount = rawBeg - myLevelsArr[0];
-      System.arraycopy(myItemsArr, myLevelsArr[0], myItemsArr, myLevelsArr[0] + halfAdjPop, amount);
-    }
-    for (int lvl = 0; lvl < level; lvl++) {
-      newIndex = myLevelsArr[lvl] + halfAdjPop; //adjust boundary
-      itmSk.setLevelsArrayAt(lvl, newIndex);
-    }
-    itmSk.setItemsArray(myItemsArr);
-  }
-*/
+	//myNewLevelsArr := make([]uint32, myCurNumLevels+2)
+	// GROW LEVELS ARRAY
+	if growLevelsArr {
+		//grow levels arr by one and copy the old data to the new array, extra space at the top.
+		myNewLevelsArr = make([]uint32, myCurNumLevels+2)
+		copy(myNewLevelsArr, myCurLevelsArr)
+		myNewNumLevels = myCurNumLevels + 1
+		s.numLevels++ //increment for off-heap
+	} else {
+		myNewLevelsArr = myCurLevelsArr
+		myNewNumLevels = myCurNumLevels
+	}
+
+	// This loop updates all level indices EXCLUDING the "extra" index at the top
+	for level := uint8(0); level <= myNewNumLevels-1; level++ {
+		myNewLevelsArr[level] += deltaItemsCap
+	}
+	myNewLevelsArr[myNewNumLevels] = myNewTotalItemsCapacity // initialize the new "extra" index at the top
+
+	// GROW items ARRAY
+	myNewItemsArr := make([]C, myNewTotalItemsCapacity)
+	for i := uint32(0); i < myCurTotalItemsCapacity; i++ {
+		myNewItemsArr[i+deltaItemsCap] = myCurItemsArr[i]
+	}
+
+	// update our sketch with new expanded spaces
+	s.numLevels = myNewNumLevels
+	s.levels = myNewLevelsArr
+
+	s.minItem = minItem
+	s.maxItem = maxItem
+	s.items = myNewItemsArr
+}
 
 func findLevelToCompact(k uint16, m uint8, numLevels uint8, levels []uint32) uint8 {
 	level := uint8(0)
 	for {
 		pop := levels[level+1] - levels[level]
-		cap := levelCapacity(k, numLevels, level, m)
-		if pop >= cap {
+		capacity := levelCapacity(k, numLevels, level, m)
+		if pop >= capacity {
 			return level
 		}
 		level++
 	}
 }
 
-/*
-  static int findLevelToCompact(final int k, final int m, final int numLevels, final int[] levels) {
-    int level = 0;
-    while (true) {
-      assert level < numLevels;
-      final int pop = levels[level + 1] - levels[level];
-      final int cap = KllHelper.levelCapacity(k, numLevels, level, m);
-      if (pop >= cap) {
-        return level;
-      }
-      level++;
-    }
-  }
-*/
-
 func levelCapacity(k uint16, numLevels uint8, level uint8, m uint8) uint32 {
 	depth := numLevels - level - 1
 	return max(uint32(m), intCapAux(k, depth))
 }
-
-/*
-  static int levelCapacity(final int k, final int numLevels, final int level, final int m) {
-    assert (k <= (1 << 29));
-    assert (numLevels >= 1) && (numLevels <= 61);
-    assert (level >= 0) && (level < numLevels);
-    final int depth = numLevels - level - 1; //depth is # levels from the top level (= 0)
-    return (int) Math.max(m, intCapAux(k, depth));
-  }
-*/
 
 func intCapAux(k uint16, depth uint8) uint32 {
 	if depth <= 30 {
@@ -392,16 +424,6 @@ func intCapAux(k uint16, depth uint8) uint32 {
 	return intCapAuxAux(uint16(tmp), rest)
 }
 
-/*
-  private static long intCapAux(final int k, final int depth) {
-    if (depth <= 30) { return intCapAuxAux(k, depth); }
-    final int half = depth / 2;
-    final int rest = depth - half;
-    final long tmp = intCapAuxAux(k, half);
-    return intCapAuxAux(tmp, rest);
-  }
-*/
-
 func intCapAuxAux(k uint16, depth uint8) uint32 {
 	twok := uint64(k << 1)                        // for rounding at the end, pre-multiply by 2 here, divide by 2 during rounding.
 	tmp := (twok << depth) / powersOfThree[depth] //2k* (2/3)^depth. 2k also keeps the fraction larger.
@@ -412,12 +434,52 @@ func intCapAuxAux(k uint16, depth uint8) uint32 {
 	return uint32(k)
 }
 
-/*
-  private static long intCapAuxAux(final long k, final int depth) {
-    final long twok = k << 1; // for rounding at the end, pre-multiply by 2 here, divide by 2 during rounding.
-    final long tmp = ((twok << depth) / powersOfThree[depth]); //2k* (2/3)^depth. 2k also keeps the fraction larger.
-    final long result = ((tmp + 1L) >>> 1); // (tmp + 1)/2. If odd, round up. This guarantees an integer.
-    assert (result <= k);
-    return result;
-  }
-*/
+func randomlyHalveUpItems[C comparable](buf []C, start uint32, length uint32) {
+	halfLength := length / 2
+	//offset := rand.Intn(2)
+	offset := 1
+	j := (start + length) - 1 - uint32(offset)
+	for i := (start + length) - 1; i >= (start + halfLength); i-- {
+		buf[i] = buf[j]
+		j -= 2
+	}
+}
+
+func randomlyHalveDownItems[C comparable](buf []C, start uint32, length uint32) {
+	halfLength := length / 2
+	//offset := rand.Intn(2)
+	offset := 1
+	j := start + uint32(offset)
+	for i := start; i < (start + halfLength); i++ {
+		buf[i] = buf[j]
+		j += 2
+	}
+}
+
+func mergeSortedItemsArrays[C comparable](bufA []C, startA uint32, lenA uint32,
+	bufB []C, startB uint32, lenB uint32,
+	bufC []C, startC uint32, lessFn common.LessFn[C]) {
+	lenC := lenA + lenB
+	limA := startA + lenA
+	limB := startB + lenB
+	limC := startC + lenC
+
+	a := startA
+	b := startB
+
+	for c := startC; c < limC; c++ {
+		if a == limA {
+			bufC[c] = bufB[b]
+			b++
+		} else if b == limB {
+			bufC[c] = bufA[a]
+			a++
+		} else if lessFn(bufA[a], bufB[b]) {
+			bufC[c] = bufA[a]
+			a++
+		} else {
+			bufC[c] = bufB[b]
+			b++
+		}
+	}
+}

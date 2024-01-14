@@ -20,6 +20,7 @@ package kll
 import (
 	"errors"
 	"math"
+	"strconv"
 )
 
 const (
@@ -51,4 +52,31 @@ func checkNormalizedRankBounds(rank float64) error {
 		return errors.New("rank must be between 0 and 1 inclusive")
 	}
 	return nil
+}
+
+func numDigits(n int) int {
+	if n%10 == 0 {
+		n++
+	}
+	return int(math.Ceil(math.Log(float64(n)) / math.Log(10)))
+}
+
+func intToFixedLengthString(number int, length int) string {
+	num := strconv.Itoa(number)
+	return characterPad(num, length, ' ', false)
+}
+
+func characterPad(s string, fieldLength int, padChar byte, postpend bool) string {
+	sLen := len(s)
+	if sLen < fieldLength {
+		addstr := ""
+		for i := 0; i < fieldLength-sLen; i++ {
+			addstr += string(padChar)
+		}
+		if postpend {
+			return s + addstr
+		}
+		return addstr + s
+	}
+	return s
 }

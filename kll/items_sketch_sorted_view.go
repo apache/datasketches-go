@@ -200,9 +200,9 @@ func blockyTandemMergeSort[C comparable](quantiles []C, weights []int64, levels 
 
 	// duplicate the input in preparation for the "ping-pong" copy reduction strategy.
 	quantilesTmp := make([]C, len(quantiles))
-	copy(quantiles, quantilesTmp)
+	copy(quantilesTmp, quantiles)
 	weightsTmp := make([]int64, len(weights))
-	copy(weights, weightsTmp) // don't need the extra one here
+	copy(weightsTmp, weights) // don't need the extra one here
 
 	blockyTandemMergeSortRecursion(quantilesTmp, weightsTmp, quantiles, weights, levels, 0, numLevels, itemsSketchOp)
 }
@@ -232,7 +232,7 @@ func tandemMerge[C comparable](quantilesSrc []C, weightsSrc []int64, quantilesDs
 
 	lessFn := itemsSketchOp.lessFn()
 	for iSrc1 < toIndex1 && iSrc2 < toIndex2 {
-		if lessFn(quantilesSrc[iSrc1], quantilesSrc[iSrc2]) {
+		if lessFn(quantilesSrc[iSrc1], quantilesSrc[iSrc2]) || quantilesSrc[iSrc1] == quantilesSrc[iSrc2] {
 			quantilesDst[iDst] = quantilesSrc[iSrc1]
 			weightsDst[iDst] = weightsSrc[iSrc1]
 			iSrc1++
@@ -244,10 +244,21 @@ func tandemMerge[C comparable](quantilesSrc []C, weightsSrc []int64, quantilesDs
 		iDst++
 	}
 	if iSrc1 < toIndex1 {
-		copy(quantilesSrc[iSrc1:toIndex1], quantilesDst[iDst:toIndex1])
-		copy(weightsSrc[iSrc1:toIndex1], weightsDst[iDst:toIndex1])
+		copy(quantilesDst[iDst:], quantilesSrc[iSrc1:toIndex1])
+		copy(weightsDst[iDst:], weightsSrc[iSrc1:toIndex1])
 	} else if iSrc2 < toIndex2 {
-		copy(quantilesSrc[iSrc2:toIndex2], quantilesDst[iDst:toIndex2])
-		copy(weightsSrc[iSrc2:toIndex2], weightsDst[iDst:toIndex2])
+		copy(quantilesDst[iDst:], quantilesSrc[iSrc2:toIndex2])
+		copy(weightsDst[iDst:], weightsSrc[iSrc2:toIndex2])
 	}
+
+	/*
+	   if (iSrc1 < toIndex1) {
+	     System.arraycopy(quantilesSrc, iSrc1, quantilesDst, iDst, toIndex1 - iSrc1);
+	     System.arraycopy(weightsSrc, iSrc1, weightsDst, iDst, toIndex1 - iSrc1);
+	   } else if (iSrc2 < toIndex2) {
+	     System.arraycopy(quantilesSrc, iSrc2, quantilesDst, iDst, toIndex2 - iSrc2);
+	     System.arraycopy(weightsSrc, iSrc2, weightsDst, iDst, toIndex2 - iSrc2);
+	   }
+
+	*/
 }

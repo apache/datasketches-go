@@ -98,11 +98,6 @@ func (s *itemsSketchSortedView[C]) GetQuantile(rank float64, inclusive bool) (C,
 	}
 	index := s.getQuantileIndex(rank, inclusive)
 	return s.quantiles[index], nil
-	/*
-	   QuantilesUtil.checkNormalizedRankBounds(rank);
-	   final int index = getQuantileIndex(rank, searchCrit);
-	   return quantiles[index];
-	*/
 }
 
 func (s *itemsSketchSortedView[C]) GetPMF(splitPoints []C, inclusive bool) ([]float64, error) {
@@ -247,15 +242,4 @@ func tandemMerge[C comparable](quantilesSrc []C, weightsSrc []int64, quantilesDs
 		copy(quantilesDst[iDst:], quantilesSrc[iSrc2:toIndex2])
 		copy(weightsDst[iDst:], weightsSrc[iSrc2:toIndex2])
 	}
-
-	/*
-	   if (iSrc1 < toIndex1) {
-	     System.arraycopy(quantilesSrc, iSrc1, quantilesDst, iDst, toIndex1 - iSrc1);
-	     System.arraycopy(weightsSrc, iSrc1, weightsDst, iDst, toIndex1 - iSrc1);
-	   } else if (iSrc2 < toIndex2) {
-	     System.arraycopy(quantilesSrc, iSrc2, quantilesDst, iDst, toIndex2 - iSrc2);
-	     System.arraycopy(weightsSrc, iSrc2, weightsDst, iDst, toIndex2 - iSrc2);
-	   }
-
-	*/
 }

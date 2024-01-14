@@ -153,20 +153,6 @@ func (s *ItemsSketch[C]) GetRanks(item []C, inclusive bool) ([]float64, error) {
 	return ranks, nil
 }
 
-/*
-  @Override
-  public double[] getRanks(final T[] quantiles, final QuantileSearchCriteria searchCrit) {
-    if (isEmpty()) { throw new SketchesArgumentException(EMPTY_MSG); }
-    refreshSortedView();
-    final int len = quantiles.length;
-    final double[] ranks = new double[len];
-    for (int i = 0; i < len; i++) {
-      ranks[i] = kllItemsSV.getRank(quantiles[i], searchCrit);
-    }
-    return ranks;
-  }
-*/
-
 func (s *ItemsSketch[C]) GetQuantile(rank float64, inclusive bool) (C, error) {
 	if s.IsEmpty() {
 		return s.itemsSketchOp.identity(), fmt.Errorf("operation is undefined for an empty sketch")

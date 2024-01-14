@@ -65,9 +65,9 @@ func TestItemsSketch_Empty(t *testing.T) {
 	_, err = sketch.GetQuantile(0.5, true)
 	assert.Error(t, err)
 	splitPoints := []string{""}
-	_, err = sketch.GetPMF(splitPoints, 1, true)
+	_, err = sketch.GetPMF(splitPoints, true)
 	assert.Error(t, err)
-	_, err = sketch.GetCDF(splitPoints, 1, true)
+	_, err = sketch.GetCDF(splitPoints, true)
 	assert.Error(t, err)
 }
 
@@ -206,38 +206,28 @@ func TestItemsSketch_ManyValuesEstimationMode(T *testing.T) {
 		assert.InDelta(T, trueRank, r, PMF_EPS_FOR_K_256)
 		assert.NoError(T, err)
 	}
+
+	s := intToFixedLengthString(n/2, digits)
+	pmf, err := sketch.GetPMF([]string{s}, true) // split at median
+	assert.NoError(T, err)
+	assert.Equal(T, 2, len(pmf))
+	assert.InDelta(T, 0.5, pmf[0], PMF_EPS_FOR_K_256)
+	assert.InDelta(T, 0.5, pmf[1], PMF_EPS_FOR_K_256)
+
+	minV, err := sketch.GetMinItem()
+	assert.NoError(T, err)
+	assert.Equal(T, intToFixedLengthString(1, digits), minV)
+
+	maxV, err := sketch.GetMaxItem()
+	assert.NoError(T, err)
+	assert.Equal(T, intToFixedLengthString(n, digits), maxV)
 }
 
 /*
 
   @Test
   public void manyValuesEstimationMode() {
-    final KllItemsSketch<String> sketch = KllItemsSketch.newHeapInstance(Comparator.naturalOrder(), serDe);
-    final int n = 1_000_000;
-    final int digits = Util.numDigits(n);
 
-    for (int i = 1; i <= n; i++) {
-      sketch.update(Util.intToFixedLengthString(i, digits));
-      assertEquals(sketch.getN(), i);
-    }
-
-    // test getRank
-    for (int i = 1; i <= n; i++) {
-      final double trueRank = (double) i / n;
-      String s = Util.intToFixedLengthString(i, digits);
-      double r = sketch.getRank(s);
-      assertEquals(r, trueRank, PMF_EPS_FOR_K_256, "for value " + s);
-    }
-
-    // test getPMF
-    String s = Util.intToFixedLengthString(n/2, digits);
-    final double[] pmf = sketch.getPMF(new String[] {s}); // split at median
-    assertEquals(pmf.length, 2);
-    assertEquals(pmf[0], 0.5, PMF_EPS_FOR_K_256);
-    assertEquals(pmf[1], 0.5, PMF_EPS_FOR_K_256);
-
-    assertEquals(sketch.getMinItem(), Util.intToFixedLengthString(1, digits));
-    assertEquals(sketch.getMaxItem(), Util.intToFixedLengthString(n, digits));
 
  // check at every 0.1 percentage point
     final double[] fractions = new double[1001];

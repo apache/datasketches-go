@@ -199,7 +199,7 @@ func (s *ItemsSketch[C]) GetQuantiles(ranks []float64, inclusive bool) ([]C, err
 	return quantiles, nil
 }
 
-func (s *ItemsSketch[C]) GetPMF(splitPoints []C, size uint32, inclusive bool) ([]float64, error) {
+func (s *ItemsSketch[C]) GetPMF(splitPoints []C, inclusive bool) ([]float64, error) {
 	if s.IsEmpty() {
 		return nil, fmt.Errorf("operation is undefined for an empty sketch")
 	}
@@ -207,10 +207,10 @@ func (s *ItemsSketch[C]) GetPMF(splitPoints []C, size uint32, inclusive bool) ([
 	if err != nil {
 		return nil, err
 	}
-	return s.sortedView.GetPMF(splitPoints, size, inclusive)
+	return s.sortedView.GetPMF(splitPoints, inclusive)
 }
 
-func (s *ItemsSketch[C]) GetCDF(splitPoints []C, size uint32, inclusive bool) ([]float64, error) {
+func (s *ItemsSketch[C]) GetCDF(splitPoints []C, inclusive bool) ([]float64, error) {
 	if s.IsEmpty() {
 		return nil, fmt.Errorf("operation is undefined for an empty sketch")
 	}
@@ -218,7 +218,7 @@ func (s *ItemsSketch[C]) GetCDF(splitPoints []C, size uint32, inclusive bool) ([
 	if err != nil {
 		return nil, err
 	}
-	return s.sortedView.GetCDF(splitPoints, size, inclusive)
+	return s.sortedView.GetCDF(splitPoints, inclusive)
 }
 
 func (s *ItemsSketch[C]) Update(item C) {

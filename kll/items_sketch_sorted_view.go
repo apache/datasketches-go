@@ -105,46 +105,43 @@ func (s *itemsSketchSortedView[C]) GetQuantile(rank float64, inclusive bool) (C,
 	*/
 }
 
-func (s *itemsSketchSortedView[C]) GetPMF(splitPoints []C, size uint32, inclusive bool) ([]float64, error) {
+func (s *itemsSketchSortedView[C]) GetPMF(splitPoints []C, inclusive bool) ([]float64, error) {
 	if s.totalN == 0 {
 		return nil, errors.New("empty sketch")
 	}
-	panic("TODO itemsSketchSortedView GetPMF")
+	err := checkItems(splitPoints, s.itemsSketchOp.lessFn())
+	if err != nil {
+		return nil, err
+	}
+	buckets, err := s.GetCDF(splitPoints, inclusive)
+	if err != nil {
+		return nil, err
+	}
+	for i := len(buckets); i > 1; {
+		i--
+		buckets[i] -= buckets[i-1]
+	}
+	return buckets, nil
 }
 
-/*
-template<typename T, typename C, typename A>
-auto quantiles_sorted_view<T, C, A>::get_PMF(const T* split_points, uint32_t size, bool inclusive) const -> vector_double {
-  auto buckets = get_CDF(split_points, size, inclusive);
-  if (buckets.size() == 0) return buckets;
-  for (uint32_t i = size; i > 0; --i) {
-    buckets[i] -= buckets[i - 1];
-  }
-  return buckets;
-}
-
-*/
-
-func (s *itemsSketchSortedView[C]) GetCDF(splitPoints []C, size uint32, inclusive bool) ([]float64, error) {
+func (s *itemsSketchSortedView[C]) GetCDF(splitPoints []C, inclusive bool) ([]float64, error) {
 	if s.totalN == 0 {
 		return nil, errors.New("empty sketch")
 	}
-	panic("TODO itemsSketchSortedView GetCDF")
+	err := checkItems(splitPoints, s.itemsSketchOp.lessFn())
+	if err != nil {
+		return nil, err
+	}
+	buckets := make([]float64, len(splitPoints)+1)
+	for i := 0; i < len(splitPoints); i++ {
+		buckets[i], err = s.GetRank(splitPoints[i], inclusive)
+		if err != nil {
+			return nil, err
+		}
+	}
+	buckets[len(splitPoints)] = 1.0
+	return buckets, nil
 }
-
-/*
-  public double[] getCDF(final T[] splitPoints, final QuantileSearchCriteria searchCrit) {
-    if (isEmpty()) { throw new SketchesArgumentException(EMPTY_MSG); }
-    GenericSortedView.validateItems(splitPoints, comparator);
-    final int len = splitPoints.length + 1;
-    final double[] buckets = new double[len];
-    for (int i = 0; i < len - 1; i++) {
-      buckets[i] = getRank(splitPoints[i], searchCrit);
-    }
-    buckets[len - 1] = 1.0;
-    return buckets;
-  }
-*/
 
 func (s *itemsSketchSortedView[C]) getQuantileIndex(rank float64, inclusive bool) int {
 	length := len(s.quantiles)

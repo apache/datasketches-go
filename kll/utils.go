@@ -19,6 +19,8 @@ package kll
 
 import (
 	"errors"
+	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal"
 	"math"
 	"strconv"
 )
@@ -50,6 +52,20 @@ func getNaturalRank(normalizedRank float64, totalN uint64, inclusive bool) int64
 func checkNormalizedRankBounds(rank float64) error {
 	if rank < 0 || rank > 1 {
 		return errors.New("rank must be between 0 and 1 inclusive")
+	}
+	return nil
+}
+
+func checkItems[C comparable](items []C, lessFn common.LessFn[C]) error {
+	if len(items) == 1 && internal.IsNil(items[0]) {
+		return errors.New("items must be unique, monotonically increasing and not nil")
+	}
+
+	for i := 0; i < len(items)-1; i++ {
+		if !internal.IsNil(items[i]) && !internal.IsNil(items[i+1]) && lessFn(items[i], items[i+1]) {
+			continue
+		}
+		return errors.New("items must be unique, monotonically increasing and not nil")
 	}
 	return nil
 }

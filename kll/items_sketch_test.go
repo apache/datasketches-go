@@ -221,30 +221,25 @@ func TestItemsSketch_ManyValuesEstimationMode(T *testing.T) {
 	maxV, err := sketch.GetMaxItem()
 	assert.NoError(T, err)
 	assert.Equal(T, intToFixedLengthString(n, digits), maxV)
+
+	// check at every 0.1 percentage point
+	fractions := make([]float64, 1001)
+	reverseFractions := make([]float64, 1001) // check that ordering doesn't matter
+	for i := 0; i <= 1000; i++ {
+		fractions[i] = float64(i) / 1000.0
+		reverseFractions[1000-i] = fractions[i]
+	}
+	quantiles, err := sketch.GetQuantiles(fractions, true)
+	assert.NoError(T, err)
+	reverseQuantiles, err := sketch.GetQuantiles(reverseFractions, true)
+	assert.NoError(T, err)
+	previousQuantile := ""
+	for i := 0; i <= 1000; i++ {
+		quantile, err := sketch.GetQuantile(fractions[i], true)
+		assert.NoError(T, err)
+		assert.Equal(T, quantile, quantiles[i])
+		assert.Equal(T, quantile, reverseQuantiles[1000-i])
+		assert.True(T, previousQuantile <= quantile)
+		previousQuantile = quantile
+	}
 }
-
-/*
-
-  @Test
-  public void manyValuesEstimationMode() {
-
-
- // check at every 0.1 percentage point
-    final double[] fractions = new double[1001];
-    final double[] reverseFractions = new double[1001]; // check that ordering doesn't matter
-    for (int i = 0; i <= 1000; i++) {
-      fractions[i] = (double) i / 1000;
-      reverseFractions[1000 - i] = fractions[i];
-    }
-    final String[] quantiles = sketch.getQuantiles(fractions);
-    final String[] reverseQuantiles = sketch.getQuantiles(reverseFractions);
-    String previousQuantile = "";
-    for (int i = 0; i <= 1000; i++) {
-      final String quantile = sketch.getQuantile(fractions[i]);
-      assertEquals(quantile, quantiles[i]);
-      assertEquals(quantile, reverseQuantiles[1000 - i]);
-      assertTrue(Util.le(previousQuantile, quantile, Comparator.naturalOrder()));
-      previousQuantile = quantile;
-    }
-  }
-*/

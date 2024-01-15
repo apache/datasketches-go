@@ -334,5 +334,52 @@ func TestItemsSketch_Merge(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, median < upperBound)
 	assert.True(t, lowerBound < median)
+}
 
+func TestItemsSketch_MergeLowerK(t *testing.T) {
+	sketch1, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	sketch2, err := NewItemsSketch[string](_DEFAULT_K/2, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	n := 10000
+	digits := numDigits(2 * n)
+	for i := 0; i < n; i++ {
+		sketch1.Update(intToFixedLengthString(i, digits))
+		sketch2.Update(intToFixedLengthString(2*n-i-1, digits))
+	}
+
+	minV, err := sketch1.GetMinItem()
+	assert.NoError(t, err)
+	assert.Equal(t, intToFixedLengthString(0, digits), minV)
+	maxV, err := sketch1.GetMaxItem()
+	assert.NoError(t, err)
+	assert.Equal(t, intToFixedLengthString(n-1, digits), maxV)
+
+	minV, err = sketch2.GetMinItem()
+	assert.NoError(t, err)
+	assert.Equal(t, intToFixedLengthString(n, digits), minV)
+	maxV, err = sketch2.GetMaxItem()
+	assert.NoError(t, err)
+	assert.Equal(t, intToFixedLengthString(2*n-1, digits), maxV)
+
+	sketch1.Merge(sketch2)
+
+	//sketch1 must get "contaminated" by the lower K in sketch2
+	assert.Equal(t, sketch1.GetNormalizedRankError(false), sketch2.GetNormalizedRankError(false))
+	assert.Equal(t, sketch1.GetNormalizedRankError(true), sketch2.GetNormalizedRankError(true))
+
+	assert.False(t, sketch1.IsEmpty())
+	assert.Equal(t, uint64(2*n), sketch1.GetN())
+	minV, err = sketch1.GetMinItem()
+	assert.NoError(t, err)
+	assert.Equal(t, intToFixedLengthString(0, digits), minV)
+	maxV, err = sketch1.GetMaxItem()
+	assert.NoError(t, err)
+	assert.Equal(t, intToFixedLengthString(2*n-1, digits), maxV)
+	upperBound := intToFixedLengthString(n+(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
+	lowerBound := intToFixedLengthString(n-(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
+	median, err := sketch1.GetQuantile(0.5, false)
+	assert.NoError(t, err)
+	assert.True(t, median < upperBound)
+	assert.True(t, lowerBound < median)
 }

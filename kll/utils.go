@@ -28,6 +28,11 @@ import (
 
 const (
 	tailRoundingFactor = 1e7
+
+	_PMF_COEF = 2.446
+	_PMF_EXP  = 0.9433
+	_CDF_COEF = 2.296
+	_CDF_EXP  = 0.9723
 )
 
 func convertToCumulative(array []int64) int64 {
@@ -113,4 +118,11 @@ func currentLevelSizeItems(level uint8, numLevels uint8, levels []uint32) uint32
 		return 0
 	}
 	return levels[level+1] - levels[level]
+}
+
+func getNormalizedRankError(k uint16, pmf bool) float64 {
+	if pmf {
+		return _PMF_COEF / math.Pow(float64(k), _PMF_EXP)
+	}
+	return _CDF_COEF / math.Pow(float64(k), _CDF_EXP)
 }

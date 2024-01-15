@@ -207,6 +207,10 @@ func (s *ItemsSketch[C]) GetCDF(splitPoints []C, inclusive bool) ([]float64, err
 	return s.sortedView.GetCDF(splitPoints, inclusive)
 }
 
+func (s *ItemsSketch[C]) GetNormalizedRankError(pmf bool) float64 {
+	return getNormalizedRankError(s.minK, pmf)
+}
+
 func (s *ItemsSketch[C]) Update(item C) {
 	s.updateItem(item, s.itemsSketchOp.lessFn())
 	s.sortedView = nil

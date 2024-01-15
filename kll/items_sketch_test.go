@@ -291,3 +291,64 @@ func TestItemsSketch_GetRankGetCdfGetPmfConsistency(t *testing.T) {
 		assert.InDelta(t, ranks[n], 1.0, NUMERIC_NOISE_TOLERANCE)
 	}
 }
+
+func TestItemsSketch_Merge(t *testing.T) {
+	sketch1, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	sketch2, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	n := 10000
+	digits := numDigits(2 * n)
+	for i := 0; i < n; i++ {
+		sketch1.Update(intToFixedLengthString(i, digits))
+		sketch2.Update(intToFixedLengthString(2*n-i-1, digits))
+	}
+
+	minV, err := sketch1.GetMinItem()
+	assert.NoError(t, err)
+	assert.Equal(t, intToFixedLengthString(0, digits), minV)
+	maxV, err := sketch1.GetMaxItem()
+	assert.NoError(t, err)
+	assert.Equal(t, intToFixedLengthString(n-1, digits), maxV)
+
+	minV, err = sketch2.GetMinItem()
+	assert.NoError(t, err)
+	assert.Equal(t, intToFixedLengthString(n, digits), minV)
+	maxV, err = sketch2.GetMaxItem()
+	assert.NoError(t, err)
+	assert.Equal(t, intToFixedLengthString(2*n-1, digits), maxV)
+
+	//sketch1.Merge(sketch2)
+}
+
+/*
+@Test
+  public void merge() {
+    final KllItemsSketch<String> sketch1 = KllItemsSketch.newHeapInstance(Comparator.naturalOrder(), serDe);
+    final KllItemsSketch<String> sketch2 = KllItemsSketch.newHeapInstance(Comparator.naturalOrder(), serDe);
+    final int n = 10000;
+    final int digits = Util.numDigits(2 * n);
+    for (int i = 0; i < n; i++) {
+      sketch1.update(Util.intToFixedLengthString(i, digits));
+      sketch2.update(Util.intToFixedLengthString(2 * n - i - 1, digits));
+    }
+
+    assertEquals(sketch1.getMinItem(), Util.intToFixedLengthString(0, digits));
+    assertEquals(sketch1.getMaxItem(), Util.intToFixedLengthString(n - 1, digits));
+
+    assertEquals(sketch2.getMinItem(), Util.intToFixedLengthString(n, digits));
+    assertEquals(sketch2.getMaxItem(), Util.intToFixedLengthString(2 * n - 1, digits));
+
+    sketch1.merge(sketch2);
+
+    assertFalse(sketch1.isEmpty());
+    assertEquals(sketch1.getN(), 2L * n);
+    assertEquals(sketch1.getMinItem(), Util.intToFixedLengthString(0, digits));
+    assertEquals(sketch1.getMaxItem(), Util.intToFixedLengthString(2 * n - 1, digits));
+    String upperBound = Util.intToFixedLengthString(n + (int)ceil(n * PMF_EPS_FOR_K_256), digits);
+    String lowerBound = Util.intToFixedLengthString(n - (int)ceil(n * PMF_EPS_FOR_K_256), digits);
+    String median = sketch1.getQuantile(0.5);
+    assertTrue(Util.le(median, upperBound, Comparator.naturalOrder()));
+    assertTrue(Util.le(lowerBound, median, Comparator.naturalOrder()));
+  }
+*/

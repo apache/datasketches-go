@@ -22,6 +22,7 @@ import (
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
 	"math"
+	"math/bits"
 	"strconv"
 )
 
@@ -74,7 +75,8 @@ func numDigits(n int) int {
 	if n%10 == 0 {
 		n++
 	}
-	return int(math.Ceil(math.Log(float64(n)) / math.Log(10)))
+	l := math.Log(float64(n))
+	return int(math.Ceil(l / math.Log(10)))
 }
 
 func intToFixedLengthString(number int, length int) string {
@@ -95,4 +97,20 @@ func characterPad(s string, fieldLength int, padChar byte, postpend bool) string
 		return addstr + s
 	}
 	return s
+}
+
+func ubOnNumLevels(n uint64) int {
+	v := internal.FloorPowerOf2(int64(n))
+	return 1 + bits.TrailingZeros64(uint64(v))
+}
+
+func getNumRetainedAboveLevelZero(numLevels uint8, levels []uint32) uint32 {
+	return levels[numLevels] - levels[1]
+}
+
+func currentLevelSizeItems(level uint8, numLevels uint8, levels []uint32) uint32 {
+	if level >= numLevels {
+		return 0
+	}
+	return levels[level+1] - levels[level]
 }

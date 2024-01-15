@@ -237,8 +237,8 @@ func (s *ItemsSketch[C]) updateItem(item C, lessFn common.LessFn[C]) {
 		s.minItem = &item
 		s.maxItem = &item
 	} else {
-		if lessFn(item, *s.maxItem) {
-			s.maxItem = &item
+		if lessFn(item, *s.minItem) {
+			s.minItem = &item
 		}
 		if lessFn(*s.maxItem, item) {
 			s.maxItem = &item
@@ -254,6 +254,141 @@ func (s *ItemsSketch[C]) updateItem(item C, lessFn common.LessFn[C]) {
 	nextPos := level0space - 1
 	s.levels[0] = nextPos
 	s.items[nextPos] = item
+}
+
+func (s *ItemsSketch[C]) Merge(other *ItemsSketch[C]) {
+	if other.IsEmpty() {
+		return
+	}
+	s.mergeItemsSketch(other)
+	s.sortedView = nil
+}
+
+func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
+	if other.IsEmpty() {
+		return
+	}
+	// capture my key mutable fields before doing any merging
+	myEmpty := s.IsEmpty()
+	var myMin, myMax C
+	var err error
+	if !myEmpty {
+		myMin, err = s.GetMinItem()
+		if err != nil {
+			panic(err)
+		}
+		myMax, err = s.GetMaxItem()
+		if err != nil {
+			panic(err)
+		}
+	}
+	myMinK := s.minK
+	finalN := s.n + other.n
+
+	// buffers that are referenced multiple times
+	otherNumLevels := other.numLevels
+	otherLevelsArr := other.levels
+	var otherItemsArr []C
+
+	// MERGE: update this sketch with level0 items from the other sketch
+	otherItemsArr = other.GetTotalItemsArray()
+	for i := otherLevelsArr[0]; i < otherLevelsArr[1]; i++ {
+		s.updateItem(otherItemsArr[i], s.itemsSketchOp.lessFn())
+	}
+
+	// After the level 0 update, we capture the intermediate state of levels and items arrays...
+	myCurNumLevels := s.numLevels
+	myCurLevelsArr := s.levels
+	myCurItemsArr := s.GetTotalItemsArray()
+
+	// then rename them and initialize in case there are no higher levels
+	myNewNumLevels := myCurNumLevels
+	myNewLevelsArr := myCurLevelsArr
+	myNewItemsArr := myCurItemsArr
+
+	//merge higher levels if they exist
+	if otherNumLevels > 1 {
+		tmpSpaceNeeded := s.GetNumRetained() + getNumRetainedAboveLevelZero(otherNumLevels, otherLevelsArr)
+		workbuf := make([]C, tmpSpaceNeeded)
+		ub := ubOnNumLevels(finalN)
+		worklevels := make([]uint32, ub+2) // ub+1 does not work
+		outlevels := make([]uint32, ub+2)
+
+		provisionalNumLevels := max(myCurNumLevels, otherNumLevels)
+
+		populateItemWorkArrays(workbuf, worklevels, provisionalNumLevels,
+			myCurNumLevels, myCurLevelsArr, myCurItemsArr,
+			otherNumLevels, otherLevelsArr, otherItemsArr, s.itemsSketchOp.lessFn())
+
+		// notice that workbuf is being used as both the input and output
+		result := generalItemsCompress(s.k, s.m, provisionalNumLevels, workbuf, worklevels, workbuf, outlevels, s.isLevelZeroSorted, s.itemsSketchOp.lessFn())
+		targetItemCount := result[1] //was finalCapacity. Max size given k, m, numLevels
+		curItemCount := result[2]    //was finalPop
+
+		// now we need to finalize the results for mySketch
+
+		//THE NEW NUM LEVELS
+		myNewNumLevels = result[0]
+
+		// THE NEW ITEMS ARRAY
+		if int(targetItemCount) == len(myCurItemsArr) {
+			myNewItemsArr = myCurItemsArr
+		} else {
+			myNewItemsArr = make([]C, targetItemCount)
+		}
+		freeSpaceAtBottom := targetItemCount - curItemCount
+
+		//shift the new items array create space at bottom
+		for i := uint32(0); i < uint32(curItemCount); i++ {
+			myNewItemsArr[uint32(freeSpaceAtBottom)+i] = workbuf[outlevels[0]+i]
+		}
+		theShift := uint32(freeSpaceAtBottom) - outlevels[0]
+
+		//calculate the new levels array length
+		finalLevelsArrLen := myNewNumLevels + 1
+		if len(myCurLevelsArr) < int(finalLevelsArrLen) {
+			finalLevelsArrLen = uint8(len(myCurLevelsArr))
+		}
+
+		//THE NEW LEVELS ARRAY
+		myNewLevelsArr = make([]uint32, finalLevelsArrLen)
+		for lvl := uint8(0); lvl < myNewNumLevels+1; lvl++ { // includes the "extra" index
+			myNewLevelsArr[lvl] = outlevels[lvl] + theShift
+		}
+
+		//MEMORY SPACE MANAGEMENT
+		//not used
+	}
+
+	// Update Preamble:
+	s.n = finalN
+	if other.IsEstimationMode() { //otherwise the merge brings over exact items.
+		s.minK = min(myMinK, other.minK)
+	}
+
+	// Update numLevels, levelsArray, items
+	s.numLevels = myNewNumLevels
+	s.levels = myNewLevelsArr
+	s.items = myNewItemsArr
+
+	// Update min, max items
+	if myEmpty {
+		s.minItem = other.minItem
+		s.maxItem = other.maxItem
+	} else {
+		less := s.itemsSketchOp.lessFn()
+		if less(myMin, *other.minItem) {
+			s.minItem = &myMin
+		} else {
+			s.minItem = other.minItem
+		}
+
+		if less(*other.maxItem, myMax) {
+			s.maxItem = &myMax
+		} else {
+			s.maxItem = other.maxItem
+		}
+	}
 }
 
 func (s *ItemsSketch[C]) compressWhileUpdatingSketch() {
@@ -395,6 +530,14 @@ func findLevelToCompact(k uint16, m uint8, numLevels uint8, levels []uint32) uin
 	}
 }
 
+func computeTotalItemCapacity(k uint16, m uint8, numLevels uint8) uint32 {
+	var total uint32 = 0
+	for level := uint8(0); level < numLevels; level++ {
+		total += levelCapacity(k, numLevels, level, m)
+	}
+	return total
+}
+
 func levelCapacity(k uint16, numLevels uint8, level uint8, m uint8) uint32 {
 	depth := numLevels - level - 1
 	return max(uint32(m), intCapAux(k, depth))
@@ -468,4 +611,137 @@ func mergeSortedItemsArrays[C comparable](bufA []C, startA uint32, lenA uint32,
 			b++
 		}
 	}
+}
+
+func populateItemWorkArrays[C comparable](workbuf []C, worklevels []uint32, provisionalNumLevels uint8,
+	myCurNumLevels uint8, myCurLevelsArr []uint32, myCurItemsArr []C,
+	otherNumLevels uint8, otherLevelsArr []uint32, otherItemsArr []C,
+	lessFn common.LessFn[C]) {
+
+	worklevels[0] = 0
+	// Note: the level zero data from "other" was already inserted into "self"
+	selfPopZero := currentLevelSizeItems(0, myCurNumLevels, myCurLevelsArr)
+	for i := uint32(0); i < selfPopZero; i++ {
+		workbuf[worklevels[0]+i] = myCurItemsArr[myCurLevelsArr[0]+i]
+	}
+	worklevels[1] = worklevels[0] + selfPopZero
+
+	for lvl := uint8(1); lvl < provisionalNumLevels; lvl++ {
+		selfPop := currentLevelSizeItems(lvl, myCurNumLevels, myCurLevelsArr)
+		otherPop := currentLevelSizeItems(lvl, otherNumLevels, otherLevelsArr)
+		worklevels[lvl+1] = worklevels[lvl] + selfPop + otherPop
+
+		if selfPop > 0 && otherPop == 0 {
+			for i := uint32(0); i < selfPop; i++ {
+				workbuf[worklevels[lvl]+i] = myCurItemsArr[myCurLevelsArr[lvl]+i]
+			}
+		} else if selfPop == 0 && otherPop > 0 {
+			for i := uint32(0); i < otherPop; i++ {
+				workbuf[worklevels[lvl]+i] = otherItemsArr[otherLevelsArr[lvl]+i]
+			}
+		} else if selfPop > 0 && otherPop > 0 {
+			mergeSortedItemsArrays(
+				myCurItemsArr, myCurLevelsArr[lvl], selfPop,
+				otherItemsArr, otherLevelsArr[lvl], otherPop,
+				workbuf, worklevels[lvl], lessFn)
+		}
+	}
+}
+
+func generalItemsCompress[C comparable](
+	k uint16,
+	m uint8,
+	numLevelsIn uint8,
+	inBuf []C,
+	inLevels []uint32,
+	outBuf []C,
+	outLevels []uint32,
+	isLevelZeroSorted bool,
+	lessFn common.LessFn[C]) []uint8 {
+	numLevels := numLevelsIn
+	currentItemCount := uint8(inLevels[numLevels] - inLevels[0]) // decreases with each compaction
+	targetItemCount := computeTotalItemCapacity(k, m, numLevels) // increases if we add levels
+	doneYet := false
+	outLevels[0] = 0
+	curLevel := -1
+	for !doneYet {
+		curLevel++ // start out at level 0
+
+		// If we are at the current top level, add an empty level above it for convenience,
+		// but do not increment numLevels until later
+		if curLevel == (int(numLevels) - 1) {
+			inLevels[curLevel+2] = inLevels[curLevel+1]
+		}
+
+		rawBeg := inLevels[curLevel]
+		rawLim := inLevels[curLevel+1]
+		rawPop := rawLim - rawBeg
+
+		if (uint32(currentItemCount) < targetItemCount) || (rawPop < levelCapacity(k, numLevels, uint8(curLevel), m)) {
+			for i := uint32(0); i < rawPop; i++ {
+				outBuf[outLevels[curLevel]+i] = inBuf[rawBeg+i]
+			}
+			outLevels[curLevel+1] = outLevels[curLevel] + rawPop
+		} else {
+			// The sketch is too full AND this level is too full, so we compact it
+			// Note: this can add a level and thus change the sketch's capacity
+
+			popAbove := inLevels[curLevel+2] - rawLim
+			oddPop := rawPop%2 == 1
+			adjBeg := rawBeg
+			if oddPop {
+				adjBeg++
+			}
+			adjPop := rawPop
+			if oddPop {
+				adjPop--
+			}
+			halfAdjPop := adjPop / 2
+
+			if oddPop {
+				outBuf[outLevels[curLevel]] = inBuf[rawBeg]
+				outLevels[curLevel+1] = outLevels[curLevel] + 1
+			} else {
+				outLevels[curLevel+1] = outLevels[curLevel]
+			}
+
+			// level zero might not be sorted, so we must sort it if we wish to compact it
+			if (curLevel == 0) && !isLevelZeroSorted {
+				tmpSlice := inBuf[adjBeg : adjBeg+adjPop]
+				sort.Slice(tmpSlice, func(a, b int) bool {
+					return lessFn(tmpSlice[a], tmpSlice[b])
+				})
+			}
+
+			if popAbove == 0 {
+				randomlyHalveUpItems(inBuf, adjBeg, adjPop)
+			} else {
+				randomlyHalveDownItems(inBuf, adjBeg, adjPop)
+				mergeSortedItemsArrays(
+					inBuf, adjBeg, halfAdjPop,
+					inBuf, rawLim, popAbove,
+					inBuf, adjBeg+halfAdjPop, lessFn)
+			}
+
+			// track the fact that we just eliminated some data
+			currentItemCount -= uint8(halfAdjPop)
+
+			// Adjust the boundaries of the level above
+			inLevels[curLevel+1] = inLevels[curLevel+1] - halfAdjPop
+
+			// Increment numLevels if we just compacted the old top level
+			// This creates some more capacity (the size of the new bottom level)
+			if curLevel == (int(numLevels) - 1) {
+				numLevels++
+				targetItemCount += levelCapacity(k, numLevels, 0, m)
+			}
+		} // end of code for compacting a level
+
+		// determine whether we have processed all levels yet (including any new levels that we created)
+		if curLevel == (int(numLevels) - 1) {
+			doneYet = true
+		}
+	} // end of loop over levels
+
+	return []uint8{numLevels, uint8(targetItemCount), currentItemCount}
 }

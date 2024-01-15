@@ -328,7 +328,7 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 		// now we need to finalize the results for mySketch
 
 		//THE NEW NUM LEVELS
-		myNewNumLevels = result[0]
+		myNewNumLevels = uint8(result[0])
 
 		// THE NEW ITEMS ARRAY
 		if int(targetItemCount) == len(myCurItemsArr) {
@@ -345,9 +345,11 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 		theShift := uint32(freeSpaceAtBottom) - outlevels[0]
 
 		//calculate the new levels array length
-		finalLevelsArrLen := myNewNumLevels + 1
-		if len(myCurLevelsArr) < int(finalLevelsArrLen) {
-			finalLevelsArrLen = uint8(len(myCurLevelsArr))
+		var finalLevelsArrLen uint32
+		if uint32(len(myCurLevelsArr)) < uint32(myNewNumLevels+1) {
+			finalLevelsArrLen = uint32(myNewNumLevels + 1)
+		} else {
+			finalLevelsArrLen = uint32(len(myCurLevelsArr))
 		}
 
 		//THE NEW LEVELS ARRAY
@@ -657,9 +659,9 @@ func generalItemsCompress[C comparable](
 	outBuf []C,
 	outLevels []uint32,
 	isLevelZeroSorted bool,
-	lessFn common.LessFn[C]) []uint8 {
+	lessFn common.LessFn[C]) []uint32 {
 	numLevels := numLevelsIn
-	currentItemCount := uint8(inLevels[numLevels] - inLevels[0]) // decreases with each compaction
+	currentItemCount := inLevels[numLevels] - inLevels[0]        // decreases with each compaction
 	targetItemCount := computeTotalItemCapacity(k, m, numLevels) // increases if we add levels
 	doneYet := false
 	outLevels[0] = 0
@@ -724,7 +726,7 @@ func generalItemsCompress[C comparable](
 			}
 
 			// track the fact that we just eliminated some data
-			currentItemCount -= uint8(halfAdjPop)
+			currentItemCount -= halfAdjPop
 
 			// Adjust the boundaries of the level above
 			inLevels[curLevel+1] = inLevels[curLevel+1] - halfAdjPop
@@ -743,5 +745,5 @@ func generalItemsCompress[C comparable](
 		}
 	} // end of loop over levels
 
-	return []uint8{numLevels, uint8(targetItemCount), currentItemCount}
+	return []uint32{uint32(numLevels), targetItemCount, currentItemCount}
 }

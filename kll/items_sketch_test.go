@@ -444,3 +444,21 @@ func TestItemsSketch_MergeEmptyLowerK(t *testing.T) {
 		assert.True(t, lowerBound < median)
 	}
 }
+
+func TestItemsSketch_MergeExactModeLowerK(t *testing.T) {
+	sketch1, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	sketch2, err := NewItemsSketch[string](_DEFAULT_K/2, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	n := 10000
+	digits := numDigits(n)
+	for i := 0; i < n; i++ {
+		sketch1.Update(intToFixedLengthString(i, digits))
+	}
+	sketch2.Update(intToFixedLengthString(1, digits))
+
+	// rank error should not be affected by a merge with a sketch in exact mode with lower K
+	rankErrorBeforeMerge := sketch1.GetNormalizedRankError(true)
+	sketch1.Merge(sketch2)
+	assert.Equal(t, sketch1.GetNormalizedRankError(true), rankErrorBeforeMerge)
+}

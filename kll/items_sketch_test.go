@@ -462,3 +462,16 @@ func TestItemsSketch_MergeExactModeLowerK(t *testing.T) {
 	sketch1.Merge(sketch2)
 	assert.Equal(t, sketch1.GetNormalizedRankError(true), rankErrorBeforeMerge)
 }
+
+func TestItemsSketch_MergeMinMinValueFromOther(t *testing.T) {
+	sketch1, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	sketch2, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	sketch1.Update(intToFixedLengthString(1, 1))
+	sketch2.Update(intToFixedLengthString(2, 1))
+	sketch2.Merge(sketch1)
+	minV, err := sketch2.GetMinItem()
+	assert.NoError(t, err)
+	assert.Equal(t, intToFixedLengthString(1, 1), minV)
+}

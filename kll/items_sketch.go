@@ -89,6 +89,10 @@ func (s *ItemsSketch[C]) GetN() uint64 {
 	return s.n
 }
 
+func (s *ItemsSketch[C]) GetK() uint16 {
+	return s.k
+}
+
 func (s *ItemsSketch[C]) GetNumRetained() uint32 {
 	return s.levels[s.numLevels] - s.levels[0]
 }

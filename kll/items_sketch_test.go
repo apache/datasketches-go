@@ -494,3 +494,31 @@ func TestItemsSketch_MergeMinAndMaxFromOther(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, intToFixedLengthString(n, digits), maxV)
 }
+
+func TestItemsSketch_KTooSmall(t *testing.T) {
+	_, err := NewItemsSketch[string](_MIN_K-1, stringItemsSketchOp{})
+	assert.Error(t, err)
+}
+
+// cannot use _MAX_K + 1 (untyped int constant 65536) as uint16 value in argument to NewItemsSketch[string] (overflows)
+//func TestItemsSketch_KTooLarge(t *testing.T) {
+//	_, err := NewItemsSketch[string](_MAX_K+1, stringItemsSketchOp{})
+//	assert.Error(t, err)
+//}
+
+func TestItemsSketch_MinK(t *testing.T) {
+	sketch, err := NewItemsSketch[string](uint16(_DEFAULT_M), stringItemsSketchOp{})
+	assert.NoError(t, err)
+	n := 1000
+	digits := numDigits(n)
+	for i := 0; i < n; i++ {
+		sketch.Update(intToFixedLengthString(i, digits))
+	}
+	assert.Equal(t, sketch.GetK(), uint16(_DEFAULT_M))
+	upperBound := intToFixedLengthString(n/2+(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
+	lowerBound := intToFixedLengthString(n/2-(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
+	median, err := sketch.GetQuantile(0.5, true)
+	assert.NoError(t, err)
+	assert.True(t, median < upperBound)
+	assert.True(t, lowerBound < median)
+}

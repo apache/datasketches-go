@@ -383,3 +383,64 @@ func TestItemsSketch_MergeLowerK(t *testing.T) {
 	assert.True(t, median < upperBound)
 	assert.True(t, lowerBound < median)
 }
+
+func TestItemsSketch_MergeEmptyLowerK(t *testing.T) {
+	sketch1, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	sketch2, err := NewItemsSketch[string](_DEFAULT_K/2, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	n := 10000
+	digits := numDigits(n)
+	for i := 0; i < n; i++ {
+		sketch1.Update(intToFixedLengthString(i, digits)) //sketch2 is empty
+	}
+
+	// rank error should not be affected by a merge with an empty sketch with lower K
+	rankErrorBeforeMerge := sketch1.GetNormalizedRankError(true)
+	sketch1.Merge(sketch2)
+	assert.Equal(t, sketch1.GetNormalizedRankError(true), rankErrorBeforeMerge)
+
+	{
+		assert.False(t, sketch1.IsEmpty())
+		assert.True(t, sketch2.IsEmpty())
+		assert.Equal(t, uint64(n), sketch1.GetN())
+		minV, err := sketch1.GetMinItem()
+		assert.NoError(t, err)
+		assert.Equal(t, intToFixedLengthString(0, digits), minV)
+		maxV, err := sketch1.GetMaxItem()
+		assert.NoError(t, err)
+		assert.Equal(t, intToFixedLengthString(n-1, digits), maxV)
+		upperBound := intToFixedLengthString(n/2+(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
+		lowerBound := intToFixedLengthString(n/2-(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
+		median, err := sketch1.GetQuantile(0.5, false)
+		assert.NoError(t, err)
+		assert.True(t, median < upperBound)
+		assert.True(t, lowerBound < median)
+	}
+	{
+		//merge the other way
+		sketch2.Merge(sketch1)
+		assert.False(t, sketch1.IsEmpty())
+		assert.False(t, sketch2.IsEmpty())
+		assert.Equal(t, uint64(n), sketch1.GetN())
+		assert.Equal(t, uint64(n), sketch2.GetN())
+		minV, err := sketch1.GetMinItem()
+		assert.NoError(t, err)
+		assert.Equal(t, intToFixedLengthString(0, digits), minV)
+		maxV, err := sketch1.GetMaxItem()
+		assert.NoError(t, err)
+		assert.Equal(t, intToFixedLengthString(n-1, digits), maxV)
+		minV, err = sketch2.GetMinItem()
+		assert.NoError(t, err)
+		assert.Equal(t, intToFixedLengthString(0, digits), minV)
+		maxV, err = sketch2.GetMaxItem()
+		assert.NoError(t, err)
+		assert.Equal(t, intToFixedLengthString(n-1, digits), maxV)
+		upperBound := intToFixedLengthString(n/2+(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
+		lowerBound := intToFixedLengthString(n/2-(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
+		median, err := sketch2.GetQuantile(0.5, false)
+		assert.NoError(t, err)
+		assert.True(t, median < upperBound)
+		assert.True(t, lowerBound < median)
+	}
+}

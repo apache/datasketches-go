@@ -475,3 +475,22 @@ func TestItemsSketch_MergeMinMinValueFromOther(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, intToFixedLengthString(1, 1), minV)
 }
+
+func TestItemsSketch_MergeMinAndMaxFromOther(t *testing.T) {
+	sketch1, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	sketch2, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	n := 1_000_000
+	digits := numDigits(n)
+	for i := 1; i <= 1_000_000; i++ {
+		sketch1.Update(intToFixedLengthString(i, digits)) //sketch2 is empty
+	}
+	sketch2.Merge(sketch1)
+	minV, err := sketch2.GetMinItem()
+	assert.NoError(t, err)
+	assert.Equal(t, intToFixedLengthString(1, digits), minV)
+	maxV, err := sketch2.GetMaxItem()
+	assert.NoError(t, err)
+	assert.Equal(t, intToFixedLengthString(n, digits), maxV)
+}

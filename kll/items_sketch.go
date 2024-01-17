@@ -232,6 +232,17 @@ func (s *ItemsSketch[C]) Update(item C) {
 	s.sortedView = nil
 }
 
+func (s *ItemsSketch[C]) Reset() {
+	s.n = 0
+	s.isLevelZeroSorted = false
+	s.numLevels = 1
+	s.levels = []uint32{uint32(s.k), uint32(s.k)}
+	s.minItem = nil
+	s.maxItem = nil
+	s.items = make([]C, s.k)
+	s.sortedView = nil
+}
+
 func (s *ItemsSketch[C]) getLevelsArray() []uint32 {
 	levels := make([]uint32, len(s.levels))
 	copy(levels, s.levels)

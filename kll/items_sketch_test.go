@@ -564,3 +564,30 @@ func TestItemsSketch_DuplicateSplitPoints(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, quantiles1, quantiles2)
 }
+
+func TestItemsSketch_CheckReset(t *testing.T) {
+	sketch, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	n := 100
+	digits := numDigits(n)
+	for i := 1; i <= n; i++ {
+		sketch.Update(intToFixedLengthString(i, digits))
+	}
+	n1 := sketch.GetN()
+	min1, err := sketch.GetMinItem()
+	assert.NoError(t, err)
+	max1, err := sketch.GetMaxItem()
+	assert.NoError(t, err)
+	sketch.Reset()
+	for i := 1; i <= 100; i++ {
+		sketch.Update(intToFixedLengthString(i, digits))
+	}
+	n2 := sketch.GetN()
+	min2, err := sketch.GetMinItem()
+	assert.NoError(t, err)
+	max2, err := sketch.GetMaxItem()
+	assert.NoError(t, err)
+	assert.Equal(t, n2, n1)
+	assert.Equal(t, min2, min1)
+	assert.Equal(t, max2, max1)
+}

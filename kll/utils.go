@@ -126,3 +126,40 @@ func getNormalizedRankError(k uint16, pmf bool) float64 {
 	}
 	return _CDF_COEF / math.Pow(float64(k), _CDF_EXP)
 }
+
+func evenlySpacedDoubles(value1 float64, value2 float64, num int) ([]float64, error) {
+	if num < 2 {
+		return nil, errors.New("num must be >= 2")
+	}
+	out := make([]float64, num)
+	out[0] = value1
+	out[num-1] = value2
+	if num == 2 {
+		return out, nil
+	}
+
+	delta := (value2 - value1) / float64(num-1)
+
+	for i := 1; i < num-1; i++ {
+		out[i] = float64(i)*delta + value1
+	}
+	return out, nil
+}
+
+/*
+  public static double[] evenlySpacedDoubles(final double value1, final double value2, final int num) {
+    if (num < 2) {
+      throw new SketchesArgumentException("num must be >= 2");
+    }
+    final double[] out = new double[num];
+    out[0] = value1;
+    out[num - 1] = value2;
+    if (num == 2) { return out; }
+
+    final double delta = (value2 - value1) / (num - 1);
+
+    for (int i = 1; i < num - 1; i++) { out[i] = i * delta + value1; }
+    return out;
+  }
+
+*/

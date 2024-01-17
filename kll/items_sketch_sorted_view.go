@@ -154,6 +154,50 @@ func (s *itemsSketchSortedView[C]) getQuantileIndex(rank float64, inclusive bool
 	return index
 }
 
+func (s *itemsSketchSortedView[C]) GetPartitionBoundaries(numEquallySized int, inclusive bool) (*ItemsPartitionBoundaries[C], error) {
+	if s.totalN == 0 {
+		return nil, errors.New("empty sketch")
+	}
+	s.cumWeights[0] = 1
+	s.cumWeights[len(s.cumWeights)-1] = int64(s.totalN)
+	s.quantiles[0] = s.minItem
+	s.quantiles[len(s.quantiles)-1] = s.maxItem
+
+	evSpNormRanks, err := evenlySpacedDoubles(0, 1.0, numEquallySized+1)
+	if err != nil {
+		return nil, err
+	}
+	evSpQuantiles := make([]C, len(evSpNormRanks))
+	evSpNatRanks := make([]int64, len(evSpNormRanks))
+	for i := 0; i < len(evSpNormRanks); i++ {
+		index := s.getQuantileIndex(evSpNormRanks[i], inclusive)
+		evSpQuantiles[i] = s.quantiles[index]
+		evSpNatRanks[i] = s.cumWeights[index]
+	}
+	return newItemsPartitionBoundaries[C](s.totalN, evSpQuantiles, evSpNatRanks, evSpNormRanks, s.maxItem, s.minItem, inclusive)
+}
+
+/*
+public GenericPartitionBoundaries<T> getPartitionBoundaries(final int numEquallySized,
+      final QuantileSearchCriteria searchCrit) {
+
+    for (int i = 0; i < len; i++) {
+      final int index = getQuantileIndex(evSpNormRanks[i], searchCrit);
+      evSpQuantiles[i] = quantiles[index];
+      evSpNatRanks[i] = cumWeights[index];
+    }
+    final GenericPartitionBoundaries<T> gpb = new GenericPartitionBoundaries<>(
+        this.totalN,
+        evSpQuantiles,
+        evSpNatRanks,
+        evSpNormRanks,
+        getMaxItem(),
+        getMinItem(),
+        searchCrit);
+    return gpb;
+  }
+*/
+
 func populateFromSketch[C comparable](srcQuantiles []C, levels []uint32, numLevels uint8, numQuantiles uint32, itemsSketchOp ItemSketchOp[C]) ([]C, []int64) {
 	quantiles := make([]C, numQuantiles)
 	cumWeights := make([]int64, numQuantiles)

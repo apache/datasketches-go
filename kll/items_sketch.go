@@ -215,6 +215,18 @@ func (s *ItemsSketch[C]) GetNormalizedRankError(pmf bool) float64 {
 	return getNormalizedRankError(s.minK, pmf)
 }
 
+func (s *ItemsSketch[C]) GetPartitionBoundaries(numEquallySized int, inclusive bool) (*ItemsPartitionBoundaries[C], error) {
+	if s.IsEmpty() {
+		return nil, fmt.Errorf("operation is undefined for an empty sketch")
+	}
+	err := s.setupSortedView()
+	if err != nil {
+		return nil, err
+
+	}
+	return s.sortedView.GetPartitionBoundaries(numEquallySized, inclusive)
+}
+
 func (s *ItemsSketch[C]) Update(item C) {
 	s.updateItem(item, s.itemsSketchOp.lessFn())
 	s.sortedView = nil

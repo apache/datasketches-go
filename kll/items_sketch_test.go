@@ -522,3 +522,45 @@ func TestItemsSketch_MinK(t *testing.T) {
 	assert.True(t, median < upperBound)
 	assert.True(t, lowerBound < median)
 }
+
+func TestItemsSketch_MaxK(t *testing.T) {
+	sketch, err := NewItemsSketch[string](uint16(_MAX_K), stringItemsSketchOp{})
+	assert.NoError(t, err)
+	n := 1000
+	digits := numDigits(n)
+	for i := 0; i < n; i++ {
+		sketch.Update(intToFixedLengthString(i, digits))
+	}
+	assert.Equal(t, sketch.GetK(), uint16(_MAX_K))
+	upperBound := intToFixedLengthString(n/2+(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
+	lowerBound := intToFixedLengthString(n/2-(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
+	median, err := sketch.GetQuantile(0.5, true)
+	assert.NoError(t, err)
+	assert.True(t, median < upperBound)
+	assert.True(t, lowerBound < median)
+}
+
+func TestItemsSketch_OutOfOrderSplitPoints(t *testing.T) {
+	sketch, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	s0 := intToFixedLengthString(0, 1)
+	s1 := intToFixedLengthString(1, 1)
+	sketch.Update(s0)
+	_, err = sketch.GetCDF([]string{s1, s0}, true)
+	assert.Error(t, err)
+}
+
+func TestItemsSketch_DuplicateSplitPoints(t *testing.T) {
+	sketch, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	sketch.Update("A")
+	sketch.Update("B")
+	sketch.Update("C")
+	sketch.Update("D")
+	quantiles1, err := sketch.GetQuantiles([]float64{0.0, 0.5, 1.0}, false)
+	assert.NoError(t, err)
+	boundaries, err := sketch.GetPartitionBoundaries(2, false)
+	quantiles2 := boundaries.GetBoundaries()
+	assert.NoError(t, err)
+	assert.Equal(t, quantiles1, quantiles2)
+}

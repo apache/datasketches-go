@@ -591,3 +591,32 @@ func TestItemsSketch_CheckReset(t *testing.T) {
 	assert.Equal(t, min2, min1)
 	assert.Equal(t, max2, max1)
 }
+
+func TestItemsSketch_SortedView(t *testing.T) {
+	sketch, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	sketch.Update("A")
+	sketch.Update("AB")
+	sketch.Update("ABC")
+
+	view, err := sketch.GetSortedView()
+	assert.NoError(t, err)
+	itr := view.Iterator()
+	assert.True(t, itr.Next())
+	assert.Equal(t, "A", itr.GetQuantile())
+	assert.Equal(t, int64(1), itr.GetWeight())
+	assert.Equal(t, int64(0), itr.GetNaturalRank(false))
+	assert.Equal(t, int64(1), itr.GetNaturalRank(true))
+	assert.True(t, itr.Next())
+	assert.Equal(t, "AB", itr.GetQuantile())
+	assert.Equal(t, int64(1), itr.GetWeight())
+	assert.Equal(t, int64(1), itr.GetNaturalRank(false))
+	assert.Equal(t, int64(2), itr.GetNaturalRank(true))
+	assert.True(t, itr.Next())
+	assert.Equal(t, "ABC", itr.GetQuantile())
+	assert.Equal(t, int64(1), itr.GetWeight())
+	assert.Equal(t, int64(2), itr.GetNaturalRank(false))
+	assert.Equal(t, int64(3), itr.GetNaturalRank(true))
+	assert.False(t, itr.Next())
+
+}

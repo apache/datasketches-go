@@ -23,7 +23,7 @@ import (
 	"sort"
 )
 
-type itemsSketchSortedView[C comparable] struct {
+type ItemsSketchSortedView[C comparable] struct {
 	quantiles     []C
 	cumWeights    []int64
 	totalN        uint64
@@ -32,7 +32,7 @@ type itemsSketchSortedView[C comparable] struct {
 	itemsSketchOp ItemSketchOp[C]
 }
 
-func newItemsSketchSortedView[C comparable](sketch *ItemsSketch[C]) (*itemsSketchSortedView[C], error) {
+func newItemsSketchSortedView[C comparable](sketch *ItemsSketch[C]) (*ItemsSketchSortedView[C], error) {
 	if sketch.IsEmpty() {
 		return nil, errors.New("empty sketch")
 	}
@@ -62,7 +62,7 @@ func newItemsSketchSortedView[C comparable](sketch *ItemsSketch[C]) (*itemsSketc
 	numQuantiles := srcLevels[srcNumLevels] - srcLevels[0]
 
 	quantiles, cumWeights := populateFromSketch(srcQuantiles, srcLevels, srcNumLevels, numQuantiles, sketch.itemsSketchOp)
-	return &itemsSketchSortedView[C]{
+	return &ItemsSketchSortedView[C]{
 		quantiles:     quantiles,
 		cumWeights:    cumWeights,
 		totalN:        totalN,
@@ -72,7 +72,7 @@ func newItemsSketchSortedView[C comparable](sketch *ItemsSketch[C]) (*itemsSketc
 	}, nil
 }
 
-func (s *itemsSketchSortedView[C]) GetRank(item C, inclusive bool) (float64, error) {
+func (s *ItemsSketchSortedView[C]) GetRank(item C, inclusive bool) (float64, error) {
 	if s.totalN == 0 {
 		return 0, errors.New("empty sketch")
 	}
@@ -88,7 +88,7 @@ func (s *itemsSketchSortedView[C]) GetRank(item C, inclusive bool) (float64, err
 	return float64(s.cumWeights[index]) / float64(s.totalN), nil
 }
 
-func (s *itemsSketchSortedView[C]) GetQuantile(rank float64, inclusive bool) (C, error) {
+func (s *ItemsSketchSortedView[C]) GetQuantile(rank float64, inclusive bool) (C, error) {
 	if s.totalN == 0 {
 		return s.itemsSketchOp.identity(), errors.New("empty sketch")
 	}
@@ -100,7 +100,7 @@ func (s *itemsSketchSortedView[C]) GetQuantile(rank float64, inclusive bool) (C,
 	return s.quantiles[index], nil
 }
 
-func (s *itemsSketchSortedView[C]) GetPMF(splitPoints []C, inclusive bool) ([]float64, error) {
+func (s *ItemsSketchSortedView[C]) GetPMF(splitPoints []C, inclusive bool) ([]float64, error) {
 	if s.totalN == 0 {
 		return nil, errors.New("empty sketch")
 	}
@@ -119,7 +119,7 @@ func (s *itemsSketchSortedView[C]) GetPMF(splitPoints []C, inclusive bool) ([]fl
 	return buckets, nil
 }
 
-func (s *itemsSketchSortedView[C]) GetCDF(splitPoints []C, inclusive bool) ([]float64, error) {
+func (s *ItemsSketchSortedView[C]) GetCDF(splitPoints []C, inclusive bool) ([]float64, error) {
 	if s.totalN == 0 {
 		return nil, errors.New("empty sketch")
 	}
@@ -138,7 +138,11 @@ func (s *itemsSketchSortedView[C]) GetCDF(splitPoints []C, inclusive bool) ([]fl
 	return buckets, nil
 }
 
-func (s *itemsSketchSortedView[C]) getQuantileIndex(rank float64, inclusive bool) int {
+func (s *ItemsSketchSortedView[C]) Iterator() *ItemsSketchSortedViewIterator[C] {
+	return newItemsSketchSortedViewIterator(s.quantiles, s.cumWeights)
+}
+
+func (s *ItemsSketchSortedView[C]) getQuantileIndex(rank float64, inclusive bool) int {
 	length := len(s.quantiles)
 	naturalRank := getNaturalRank(rank, s.totalN, inclusive)
 	crit := internal.InequalityGT
@@ -154,7 +158,7 @@ func (s *itemsSketchSortedView[C]) getQuantileIndex(rank float64, inclusive bool
 	return index
 }
 
-func (s *itemsSketchSortedView[C]) GetPartitionBoundaries(numEquallySized int, inclusive bool) (*ItemsPartitionBoundaries[C], error) {
+func (s *ItemsSketchSortedView[C]) GetPartitionBoundaries(numEquallySized int, inclusive bool) (*ItemsSketchPartitionBoundaries[C], error) {
 	if s.totalN == 0 {
 		return nil, errors.New("empty sketch")
 	}
@@ -174,7 +178,7 @@ func (s *itemsSketchSortedView[C]) GetPartitionBoundaries(numEquallySized int, i
 		evSpQuantiles[i] = s.quantiles[index]
 		evSpNatRanks[i] = s.cumWeights[index]
 	}
-	return newItemsPartitionBoundaries[C](s.totalN, evSpQuantiles, evSpNatRanks, evSpNormRanks, s.maxItem, s.minItem, inclusive)
+	return newItemsSketchPartitionBoundaries[C](s.totalN, evSpQuantiles, evSpNatRanks, evSpNormRanks, s.maxItem, s.minItem, inclusive)
 }
 
 /*

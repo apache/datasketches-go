@@ -41,7 +41,7 @@ type ItemsSketch[C comparable] struct {
 	itemsSize         uint32
 	minItem           *C
 	maxItem           *C
-	sortedView        *itemsSketchSortedView[C]
+	sortedView        *ItemsSketchSortedView[C]
 	itemsSketchOp     ItemSketchOp[C]
 }
 
@@ -215,7 +215,7 @@ func (s *ItemsSketch[C]) GetNormalizedRankError(pmf bool) float64 {
 	return getNormalizedRankError(s.minK, pmf)
 }
 
-func (s *ItemsSketch[C]) GetPartitionBoundaries(numEquallySized int, inclusive bool) (*ItemsPartitionBoundaries[C], error) {
+func (s *ItemsSketch[C]) GetPartitionBoundaries(numEquallySized int, inclusive bool) (*ItemsSketchPartitionBoundaries[C], error) {
 	if s.IsEmpty() {
 		return nil, fmt.Errorf("operation is undefined for an empty sketch")
 	}
@@ -225,6 +225,17 @@ func (s *ItemsSketch[C]) GetPartitionBoundaries(numEquallySized int, inclusive b
 
 	}
 	return s.sortedView.GetPartitionBoundaries(numEquallySized, inclusive)
+}
+
+func (s *ItemsSketch[C]) GetSortedView() (*ItemsSketchSortedView[C], error) {
+	if s.IsEmpty() {
+		return nil, fmt.Errorf("operation is undefined for an empty sketch")
+	}
+	err := s.setupSortedView()
+	if err != nil {
+		return nil, err
+	}
+	return s.sortedView, nil
 }
 
 func (s *ItemsSketch[C]) Update(item C) {

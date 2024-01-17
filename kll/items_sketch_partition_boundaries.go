@@ -19,7 +19,7 @@ package kll
 
 import "errors"
 
-type ItemsPartitionBoundaries[C comparable] struct {
+type ItemsSketchPartitionBoundaries[C comparable] struct {
 	totalN     uint64    //totalN of source sketch
 	boundaries []C       //quantiles at the boundaries
 	natRanks   []int64   //natural ranks at the boundaries
@@ -32,7 +32,7 @@ type ItemsPartitionBoundaries[C comparable] struct {
 	numPartitions int     //num of partitions
 }
 
-func newItemsPartitionBoundaries[C comparable](totalN uint64, boundaries []C, natRanks []int64, normRanks []float64, maxItem C, minItem C, inclusive bool) (*ItemsPartitionBoundaries[C], error) {
+func newItemsSketchPartitionBoundaries[C comparable](totalN uint64, boundaries []C, natRanks []int64, normRanks []float64, maxItem C, minItem C, inclusive bool) (*ItemsSketchPartitionBoundaries[C], error) {
 	if len(boundaries) < 2 {
 		return nil, errors.New("boundaries must have at least 2 items")
 	}
@@ -45,7 +45,7 @@ func newItemsPartitionBoundaries[C comparable](totalN uint64, boundaries []C, na
 		}
 		numDeltaItems[i] = natRanks[i] - natRanks[i-1] + int64(addOne)
 	}
-	return &ItemsPartitionBoundaries[C]{
+	return &ItemsSketchPartitionBoundaries[C]{
 		totalN:        totalN,
 		boundaries:    boundaries,
 		natRanks:      natRanks,
@@ -58,6 +58,6 @@ func newItemsPartitionBoundaries[C comparable](totalN uint64, boundaries []C, na
 	}, nil
 }
 
-func (b *ItemsPartitionBoundaries[C]) GetBoundaries() []C {
+func (b *ItemsSketchPartitionBoundaries[C]) GetBoundaries() []C {
 	return b.boundaries
 }

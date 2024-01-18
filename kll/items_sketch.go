@@ -18,6 +18,7 @@
 package kll
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
@@ -27,6 +28,10 @@ import (
 type ItemSketchOp[C comparable] interface {
 	identity() C
 	lessFn() common.LessFn[C]
+	sizeOf(item C) int
+	sizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error)
+	SerializeManyToSlice(items []C) []byte
+	SerializeOneToSlice(item C) []byte
 }
 
 type ItemsSketch[C comparable] struct {
@@ -50,6 +55,8 @@ const (
 	_DEFAULT_M = uint8(8)
 	_MIN_K     = uint16(_DEFAULT_M)
 	_MAX_K     = (1 << 16) - 1
+	_MIN_M     = 2 //The minimum M
+	_MAX_M     = 8 //The maximum M
 )
 
 var (
@@ -254,10 +261,212 @@ func (s *ItemsSketch[C]) Reset() {
 	s.sortedView = nil
 }
 
+func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
+	srcN := s.n
+	var tgtStructure = _COMPACT_FULL
+	if srcN == 0 {
+		tgtStructure = _COMPACT_EMPTY
+	} else if srcN == 1 {
+		tgtStructure = _COMPACT_SINGLE
+	}
+	totalBytes, err := s.currentSerializedSizeBytes()
+	if err != nil {
+		return nil, err
+	}
+	bytesOut := make([]byte, totalBytes)
+
+	//ints 0,1
+	preInts := byte(tgtStructure.getPreInts())
+	serVer := byte(tgtStructure.getSerVer())
+	famId := byte(internal.FamilyEnum.Kll.Id)
+	flags := byte(0)
+	if s.IsEmpty() {
+		flags |= _EMPTY_BIT_MASK
+	}
+	if s.IsLevelZeroSorted() {
+		flags |= _LEVEL_ZERO_SORTED_BIT_MASK
+	}
+	if s.n == 1 {
+		flags |= _SINGLE_ITEM_BIT_MASK
+	}
+	k := uint16(s.k)
+	m := uint8(s.m)
+
+	bytesOut[0] = preInts
+	bytesOut[1] = serVer
+	bytesOut[2] = famId
+	bytesOut[3] = flags
+	binary.LittleEndian.PutUint16(bytesOut[4:6], k)
+	bytesOut[6] = m
+
+	if tgtStructure == _COMPACT_EMPTY {
+		return bytesOut, nil
+	}
+
+	if tgtStructure == _COMPACT_SINGLE {
+		siByteArr, err := s.getSingleItemByteArr()
+		if err != nil {
+			return nil, err
+		}
+		copy(bytesOut[_DATA_START_ADR_SINGLE_ITEM:], siByteArr)
+		return bytesOut, nil
+	}
+
+	return nil, fmt.Errorf("updatable serialization not implemented")
+}
+
+/*
+	static  byte[] toByteArray(final KllSketch srcSk, final boolean updatable) {
+	    //ITEMS_SKETCH byte array is never updatable
+	    final boolean myUpdatable = srcSk.sketchType == ITEMS_SKETCH ? false : updatable;
+	    final long srcN = srcSk.getN();
+	    final sketchStructure tgtStructure;
+	    if (myUpdatable) { tgtStructure = UPDATABLE; }
+	    else if (srcN == 0) { tgtStructure = COMPACT_EMPTY; }
+	    else if (srcN == 1) { tgtStructure = COMPACT_SINGLE; }
+	    else { tgtStructure = COMPACT_FULL; }
+	    final int totalBytes = srcSk.currentSerializedSizeBytes(myUpdatable);
+	    final byte[] bytesOut = new byte[totalBytes];
+	    final WritableBuffer wbuf = WritableMemory.writableWrap(bytesOut).asWritableBuffer(ByteOrder.LITTLE_ENDIAN);
+
+	    //ints 0,1
+	    final byte preInts = (byte)tgtStructure.getPreInts();
+	    final byte serVer = (byte)tgtStructure.getSerVer();
+	    final byte famId = (byte)(KLL.getID());
+	    final byte flags = (byte) ((srcSk.isEmpty() ? EMPTY_BIT_MASK : 0)
+	        | (srcSk.isLevelZeroSorted() ? LEVEL_ZERO_SORTED_BIT_MASK : 0)
+	        | (srcSk.getN() == 1 ? SINGLE_ITEM_BIT_MASK : 0));
+	    final short k = (short) srcSk.getK();
+	    final byte m = (byte) srcSk.getM();
+
+	    //load first 8 bytes
+	    wbuf.putByte(preInts); //byte 0
+	    wbuf.putByte(serVer);
+	    wbuf.putByte(famId);
+	    wbuf.putByte(flags);
+	    wbuf.putShort(k);
+	    wbuf.putByte(m);
+	    wbuf.incrementPosition(1); //byte 7 is unused
+
+	    if (tgtStructure == COMPACT_EMPTY) {
+	      return bytesOut;
+	    }
+
+	    if (tgtStructure == COMPACT_SINGLE) {
+	      final byte[] siByteArr = srcSk.getSingleItemByteArr();
+	      final int len = siByteArr.length;
+	      wbuf.putByteArray(siByteArr, 0, len);
+	      wbuf.incrementPosition(-len);
+	      return bytesOut;
+	    }
+
+	    // Tgt is either COMPACT_FULL or UPDATABLE
+	    //ints 2,3
+	    final long n = srcSk.getN();
+	    //ints 4
+	    final short minK = (short) srcSk.getMinK();
+	    final byte numLevels = (byte) srcSk.getNumLevels();
+	    //end of full preamble
+	    final int[] lvlsArr = srcSk.getLevelsArray(tgtStructure);
+	    final byte[] minMaxByteArr = srcSk.getMinMaxByteArr();
+	    final byte[] itemsByteArr = tgtStructure == COMPACT_FULL
+	        ? srcSk.getRetainedItemsByteArr()
+	        : srcSk.getTotalItemsByteArr();
+
+	    wbuf.putLong(n);
+	    wbuf.putShort(minK);
+	    wbuf.putByte(numLevels);
+	    wbuf.incrementPosition(1);
+	    wbuf.putIntArray(lvlsArr, 0, lvlsArr.length);
+	    wbuf.putByteArray(minMaxByteArr, 0, minMaxByteArr.length);
+	    wbuf.putByteArray(itemsByteArr, 0, itemsByteArr.length);
+	    return bytesOut;
+	  }
+*/
+func (s *ItemsSketch[C]) currentSerializedSizeBytes() (int, error) {
+	srcN := s.n
+	var tgtStructure = _COMPACT_FULL
+	if srcN == 0 {
+		tgtStructure = _COMPACT_EMPTY
+	} else if srcN == 1 {
+		tgtStructure = _COMPACT_SINGLE
+	}
+
+	totalBytes := 0
+	if tgtStructure == _COMPACT_EMPTY {
+		totalBytes = _N_LONG_ADR
+	} else if tgtStructure == _COMPACT_SINGLE {
+		v, err := s.getSingleItemSizeBytes()
+		if err != nil {
+			return 0, err
+		}
+		totalBytes = _DATA_START_ADR_SINGLE_ITEM + v
+	} else if tgtStructure == _COMPACT_FULL {
+
+		totalBytes = _DATA_START_ADR + s.getLevelsArrSizeBytes(tgtStructure) + s.getMinMaxSizeBytes() + s.getRetainedItemsSizeBytes()
+	} else { //structure = UPDATABLE
+		return 0, fmt.Errorf("updatable serialization not implemented")
+	}
+	return totalBytes, nil
+}
+
 func (s *ItemsSketch[C]) getLevelsArray() []uint32 {
 	levels := make([]uint32, len(s.levels))
 	copy(levels, s.levels)
 	return levels
+}
+
+func (s *ItemsSketch[C]) getLevelsArrSizeBytes(structure sketchStructure) int {
+	if structure == _UPDATABLE {
+		return len(s.levels) * 4 // * Integer.BYTES
+	} else if structure == _COMPACT_FULL {
+		return (len(s.levels) - 1) * 4 // // * Integer.BYTES
+	} else {
+		return 0
+	}
+}
+
+func (s *ItemsSketch[C]) getMinMaxSizeBytes() int {
+	return s.itemsSketchOp.sizeOf(*s.minItem) + s.itemsSketchOp.sizeOf(*s.maxItem)
+}
+
+func (s *ItemsSketch[C]) getSingleItemSizeBytes() (int, error) {
+	v, err := s.getSingleItem()
+	if err != nil {
+		return 0, err
+	}
+	return s.itemsSketchOp.sizeOf(v), nil
+}
+
+func (s *ItemsSketch[C]) getSingleItemByteArr() ([]byte, error) {
+	v, err := s.getSingleItem()
+	if err != nil {
+		return nil, err
+	}
+	return s.itemsSketchOp.SerializeOneToSlice(v), nil
+}
+
+func (s *ItemsSketch[C]) getSingleItem() (C, error) {
+	if s.n != 1 {
+		return s.itemsSketchOp.identity(), fmt.Errorf("sketch must have exactly one item")
+	}
+	return s.items[s.k-1], nil
+}
+
+func (s *ItemsSketch[C]) getRetainedItemsArray() []C {
+	numRet := s.GetNumRetained()
+	outArr := make([]C, numRet)
+	copy(outArr, s.items[s.levels[0]:])
+	return outArr
+}
+
+func (s *ItemsSketch[C]) getRetainedItemsByteArr() []byte {
+	retArr := s.getRetainedItemsArray()
+	return s.itemsSketchOp.SerializeManyToSlice(retArr)
+}
+
+func (s *ItemsSketch[C]) getRetainedItemsSizeBytes() int {
+	return len(s.getRetainedItemsByteArr())
 }
 
 func (s *ItemsSketch[C]) setupSortedView() error {

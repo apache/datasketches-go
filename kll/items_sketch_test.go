@@ -18,6 +18,8 @@
 package kll
 
 import (
+	"encoding/binary"
+	"errors"
 	"github.com/apache/datasketches-go/common"
 	"github.com/stretchr/testify/assert"
 	"math"
@@ -35,6 +37,64 @@ func (f stringItemsSketchOp) lessFn() common.LessFn[string] {
 	return func(a string, b string) bool {
 		return a < b
 	}
+}
+
+func (f stringItemsSketchOp) sizeOf(item string) int {
+	return len(item)
+}
+
+func (f stringItemsSketchOp) sizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error) {
+	if numItems <= 0 {
+		return 0, nil
+	}
+	offset := offsetBytes
+	memCap := len(mem)
+	for i := 0; i < numItems; i++ {
+		if offset+4 > memCap {
+			return 0, errors.New("offset out of bounds")
+		}
+		itemLenBytes := int(binary.LittleEndian.Uint32(mem[offset:]))
+		offset += 4
+		if offset+itemLenBytes > memCap {
+			return 0, errors.New("offset out of bounds")
+		}
+		offset += itemLenBytes
+	}
+	return offset - offsetBytes, nil
+}
+
+func (h stringItemsSketchOp) SerializeOneToSlice(item string) []byte {
+	if len(item) == 0 {
+		return []byte{}
+	}
+	utf8len := len(item)
+	bytesOut := make([]byte, utf8len+4)
+	binary.LittleEndian.PutUint32(bytesOut, uint32(utf8len))
+	copy(bytesOut[4:], []byte(item))
+	return bytesOut
+}
+
+func (h stringItemsSketchOp) SerializeManyToSlice(item []string) []byte {
+	if len(item) == 0 {
+		return []byte{}
+	}
+	totalBytes := 0
+	numItems := len(item)
+	serialized2DArray := make([][]byte, numItems)
+	for i := 0; i < numItems; i++ {
+		serialized2DArray[i] = []byte(item[i])
+		totalBytes += len(serialized2DArray[i]) + 4
+	}
+	bytesOut := make([]byte, totalBytes)
+	offset := 0
+	for i := 0; i < numItems; i++ {
+		utf8len := len(serialized2DArray[i])
+		binary.LittleEndian.PutUint32(bytesOut[offset:], uint32(utf8len))
+		offset += 4
+		copy(bytesOut[offset:], serialized2DArray[i])
+		offset += utf8len
+	}
+	return bytesOut
 }
 
 const (
@@ -618,5 +678,79 @@ func TestItemsSketch_SortedView(t *testing.T) {
 	assert.Equal(t, int64(2), itr.GetNaturalRank(false))
 	assert.Equal(t, int64(3), itr.GetNaturalRank(true))
 	assert.False(t, itr.Next())
-
 }
+
+func TestItemsSketch_CDF_PDF(t *testing.T) {
+	cdfI := []float64{.25, .50, .75, 1.0, 1.0}
+	cdfE := []float64{0.0, .25, .50, .75, 1.0}
+	pmfI := []float64{.25, .25, .25, .25, 0.0}
+	pmfE := []float64{0.0, .25, .25, .25, .25}
+	toll := 1e-10
+	sketch, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	strIn := []string{"A", "AB", "ABC", "ABCD"}
+	for i := 0; i < len(strIn); i++ {
+		sketch.Update(strIn[i])
+	}
+	sp := []string{"A", "AB", "ABC", "ABCD"}
+	t.Logf("SplitPoints: %v", sp)
+	for i := 0; i < len(sp); i++ {
+		t.Logf("%10s", sp[i])
+	}
+	t.Logf("")
+	t.Logf("INCLUSIVE:")
+	cdf, err := sketch.GetCDF(sp, true)
+	assert.NoError(t, err)
+	pmf, err := sketch.GetPMF(sp, true)
+	assert.NoError(t, err)
+	t.Logf("%10s%10s\n", "CDF", "PMF")
+	for i := 0; i < len(cdf); i++ {
+		t.Logf("%10.2f%10.2f\n", cdf[i], pmf[i])
+		assert.InDelta(t, cdf[i], cdfI[i], toll)
+		assert.InDelta(t, pmf[i], pmfI[i], toll)
+	}
+	t.Logf("EXCLUSIVE")
+	cdf, err = sketch.GetCDF(sp, false)
+	assert.NoError(t, err)
+	pmf, err = sketch.GetPMF(sp, false)
+	assert.NoError(t, err)
+	t.Logf("%10s%10s\n", "CDF", "PMF")
+	for i := 0; i < len(cdf); i++ {
+		t.Logf("%10.2f%10.2f\n", cdf[i], pmf[i])
+		assert.InDelta(t, cdf[i], cdfE[i], toll)
+		assert.InDelta(t, pmf[i], pmfE[i], toll)
+	}
+}
+
+func TestItemsSketch_HeapifyEmpty(t *testing.T) {
+	sk1, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	mem, err := sk1.ToSlice()
+	assert.NoError(t, err)
+	assert.NotNil(t, mem)
+	memVal, err := NewItemsSketchMemoryValidate[string](mem, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	assert.Equal(t, memVal.sketchStructure, _COMPACT_EMPTY)
+	assert.Equal(t, len(mem), 8)
+}
+
+/*
+  // New added tests specially for KllItemsSketch
+  @Test
+  public void checkHeapifyEmpty() {
+    final KllItemsSketch<String> sk1 = KllItemsSketch.newHeapInstance(20, Comparator.naturalOrder(), serDe);
+    Memory mem = Memory.wrap(sk1.toByteArray());
+    KllMemoryValidate memVal = new KllMemoryValidate(mem, SketchType.ITEMS_SKETCH, serDe);
+    assertEquals(memVal.sketchStructure, COMPACT_EMPTY);
+    assertEquals(mem.getCapacity(), 8);
+    final KllItemsSketch<String> sk2 = KllItemsSketch.heapify(mem, Comparator.naturalOrder(), serDe);
+    assertEquals(sk2.sketchStructure, UPDATABLE);
+    assertEquals(sk2.getN(), 0);
+    assertFalse(sk2.isReadOnly());
+    try { sk2.getMinItem(); fail(); } catch (SketchesArgumentException e) { }
+    try { sk2.getMaxItem(); fail(); } catch (SketchesArgumentException e) { }
+    println(sk1.toString(true, true));
+    println("");
+    println(KllPreambleUtil.toString(mem, ITEMS_SKETCH, true, serDe));
+  }
+*/

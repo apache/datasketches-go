@@ -55,6 +55,20 @@ func getNaturalRank(normalizedRank float64, totalN uint64, inclusive bool) int64
 	return int64(math.Floor(naturalRank))
 }
 
+func checkK(k int, m int) error {
+	if k < m || k > _MAX_K {
+		return errors.New("K must be >= " + strconv.Itoa(m) + " and <= " + strconv.Itoa(_MAX_K) + ": " + strconv.Itoa(k))
+	}
+	return nil
+}
+
+func checkM(m int) error {
+	if m < _MIN_M || m > _MAX_M || ((m & 1) == 1) {
+		return errors.New("M must be >= 2, <= 8 and even: " + strconv.Itoa(m))
+	}
+	return nil
+}
+
 func checkNormalizedRankBounds(rank float64) error {
 	if rank < 0 || rank > 1 {
 		return errors.New("rank must be between 0 and 1 inclusive")

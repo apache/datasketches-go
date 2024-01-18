@@ -77,7 +77,7 @@ func Example() {
 
 	// Serialize and deserialize the union sketch
 	serializedSketch, _ := unionSketch.ToUpdatableSlice()
-	reloadedSketch, _ := DeserializeHllSketch(serializedSketch, true)
+	reloadedSketch, _ := NewHllSketchFromSlice(serializedSketch, true)
 	reloadedEst, _ := reloadedSketch.GetEstimate()
 	fmt.Printf("Cardinality estimation of reloaded unioned sketch: %d\n", int64(reloadedEst))
 

@@ -71,7 +71,7 @@ func TestJavaCompat(t *testing.T) {
 		for _, n := range nArr {
 			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll4_n%d_java.sk", internal.JavaPath, n))
 			assert.NoError(t, err)
-			sketch, err := DeserializeHllSketch(bytes, true)
+			sketch, err := NewHllSketchFromSlice(bytes, true)
 			if err != nil {
 				return
 			}
@@ -89,7 +89,7 @@ func TestJavaCompat(t *testing.T) {
 			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll6_n%d_java.sk", internal.JavaPath, n))
 			assert.NoError(t, err)
 
-			sketch, err := DeserializeHllSketch(bytes, true)
+			sketch, err := NewHllSketchFromSlice(bytes, true)
 			if err != nil {
 				return
 			}
@@ -106,7 +106,7 @@ func TestJavaCompat(t *testing.T) {
 		for _, n := range nArr {
 			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll8_n%d_java.sk", internal.JavaPath, n))
 			assert.NoError(t, err)
-			sketch, err := DeserializeHllSketch(bytes, true)
+			sketch, err := NewHllSketchFromSlice(bytes, true)
 			if err != nil {
 				return
 			}
@@ -125,7 +125,7 @@ func TestCppCompat(t *testing.T) {
 		for _, n := range nArr {
 			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll4_n%d_cpp.sk", internal.CppPath, n))
 			assert.NoError(t, err)
-			sketch, err := DeserializeHllSketch(bytes, true)
+			sketch, err := NewHllSketchFromSlice(bytes, true)
 			if err != nil {
 				return
 			}
@@ -143,7 +143,7 @@ func TestCppCompat(t *testing.T) {
 			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll6_n%d_cpp.sk", internal.CppPath, n))
 			assert.NoError(t, err)
 
-			sketch, err := DeserializeHllSketch(bytes, true)
+			sketch, err := NewHllSketchFromSlice(bytes, true)
 			if err != nil {
 				return
 			}
@@ -160,7 +160,7 @@ func TestCppCompat(t *testing.T) {
 		for _, n := range nArr {
 			bytes, err := os.ReadFile(fmt.Sprintf("%s/hll8_n%d_cpp.sk", internal.CppPath, n))
 			assert.NoError(t, err)
-			sketch, err := DeserializeHllSketch(bytes, true)
+			sketch, err := NewHllSketchFromSlice(bytes, true)
 			if err != nil {
 				return
 			}

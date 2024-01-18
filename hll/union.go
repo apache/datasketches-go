@@ -107,12 +107,12 @@ func NewUnion(lgMaxK int) (Union, error) {
 	}, nil
 }
 
-func DeserializeUnion(byteArray []byte) (Union, error) {
+func NewUnionFromSlice(byteArray []byte) (Union, error) {
 	lgK, err := checkLgK(extractLgK(byteArray))
 	if err != nil {
 		return nil, err
 	}
-	sk, e := DeserializeHllSketch(byteArray, false)
+	sk, e := NewHllSketchFromSlice(byteArray, false)
 	if e != nil {
 		return nil, e
 	}

@@ -97,6 +97,10 @@ func (h stringItemsSketchOp) SerializeManyToSlice(item []string) []byte {
 	return bytesOut
 }
 
+func (h stringItemsSketchOp) DeserializeFromSlice(mem []byte, offsetBytes int, numItems int) ([]string, error) {
+	return nil, nil
+}
+
 const (
 	PMF_EPS_FOR_K_256       = 0.013 // PMF rank error (epsilon) for k=256
 	NUMERIC_NOISE_TOLERANCE = 1e-6
@@ -722,35 +726,22 @@ func TestItemsSketch_CDF_PDF(t *testing.T) {
 	}
 }
 
-func TestItemsSketch_HeapifyEmpty(t *testing.T) {
+func TestItemsSketch_DeserializeEmpty(t *testing.T) {
 	sk1, err := NewItemsSketch[string](20, stringItemsSketchOp{})
 	assert.NoError(t, err)
 	mem, err := sk1.ToSlice()
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
-	memVal, err := NewItemsSketchMemoryValidate[string](mem, stringItemsSketchOp{})
+	memVal, err := newItemsSketchMemoryValidate[string](mem, stringItemsSketchOp{})
 	assert.NoError(t, err)
 	assert.Equal(t, memVal.sketchStructure, _COMPACT_EMPTY)
 	assert.Equal(t, len(mem), 8)
-}
 
-/*
-  // New added tests specially for KllItemsSketch
-  @Test
-  public void checkHeapifyEmpty() {
-    final KllItemsSketch<String> sk1 = KllItemsSketch.newHeapInstance(20, Comparator.naturalOrder(), serDe);
-    Memory mem = Memory.wrap(sk1.toByteArray());
-    KllMemoryValidate memVal = new KllMemoryValidate(mem, SketchType.ITEMS_SKETCH, serDe);
-    assertEquals(memVal.sketchStructure, COMPACT_EMPTY);
-    assertEquals(mem.getCapacity(), 8);
-    final KllItemsSketch<String> sk2 = KllItemsSketch.heapify(mem, Comparator.naturalOrder(), serDe);
-    assertEquals(sk2.sketchStructure, UPDATABLE);
-    assertEquals(sk2.getN(), 0);
-    assertFalse(sk2.isReadOnly());
-    try { sk2.getMinItem(); fail(); } catch (SketchesArgumentException e) { }
-    try { sk2.getMaxItem(); fail(); } catch (SketchesArgumentException e) { }
-    println(sk1.toString(true, true));
-    println("");
-    println(KllPreambleUtil.toString(mem, ITEMS_SKETCH, true, serDe));
-  }
-*/
+	sk2, err := NewItemsSketchFromSlice[string](mem, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	assert.Equal(t, sk2.GetN(), uint64(0))
+	_, err = sk2.GetMinItem()
+	assert.Error(t, err)
+	_, err = sk2.GetMaxItem()
+	assert.Error(t, err)
+}

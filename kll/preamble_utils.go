@@ -53,24 +53,24 @@ func getEmptyFlag(mem []byte) bool {
 	return (getFlags(mem) & _EMPTY_BIT_MASK) != 0
 }
 
-func getK(mem []byte) int {
-	return int(uint16(mem[_K_SHORT_ADR]) & 0xFFFF)
+func getK(mem []byte) uint16 {
+	return uint16(mem[_K_SHORT_ADR]) & 0xFFFF
 }
 
-func getM(mem []byte) int {
-	return int(mem[_M_BYTE_ADR] & 0xFF)
+func getM(mem []byte) uint8 {
+	return mem[_M_BYTE_ADR] & 0xFF
 }
 
-func getN(mem []byte) int64 {
-	return int64(binary.LittleEndian.Uint64(mem[_N_LONG_ADR : _N_LONG_ADR+8]))
+func getN(mem []byte) uint64 {
+	return binary.LittleEndian.Uint64(mem[_N_LONG_ADR : _N_LONG_ADR+8])
 }
 
-func getMinK(mem []byte) int {
-	return int(binary.LittleEndian.Uint16(mem[_MIN_K_SHORT_ADR : _MIN_K_SHORT_ADR+2]))
+func getMinK(mem []byte) uint16 {
+	return binary.LittleEndian.Uint16(mem[_MIN_K_SHORT_ADR : _MIN_K_SHORT_ADR+2])
 }
 
-func getNumLevels(mem []byte) int {
-	return int(mem[_FLAGS_BYTE_ADR] & 0xFF)
+func getNumLevels(mem []byte) uint8 {
+	return mem[_FLAGS_BYTE_ADR] & 0xFF
 }
 
 /*

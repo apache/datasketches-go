@@ -32,6 +32,7 @@ type ItemSketchOp[C comparable] interface {
 	sizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error)
 	SerializeManyToSlice(items []C) []byte
 	SerializeOneToSlice(item C) []byte
+	DeserializeFromSlice(mem []byte, offsetBytes int, numItems int) ([]C, error)
 }
 
 type ItemsSketch[C comparable] struct {
@@ -43,7 +44,6 @@ type ItemsSketch[C comparable] struct {
 	n                 uint64
 	levels            []uint32
 	items             []C
-	itemsSize         uint32
 	minItem           *C
 	maxItem           *C
 	sortedView        *ItemsSketchSortedView[C]
@@ -67,24 +67,91 @@ var (
 		205891132094649}
 )
 
-func NewItemsSketch[C comparable](k uint16, itemSketchOp ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewItemsSketch[C comparable](k uint16, itemsSketchOp ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	if k < _MIN_K || k > _MAX_K {
 		return nil, fmt.Errorf("k must be >= %d and <= %d: %d", _MIN_K, _MAX_K, k)
 	}
 	return &ItemsSketch[C]{
-		k,
-		_DEFAULT_M,
-		k,
-		uint8(1),
-		false,
-		0,
-		[]uint32{uint32(k), uint32(k)},
-		make([]C, k),
-		uint32(k),
-		nil,
-		nil,
-		nil,
-		itemSketchOp,
+		k:             k,
+		m:             _DEFAULT_M,
+		minK:          k,
+		numLevels:     uint8(1),
+		levels:        []uint32{uint32(k), uint32(k)},
+		items:         make([]C, k),
+		itemsSketchOp: itemsSketchOp,
+	}, nil
+}
+
+func NewItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp ItemSketchOp[C]) (*ItemsSketch[C], error) {
+
+	memVal, err := newItemsSketchMemoryValidate(sl, itemsSketchOp)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		k                 = memVal.k
+		m                 = memVal.m
+		levelsArr         = memVal.levelsArr
+		n                 = memVal.n
+		minK              = memVal.minK
+		isLevelZeroSorted = memVal.level0SortedFlag
+		minItem           *C
+		maxItem           *C
+		items             []C
+	)
+
+	switch memVal.sketchStructure {
+	case _COMPACT_EMPTY:
+		minItem = nil
+		maxItem = nil
+		items = make([]C, k)
+	case _COMPACT_SINGLE:
+		offset := _N_LONG_ADR
+		deserItems, err := itemsSketchOp.DeserializeFromSlice(sl, offset, 1)
+		if err != nil {
+			return nil, err
+		}
+		minItem = &deserItems[0]
+		maxItem = &deserItems[0]
+		items = make([]C, k)
+		items[k-1] = deserItems[0]
+	case _COMPACT_FULL:
+		offset := int(_DATA_START_ADR + memVal.numLevels*4)
+		deserMinItems, err := itemsSketchOp.DeserializeFromSlice(sl, offset, 1)
+		minItem = &deserMinItems[0]
+		if err != nil {
+			return nil, err
+		}
+		offset += itemsSketchOp.sizeOf(*minItem)
+		deserMaxItems, err := itemsSketchOp.DeserializeFromSlice(sl, offset, 1)
+		maxItem = &deserMaxItems[0]
+		if err != nil {
+			return nil, err
+		}
+		offset += itemsSketchOp.sizeOf(*maxItem)
+		numRetained := levelsArr[memVal.numLevels] - levelsArr[0]
+		deseRetItems, err := itemsSketchOp.DeserializeFromSlice(sl, offset, int(numRetained))
+		if err != nil {
+			return nil, err
+		}
+		for i := uint32(0); i < numRetained; i++ {
+			items[i] = deseRetItems[i+levelsArr[0]]
+		}
+	}
+
+	return &ItemsSketch[C]{
+		k:                 k,
+		m:                 m,
+		minK:              minK,
+		numLevels:         memVal.numLevels,
+		isLevelZeroSorted: isLevelZeroSorted,
+		n:                 n,
+		levels:            levelsArr,
+		items:             items,
+		minItem:           minItem,
+		maxItem:           maxItem,
+		itemsSketchOp:     itemsSketchOp,
 	}, nil
 }
 

@@ -6,18 +6,18 @@ import (
 	"github.com/apache/datasketches-go/internal"
 )
 
-type ItemsSketchMemoryValidate[C comparable] struct {
+type itemsSketchMemoryValidate[C comparable] struct {
 	srcMem          []byte
 	itemSketchOp    ItemSketchOp[C]
 	sketchStructure sketchStructure
 
 	// first 8 bytes of preamble
-	preInts  int //used by KllPreambleUtil
-	serVer   int //used by KllPreambleUtil
-	familyID int //used by KllPreambleUtil
-	flags    int //used by KllPreambleUtil
-	k        int //used multiple places
-	m        int //used multiple places
+	preInts  int    //used by KllPreambleUtil
+	serVer   int    //used by KllPreambleUtil
+	familyID int    //used by KllPreambleUtil
+	flags    int    //used by KllPreambleUtil
+	k        uint16 //used multiple places
+	m        uint8  //used multiple places
 	//byte 7 is unused
 
 	//Flag bits:
@@ -26,18 +26,18 @@ type ItemsSketchMemoryValidate[C comparable] struct {
 
 	// depending on the layout, the next 8-16 bytes of the preamble, may be derived by assumption.
 	// For example, if the layout is compact & empty, n = 0, if compact and single, n = 1.
-	n         int64 //8 bytes (if present), used multiple places
-	minK      int   //2 bytes (if present), used multiple places
-	numLevels int   //1 byte  (if present), used by KllPreambleUtil
+	n         uint64 //8 bytes (if present), used multiple places
+	minK      uint16 //2 bytes (if present), used multiple places
+	numLevels uint8  //1 byte  (if present), used by KllPreambleUtil
 	//skip unused byte
-	levelsArr []int //starts at byte 20, adjusted to include top index here, used multiple places
+	levelsArr []uint32 //starts at byte 20, adjusted to include top index here, used multiple places
 
 	// derived.
 	sketchBytes int //used by KllPreambleUtil
 	typeBytes   int //always 0 for generic
 }
 
-func NewItemsSketchMemoryValidate[C comparable](srcMem []byte, itemSketchOp ItemSketchOp[C]) (*ItemsSketchMemoryValidate[C], error) {
+func newItemsSketchMemoryValidate[C comparable](srcMem []byte, itemSketchOp ItemSketchOp[C]) (*itemsSketchMemoryValidate[C], error) {
 	capa := cap(srcMem)
 	if capa < 8 {
 		return nil, fmt.Errorf("Memory too small: %d", capa)
@@ -64,7 +64,7 @@ func NewItemsSketchMemoryValidate[C comparable](srcMem []byte, itemSketchOp Item
 	emptyFlag := getEmptyFlag(srcMem)
 	level0SortedFlag := getLevelZeroSortedFlag(srcMem)
 	typeBytes := 0
-	vlid := &ItemsSketchMemoryValidate[C]{
+	vlid := &itemsSketchMemoryValidate[C]{
 		srcMem:           srcMem,
 		itemSketchOp:     itemSketchOp,
 		sketchStructure:  sketchStructure,
@@ -82,7 +82,7 @@ func NewItemsSketchMemoryValidate[C comparable](srcMem []byte, itemSketchOp Item
 	return vlid, err
 }
 
-func (vlid *ItemsSketchMemoryValidate[C]) validate() error {
+func (vlid *itemsSketchMemoryValidate[C]) validate() error {
 	switch vlid.sketchStructure {
 	case _COMPACT_FULL:
 		if vlid.emptyFlag {
@@ -92,12 +92,12 @@ func (vlid *ItemsSketchMemoryValidate[C]) validate() error {
 		vlid.minK = getMinK(vlid.srcMem)
 		vlid.numLevels = getNumLevels(vlid.srcMem)
 		// Get Levels Arr and add the last element
-		vlid.levelsArr = make([]int, vlid.numLevels+1)
-		for i := 0; i < vlid.numLevels; i++ {
-			vlid.levelsArr[i] = int(binary.LittleEndian.Uint32(vlid.srcMem[_DATA_START_ADR+i*4 : _DATA_START_ADR+i*4+4]))
+		vlid.levelsArr = make([]uint32, vlid.numLevels+1)
+		for i := uint8(0); i < vlid.numLevels; i++ {
+			vlid.levelsArr[i] = binary.LittleEndian.Uint32(vlid.srcMem[_DATA_START_ADR+i*4 : _DATA_START_ADR+i*4+4])
 		}
 		capacityItems := computeTotalItemCapacity(uint16(vlid.k), uint8(vlid.m), uint8(vlid.numLevels))
-		vlid.levelsArr[vlid.numLevels] = int(capacityItems) //load the last one
+		vlid.levelsArr[vlid.numLevels] = capacityItems //load the last one
 		sb, err := computeSketchBytes(vlid.srcMem, vlid.levelsArr, vlid.typeBytes, vlid.itemSketchOp)
 		if err != nil {
 			return err
@@ -109,18 +109,18 @@ func (vlid *ItemsSketchMemoryValidate[C]) validate() error {
 			return fmt.Errorf("Empty flag and compact empty")
 		}
 		vlid.n = 0 //assumed
-		vlid.minK = vlid.k
+		vlid.minK = uint16(vlid.k)
 		vlid.numLevels = 1 //assumed
-		vlid.levelsArr = []int{vlid.k, vlid.k}
+		vlid.levelsArr = []uint32{uint32(vlid.k), uint32(vlid.k)}
 		vlid.sketchBytes = _DATA_START_ADR_SINGLE_ITEM
 	case _COMPACT_SINGLE:
 		if vlid.emptyFlag {
 			return fmt.Errorf("Empty flag and compact single")
 		}
 		vlid.n = 1 //assumed
-		vlid.minK = vlid.k
+		vlid.minK = uint16(vlid.k)
 		vlid.numLevels = 1 //assumed
-		vlid.levelsArr = []int{vlid.k - 1, vlid.k}
+		vlid.levelsArr = []uint32{uint32(vlid.k) - 1, uint32(vlid.k)}
 		v, err := vlid.itemSketchOp.sizeOfMany(vlid.srcMem, _DATA_START_ADR_SINGLE_ITEM, 1)
 		if err != nil {
 			return err
@@ -132,20 +132,20 @@ func (vlid *ItemsSketchMemoryValidate[C]) validate() error {
 	return nil
 }
 
-func computeSketchBytes[C comparable](srcMem []byte, levelsArr []int, typeBytes int, itemSketchOp ItemSketchOp[C]) (int, error) {
+func computeSketchBytes[C comparable](srcMem []byte, levelsArr []uint32, typeBytes int, itemSketchOp ItemSketchOp[C]) (int, error) {
 	numLevels := len(levelsArr) - 1
 	retainedItems := levelsArr[numLevels] - levelsArr[0]
 	levelsLen := len(levelsArr) - 1
 	numItems := retainedItems
 	offsetBytes := _DATA_START_ADR + levelsLen*4
 	if typeBytes == 1 {
-		v, err := itemSketchOp.sizeOfMany(srcMem, offsetBytes, numItems)
+		v, err := itemSketchOp.sizeOfMany(srcMem, offsetBytes, int(numItems))
 		if err != nil {
 			return 0, err
 		}
 		offsetBytes += v + 2 //2 for min & max
 	} else {
-		v, err := itemSketchOp.sizeOfMany(srcMem, offsetBytes, numItems+2) //2 for min & max
+		v, err := itemSketchOp.sizeOfMany(srcMem, offsetBytes, int(numItems)+2) //2 for min & max
 		if err != nil {
 			return 0, err
 		}

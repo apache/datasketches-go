@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"math"
 	"testing"
+	"unsafe"
 )
 
 type stringItemsSketchOp struct {
@@ -47,10 +48,11 @@ func (f stringItemsSketchOp) sizeOfMany(mem []byte, offsetBytes int, numItems in
 	if numItems <= 0 {
 		return 0, nil
 	}
+	reqLen := 4
 	offset := offsetBytes
 	memCap := len(mem)
 	for i := 0; i < numItems; i++ {
-		if offset+4 > memCap {
+		if !checkBounds(offset, reqLen, memCap) {
 			return 0, errors.New("offset out of bounds")
 		}
 		itemLenBytes := int(binary.LittleEndian.Uint32(mem[offset:]))
@@ -98,7 +100,28 @@ func (h stringItemsSketchOp) SerializeManyToSlice(item []string) []byte {
 }
 
 func (h stringItemsSketchOp) DeserializeFromSlice(mem []byte, offsetBytes int, numItems int) ([]string, error) {
-	return nil, nil
+	if numItems <= 0 {
+		return []string{}, nil
+	}
+	array := make([]string, numItems)
+	offset := offsetBytes
+	intSize := int(unsafe.Sizeof(uint32(0)))
+	memCap := len(mem)
+	for i := 0; i < numItems; i++ {
+		if !checkBounds(offset, intSize, memCap) {
+			return nil, errors.New("offset out of bounds")
+		}
+		strLength := int(binary.LittleEndian.Uint32(mem[offset:]))
+		offset += intSize
+		utf8Bytes := make([]byte, strLength)
+		if !checkBounds(offset, strLength, memCap) {
+			return nil, errors.New("offset out of bounds")
+		}
+		copy(utf8Bytes, mem[offset:offset+strLength])
+		offset += strLength
+		array[i] = string(utf8Bytes)
+	}
+	return array, nil
 }
 
 const (
@@ -744,4 +767,25 @@ func TestItemsSketch_DeserializeEmpty(t *testing.T) {
 	assert.Error(t, err)
 	_, err = sk2.GetMaxItem()
 	assert.Error(t, err)
+}
+
+func TestItemsSketch_DeserializeSingleItem(t *testing.T) {
+	sk1, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	sk1.Update("A")
+	mem, err := sk1.ToSlice()
+	assert.NoError(t, err)
+	assert.NotNil(t, mem)
+	memVal, err := newItemsSketchMemoryValidate[string](mem, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	assert.Equal(t, memVal.sketchStructure, _COMPACT_SINGLE)
+	sk2, err := NewItemsSketchFromSlice[string](mem, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	assert.Equal(t, sk2.GetN(), uint64(1))
+	minV, err := sk2.GetMinItem()
+	assert.NoError(t, err)
+	assert.Equal(t, minV, "A")
+	maxV, err := sk2.GetMaxItem()
+	assert.NoError(t, err)
+	assert.Equal(t, maxV, "A")
 }

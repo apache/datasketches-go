@@ -23,6 +23,7 @@ import (
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
 	"sort"
+	"unsafe"
 )
 
 type ItemSketchOp[C comparable] interface {
@@ -502,7 +503,7 @@ func (s *ItemsSketch[C]) getSingleItemSizeBytes() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return s.itemsSketchOp.sizeOf(v), nil
+	return s.itemsSketchOp.sizeOf(v) + int(unsafe.Sizeof(uint32(1))), nil
 }
 
 func (s *ItemsSketch[C]) getSingleItemByteArr() ([]byte, error) {

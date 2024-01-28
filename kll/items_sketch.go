@@ -377,6 +377,7 @@ func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
 			return nil, err
 		}
 		copy(bytesOut[_DATA_START_ADR_SINGLE_ITEM:], siByteArr)
+		//wbuf.incrementPosition(-len);
 		return bytesOut, nil
 	}
 
@@ -395,79 +396,11 @@ func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
 	binary.LittleEndian.PutUint16(bytesOut[16:18], minK)
 	bytesOut[18] = numLevels
 	binary.LittleEndian.PutUint32(bytesOut[20:24], lvlsArr[0])
-	copy(bytesOut[_DATA_START_ADR:], minMaxByteArr)
-	copy(bytesOut[_DATA_START_ADR+len(minMaxByteArr):], itemsByteArr)
+	copy(bytesOut[_DATA_START_ADR+4:], minMaxByteArr)
+	copy(bytesOut[_DATA_START_ADR+4+len(minMaxByteArr):], itemsByteArr)
 	return bytesOut, nil
 }
 
-/*
-	static  byte[] toByteArray(final KllSketch srcSk, final boolean updatable) {
-	    //ITEMS_SKETCH byte array is never updatable
-	    final boolean myUpdatable = srcSk.sketchType == ITEMS_SKETCH ? false : updatable;
-	    final long srcN = srcSk.getN();
-	    final sketchStructure tgtStructure;
-	    if (myUpdatable) { tgtStructure = UPDATABLE; }
-	    else if (srcN == 0) { tgtStructure = COMPACT_EMPTY; }
-	    else if (srcN == 1) { tgtStructure = COMPACT_SINGLE; }
-	    else { tgtStructure = COMPACT_FULL; }
-	    final int totalBytes = srcSk.currentSerializedSizeBytes(myUpdatable);
-	    final byte[] bytesOut = new byte[totalBytes];
-	    final WritableBuffer wbuf = WritableMemory.writableWrap(bytesOut).asWritableBuffer(ByteOrder.LITTLE_ENDIAN);
-
-	    //ints 0,1
-	    final byte preInts = (byte)tgtStructure.getPreInts();
-	    final byte serVer = (byte)tgtStructure.getSerVer();
-	    final byte famId = (byte)(KLL.getID());
-	    final byte flags = (byte) ((srcSk.isEmpty() ? EMPTY_BIT_MASK : 0)
-	        | (srcSk.isLevelZeroSorted() ? LEVEL_ZERO_SORTED_BIT_MASK : 0)
-	        | (srcSk.getN() == 1 ? SINGLE_ITEM_BIT_MASK : 0));
-	    final short k = (short) srcSk.getK();
-	    final byte m = (byte) srcSk.getM();
-
-	    //load first 8 bytes
-	    wbuf.putByte(preInts); //byte 0
-	    wbuf.putByte(serVer);
-	    wbuf.putByte(famId);
-	    wbuf.putByte(flags);
-	    wbuf.putShort(k);
-	    wbuf.putByte(m);
-	    wbuf.incrementPosition(1); //byte 7 is unused
-
-	    if (tgtStructure == COMPACT_EMPTY) {
-	      return bytesOut;
-	    }
-
-	    if (tgtStructure == COMPACT_SINGLE) {
-	      final byte[] siByteArr = srcSk.getSingleItemByteArr();
-	      final int len = siByteArr.length;
-	      wbuf.putByteArray(siByteArr, 0, len);
-	      wbuf.incrementPosition(-len);
-	      return bytesOut;
-	    }
-
-	    // Tgt is either COMPACT_FULL or UPDATABLE
-	    //ints 2,3
-	    final long n = srcSk.getN();
-	    //ints 4
-	    final short minK = (short) srcSk.getMinK();
-	    final byte numLevels = (byte) srcSk.getNumLevels();
-	    //end of full preamble
-	    final int[] lvlsArr = srcSk.getLevelsArray(tgtStructure);
-	    final byte[] minMaxByteArr = srcSk.getMinMaxByteArr();
-	    final byte[] itemsByteArr = tgtStructure == COMPACT_FULL
-	        ? srcSk.getRetainedItemsByteArr()
-	        : srcSk.getTotalItemsByteArr();
-
-	    wbuf.putLong(n);
-	    wbuf.putShort(minK);
-	    wbuf.putByte(numLevels);
-	    wbuf.incrementPosition(1);
-	    wbuf.putIntArray(lvlsArr, 0, lvlsArr.length);
-	    wbuf.putByteArray(minMaxByteArr, 0, minMaxByteArr.length);
-	    wbuf.putByteArray(itemsByteArr, 0, itemsByteArr.length);
-	    return bytesOut;
-	  }
-*/
 func (s *ItemsSketch[C]) currentSerializedSizeBytes() (int, error) {
 	srcN := s.n
 	var tgtStructure = _COMPACT_FULL

@@ -802,27 +802,13 @@ func TestItemsSketch_FewItems(t *testing.T) {
 	mem, err := sk1.ToSlice()
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
-	//memVal, err := newItemsSketchMemoryValidate[string](mem, stringItemsSketchOp{})
-	//assert.NoError(t, err)
-	//assert.Equal(t, memVal.sketchStructure, _COMPACT_FULL)
-	//assert.Equal(t, len(mem), memVal.sketchBytes)
+	memVal, err := newItemsSketchMemoryValidate[string](mem, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	assert.Equal(t, memVal.sketchStructure, _COMPACT_FULL)
+	assert.Equal(t, len(mem), memVal.sketchBytes)
 }
 
 /*
-public void checkHeapifyFewItems() {
-    final KllItemsSketch<String> sk1 = KllItemsSketch.newHeapInstance(20, Comparator.naturalOrder(), serDe);
-    sk1.update("A");
-    sk1.update("AB");
-    sk1.update("ABC");
-    Memory mem = Memory.wrap(sk1.toByteArray());
-    KllMemoryValidate memVal = new KllMemoryValidate(mem, SketchType.ITEMS_SKETCH, serDe);
-    assertEquals(memVal.sketchStructure, COMPACT_FULL);
-    assertEquals(mem.getCapacity(), memVal.sketchBytes);
-    println(sk1.toString(true, true));
-    println("");
-    println(KllPreambleUtil.toString(mem, ITEMS_SKETCH, true, serDe));
-  }
-
   @Test
   public void checkHeapifyManyItems() {
     final KllItemsSketch<String> sk1 = KllItemsSketch.newHeapInstance(20, Comparator.naturalOrder(), serDe);

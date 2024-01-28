@@ -17,6 +17,8 @@ const (
 	_N_LONG_ADR      = 8  // to 15
 	_MIN_K_SHORT_ADR = 16 // to 17
 
+	_NUM_LEVELS_BYTE_ADR = 18
+
 	// 19 is reserved for future use
 	_DATA_START_ADR = 20 // Full Sketch, not single item
 
@@ -70,7 +72,7 @@ func getMinK(mem []byte) uint16 {
 }
 
 func getNumLevels(mem []byte) uint8 {
-	return mem[_FLAGS_BYTE_ADR] & 0xFF
+	return mem[_NUM_LEVELS_BYTE_ADR] & 0xFF
 }
 
 /*

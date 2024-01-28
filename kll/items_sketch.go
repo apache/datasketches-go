@@ -395,9 +395,11 @@ func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
 	binary.LittleEndian.PutUint64(bytesOut[8:16], n)
 	binary.LittleEndian.PutUint16(bytesOut[16:18], minK)
 	bytesOut[18] = numLevels
-	binary.LittleEndian.PutUint32(bytesOut[20:24], lvlsArr[0])
-	copy(bytesOut[_DATA_START_ADR+4:], minMaxByteArr)
-	copy(bytesOut[_DATA_START_ADR+4+len(minMaxByteArr):], itemsByteArr)
+	for i := uint8(0); i < numLevels; i++ {
+		binary.LittleEndian.PutUint32(bytesOut[_DATA_START_ADR+i*4:], lvlsArr[i])
+	}
+	copy(bytesOut[_DATA_START_ADR+(numLevels*4):], minMaxByteArr)
+	copy(bytesOut[_DATA_START_ADR+int(numLevels*4)+len(minMaxByteArr):], itemsByteArr)
 	return bytesOut, nil
 }
 

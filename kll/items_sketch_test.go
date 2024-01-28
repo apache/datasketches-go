@@ -41,7 +41,10 @@ func (f stringItemsSketchOp) lessFn() common.LessFn[string] {
 }
 
 func (f stringItemsSketchOp) sizeOf(item string) int {
-	return len(item)
+	if len(item) == 0 {
+		return int(unsafe.Sizeof(uint32(0)))
+	}
+	return len(item) + int(unsafe.Sizeof(uint32(0)))
 }
 
 func (f stringItemsSketchOp) sizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error) {
@@ -789,3 +792,51 @@ func TestItemsSketch_DeserializeSingleItem(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, maxV, "A")
 }
+
+func TestItemsSketch_FewItems(t *testing.T) {
+	sk1, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	sk1.Update("A")
+	sk1.Update("AB")
+	sk1.Update("ABC")
+	mem, err := sk1.ToSlice()
+	assert.NoError(t, err)
+	assert.NotNil(t, mem)
+	//memVal, err := newItemsSketchMemoryValidate[string](mem, stringItemsSketchOp{})
+	//assert.NoError(t, err)
+	//assert.Equal(t, memVal.sketchStructure, _COMPACT_FULL)
+	//assert.Equal(t, len(mem), memVal.sketchBytes)
+}
+
+/*
+public void checkHeapifyFewItems() {
+    final KllItemsSketch<String> sk1 = KllItemsSketch.newHeapInstance(20, Comparator.naturalOrder(), serDe);
+    sk1.update("A");
+    sk1.update("AB");
+    sk1.update("ABC");
+    Memory mem = Memory.wrap(sk1.toByteArray());
+    KllMemoryValidate memVal = new KllMemoryValidate(mem, SketchType.ITEMS_SKETCH, serDe);
+    assertEquals(memVal.sketchStructure, COMPACT_FULL);
+    assertEquals(mem.getCapacity(), memVal.sketchBytes);
+    println(sk1.toString(true, true));
+    println("");
+    println(KllPreambleUtil.toString(mem, ITEMS_SKETCH, true, serDe));
+  }
+
+  @Test
+  public void checkHeapifyManyItems() {
+    final KllItemsSketch<String> sk1 = KllItemsSketch.newHeapInstance(20, Comparator.naturalOrder(), serDe);
+    final int n = 109;
+    final int digits = Util.numDigits(n);
+    for (int i = 1; i <= n; i++) {
+      sk1.update(Util.intToFixedLengthString(i, digits));
+    }
+    Memory mem = Memory.wrap(sk1.toByteArray());
+    KllMemoryValidate memVal = new KllMemoryValidate(mem, SketchType.ITEMS_SKETCH, serDe);
+    assertEquals(memVal.sketchStructure, COMPACT_FULL);
+    assertEquals(mem.getCapacity(), memVal.sketchBytes);
+    println(sk1.toString(true, true));
+    println("");
+    println(KllPreambleUtil.toString(mem, ITEMS_SKETCH, true, serDe));
+  }
+*/

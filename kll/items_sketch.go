@@ -380,7 +380,24 @@ func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
 		return bytesOut, nil
 	}
 
-	return nil, fmt.Errorf("updatable serialization not implemented")
+	// Tgt is either COMPACT_FULL or UPDATABLE
+	//ints 2,3
+	n := s.n
+	//ints 4
+	minK := uint16(s.minK)
+	numLevels := uint8(s.numLevels)
+	//end of full preamble
+	lvlsArr := s.getLevelsArray()
+	minMaxByteArr := s.getMinMaxByteArr()
+	itemsByteArr := s.getRetainedItemsByteArr()
+
+	binary.LittleEndian.PutUint64(bytesOut[8:16], n)
+	binary.LittleEndian.PutUint16(bytesOut[16:18], minK)
+	bytesOut[18] = numLevels
+	binary.LittleEndian.PutUint32(bytesOut[20:24], lvlsArr[0])
+	copy(bytesOut[_DATA_START_ADR:], minMaxByteArr)
+	copy(bytesOut[_DATA_START_ADR+len(minMaxByteArr):], itemsByteArr)
+	return bytesOut, nil
 }
 
 /*
@@ -496,6 +513,15 @@ func (s *ItemsSketch[C]) getLevelsArrSizeBytes(structure sketchStructure) int {
 
 func (s *ItemsSketch[C]) getMinMaxSizeBytes() int {
 	return s.itemsSketchOp.sizeOf(*s.minItem) + s.itemsSketchOp.sizeOf(*s.maxItem)
+}
+
+func (s *ItemsSketch[C]) getMinMaxByteArr() []byte {
+	minBytes := s.itemsSketchOp.SerializeOneToSlice(*s.minItem)
+	maxBytes := s.itemsSketchOp.SerializeOneToSlice(*s.maxItem)
+	minMaxBytes := make([]byte, len(minBytes)+len(maxBytes))
+	copy(minMaxBytes, minBytes)
+	copy(minMaxBytes[len(minBytes):], maxBytes)
+	return minMaxBytes
 }
 
 func (s *ItemsSketch[C]) getSingleItemSizeBytes() (int, error) {

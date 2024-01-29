@@ -824,3 +824,17 @@ func TestItemsSketch_ManyItems(t *testing.T) {
 	assert.Equal(t, memVal.sketchStructure, _COMPACT_FULL)
 	assert.Equal(t, len(mem), memVal.sketchBytes)
 }
+
+func TestItemsSketch_SortedViewAfterReset(t *testing.T) {
+	sk, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	assert.NoError(t, err)
+	sk.Update("1")
+	sv, err := sk.GetSortedView()
+	assert.NoError(t, err)
+	ssv, err := sv.GetQuantile(1.0, true)
+	assert.NoError(t, err)
+	assert.Equal(t, ssv, "1")
+	sk.Reset()
+	_, err = sk.GetSortedView()
+	assert.Error(t, err)
+}

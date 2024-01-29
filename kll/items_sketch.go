@@ -403,6 +403,10 @@ func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
 	return bytesOut, nil
 }
 
+func (s *ItemsSketch[C]) GetSerializedSizeBytes() (int, error) {
+	return s.currentSerializedSizeBytes()
+}
+
 func (s *ItemsSketch[C]) currentSerializedSizeBytes() (int, error) {
 	srcN := s.n
 	var tgtStructure = _COMPACT_FULL

@@ -163,21 +163,3 @@ func evenlySpacedDoubles(value1 float64, value2 float64, num int) ([]float64, er
 	}
 	return out, nil
 }
-
-/*
-  public static double[] evenlySpacedDoubles(final double value1, final double value2, final int num) {
-    if (num < 2) {
-      throw new SketchesArgumentException("num must be >= 2");
-    }
-    final double[] out = new double[num];
-    out[0] = value1;
-    out[num - 1] = value2;
-    if (num == 2) { return out; }
-
-    final double delta = (value2 - value1) / (num - 1);
-
-    for (int i = 1; i < num - 1; i++) { out[i] = i * delta + value1; }
-    return out;
-  }
-
-*/

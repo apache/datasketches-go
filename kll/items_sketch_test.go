@@ -864,33 +864,3 @@ func TestItemsSketch_SerializeDeserializeEmpty(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, s2, s1)
 }
-
-/*
-  @Test
-  public void serializeDeserializeEmpty() {
-    final KllItemsSketch<String> sk1 = KllItemsSketch.newHeapInstance(20, Comparator.naturalOrder(), serDe);
-    //from heap -> byte[] -> heap
-    final byte[] bytes = sk1.toByteArray();
-    final KllItemsSketch<String> sk2 = KllItemsSketch.heapify(Memory.wrap(bytes), Comparator.naturalOrder(), serDe);
-    assertEquals(bytes.length, sk1.getSerializedSizeBytes());
-    assertTrue(sk2.isEmpty());
-    assertEquals(sk2.getNumRetained(), sk1.getNumRetained());
-    assertEquals(sk2.getN(), sk1.getN());
-    assertEquals(sk2.getNormalizedRankError(false), sk1.getNormalizedRankError(false));
-    try { sk2.getMinItem(); fail(); } catch (SketchesArgumentException e) {}
-    try { sk2.getMaxItem(); fail(); } catch (SketchesArgumentException e) {}
-    assertEquals(sk2.getSerializedSizeBytes(), sk1.getSerializedSizeBytes());
-    //from heap -> byte[] -> off heap
-    final KllItemsSketch<String> sk3 = KllItemsSketch.wrap(Memory.wrap(bytes), Comparator.naturalOrder(), serDe);
-    assertTrue(sk3.isEmpty());
-    assertEquals(sk3.getNumRetained(), sk1.getNumRetained());
-    assertEquals(sk3.getN(), sk1.getN());
-    assertEquals(sk3.getNormalizedRankError(false), sk1.getNormalizedRankError(false));
-    try { sk3.getMinItem(); fail(); } catch (SketchesArgumentException e) {}
-    try { sk3.getMaxItem(); fail(); } catch (SketchesArgumentException e) {}
-    assertEquals(sk3.getSerializedSizeBytes(), sk1.getSerializedSizeBytes());
-    //from heap -> byte[] -> off heap -> byte[] -> compare byte[]
-    final byte[] bytes2 = sk3.toByteArray();
-    assertEquals(bytes, bytes2);
-  }
-*/

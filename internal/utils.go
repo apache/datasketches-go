@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"math/bits"
+	"reflect"
 	"strconv"
 )
 
@@ -90,4 +91,25 @@ func BoolToInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+func FloorPowerOf2(n int64) int64 {
+	if n <= 1 {
+		return 1
+	}
+
+	return n & (math.MinInt64 >> (bits.LeadingZeros64(uint64(n))))
+}
+
+func IsNil[T any](t T) bool {
+	v := reflect.ValueOf(t)
+	kind := v.Kind()
+	// Must be one of these types to be nillable
+	return (kind == reflect.Ptr ||
+		kind == reflect.Interface ||
+		kind == reflect.Slice ||
+		kind == reflect.Map ||
+		kind == reflect.Chan ||
+		kind == reflect.Func) &&
+		v.IsNil()
 }

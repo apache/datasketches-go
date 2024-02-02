@@ -138,7 +138,7 @@ func toFrom1(t *testing.T, lgK int, tgtHllType TgtHllType, n int) {
 
 	byteArr, err := srcU.ToCompactSlice()
 	assert.NoError(t, err)
-	dstU, _ := DeserializeUnion(byteArr)
+	dstU, _ := NewUnionFromSlice(byteArr)
 
 	dstUest, err := dstU.GetEstimate()
 	assert.NoError(t, err)
@@ -179,7 +179,7 @@ func TestDeserialize1k(t *testing.T) {
 	assert.NoError(t, err)
 	byteArr, err := u.ToUpdatableSlice()
 	assert.NoError(t, err)
-	u2, e := DeserializeUnion(byteArr)
+	u2, e := NewUnionFromSlice(byteArr)
 	assert.NoError(t, e)
 	est, err := u2.GetEstimate()
 	assert.NoError(t, err)
@@ -196,7 +196,7 @@ func TestDeserialize1M(t *testing.T) {
 	assert.NoError(t, err)
 	byteArr, err := u.ToUpdatableSlice()
 	assert.NoError(t, err)
-	u2, e := DeserializeUnion(byteArr)
+	u2, e := NewUnionFromSlice(byteArr)
 	assert.NoError(t, e)
 	est, err := u2.GetEstimate()
 	assert.NoError(t, err)
@@ -234,7 +234,7 @@ func TestUnionWithWrap(t *testing.T) {
 	skByteArr, err := sk.ToCompactSlice()
 	assert.NoError(t, err)
 
-	sk2, _ := DeserializeHllSketch(skByteArr, false)
+	sk2, _ := NewHllSketchFromSlice(skByteArr, false)
 	est2, err := sk2.GetEstimate()
 	assert.NoError(t, err)
 	assert.Equal(t, est2, est)
@@ -261,7 +261,7 @@ func TestUnionWithWrap2(t *testing.T) {
 	skByteArr, err := sk.ToCompactSlice()
 	assert.NoError(t, err)
 
-	sk2, _ := DeserializeHllSketch(skByteArr, false)
+	sk2, _ := NewHllSketchFromSlice(skByteArr, false)
 	sk2Est, err := sk2.GetEstimate()
 	assert.NoError(t, err)
 	assert.Equal(t, sk2Est, est)
@@ -329,7 +329,7 @@ func TestCheckUnionDeserializeRebuildAfterMerge(t *testing.T) {
 	//Deserialize byteArr as if it were a sketch, but it is actually a union!
 	sl, err := union1.ToUpdatableSlice() //forces rebuild
 	assert.NoError(t, err)
-	sk3, e := DeserializeHllSketch(sl, false) //rebuilds sk3
+	sk3, e := NewHllSketchFromSlice(sl, false) //rebuilds sk3
 	assert.NoError(t, e)
 	rebuild = sk3.(*hllSketchState).sketch.(*hll8ArrayImpl).isRebuildCurMinNumKxQFlag()
 	assert.False(t, rebuild)

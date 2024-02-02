@@ -185,10 +185,10 @@ func NewHllSketchWithLgK(lgConfigK int) (HllSketch, error) {
 	return newHllSketchState(&couponList), nil
 }
 
-// DeserializeHllSketch deserialize a given byte slice, which must be a valid HllSketch image and may have data.
+// NewHllSketchFromSlice deserialize a given byte slice, which must be a valid HllSketch image and may have data.
 //
 //   - bytes, the given byte slice, this slice is not modified and is not retained by the sketch
-func DeserializeHllSketch(bytes []byte, checkRebuild bool) (HllSketch, error) {
+func NewHllSketchFromSlice(bytes []byte, checkRebuild bool) (HllSketch, error) {
 	if len(bytes) < 8 {
 		return nil, fmt.Errorf("input array too small: %d", len(bytes))
 	}

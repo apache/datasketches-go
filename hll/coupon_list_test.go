@@ -105,7 +105,7 @@ func toCouponSliceDeserialize(t *testing.T, lgK int) {
 
 	sl1, err := sk1.ToCompactSlice()
 	assert.NoError(t, err)
-	sk2, err := DeserializeHllSketch(sl1, true)
+	sk2, err := NewHllSketchFromSlice(sl1, true)
 	assert.NoError(t, err)
 	est2, err := sk2.GetEstimate()
 	assert.NoError(t, err)
@@ -113,7 +113,7 @@ func toCouponSliceDeserialize(t *testing.T, lgK int) {
 
 	sl1, err = sk1.ToUpdatableSlice()
 	assert.NoError(t, err)
-	sk2, err = DeserializeHllSketch(sl1, true)
+	sk2, err = NewHllSketchFromSlice(sl1, true)
 	assert.NoError(t, err)
 	est2, err = sk2.GetEstimate()
 	assert.NoError(t, err)

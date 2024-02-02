@@ -74,7 +74,7 @@ func newReversePurgeItemHashMap[C comparable](mapSize int, operations ItemSketch
 }
 
 func (r *reversePurgeItemHashMap[C]) get(key C) (int64, error) {
-	if isNil(key) {
+	if internal.IsNil(key) {
 		return 0, nil
 	}
 

@@ -113,7 +113,7 @@ func toArraySliceDeserialize(t *testing.T, lgK int, tgtHllType TgtHllType, u int
 
 	sl1, err := sk1.ToCompactSlice()
 	assert.NoError(t, err)
-	sk2, e := DeserializeHllSketch(sl1, true)
+	sk2, e := NewHllSketchFromSlice(sl1, true)
 	assert.NoError(t, e)
 	est2, err := sk2.GetEstimate()
 	assert.NoError(t, err)

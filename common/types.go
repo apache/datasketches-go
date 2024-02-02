@@ -15,28 +15,6 @@
  * limitations under the License.
  */
 
-package internal
+package common
 
-import (
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-)
-
-func TestInvPow2(t *testing.T) {
-	_, err := InvPow2(0)
-	assert.NoError(t, err)
-}
-
-func TestFloorPowerOf2(t *testing.T) {
-	assert.Equal(t, FloorPowerOf2(-1), int64(1))
-	assert.Equal(t, FloorPowerOf2(0), int64(1))
-	assert.Equal(t, FloorPowerOf2(1), int64(1))
-	assert.Equal(t, FloorPowerOf2(2), int64(2))
-	assert.Equal(t, FloorPowerOf2(3), int64(2))
-	assert.Equal(t, FloorPowerOf2(4), int64(4))
-
-	assert.Equal(t, FloorPowerOf2((1<<63)-1), int64(1<<62))
-	assert.Equal(t, FloorPowerOf2(1<<62), int64(1<<62))
-	assert.Equal(t, FloorPowerOf2((1<<62)+1), int64(1<<62))
-}
+type LessFn[C comparable] func(C, C) bool

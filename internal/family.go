@@ -25,6 +25,7 @@ type family struct {
 type families struct {
 	HLL       family
 	Frequency family
+	Kll       family
 }
 
 var FamilyEnum = &families{
@@ -35,5 +36,9 @@ var FamilyEnum = &families{
 	Frequency: family{
 		Id:          10,
 		MaxPreLongs: 4,
+	},
+	Kll: family{
+		Id:          15,
+		MaxPreLongs: 2,
 	},
 }

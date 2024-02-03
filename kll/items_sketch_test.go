@@ -900,7 +900,7 @@ func TestItemsSketch_SerializeDeserializeOneValue(t *testing.T) {
 }
 
 func TestItemsSketch_SerializeDeserializeMultipleValue(t *testing.T) {
-	sk1, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	sk1, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
 	assert.NoError(t, err)
 	n := 1000
 	for i := 0; i < n; i++ {

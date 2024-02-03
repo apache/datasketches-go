@@ -99,14 +99,14 @@ func NewItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp ItemSketchOp
 		isLevelZeroSorted = memVal.level0SortedFlag
 		minItem           *C
 		maxItem           *C
-		items             []C
+		items             = make([]C, levelsArr[memVal.numLevels])
 	)
 
 	switch memVal.sketchStructure {
 	case _COMPACT_EMPTY:
 		minItem = nil
 		maxItem = nil
-		items = make([]C, k)
+		items = items[:k]
 	case _COMPACT_SINGLE:
 		offset := _N_LONG_ADR
 		deserItems, err := itemsSketchOp.DeserializeFromSlice(sl, offset, 1)
@@ -115,7 +115,7 @@ func NewItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp ItemSketchOp
 		}
 		minItem = &deserItems[0]
 		maxItem = &deserItems[0]
-		items = make([]C, k)
+		items = items[:k]
 		items[k-1] = deserItems[0]
 	case _COMPACT_FULL:
 		offset := int(_DATA_START_ADR + memVal.numLevels*4)
@@ -137,7 +137,7 @@ func NewItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp ItemSketchOp
 			return nil, err
 		}
 		for i := uint32(0); i < numRetained; i++ {
-			items[i] = deseRetItems[i+levelsArr[0]]
+			items[i+levelsArr[0]] = deseRetItems[i]
 		}
 	}
 

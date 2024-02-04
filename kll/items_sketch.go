@@ -106,7 +106,7 @@ func NewItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp ItemSketchOp
 	case _COMPACT_EMPTY:
 		minItem = nil
 		maxItem = nil
-		items = items[:k]
+		items = make([]C, k)
 	case _COMPACT_SINGLE:
 		offset := _N_LONG_ADR
 		deserItems, err := itemsSketchOp.DeserializeFromSlice(sl, offset, 1)
@@ -115,7 +115,7 @@ func NewItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp ItemSketchOp
 		}
 		minItem = &deserItems[0]
 		maxItem = &deserItems[0]
-		items = items[:k]
+		items = make([]C, k)
 		items[k-1] = deserItems[0]
 	case _COMPACT_FULL:
 		offset := int(_DATA_START_ADR + memVal.numLevels*4)

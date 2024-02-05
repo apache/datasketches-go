@@ -99,7 +99,7 @@ func NewItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp ItemSketchOp
 		isLevelZeroSorted = memVal.level0SortedFlag
 		minItem           *C
 		maxItem           *C
-		items             []C
+		items             = make([]C, levelsArr[memVal.numLevels])
 	)
 
 	switch memVal.sketchStructure {
@@ -137,7 +137,7 @@ func NewItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp ItemSketchOp
 			return nil, err
 		}
 		for i := uint32(0); i < numRetained; i++ {
-			items[i] = deseRetItems[i+levelsArr[0]]
+			items[i+levelsArr[0]] = deseRetItems[i]
 		}
 	}
 

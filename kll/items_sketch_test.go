@@ -20,6 +20,7 @@ package kll
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"github.com/apache/datasketches-go/common"
 	"github.com/stretchr/testify/assert"
 	"math"
@@ -935,4 +936,57 @@ func TestItemsSketch_SerializeDeserializeMultipleValue(t *testing.T) {
 	mem2, err := sk2.ToSlice()
 	assert.NoError(t, err)
 	assert.Equal(t, mem, mem2)
+}
+
+func TestSerializeDeserialize(t *testing.T) {
+	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+	for _, n := range nArr {
+		digits := numDigits(n)
+		sk, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+		assert.NoError(t, err)
+		for i := 1; i <= n; i++ {
+			sk.Update(intToFixedLengthString(i, digits))
+		}
+		slc, err := sk.ToSlice()
+		assert.NoError(t, err)
+
+		sketch, err := NewItemsSketchFromSlice[string](slc, stringItemsSketchOp{})
+		if err != nil {
+			return
+		}
+
+		assert.Equal(t, sketch.GetK(), uint16(200))
+		if n == 0 {
+			assert.True(t, sketch.IsEmpty())
+		} else {
+			assert.False(t, sketch.IsEmpty())
+		}
+
+		if n > 100 {
+			assert.True(t, sketch.IsEstimationMode())
+		} else {
+			assert.False(t, sketch.IsEstimationMode())
+		}
+
+		if n > 0 {
+			minV, err := sketch.GetMinItem()
+			assert.NoError(t, err)
+			assert.Equal(t, minV, intToFixedLengthString(1, digits))
+
+			maxV, err := sketch.GetMaxItem()
+			assert.NoError(t, err)
+			assert.Equal(t, maxV, intToFixedLengthString(n, digits))
+
+			weight := int64(0)
+			it := sketch.GetIterator()
+			lessFn := stringItemsSketchOp{}.lessFn()
+			for it.Next() {
+				qut := it.GetQuantile()
+				assert.True(t, lessFn(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
+				assert.True(t, !lessFn(maxV, qut) || maxV == qut, fmt.Sprintf("max: \"%v\" \"%v\"", maxV, qut))
+				weight += it.GetWeight()
+			}
+			assert.Equal(t, weight, int64(n))
+		}
+	}
 }

@@ -25,6 +25,26 @@ import (
 	"testing"
 )
 
+func TestGenerateGoFiles(t *testing.T) {
+	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
+		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
+	}
+
+	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+	for _, n := range nArr {
+		digits := numDigits(n)
+		sk, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+		assert.NoError(t, err)
+		for i := 1; i <= n; i++ {
+			sk.Update(intToFixedLengthString(i, digits))
+		}
+		slc, err := sk.ToSlice()
+		assert.NoError(t, err)
+		err = os.WriteFile(fmt.Sprintf("%s/kll_string_n%d_go.sk", internal.GoPath, n), slc, 0644)
+		assert.NoError(t, err)
+	}
+}
+
 func TestJavaCompat(t *testing.T) {
 	t.Run("Java KLL String", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}

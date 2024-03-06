@@ -38,6 +38,62 @@ func TestHllItemsSketch(t *testing.T) {
 	// Get the estimate of the number of unique items
 	estimate, err := sketch.GetEstimate()
 	assert.NoError(t, err)
-	assert.Greater(t, estimate, 900)
-	assert.Less(t, estimate, 1100)
+	assert.InDelta(t, 1000, estimate, 1000*0.03)
+
+	// Create a new KLL sketch with a different log2m
+	sketch2, err := hll.NewHllSketch(12, hll.TgtHllTypeDefault)
+	assert.NoError(t, err)
+
+	// Update the sketch with another 1000 items
+	for i := 500; i < 1500; i++ {
+		err := sketch2.UpdateString(fmt.Sprintf("item_%d", i))
+		assert.NoError(t, err)
+	}
+
+	// Merge the two sketches
+	union, err := hll.NewUnionWithDefault()
+	assert.NoError(t, err)
+
+	err = union.UpdateSketch(sketch)
+	assert.NoError(t, err)
+	err = union.UpdateSketch(sketch2)
+	assert.NoError(t, err)
+
+	mergedSketch, err := union.GetResult(hll.TgtHllTypeDefault)
+	assert.NoError(t, err)
+
+	// Get the estimate of the number of unique items
+	estimate, err = mergedSketch.GetEstimate()
+	assert.NoError(t, err)
+	assert.InDelta(t, 1500, estimate, 1500*0.03)
+
+	// Serialize the sketches
+	bytes, err := sketch.ToCompactSlice()
+	assert.NoError(t, err)
+	bytes2, err := sketch2.ToCompactSlice()
+	assert.NoError(t, err)
+
+	// Deserialize the sketches into a union
+	union2, err := hll.NewUnionWithDefault()
+	assert.NoError(t, err)
+
+	sketch_1, err := hll.NewHllSketchFromSlice(bytes, true)
+	assert.NoError(t, err)
+
+	sketch_2, err := hll.NewHllSketchFromSlice(bytes2, true)
+	assert.NoError(t, err)
+
+	err = union2.UpdateSketch(sketch_1)
+	assert.NoError(t, err)
+	err = union2.UpdateSketch(sketch_2)
+	assert.NoError(t, err)
+
+	mergedSketch2, err := union2.GetResult(hll.TgtHllTypeDefault)
+	assert.NoError(t, err)
+
+	// Get the estimate of the number of unique items
+	estimate, err = mergedSketch2.GetEstimate()
+	assert.NoError(t, err)
+	assert.InDelta(t, 1500, estimate, 1500*0.03)
+
 }

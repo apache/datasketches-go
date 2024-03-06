@@ -66,7 +66,7 @@ func TestGenerateGoBinariesForCompatibilityTestingLongsSketch(t *testing.T) {
 	t.Run("String Frequency", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
-			sk, err := NewItemsSketchWithMaxMapSize[string](64, common.ArrayOfStringsSerDe{})
+			sk, err := NewFrequencyItemsSketchWithMaxMapSize[string](64, common.ArrayOfStringsSerDe{})
 			assert.NoError(t, err)
 			for i := 1; i <= n; i++ {
 				err = sk.Update(strconv.Itoa(i))
@@ -94,7 +94,7 @@ func TestGenerateGoBinariesForCompatibilityTestingLongsSketch(t *testing.T) {
 	})
 
 	t.Run("String ut8", func(t *testing.T) {
-		sk, err := NewItemsSketchWithMaxMapSize[string](64, common.ArrayOfStringsSerDe{})
+		sk, err := NewFrequencyItemsSketchWithMaxMapSize[string](64, common.ArrayOfStringsSerDe{})
 		assert.NoError(t, err)
 
 		assert.NoError(t, sk.UpdateMany("абвгд", 1))
@@ -116,7 +116,7 @@ func TestGenerateGoBinariesForCompatibilityTestingLongsSketch(t *testing.T) {
 	})
 
 	t.Run("String ascii", func(t *testing.T) {
-		sk, err := NewItemsSketchWithMaxMapSize[string](64, common.ArrayOfStringsSerDe{})
+		sk, err := NewFrequencyItemsSketchWithMaxMapSize[string](64, common.ArrayOfStringsSerDe{})
 		assert.NoError(t, err)
 
 		assert.NoError(t, sk.UpdateMany("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 1))
@@ -166,7 +166,7 @@ func TestJavaCompat(t *testing.T) {
 		for _, n := range nArr {
 			bytes, err := os.ReadFile(fmt.Sprintf("%s/frequent_string_n%d_java.sk", internal.JavaPath, n))
 			assert.NoError(t, err)
-			sketch, err := NewItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
+			sketch, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
 			if err != nil {
 				return
 			}
@@ -188,7 +188,7 @@ func TestJavaCompat(t *testing.T) {
 	t.Run("String utf8", func(t *testing.T) {
 		bytes, err := os.ReadFile(fmt.Sprintf("%s/frequent_string_utf8_java.sk", internal.JavaPath))
 		assert.NoError(t, err)
-		sketch, err := NewItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
+		sketch, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
 		if err != nil {
 			return
 		}
@@ -221,7 +221,7 @@ func TestJavaCompat(t *testing.T) {
 	t.Run("String ascii", func(t *testing.T) {
 		bytes, err := os.ReadFile(fmt.Sprintf("%s/frequent_string_ascii_java.sk", internal.JavaPath))
 		assert.NoError(t, err)
-		sketch, err := NewItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
+		sketch, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
 		if err != nil {
 			return
 		}
@@ -273,7 +273,7 @@ func TestCppCompat(t *testing.T) {
 		for _, n := range nArr {
 			bytes, err := os.ReadFile(fmt.Sprintf("%s/frequent_string_n%d_cpp.sk", internal.CppPath, n))
 			assert.NoError(t, err)
-			sketch, err := NewItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
+			sketch, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
 			if err != nil {
 				return
 			}
@@ -295,7 +295,7 @@ func TestCppCompat(t *testing.T) {
 	t.Run("String utf8", func(t *testing.T) {
 		bytes, err := os.ReadFile(fmt.Sprintf("%s/frequent_string_utf8_cpp.sk", internal.CppPath))
 		assert.NoError(t, err)
-		sketch, err := NewItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
+		sketch, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
 		if err != nil {
 			return
 		}
@@ -328,7 +328,7 @@ func TestCppCompat(t *testing.T) {
 	t.Run("String ascii", func(t *testing.T) {
 		bytes, err := os.ReadFile(fmt.Sprintf("%s/frequent_string_ascii_cpp.sk", internal.CppPath))
 		assert.NoError(t, err)
-		sketch, err := NewItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
+		sketch, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
 		if err != nil {
 			return
 		}

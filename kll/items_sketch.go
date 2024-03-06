@@ -407,6 +407,14 @@ func (s *ItemsSketch[C]) GetSerializedSizeBytes() (int, error) {
 	return s.currentSerializedSizeBytes()
 }
 
+func (s *ItemsSketch[C]) GetIterator() *ItemsSketchIterator[C] {
+	return NewItemsSketchIterator[C](
+		s.GetTotalItemsArray(),
+		s.getLevelsArray(),
+		s.getNumLevels(),
+	)
+}
+
 func (s *ItemsSketch[C]) currentSerializedSizeBytes() (int, error) {
 	srcN := s.n
 	var tgtStructure = _COMPACT_FULL
@@ -432,6 +440,10 @@ func (s *ItemsSketch[C]) currentSerializedSizeBytes() (int, error) {
 		return 0, fmt.Errorf("updatable serialization not implemented")
 	}
 	return totalBytes, nil
+}
+
+func (s *ItemsSketch[C]) getNumLevels() int {
+	return len(s.levels) - 1
 }
 
 func (s *ItemsSketch[C]) getLevelsArray() []uint32 {

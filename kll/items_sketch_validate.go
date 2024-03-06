@@ -20,12 +20,13 @@ package kll
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
 )
 
 type itemsSketchMemoryValidate[C comparable] struct {
 	srcMem          []byte
-	itemSketchOp    ItemSketchOp[C]
+	itemSketchOp    common.ItemSketchOp[C]
 	sketchStructure sketchStructure
 
 	// first 8 bytes of preamble
@@ -54,7 +55,7 @@ type itemsSketchMemoryValidate[C comparable] struct {
 	typeBytes   int //always 0 for generic
 }
 
-func newItemsSketchMemoryValidate[C comparable](srcMem []byte, itemSketchOp ItemSketchOp[C]) (*itemsSketchMemoryValidate[C], error) {
+func newItemsSketchMemoryValidate[C comparable](srcMem []byte, itemSketchOp common.ItemSketchOp[C]) (*itemsSketchMemoryValidate[C], error) {
 	capa := cap(srcMem)
 	if capa < 8 {
 		return nil, fmt.Errorf("Memory too small: %d", capa)
@@ -138,7 +139,7 @@ func (vlid *itemsSketchMemoryValidate[C]) validate() error {
 		vlid.minK = uint16(vlid.k)
 		vlid.numLevels = 1 //assumed
 		vlid.levelsArr = []uint32{uint32(vlid.k) - 1, uint32(vlid.k)}
-		v, err := vlid.itemSketchOp.sizeOfMany(vlid.srcMem, _DATA_START_ADR_SINGLE_ITEM, 1)
+		v, err := vlid.itemSketchOp.SizeOfMany(vlid.srcMem, _DATA_START_ADR_SINGLE_ITEM, 1)
 		if err != nil {
 			return err
 		}
@@ -149,20 +150,20 @@ func (vlid *itemsSketchMemoryValidate[C]) validate() error {
 	return nil
 }
 
-func computeSketchBytes[C comparable](srcMem []byte, levelsArr []uint32, typeBytes int, itemSketchOp ItemSketchOp[C]) (int, error) {
+func computeSketchBytes[C comparable](srcMem []byte, levelsArr []uint32, typeBytes int, itemSketchOp common.ItemSketchOp[C]) (int, error) {
 	numLevels := len(levelsArr) - 1
 	retainedItems := levelsArr[numLevels] - levelsArr[0]
 	levelsLen := len(levelsArr) - 1
 	numItems := retainedItems
 	offsetBytes := _DATA_START_ADR + levelsLen*4
 	if typeBytes == 1 {
-		v, err := itemSketchOp.sizeOfMany(srcMem, offsetBytes, int(numItems))
+		v, err := itemSketchOp.SizeOfMany(srcMem, offsetBytes, int(numItems))
 		if err != nil {
 			return 0, err
 		}
 		offsetBytes += v + 2 //2 for min & max
 	} else {
-		v, err := itemSketchOp.sizeOfMany(srcMem, offsetBytes, int(numItems)+2) //2 for min & max
+		v, err := itemSketchOp.SizeOfMany(srcMem, offsetBytes, int(numItems)+2) //2 for min & max
 		if err != nil {
 			return 0, err
 		}

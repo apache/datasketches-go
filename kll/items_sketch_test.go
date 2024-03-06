@@ -18,115 +18,12 @@
 package kll
 
 import (
-	"encoding/binary"
-	"errors"
 	"fmt"
 	"github.com/apache/datasketches-go/common"
 	"github.com/stretchr/testify/assert"
 	"math"
 	"testing"
-	"unsafe"
 )
-
-type stringItemsSketchOp struct {
-}
-
-func (f stringItemsSketchOp) identity() string {
-	return ""
-}
-
-func (f stringItemsSketchOp) lessFn() common.LessFn[string] {
-	return func(a string, b string) bool {
-		return a < b
-	}
-}
-
-func (f stringItemsSketchOp) sizeOf(item string) int {
-	if len(item) == 0 {
-		return int(unsafe.Sizeof(uint32(0)))
-	}
-	return len(item) + int(unsafe.Sizeof(uint32(0)))
-}
-
-func (f stringItemsSketchOp) sizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error) {
-	if numItems <= 0 {
-		return 0, nil
-	}
-	reqLen := 4
-	offset := offsetBytes
-	memCap := len(mem)
-	for i := 0; i < numItems; i++ {
-		if !checkBounds(offset, reqLen, memCap) {
-			return 0, errors.New("offset out of bounds")
-		}
-		itemLenBytes := int(binary.LittleEndian.Uint32(mem[offset:]))
-		offset += 4
-		if offset+itemLenBytes > memCap {
-			return 0, errors.New("offset out of bounds")
-		}
-		offset += itemLenBytes
-	}
-	return offset - offsetBytes, nil
-}
-
-func (h stringItemsSketchOp) SerializeOneToSlice(item string) []byte {
-	if len(item) == 0 {
-		return []byte{}
-	}
-	utf8len := len(item)
-	bytesOut := make([]byte, utf8len+4)
-	binary.LittleEndian.PutUint32(bytesOut, uint32(utf8len))
-	copy(bytesOut[4:], []byte(item))
-	return bytesOut
-}
-
-func (h stringItemsSketchOp) SerializeManyToSlice(item []string) []byte {
-	if len(item) == 0 {
-		return []byte{}
-	}
-	totalBytes := 0
-	numItems := len(item)
-	serialized2DArray := make([][]byte, numItems)
-	for i := 0; i < numItems; i++ {
-		serialized2DArray[i] = []byte(item[i])
-		totalBytes += len(serialized2DArray[i]) + 4
-	}
-	bytesOut := make([]byte, totalBytes)
-	offset := 0
-	for i := 0; i < numItems; i++ {
-		utf8len := len(serialized2DArray[i])
-		binary.LittleEndian.PutUint32(bytesOut[offset:], uint32(utf8len))
-		offset += 4
-		copy(bytesOut[offset:], serialized2DArray[i])
-		offset += utf8len
-	}
-	return bytesOut
-}
-
-func (h stringItemsSketchOp) DeserializeFromSlice(mem []byte, offsetBytes int, numItems int) ([]string, error) {
-	if numItems <= 0 {
-		return []string{}, nil
-	}
-	array := make([]string, numItems)
-	offset := offsetBytes
-	intSize := int(unsafe.Sizeof(uint32(0)))
-	memCap := len(mem)
-	for i := 0; i < numItems; i++ {
-		if !checkBounds(offset, intSize, memCap) {
-			return nil, errors.New("offset out of bounds")
-		}
-		strLength := int(binary.LittleEndian.Uint32(mem[offset:]))
-		offset += intSize
-		utf8Bytes := make([]byte, strLength)
-		if !checkBounds(offset, strLength, memCap) {
-			return nil, errors.New("offset out of bounds")
-		}
-		copy(utf8Bytes, mem[offset:offset+strLength])
-		offset += strLength
-		array[i] = string(utf8Bytes)
-	}
-	return array, nil
-}
 
 const (
 	PMF_EPS_FOR_K_256       = 0.013 // PMF rank error (epsilon) for k=256
@@ -134,16 +31,16 @@ const (
 )
 
 func TestItemsSketch_KLimits(t *testing.T) {
-	_, err := NewItemsSketch[string](uint16(_MIN_K), stringItemsSketchOp{})
+	_, err := NewKllItemsSketch[string](_MIN_K, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
-	_, err = NewItemsSketch[string](uint16(_MAX_K), stringItemsSketchOp{})
+	_, err = NewKllItemsSketch[string](uint16(_MAX_K), _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
-	_, err = NewItemsSketch[string](uint16(_MIN_K-1), stringItemsSketchOp{})
+	_, err = NewKllItemsSketch[string](_MIN_K-1, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.Error(t, err)
 }
 
 func TestItemsSketch_Empty(t *testing.T) {
-	sketch, err := NewItemsSketch[string](200, stringItemsSketchOp{})
+	sketch, err := NewKllItemsSketch[string](200, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	assert.True(t, sketch.IsEmpty())
 	assert.False(t, sketch.IsEstimationMode())
@@ -165,7 +62,7 @@ func TestItemsSketch_Empty(t *testing.T) {
 }
 
 func TestItemsSketch_BadQuantile(t *testing.T) {
-	sketch, err := NewItemsSketch[string](200, stringItemsSketchOp{})
+	sketch, err := NewKllItemsSketch[string](200, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	sketch.Update("") // has to be non-empty to reach the check
 	_, err = sketch.GetQuantile(-1, true)
@@ -173,7 +70,7 @@ func TestItemsSketch_BadQuantile(t *testing.T) {
 }
 
 func TestItemsSketch_OneValue(t *testing.T) {
-	sketch, err := NewItemsSketch[string](200, stringItemsSketchOp{})
+	sketch, err := NewKllItemsSketch[string](200, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	sketch.Update("A")
 	assert.False(t, sketch.IsEmpty())
@@ -203,7 +100,7 @@ func TestItemsSketch_OneValue(t *testing.T) {
 
 func TestItemsSketch_TenValues(t *testing.T) {
 	tenStr := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"}
-	sketch, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	sketch, err := NewKllItemsSketch[string](20, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	strLen := len(tenStr)
 	dblStrLen := float64(strLen)
@@ -278,7 +175,7 @@ func TestItemsSketch_TenValues(t *testing.T) {
 }
 
 func TestItemsSketch_ManyValuesEstimationMode(T *testing.T) {
-	sketch, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	sketch, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(T, err)
 	n := 1_000_000
 	digits := numDigits(n)
@@ -338,7 +235,7 @@ func TestItemsSketch_ManyValuesEstimationMode(T *testing.T) {
 }
 
 func TestItemsSketch_GetRankGetCdfGetPmfConsistency(t *testing.T) {
-	sketch, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	sketch, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	n := 1000
 	digits := numDigits(n)
@@ -385,9 +282,9 @@ func TestItemsSketch_GetRankGetCdfGetPmfConsistency(t *testing.T) {
 }
 
 func TestItemsSketch_Merge(t *testing.T) {
-	sketch1, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	sketch1, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
-	sketch2, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	sketch2, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	n := 10000
 	digits := numDigits(2 * n)
@@ -428,9 +325,9 @@ func TestItemsSketch_Merge(t *testing.T) {
 }
 
 func TestItemsSketch_MergeLowerK(t *testing.T) {
-	sketch1, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	sketch1, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
-	sketch2, err := NewItemsSketch[string](_DEFAULT_K/2, stringItemsSketchOp{})
+	sketch2, err := NewKllItemsSketch[string](_DEFAULT_K/2, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	n := 10000
 	digits := numDigits(2 * n)
@@ -476,9 +373,9 @@ func TestItemsSketch_MergeLowerK(t *testing.T) {
 }
 
 func TestItemsSketch_MergeEmptyLowerK(t *testing.T) {
-	sketch1, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	sketch1, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
-	sketch2, err := NewItemsSketch[string](_DEFAULT_K/2, stringItemsSketchOp{})
+	sketch2, err := NewKllItemsSketch[string](_DEFAULT_K/2, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	n := 10000
 	digits := numDigits(n)
@@ -537,9 +434,9 @@ func TestItemsSketch_MergeEmptyLowerK(t *testing.T) {
 }
 
 func TestItemsSketch_MergeExactModeLowerK(t *testing.T) {
-	sketch1, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	sketch1, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
-	sketch2, err := NewItemsSketch[string](_DEFAULT_K/2, stringItemsSketchOp{})
+	sketch2, err := NewKllItemsSketch[string](_DEFAULT_K/2, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	n := 10000
 	digits := numDigits(n)
@@ -555,9 +452,9 @@ func TestItemsSketch_MergeExactModeLowerK(t *testing.T) {
 }
 
 func TestItemsSketch_MergeMinMinValueFromOther(t *testing.T) {
-	sketch1, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	sketch1, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
-	sketch2, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	sketch2, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	sketch1.Update(intToFixedLengthString(1, 1))
 	sketch2.Update(intToFixedLengthString(2, 1))
@@ -568,9 +465,9 @@ func TestItemsSketch_MergeMinMinValueFromOther(t *testing.T) {
 }
 
 func TestItemsSketch_MergeMinAndMaxFromOther(t *testing.T) {
-	sketch1, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	sketch1, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
-	sketch2, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	sketch2, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	n := 1_000_000
 	digits := numDigits(n)
@@ -587,18 +484,18 @@ func TestItemsSketch_MergeMinAndMaxFromOther(t *testing.T) {
 }
 
 func TestItemsSketch_KTooSmall(t *testing.T) {
-	_, err := NewItemsSketch[string](_MIN_K-1, stringItemsSketchOp{})
+	_, err := NewKllItemsSketch[string](_MIN_K-1, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.Error(t, err)
 }
 
-// cannot use _MAX_K + 1 (untyped int constant 65536) as uint16 value in argument to NewItemsSketch[string] (overflows)
+// cannot use _MAX_K + 1 (untyped int constant 65536) as uint16 value in argument to NewKllItemsSketch[string] (overflows)
 //func TestItemsSketch_KTooLarge(t *testing.T) {
-//	_, err := NewItemsSketch[string](_MAX_K+1, stringItemsSketchOp{})
+//	_, err := NewKllItemsSketch[string](_MAX_K+1, stringItemsSketchOp{})
 //	assert.Error(t, err)
 //}
 
 func TestItemsSketch_MinK(t *testing.T) {
-	sketch, err := NewItemsSketch[string](uint16(_DEFAULT_M), stringItemsSketchOp{})
+	sketch, err := NewKllItemsSketch[string](uint16(_DEFAULT_M), _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	n := 1000
 	digits := numDigits(n)
@@ -615,7 +512,7 @@ func TestItemsSketch_MinK(t *testing.T) {
 }
 
 func TestItemsSketch_MaxK(t *testing.T) {
-	sketch, err := NewItemsSketch[string](uint16(_MAX_K), stringItemsSketchOp{})
+	sketch, err := NewKllItemsSketch[string](uint16(_MAX_K), _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	n := 1000
 	digits := numDigits(n)
@@ -632,7 +529,7 @@ func TestItemsSketch_MaxK(t *testing.T) {
 }
 
 func TestItemsSketch_OutOfOrderSplitPoints(t *testing.T) {
-	sketch, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	sketch, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	s0 := intToFixedLengthString(0, 1)
 	s1 := intToFixedLengthString(1, 1)
@@ -642,7 +539,7 @@ func TestItemsSketch_OutOfOrderSplitPoints(t *testing.T) {
 }
 
 func TestItemsSketch_DuplicateSplitPoints(t *testing.T) {
-	sketch, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	sketch, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	sketch.Update("A")
 	sketch.Update("B")
@@ -657,7 +554,7 @@ func TestItemsSketch_DuplicateSplitPoints(t *testing.T) {
 }
 
 func TestItemsSketch_CheckReset(t *testing.T) {
-	sketch, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	sketch, err := NewKllItemsSketch[string](20, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	n := 100
 	digits := numDigits(n)
@@ -684,7 +581,7 @@ func TestItemsSketch_CheckReset(t *testing.T) {
 }
 
 func TestItemsSketch_SortedView(t *testing.T) {
-	sketch, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	sketch, err := NewKllItemsSketch[string](20, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	sketch.Update("A")
 	sketch.Update("AB")
@@ -717,7 +614,7 @@ func TestItemsSketch_CDF_PDF(t *testing.T) {
 	pmfI := []float64{.25, .25, .25, .25, 0.0}
 	pmfE := []float64{0.0, .25, .25, .25, .25}
 	toll := 1e-10
-	sketch, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	sketch, err := NewKllItemsSketch[string](20, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	strIn := []string{"A", "AB", "ABC", "ABCD"}
 	for i := 0; i < len(strIn); i++ {
@@ -754,17 +651,17 @@ func TestItemsSketch_CDF_PDF(t *testing.T) {
 }
 
 func TestItemsSketch_DeserializeEmpty(t *testing.T) {
-	sk1, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	mem, err := sk1.ToSlice()
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
-	memVal, err := newItemsSketchMemoryValidate[string](mem, stringItemsSketchOp{})
+	memVal, err := newItemsSketchMemoryValidate[string](mem, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	assert.Equal(t, memVal.sketchStructure, _COMPACT_EMPTY)
 	assert.Equal(t, len(mem), 8)
 
-	sk2, err := NewItemsSketchFromSlice[string](mem, stringItemsSketchOp{})
+	sk2, err := NewKllItemsSketchFromSlice[string](mem, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	assert.Equal(t, sk2.GetN(), uint64(0))
 	_, err = sk2.GetMinItem()
@@ -774,16 +671,16 @@ func TestItemsSketch_DeserializeEmpty(t *testing.T) {
 }
 
 func TestItemsSketch_DeserializeSingleItem(t *testing.T) {
-	sk1, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	sk1.Update("A")
 	mem, err := sk1.ToSlice()
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
-	memVal, err := newItemsSketchMemoryValidate[string](mem, stringItemsSketchOp{})
+	memVal, err := newItemsSketchMemoryValidate[string](mem, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	assert.Equal(t, memVal.sketchStructure, _COMPACT_SINGLE)
-	sk2, err := NewItemsSketchFromSlice[string](mem, stringItemsSketchOp{})
+	sk2, err := NewKllItemsSketchFromSlice[string](mem, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	assert.Equal(t, sk2.GetN(), uint64(1))
 	minV, err := sk2.GetMinItem()
@@ -795,7 +692,7 @@ func TestItemsSketch_DeserializeSingleItem(t *testing.T) {
 }
 
 func TestItemsSketch_FewItems(t *testing.T) {
-	sk1, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	sk1.Update("A")
 	sk1.Update("AB")
@@ -803,14 +700,14 @@ func TestItemsSketch_FewItems(t *testing.T) {
 	mem, err := sk1.ToSlice()
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
-	memVal, err := newItemsSketchMemoryValidate[string](mem, stringItemsSketchOp{})
+	memVal, err := newItemsSketchMemoryValidate[string](mem, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	assert.Equal(t, memVal.sketchStructure, _COMPACT_FULL)
 	assert.Equal(t, len(mem), memVal.sketchBytes)
 }
 
 func TestItemsSketch_ManyItems(t *testing.T) {
-	sk1, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	n := 109
 	digits := numDigits(n)
@@ -820,14 +717,14 @@ func TestItemsSketch_ManyItems(t *testing.T) {
 	mem, err := sk1.ToSlice()
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
-	memVal, err := newItemsSketchMemoryValidate[string](mem, stringItemsSketchOp{})
+	memVal, err := newItemsSketchMemoryValidate[string](mem, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	assert.Equal(t, memVal.sketchStructure, _COMPACT_FULL)
 	assert.Equal(t, len(mem), memVal.sketchBytes)
 }
 
 func TestItemsSketch_SortedViewAfterReset(t *testing.T) {
-	sk, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	sk, err := NewKllItemsSketch[string](20, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	sk.Update("1")
 	sv, err := sk.GetSortedView()
@@ -841,12 +738,12 @@ func TestItemsSketch_SortedViewAfterReset(t *testing.T) {
 }
 
 func TestItemsSketch_SerializeDeserializeEmpty(t *testing.T) {
-	sk1, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	mem, err := sk1.ToSlice()
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
-	sk2, err := NewItemsSketchFromSlice[string](mem, stringItemsSketchOp{})
+	sk2, err := NewKllItemsSketchFromSlice[string](mem, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	s, err := sk1.GetSerializedSizeBytes()
 	assert.NoError(t, err)
@@ -870,13 +767,13 @@ func TestItemsSketch_SerializeDeserializeEmpty(t *testing.T) {
 }
 
 func TestItemsSketch_SerializeDeserializeOneValue(t *testing.T) {
-	sk1, err := NewItemsSketch[string](20, stringItemsSketchOp{})
+	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	sk1.Update(" 1")
 	mem, err := sk1.ToSlice()
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
-	sk2, err := NewItemsSketchFromSlice[string](mem, stringItemsSketchOp{})
+	sk2, err := NewKllItemsSketchFromSlice[string](mem, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	s1SizeBytes, err := sk1.GetSerializedSizeBytes()
 	assert.Equal(t, len(mem), s1SizeBytes)
@@ -901,7 +798,7 @@ func TestItemsSketch_SerializeDeserializeOneValue(t *testing.T) {
 }
 
 func TestItemsSketch_SerializeDeserializeMultipleValue(t *testing.T) {
-	sk1, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+	sk1, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	n := 1000
 	for i := 0; i < n; i++ {
@@ -916,7 +813,7 @@ func TestItemsSketch_SerializeDeserializeMultipleValue(t *testing.T) {
 	mem, err := sk1.ToSlice()
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
-	sk2, err := NewItemsSketchFromSlice[string](mem, stringItemsSketchOp{})
+	sk2, err := NewKllItemsSketchFromSlice[string](mem, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	s1, err := sk2.GetSerializedSizeBytes()
 	assert.NoError(t, err)
@@ -940,9 +837,10 @@ func TestItemsSketch_SerializeDeserializeMultipleValue(t *testing.T) {
 
 func TestSerializeDeserialize(t *testing.T) {
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+	serde := common.ArrayOfStringsSerDe{}
 	for _, n := range nArr {
 		digits := numDigits(n)
-		sk, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+		sk, err := NewKllItemsSketchWithDefault[string](serde)
 		assert.NoError(t, err)
 		for i := 1; i <= n; i++ {
 			sk.Update(intToFixedLengthString(i, digits))
@@ -950,7 +848,7 @@ func TestSerializeDeserialize(t *testing.T) {
 		slc, err := sk.ToSlice()
 		assert.NoError(t, err)
 
-		sketch, err := NewItemsSketchFromSlice[string](slc, stringItemsSketchOp{})
+		sketch, err := NewKllItemsSketchFromSlice[string](slc, serde)
 		if err != nil {
 			return
 		}
@@ -979,7 +877,7 @@ func TestSerializeDeserialize(t *testing.T) {
 
 			weight := int64(0)
 			it := sketch.GetIterator()
-			lessFn := stringItemsSketchOp{}.lessFn()
+			lessFn := serde.LessFn()
 			for it.Next() {
 				qut := it.GetQuantile()
 				assert.True(t, lessFn(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))

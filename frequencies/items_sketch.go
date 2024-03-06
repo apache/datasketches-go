@@ -29,6 +29,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
 	"sort"
 	"strconv"
@@ -52,13 +53,6 @@ type ItemsSketch[C comparable] struct {
 	hashMap *reversePurgeItemHashMap[C]
 }
 
-type ItemSketchOp[C comparable] interface {
-	Hash(item C) uint64
-	SerializeOneToSlice(item C) []byte
-	SerializeManyToSlice(item []C) []byte
-	DeserializeManyFromSlice(slc []byte, offset int, length int) []C
-}
-
 // NewItemsSketch constructs a new ItemsSketch with the given parameters.
 // this internal constructor is used when deserializing the sketch.
 //
@@ -67,7 +61,7 @@ type ItemSketchOp[C comparable] interface {
 //     Both the ultimate accuracy and size of this sketch are functions of lgMaxMapSize.
 //   - lgCurMapSize, log2 of the starting (current) physical size of the internal hashFn
 //     map managed by this sketch.
-func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, operations ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, operations common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	lgMaxMapSz := max(lgMaxMapSize, _LG_MIN_MAP_SIZE)
 	lgCurMapSz := max(lgCurMapSize, _LG_MIN_MAP_SIZE)
 	hashMap, err := newReversePurgeItemHashMap[C](1<<lgCurMapSz, operations)
@@ -95,7 +89,7 @@ func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, operations
 //     sketch and must be a power of 2. The maximum capacity of this internal hash map is
 //     0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are
 //     functions of maxMapSize.
-func NewItemsSketchWithMaxMapSize[C comparable](maxMapSize int, operations ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewItemsSketchWithMaxMapSize[C comparable](maxMapSize int, operations common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	maxMapSz, err := internal.ExactLog2(maxMapSize)
 	if err != nil {
 		return nil, err
@@ -110,7 +104,7 @@ func NewItemsSketchWithMaxMapSize[C comparable](maxMapSize int, operations ItemS
 // sketch and must be a power of 2.  The maximum capacity of this internal hash map is
 // 0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are a
 // function of maxMapSize.
-func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewItemsSketchFromSlice[C comparable](slc []byte, operations common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	pre0, err := checkPreambleSize(slc) //make sure preamble will fit
 	maxPreLongs := internal.FamilyEnum.Frequency.MaxPreLongs
 
@@ -167,7 +161,10 @@ func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C
 	}
 	// Get itemArray
 	itemsOffset := preBytes + (8 * activeItems)
-	itemArray := operations.DeserializeManyFromSlice(slc[itemsOffset:], 0, activeItems)
+	itemArray, err := operations.DeserializeManyFromSlice(slc[itemsOffset:], 0, activeItems)
+	if err != nil {
+		return nil, err
+	}
 	// update the sketch
 	for j := 0; j < activeItems; j++ {
 		err := fis.UpdateMany(itemArray[j], countArray[j])

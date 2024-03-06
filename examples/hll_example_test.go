@@ -15,17 +15,29 @@
  * limitations under the License.
  */
 
-package common
+package examples
 
-type LessFn[C comparable] func(C, C) bool
+import (
+	"fmt"
+	"github.com/apache/datasketches-go/hll"
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
 
-type ItemSketchOp[C comparable] interface {
-	Identity() C
-	Hash(item C) uint64
-	LessFn() LessFn[C]
-	SizeOf(item C) int
-	SizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error)
-	SerializeManyToSlice(items []C) []byte
-	SerializeOneToSlice(item C) []byte
-	DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]C, error)
+func TestHllItemsSketch(t *testing.T) {
+	// Create a new KLL sketch
+	sketch, err := hll.NewHllSketchWithDefault()
+	assert.NoError(t, err)
+
+	// Update the sketch with 1000 items
+	for i := 0; i < 1000; i++ {
+		err := sketch.UpdateString(fmt.Sprintf("item_%d", i))
+		assert.NoError(t, err)
+	}
+
+	// Get the estimate of the number of unique items
+	estimate, err := sketch.GetEstimate()
+	assert.NoError(t, err)
+	assert.Greater(t, estimate, 900)
+	assert.Less(t, estimate, 1100)
 }

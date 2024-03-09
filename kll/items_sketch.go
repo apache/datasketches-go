@@ -27,7 +27,10 @@ import (
 )
 
 type ItemsSketch[C comparable] struct {
-	k                 uint16
+	// k is the config that controls the accuracy of the sketch and its memory space usage
+	// The default k = 200 results in a normalized rank error of about 1.65%.
+	k uint16
+	// m is the number of items in the base level of the KLL array
 	m                 uint8
 	minK              uint16
 	numLevels         uint8
@@ -58,6 +61,9 @@ var (
 		205891132094649}
 )
 
+// NewKllItemsSketch create a new ItemsSketch with the given k and m.
+// The default k = 200 results in a normalized rank error of about 1.65%.
+// Larger K will have smaller error but the sketch will be larger (and slower).
 func NewKllItemsSketch[C comparable](k uint16, m uint8, itemsSketchOp common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	if k < _MIN_K || k > _MAX_K {
 		return nil, fmt.Errorf("k must be >= %d and <= %d: %d", _MIN_K, _MAX_K, k)
@@ -73,10 +79,13 @@ func NewKllItemsSketch[C comparable](k uint16, m uint8, itemsSketchOp common.Ite
 	}, nil
 }
 
+// NewKllItemsSketchWithDefault create a new ItemsSketch with default k and m.
+// The default k = 200 results in a normalized rank error of about 1.65%.
 func NewKllItemsSketchWithDefault[C comparable](itemsSketchOp common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	return NewKllItemsSketch[C](_DEFAULT_K, _DEFAULT_M, itemsSketchOp)
 }
 
+// NewKllItemsSketchFromSlice create a new ItemsSketch from the given byte slice (serialized sketch).
 func NewKllItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
 
 	memVal, err := newItemsSketchMemoryValidate(sl, itemsSketchOp)
@@ -150,22 +159,27 @@ func NewKllItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp common.It
 	}, nil
 }
 
+// IsEmpty returns true if the sketch is empty, otherwise false.
 func (s *ItemsSketch[C]) IsEmpty() bool {
 	return s.n == 0
 }
 
+// GetN returns the value of n (the length of the input stream offered to the sketch)
 func (s *ItemsSketch[C]) GetN() uint64 {
 	return s.n
 }
 
+// GetK returns the value of k (which controls the accuracy of the sketch and its memory space usage)
 func (s *ItemsSketch[C]) GetK() uint16 {
 	return s.k
 }
 
+// GetNumRetained returns the number of quantiles retained by the sketch.
 func (s *ItemsSketch[C]) GetNumRetained() uint32 {
 	return s.levels[s.numLevels] - s.levels[0]
 }
 
+// GetMinItem returns the minimum item of the stream. This may be distinct from the smallest item retained by the sketch algorithm.
 func (s *ItemsSketch[C]) GetMinItem() (C, error) {
 	if s.IsEmpty() {
 		return s.itemsSketchOp.Identity(), fmt.Errorf("operation is undefined for an empty sketch")
@@ -173,6 +187,7 @@ func (s *ItemsSketch[C]) GetMinItem() (C, error) {
 	return *s.minItem, nil
 }
 
+// GetMaxItem returns the maximum item of the stream. This may be distinct from the largest item retained by the sketch algorithm.
 func (s *ItemsSketch[C]) GetMaxItem() (C, error) {
 	if s.IsEmpty() {
 		return s.itemsSketchOp.Identity(), fmt.Errorf("operation is undefined for an empty sketch")

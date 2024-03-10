@@ -53,7 +53,7 @@ func newItemsSketchSortedView[C comparable](sketch *ItemsSketch[C]) (*ItemsSketc
 	if totalN == 0 {
 		return nil, errors.New("empty sketch")
 	}
-	if !sketch.IsLevelZeroSorted() {
+	if !sketch.isLevelZeroSorted {
 		subSlice := srcQuantiles[srcLevels[0]:srcLevels[1]]
 		lessFn := sketch.itemsSketchOp.LessFn()
 		sort.Slice(subSlice, func(a, b int) bool {

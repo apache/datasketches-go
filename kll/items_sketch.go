@@ -195,14 +195,14 @@ func (s *ItemsSketch[C]) GetMaxItem() (C, error) {
 	return *s.maxItem, nil
 }
 
+// IsEstimationMode returns true if the sketch is in estimation mode, otherwise false.
 func (s *ItemsSketch[C]) IsEstimationMode() bool {
 	return s.numLevels > 1
 }
 
-func (s *ItemsSketch[C]) IsLevelZeroSorted() bool {
-	return s.isLevelZeroSorted
-}
-
+// GetTotalItemsArray return the serialized byte array of the entire internal items hypothetical structure.
+// It does not include the preamble, the levels array, or minimum or maximum items.
+// It may include empty or garbage items.
 func (s *ItemsSketch[C]) GetTotalItemsArray() []C {
 	if s.n == 0 {
 		return make([]C, s.k)
@@ -212,6 +212,8 @@ func (s *ItemsSketch[C]) GetTotalItemsArray() []C {
 	return outArr
 }
 
+// GetRank return the normalized rank corresponding to the given a quantile.
+// if INCLUSIVE the given quantile is included into the rank.
 func (s *ItemsSketch[C]) GetRank(item C, inclusive bool) (float64, error) {
 	if s.IsEmpty() {
 		return 0, fmt.Errorf("operation is undefined for an empty sketch")
@@ -223,6 +225,8 @@ func (s *ItemsSketch[C]) GetRank(item C, inclusive bool) (float64, error) {
 	return s.sortedView.GetRank(item, inclusive)
 }
 
+// GetRanks return an array of normalized ranks corresponding to the given array of quantiles and the given search criterion.
+// if INCLUSIVE, the given quantiles include the rank directly corresponding to each quantile.
 func (s *ItemsSketch[C]) GetRanks(item []C, inclusive bool) ([]float64, error) {
 	if s.IsEmpty() {
 		return nil, fmt.Errorf("operation is undefined for an empty sketch")
@@ -241,6 +245,9 @@ func (s *ItemsSketch[C]) GetRanks(item []C, inclusive bool) ([]float64, error) {
 	return ranks, nil
 }
 
+// GetQuantile return the approximate quantile of the given normalized rank and the given search criterion.
+// If INCLUSIVE, the given rank includes all quantiles <= the quantile directly corresponding to the given rank.
+// If EXCLUSIVE, the given rank includes all quantiles < the quantile directly corresponding to the given rank.
 func (s *ItemsSketch[C]) GetQuantile(rank float64, inclusive bool) (C, error) {
 	if s.IsEmpty() {
 		return s.itemsSketchOp.Identity(), fmt.Errorf("operation is undefined for an empty sketch")
@@ -255,6 +262,8 @@ func (s *ItemsSketch[C]) GetQuantile(rank float64, inclusive bool) (C, error) {
 	return s.sortedView.GetQuantile(rank, inclusive)
 }
 
+// GetQuantiles return an array of quantiles from the given array of normalized ranks.
+// if INCLUSIVE, the given ranks include all quantiles <= the quantile directly corresponding to each rank.
 func (s *ItemsSketch[C]) GetQuantiles(ranks []float64, inclusive bool) ([]C, error) {
 	if s.IsEmpty() {
 		return nil, fmt.Errorf("operation is undefined for an empty sketch")
@@ -360,7 +369,7 @@ func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
 	if s.IsEmpty() {
 		flags |= _EMPTY_BIT_MASK
 	}
-	if s.IsLevelZeroSorted() {
+	if s.isLevelZeroSorted {
 		flags |= _LEVEL_ZERO_SORTED_BIT_MASK
 	}
 	if s.n == 1 {

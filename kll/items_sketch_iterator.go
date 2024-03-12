@@ -30,7 +30,7 @@ type ItemsSketchIterator[C comparable] struct {
 	itemsSketchOp common.ItemSketchOp[C]
 }
 
-func NewItemsSketchIterator[C comparable](
+func newItemsSketchIterator[C comparable](
 	quantiles []C,
 	levelsArr []uint32,
 	numLevels int,
@@ -70,6 +70,10 @@ func (s *ItemsSketchIterator[C]) Next() bool {
 	return true
 }
 
+// GetQuantile return the generic quantile at the current index.
+//
+// Don't call this before calling next() for the first time
+// or after getting false from next().
 func (s *ItemsSketchIterator[C]) GetQuantile() C {
 	return s.quantiles[s.index]
 }

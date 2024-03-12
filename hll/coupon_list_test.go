@@ -26,7 +26,7 @@ import (
 func TestCouponIterator(t *testing.T) {
 	lgK := 4
 	n := 7
-	sk, err := NewHllSketchWithLgK(lgK)
+	sk, err := NewHllSketch(lgK, TgtHllTypeDefault)
 	assert.NoError(t, err)
 	for i := 0; i < n; i++ {
 		assert.NoError(t, sk.UpdateInt64(int64(i)))
@@ -41,7 +41,7 @@ func TestCouponIterator(t *testing.T) {
 }
 
 func TestCouponDuplicatesAndMisc(t *testing.T) {
-	sk, err := NewHllSketchWithLgK(8)
+	sk, err := NewHllSketch(8, TgtHllTypeDefault)
 	assert.NoError(t, err)
 	for i := 1; i <= 7; i++ {
 		assert.NoError(t, sk.UpdateInt64(int64(i)))
@@ -84,7 +84,7 @@ func TestToCouponSliceDeserialize(t *testing.T) {
 }
 
 func toCouponSliceDeserialize(t *testing.T, lgK int) {
-	sk1, err := NewHllSketchWithLgK(lgK)
+	sk1, err := NewHllSketch(lgK, TgtHllTypeDefault)
 	assert.NoError(t, err)
 
 	u := 7

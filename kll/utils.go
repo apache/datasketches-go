@@ -141,10 +141,6 @@ func getNormalizedRankError(k uint16, pmf bool) float64 {
 	return _CDF_COEF / math.Pow(float64(k), _CDF_EXP)
 }
 
-func checkBounds(offset int, reqLen int, memCap int) bool {
-	return !((offset | reqLen | (offset + reqLen) | (memCap - (offset + reqLen))) < 0)
-}
-
 func evenlySpacedDoubles(value1 float64, value2 float64, num int) ([]float64, error) {
 	if num < 2 {
 		return nil, errors.New("num must be >= 2")

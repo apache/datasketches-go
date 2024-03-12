@@ -29,6 +29,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
 	"sort"
 	"strconv"
@@ -52,14 +53,7 @@ type ItemsSketch[C comparable] struct {
 	hashMap *reversePurgeItemHashMap[C]
 }
 
-type ItemSketchOp[C comparable] interface {
-	Hash(item C) uint64
-	SerializeOneToSlice(item C) []byte
-	SerializeManyToSlice(item []C) []byte
-	DeserializeManyFromSlice(slc []byte, offset int, length int) []C
-}
-
-// NewItemsSketch constructs a new ItemsSketch with the given parameters.
+// NewFrequencyItemsSketch constructs a new ItemsSketch with the given parameters.
 // this internal constructor is used when deserializing the sketch.
 //
 //   - lgMaxMapSize, log2 of the physical size of the internal hash map managed by this
@@ -67,7 +61,7 @@ type ItemSketchOp[C comparable] interface {
 //     Both the ultimate accuracy and size of this sketch are functions of lgMaxMapSize.
 //   - lgCurMapSize, log2 of the starting (current) physical size of the internal hashFn
 //     map managed by this sketch.
-func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, operations ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewFrequencyItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, operations common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	lgMaxMapSz := max(lgMaxMapSize, _LG_MIN_MAP_SIZE)
 	lgCurMapSz := max(lgCurMapSize, _LG_MIN_MAP_SIZE)
 	hashMap, err := newReversePurgeItemHashMap[C](1<<lgCurMapSz, operations)
@@ -88,29 +82,29 @@ func NewItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, operations
 	}, nil
 }
 
-// NewItemsSketchWithMaxMapSize constructs a new ItemsSketch with the given maxMapSize and the default
+// NewFrequencyItemsSketchWithMaxMapSize constructs a new ItemsSketch with the given maxMapSize and the default
 // initialMapSize (8).
 //
 //   - maxMapSize, Determines the physical size of the internal hash map managed by this
 //     sketch and must be a power of 2. The maximum capacity of this internal hash map is
 //     0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are
 //     functions of maxMapSize.
-func NewItemsSketchWithMaxMapSize[C comparable](maxMapSize int, operations ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewFrequencyItemsSketchWithMaxMapSize[C comparable](maxMapSize int, operations common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	maxMapSz, err := internal.ExactLog2(maxMapSize)
 	if err != nil {
 		return nil, err
 	}
-	return NewItemsSketch[C](maxMapSz, _LG_MIN_MAP_SIZE, operations)
+	return NewFrequencyItemsSketch[C](maxMapSz, _LG_MIN_MAP_SIZE, operations)
 }
 
-// NewItemsSketchFromSlice constructs a new ItemsSketch with the given maxMapSize and the
+// NewFrequencyItemsSketchFromSlice constructs a new ItemsSketch with the given maxMapSize and the
 // default initialMapSize (8).
 //
 // maxMapSize determines the physical size of the internal hashmap managed by this
 // sketch and must be a power of 2.  The maximum capacity of this internal hash map is
 // 0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are a
 // function of maxMapSize.
-func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, operations common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	pre0, err := checkPreambleSize(slc) //make sure preamble will fit
 	maxPreLongs := internal.FamilyEnum.Frequency.MaxPreLongs
 
@@ -138,7 +132,7 @@ func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C
 		return nil, fmt.Errorf("(preLongs == 1) ^ empty == true")
 	}
 	if empty {
-		return NewItemsSketchWithMaxMapSize[C](1<<_LG_MIN_MAP_SIZE, operations)
+		return NewFrequencyItemsSketchWithMaxMapSize[C](1<<_LG_MIN_MAP_SIZE, operations)
 	}
 	// Get full preamble
 	preArr := make([]int64, preLongs)
@@ -146,7 +140,7 @@ func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C
 		preArr[j] = int64(binary.LittleEndian.Uint64(slc[j<<3:]))
 	}
 
-	fis, err := NewItemsSketch[C](int(lgMaxMapSize), int(lgCurMapSize), operations)
+	fis, err := NewFrequencyItemsSketch[C](int(lgMaxMapSize), int(lgCurMapSize), operations)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +161,10 @@ func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C
 	}
 	// Get itemArray
 	itemsOffset := preBytes + (8 * activeItems)
-	itemArray := operations.DeserializeManyFromSlice(slc[itemsOffset:], 0, activeItems)
+	itemArray, err := operations.DeserializeManyFromSlice(slc[itemsOffset:], 0, activeItems)
+	if err != nil {
+		return nil, err
+	}
 	// update the sketch
 	for j := 0; j < activeItems; j++ {
 		err := fis.UpdateMany(itemArray[j], countArray[j])
@@ -179,12 +176,12 @@ func NewItemsSketchFromSlice[C comparable](slc []byte, operations ItemSketchOp[C
 	return fis, nil
 }
 
-// GetAprioriErrorItemsSketch returns the estimated a priori error given the maxMapSize for the sketch and the
+// GetAprioriErrorFrequencyItemsSketch returns the estimated a priori error given the maxMapSize for the sketch and the
 // estimatedTotalStreamWeight.
 //
 // maxMapSize is the planned map size to be used when constructing this sketch.
 // estimatedTotalStreamWeight is the estimated total stream weight.
-func GetAprioriErrorItemsSketch(maxMapSize int, estimatedTotalStreamWeight int64) (float64, error) {
+func GetAprioriErrorFrequencyItemsSketch(maxMapSize int, estimatedTotalStreamWeight int64) (float64, error) {
 	epsilon, err := GetEpsilonLongsSketch(maxMapSize)
 	if err != nil {
 		return 0, err
@@ -192,20 +189,20 @@ func GetAprioriErrorItemsSketch(maxMapSize int, estimatedTotalStreamWeight int64
 	return epsilon * float64(estimatedTotalStreamWeight), nil
 }
 
-// GetCurrentMapCapacity returns the current number of counters the sketch is configured to support.
-func (i *ItemsSketch[C]) GetCurrentMapCapacity() int {
-	return i.curMapCap
-}
-
-// GetEpsilonItemsSketch returns epsilon used to compute a priori error.
+// GetEpsilonFrequencyItemsSketch returns epsilon used to compute a priori error.
 // This is just the value 3.5 / maxMapSize.
 //
 // maxMapSize is the planned map size to be used when constructing this sketch.
-func GetEpsilonItemsSketch(maxMapSize int) (float64, error) {
+func GetEpsilonFrequencyItemsSketch(maxMapSize int) (float64, error) {
 	if !internal.IsPowerOf2(maxMapSize) {
 		return 0, errors.New("maxMapSize is not a power of 2")
 	}
 	return 3.5 / float64(maxMapSize), nil
+}
+
+// GetCurrentMapCapacity returns the current number of counters the sketch is configured to support.
+func (i *ItemsSketch[C]) GetCurrentMapCapacity() int {
+	return i.curMapCap
 }
 
 // GetEstimate gets the estimate of the frequency of the given item.

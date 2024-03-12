@@ -17,15 +17,10 @@
 
 package common
 
-type LessFn[C comparable] func(C, C) bool
+const (
+	_DEFAULT_SERDE_HASH_SEED = uint64(9001)
+)
 
-type ItemSketchOp[C comparable] interface {
-	Identity() C
-	Hash(item C) uint64
-	LessFn() LessFn[C]
-	SizeOf(item C) int
-	SizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error)
-	SerializeManyToSlice(items []C) []byte
-	SerializeOneToSlice(item C) []byte
-	DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]C, error)
+func checkBounds(offset int, reqLen int, memCap int) bool {
+	return !((offset | reqLen | (offset + reqLen) | (memCap - (offset + reqLen))) < 0)
 }

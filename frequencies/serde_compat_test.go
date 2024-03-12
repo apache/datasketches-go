@@ -18,12 +18,13 @@
 package frequencies
 
 import (
+	"github.com/apache/datasketches-go/common"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestItemsToLongs(t *testing.T) {
-	sketch1, err := NewItemsSketchWithMaxMapSize[int64](8, IntItemsSketchOp{})
+	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[int64](8, common.ArrayOfLongsSerDe{})
 	assert.NoError(t, err)
 	sketch1.Update(1)
 	sketch1.Update(2)
@@ -63,7 +64,7 @@ func TestLongToItems(t *testing.T) {
 	sketch1.Update(4)
 
 	bytes := sketch1.ToSlice()
-	sketch2, err := NewItemsSketchFromSlice[int64](bytes, IntItemsSketchOp{})
+	sketch2, err := NewFrequencyItemsSketchFromSlice[int64](bytes, common.ArrayOfLongsSerDe{})
 	assert.NoError(t, err)
 	sketch2.Update(2)
 	sketch2.Update(3)

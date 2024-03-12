@@ -15,6 +15,15 @@
  * limitations under the License.
  */
 
+// Package kll is an implementation of a very compact quantiles sketch with lazy compaction scheme
+// and nearly optimal accuracy per retained quantile.</p>
+//
+// Reference: https://arxiv.org/abs/1603.05346v2" Optimal Quantile Approximation in Streams
+//
+// The default k of 200 yields a "single-sided" epsilon of about 1.33% and a
+// "double-sided" (PMF) epsilon of about 1.65%, with a confidence of 99%.
+//
+// See "https://datasketches.apache.org/docs/KLL/KLLSketch.html" KLL Sketch
 package kll
 
 import (
@@ -26,18 +35,11 @@ import (
 	"unsafe"
 )
 
-type ItemSketchOp[C comparable] interface {
-	identity() C
-	lessFn() common.LessFn[C]
-	sizeOf(item C) int
-	sizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error)
-	SerializeManyToSlice(items []C) []byte
-	SerializeOneToSlice(item C) []byte
-	DeserializeFromSlice(mem []byte, offsetBytes int, numItems int) ([]C, error)
-}
-
 type ItemsSketch[C comparable] struct {
-	k                 uint16
+	// k is the config that controls the accuracy of the sketch and its memory space usage
+	// The default k = 200 results in a normalized rank error of about 1.65%.
+	k uint16
+	// m is the number of items in the base level of the KLL array
 	m                 uint8
 	minK              uint16
 	numLevels         uint8
@@ -48,7 +50,7 @@ type ItemsSketch[C comparable] struct {
 	minItem           *C
 	maxItem           *C
 	sortedView        *ItemsSketchSortedView[C]
-	itemsSketchOp     ItemSketchOp[C]
+	itemsSketchOp     common.ItemSketchOp[C]
 }
 
 const (
@@ -68,13 +70,16 @@ var (
 		205891132094649}
 )
 
-func NewItemsSketch[C comparable](k uint16, itemsSketchOp ItemSketchOp[C]) (*ItemsSketch[C], error) {
+// NewKllItemsSketch create a new ItemsSketch with the given k and m.
+// The default k = 200 results in a normalized rank error of about 1.65%.
+// Larger K will have smaller error but the sketch will be larger (and slower).
+func NewKllItemsSketch[C comparable](k uint16, m uint8, itemsSketchOp common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
 	if k < _MIN_K || k > _MAX_K {
 		return nil, fmt.Errorf("k must be >= %d and <= %d: %d", _MIN_K, _MAX_K, k)
 	}
 	return &ItemsSketch[C]{
 		k:             k,
-		m:             _DEFAULT_M,
+		m:             m,
 		minK:          k,
 		numLevels:     uint8(1),
 		levels:        []uint32{uint32(k), uint32(k)},
@@ -83,7 +88,14 @@ func NewItemsSketch[C comparable](k uint16, itemsSketchOp ItemSketchOp[C]) (*Ite
 	}, nil
 }
 
-func NewItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp ItemSketchOp[C]) (*ItemsSketch[C], error) {
+// NewKllItemsSketchWithDefault create a new ItemsSketch with default k and m.
+// The default k = 200 results in a normalized rank error of about 1.65%.
+func NewKllItemsSketchWithDefault[C comparable](itemsSketchOp common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
+	return NewKllItemsSketch[C](_DEFAULT_K, _DEFAULT_M, itemsSketchOp)
+}
+
+// NewKllItemsSketchFromSlice create a new ItemsSketch from the given byte slice (serialized sketch).
+func NewKllItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
 
 	memVal, err := newItemsSketchMemoryValidate(sl, itemsSketchOp)
 	if err != nil {
@@ -109,7 +121,7 @@ func NewItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp ItemSketchOp
 		items = make([]C, k)
 	case _COMPACT_SINGLE:
 		offset := _N_LONG_ADR
-		deserItems, err := itemsSketchOp.DeserializeFromSlice(sl, offset, 1)
+		deserItems, err := itemsSketchOp.DeserializeManyFromSlice(sl, offset, 1)
 		if err != nil {
 			return nil, err
 		}
@@ -119,20 +131,20 @@ func NewItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp ItemSketchOp
 		items[k-1] = deserItems[0]
 	case _COMPACT_FULL:
 		offset := int(_DATA_START_ADR + memVal.numLevels*4)
-		deserMinItems, err := itemsSketchOp.DeserializeFromSlice(sl, offset, 1)
+		deserMinItems, err := itemsSketchOp.DeserializeManyFromSlice(sl, offset, 1)
 		minItem = &deserMinItems[0]
 		if err != nil {
 			return nil, err
 		}
-		offset += itemsSketchOp.sizeOf(*minItem)
-		deserMaxItems, err := itemsSketchOp.DeserializeFromSlice(sl, offset, 1)
+		offset += itemsSketchOp.SizeOf(*minItem)
+		deserMaxItems, err := itemsSketchOp.DeserializeManyFromSlice(sl, offset, 1)
 		maxItem = &deserMaxItems[0]
 		if err != nil {
 			return nil, err
 		}
-		offset += itemsSketchOp.sizeOf(*maxItem)
+		offset += itemsSketchOp.SizeOf(*maxItem)
 		numRetained := levelsArr[memVal.numLevels] - levelsArr[0]
-		deseRetItems, err := itemsSketchOp.DeserializeFromSlice(sl, offset, int(numRetained))
+		deseRetItems, err := itemsSketchOp.DeserializeManyFromSlice(sl, offset, int(numRetained))
 		if err != nil {
 			return nil, err
 		}
@@ -156,44 +168,50 @@ func NewItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp ItemSketchOp
 	}, nil
 }
 
+// IsEmpty returns true if the sketch is empty, otherwise false.
 func (s *ItemsSketch[C]) IsEmpty() bool {
 	return s.n == 0
 }
 
+// GetN returns the value of n (the length of the input stream offered to the sketch)
 func (s *ItemsSketch[C]) GetN() uint64 {
 	return s.n
 }
 
+// GetK returns the value of k (which controls the accuracy of the sketch and its memory space usage)
 func (s *ItemsSketch[C]) GetK() uint16 {
 	return s.k
 }
 
+// GetNumRetained returns the number of quantiles retained by the sketch.
 func (s *ItemsSketch[C]) GetNumRetained() uint32 {
 	return s.levels[s.numLevels] - s.levels[0]
 }
 
+// GetMinItem returns the minimum item of the stream. This may be distinct from the smallest item retained by the sketch algorithm.
 func (s *ItemsSketch[C]) GetMinItem() (C, error) {
 	if s.IsEmpty() {
-		return s.itemsSketchOp.identity(), fmt.Errorf("operation is undefined for an empty sketch")
+		return s.itemsSketchOp.Identity(), fmt.Errorf("operation is undefined for an empty sketch")
 	}
 	return *s.minItem, nil
 }
 
+// GetMaxItem returns the maximum item of the stream. This may be distinct from the largest item retained by the sketch algorithm.
 func (s *ItemsSketch[C]) GetMaxItem() (C, error) {
 	if s.IsEmpty() {
-		return s.itemsSketchOp.identity(), fmt.Errorf("operation is undefined for an empty sketch")
+		return s.itemsSketchOp.Identity(), fmt.Errorf("operation is undefined for an empty sketch")
 	}
 	return *s.maxItem, nil
 }
 
+// IsEstimationMode returns true if the sketch is in estimation mode, otherwise false.
 func (s *ItemsSketch[C]) IsEstimationMode() bool {
 	return s.numLevels > 1
 }
 
-func (s *ItemsSketch[C]) IsLevelZeroSorted() bool {
-	return s.isLevelZeroSorted
-}
-
+// GetTotalItemsArray return the serialized byte array of the entire internal items hypothetical structure.
+// It does not include the preamble, the levels array, or minimum or maximum items.
+// It may include empty or garbage items.
 func (s *ItemsSketch[C]) GetTotalItemsArray() []C {
 	if s.n == 0 {
 		return make([]C, s.k)
@@ -203,6 +221,8 @@ func (s *ItemsSketch[C]) GetTotalItemsArray() []C {
 	return outArr
 }
 
+// GetRank return the normalized rank corresponding to the given a quantile.
+// if INCLUSIVE the given quantile is included into the rank.
 func (s *ItemsSketch[C]) GetRank(item C, inclusive bool) (float64, error) {
 	if s.IsEmpty() {
 		return 0, fmt.Errorf("operation is undefined for an empty sketch")
@@ -214,6 +234,8 @@ func (s *ItemsSketch[C]) GetRank(item C, inclusive bool) (float64, error) {
 	return s.sortedView.GetRank(item, inclusive)
 }
 
+// GetRanks return an array of normalized ranks corresponding to the given array of quantiles and the given search criterion.
+// if INCLUSIVE, the given quantiles include the rank directly corresponding to each quantile.
 func (s *ItemsSketch[C]) GetRanks(item []C, inclusive bool) ([]float64, error) {
 	if s.IsEmpty() {
 		return nil, fmt.Errorf("operation is undefined for an empty sketch")
@@ -232,20 +254,25 @@ func (s *ItemsSketch[C]) GetRanks(item []C, inclusive bool) ([]float64, error) {
 	return ranks, nil
 }
 
+// GetQuantile return the approximate quantile of the given normalized rank and the given search criterion.
+// If INCLUSIVE, the given rank includes all quantiles <= the quantile directly corresponding to the given rank.
+// If EXCLUSIVE, the given rank includes all quantiles < the quantile directly corresponding to the given rank.
 func (s *ItemsSketch[C]) GetQuantile(rank float64, inclusive bool) (C, error) {
 	if s.IsEmpty() {
-		return s.itemsSketchOp.identity(), fmt.Errorf("operation is undefined for an empty sketch")
+		return s.itemsSketchOp.Identity(), fmt.Errorf("operation is undefined for an empty sketch")
 	}
 	if rank < 0.0 || rank > 1.0 {
-		return s.itemsSketchOp.identity(), fmt.Errorf("normalized rank cannot be less than zero or greater than 1.0: %f", rank)
+		return s.itemsSketchOp.Identity(), fmt.Errorf("normalized rank cannot be less than zero or greater than 1.0: %f", rank)
 	}
 	err := s.setupSortedView()
 	if err != nil {
-		return s.itemsSketchOp.identity(), err
+		return s.itemsSketchOp.Identity(), err
 	}
 	return s.sortedView.GetQuantile(rank, inclusive)
 }
 
+// GetQuantiles return an array of quantiles from the given array of normalized ranks.
+// if INCLUSIVE, the given ranks include all quantiles <= the quantile directly corresponding to each rank.
 func (s *ItemsSketch[C]) GetQuantiles(ranks []float64, inclusive bool) ([]C, error) {
 	if s.IsEmpty() {
 		return nil, fmt.Errorf("operation is undefined for an empty sketch")
@@ -264,6 +291,38 @@ func (s *ItemsSketch[C]) GetQuantiles(ranks []float64, inclusive bool) ([]C, err
 	return quantiles, nil
 }
 
+// GetPMF returns an approximation to the Probability Mass Function (PMF) of the input stream
+// as an array of probability masses as doubles on the interval [0.0, 1.0], given a set of splitPoints.
+//
+// The resulting approximations have a probabilistic guarantee that can be obtained from the
+// getNormalizedRankError(true) function.</p>
+//
+//   - splitPoints an array of m unique, monotonically increasing items
+//     (of the same type as the input items)
+//     that divide the item input domain into <i>m+1</i> consecutive, non-overlapping intervals.
+//
+// Each interval except for the end intervals starts with a split point and ends with the next split
+// point in sequence.
+//
+// The first interval starts below the lowest item retained by the sketch
+// corresponding to a zero rank or zero probability, and ends with the first split point</p>
+//
+// The last (m+1)th interval starts with the last split point and ends after the last
+// item retained by the sketch corresponding to a rank or probability of 1.0.
+//
+// The sum of the probability masses of all (m+1) intervals is 1.0.
+//
+// If the search criterion is:
+//
+//   - INCLUSIVE, and the upper split point of an interval equals an item retained by the sketch, the interval
+//     will include that item. If the lower split point equals an item retained by the sketch, the interval will exclude
+//     that item.
+//
+//   - EXCLUSIVE, and the upper split point of an interval equals an item retained by the sketch, the interval
+//     will exclude that item. If the lower split point equals an item retained by the sketch, the interval will include
+//     that item.
+//
+// It is not recommended to include either the minimum or maximum items of the input stream.
 func (s *ItemsSketch[C]) GetPMF(splitPoints []C, inclusive bool) ([]float64, error) {
 	if s.IsEmpty() {
 		return nil, fmt.Errorf("operation is undefined for an empty sketch")
@@ -275,6 +334,31 @@ func (s *ItemsSketch[C]) GetPMF(splitPoints []C, inclusive bool) ([]float64, err
 	return s.sortedView.GetPMF(splitPoints, inclusive)
 }
 
+// GetCDF returns an approximation to the Cumulative Distribution Function (CDF) of the input stream
+// as a monotonically increasing array of double ranks (or cumulative probabilities) on the interval [0.0, 1.0],
+// given a set of splitPoints.
+//
+// The resulting approximations have a probabilistic guarantee that can be obtained from the
+// getNormalizedRankError(false) function.
+//
+// - splitPoints an array of <i>m</i> unique, monotonically increasing items
+// (of the same type as the input items)
+// that divide the item input domain into <i>m+1</i> overlapping intervals.
+//
+// The start of each interval is below the lowest item retained by the sketch
+// corresponding to a zero rank or zero probability, and the end of the interval
+// is the rank or cumulative probability corresponding to the split point.
+//
+// The (m+1)th interval represents 100% of the distribution represented by the sketch
+// and consistent with the definition of a cumulative probability distribution, thus the (m+1)th
+// rank or probability in the returned array is always 1.0.
+//
+// If a split point exactly equals a retained item of the sketch and the search criterion is:
+//
+// - INCLUSIVE, the resulting cumulative probability will include that item.
+// - EXCLUSIVE, the resulting cumulative probability will not include the weight of that split point.
+//
+// It is not recommended to include either the minimum or maximum items of the input stream.
 func (s *ItemsSketch[C]) GetCDF(splitPoints []C, inclusive bool) ([]float64, error) {
 	if s.IsEmpty() {
 		return nil, fmt.Errorf("operation is undefined for an empty sketch")
@@ -286,10 +370,34 @@ func (s *ItemsSketch[C]) GetCDF(splitPoints []C, inclusive bool) ([]float64, err
 	return s.sortedView.GetCDF(splitPoints, inclusive)
 }
 
+// GetNormalizedRankError return the approximate rank error of this sketch normalized as a fraction between zero and one.
+// The epsilon returned is a best fit to 99 percent confidence empirically measured max error
+// in thousands of trials.
+// = pmf if true, returns the "double-sided" normalized rank error for the getPMF() function.
+// Otherwise, it is the "single-sided" normalized rank error for all the other queries.
+// @return if pmf is true, returns the "double-sided" normalized rank error for the getPMF() function.
+// Otherwise, it is the "single-sided" normalized rank error for all the other queries.
 func (s *ItemsSketch[C]) GetNormalizedRankError(pmf bool) float64 {
 	return getNormalizedRankError(s.minK, pmf)
 }
 
+// GetPartitionBoundaries returns an instance of ItemsSketchPartitionBoundaries
+// which provides sufficient information for the user to create the given number of equally sized partitions,
+// where "equally sized" refers to an approximately equal number of items per partition.
+//
+// - numEquallySized an integer that specifies the number of equally sized partitions between getMinItem() and
+// getMaxItem().
+// This must be a positive integer greater than zero.
+//
+// A 1 will return: minItem, maxItem.
+// A 2 will return: minItem, median quantile, maxItem.
+// Etc.
+//
+// - searchCrit
+// If INCLUSIVE, all the returned quantiles are the upper boundaries of the equally sized partitions
+// except for the lowest returned quantile, which is the lowest boundary of the lowest ranked partition.
+// If EXCLUSIVE, all the returned quantiles are the lower boundaries of the equally sized partitions
+// except for the highest returned quantile, which is the upper boundary of the highest ranked partition.
 func (s *ItemsSketch[C]) GetPartitionBoundaries(numEquallySized int, inclusive bool) (*ItemsSketchPartitionBoundaries[C], error) {
 	if s.IsEmpty() {
 		return nil, fmt.Errorf("operation is undefined for an empty sketch")
@@ -302,6 +410,7 @@ func (s *ItemsSketch[C]) GetPartitionBoundaries(numEquallySized int, inclusive b
 	return s.sortedView.GetPartitionBoundaries(numEquallySized, inclusive)
 }
 
+// GetSortedView return the sorted view of this sketch.
 func (s *ItemsSketch[C]) GetSortedView() (*ItemsSketchSortedView[C], error) {
 	if s.IsEmpty() {
 		return nil, fmt.Errorf("operation is undefined for an empty sketch")
@@ -313,11 +422,22 @@ func (s *ItemsSketch[C]) GetSortedView() (*ItemsSketchSortedView[C], error) {
 	return s.sortedView, nil
 }
 
+// Update this sketch with the given item.
 func (s *ItemsSketch[C]) Update(item C) {
-	s.updateItem(item, s.itemsSketchOp.lessFn())
+	s.updateItem(item, s.itemsSketchOp.LessFn())
 	s.sortedView = nil
 }
 
+// Merge the given sketch into this sketch.
+func (s *ItemsSketch[C]) Merge(other *ItemsSketch[C]) {
+	if other.IsEmpty() {
+		return
+	}
+	s.mergeItemsSketch(other)
+	s.sortedView = nil
+}
+
+// Reset this sketch to the empty state.
 func (s *ItemsSketch[C]) Reset() {
 	s.n = 0
 	s.isLevelZeroSorted = false
@@ -329,6 +449,7 @@ func (s *ItemsSketch[C]) Reset() {
 	s.sortedView = nil
 }
 
+// ToSlice returns the serialized byte array of this sketch.
 func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
 	srcN := s.n
 	var tgtStructure = _COMPACT_FULL
@@ -351,7 +472,7 @@ func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
 	if s.IsEmpty() {
 		flags |= _EMPTY_BIT_MASK
 	}
-	if s.IsLevelZeroSorted() {
+	if s.isLevelZeroSorted {
 		flags |= _LEVEL_ZERO_SORTED_BIT_MASK
 	}
 	if s.n == 1 {
@@ -403,17 +524,23 @@ func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
 	return bytesOut, nil
 }
 
+// GetSerializedSizeBytes Returns the current number of bytes this Sketch would require if serialized in compact form.
 func (s *ItemsSketch[C]) GetSerializedSizeBytes() (int, error) {
 	return s.currentSerializedSizeBytes()
 }
 
+// GetIterator returns the iterator for this sketch, which is not sorted.
 func (s *ItemsSketch[C]) GetIterator() *ItemsSketchIterator[C] {
-	return NewItemsSketchIterator[C](
+	return newItemsSketchIterator[C](
 		s.GetTotalItemsArray(),
 		s.getLevelsArray(),
 		s.getNumLevels(),
 	)
 }
+
+//
+// Private methods
+//
 
 func (s *ItemsSketch[C]) currentSerializedSizeBytes() (int, error) {
 	srcN := s.n
@@ -463,7 +590,7 @@ func (s *ItemsSketch[C]) getLevelsArrSizeBytes(structure sketchStructure) int {
 }
 
 func (s *ItemsSketch[C]) getMinMaxSizeBytes() int {
-	return s.itemsSketchOp.sizeOf(*s.minItem) + s.itemsSketchOp.sizeOf(*s.maxItem)
+	return s.itemsSketchOp.SizeOf(*s.minItem) + s.itemsSketchOp.SizeOf(*s.maxItem)
 }
 
 func (s *ItemsSketch[C]) getMinMaxByteArr() []byte {
@@ -480,7 +607,7 @@ func (s *ItemsSketch[C]) getSingleItemSizeBytes() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return s.itemsSketchOp.sizeOf(v) + int(unsafe.Sizeof(uint32(1))), nil
+	return s.itemsSketchOp.SizeOf(v) + int(unsafe.Sizeof(uint32(1))), nil
 }
 
 func (s *ItemsSketch[C]) getSingleItemByteArr() ([]byte, error) {
@@ -493,7 +620,7 @@ func (s *ItemsSketch[C]) getSingleItemByteArr() ([]byte, error) {
 
 func (s *ItemsSketch[C]) getSingleItem() (C, error) {
 	if s.n != 1 {
-		return s.itemsSketchOp.identity(), fmt.Errorf("sketch must have exactly one item")
+		return s.itemsSketchOp.Identity(), fmt.Errorf("sketch must have exactly one item")
 	}
 	return s.items[s.k-1], nil
 }
@@ -552,14 +679,6 @@ func (s *ItemsSketch[C]) updateItem(item C, lessFn common.LessFn[C]) {
 	s.items[nextPos] = item
 }
 
-func (s *ItemsSketch[C]) Merge(other *ItemsSketch[C]) {
-	if other.IsEmpty() {
-		return
-	}
-	s.mergeItemsSketch(other)
-	s.sortedView = nil
-}
-
 func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 	if other.IsEmpty() {
 		return
@@ -589,7 +708,7 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 	// MERGE: update this sketch with level0 items from the other sketch
 	otherItemsArr = other.GetTotalItemsArray()
 	for i := otherLevelsArr[0]; i < otherLevelsArr[1]; i++ {
-		s.updateItem(otherItemsArr[i], s.itemsSketchOp.lessFn())
+		s.updateItem(otherItemsArr[i], s.itemsSketchOp.LessFn())
 	}
 
 	// After the level 0 update, we capture the intermediate state of levels and items arrays...
@@ -614,10 +733,10 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 
 		populateItemWorkArrays(workbuf, worklevels, provisionalNumLevels,
 			myCurNumLevels, myCurLevelsArr, myCurItemsArr,
-			otherNumLevels, otherLevelsArr, otherItemsArr, s.itemsSketchOp.lessFn())
+			otherNumLevels, otherLevelsArr, otherItemsArr, s.itemsSketchOp.LessFn())
 
 		// notice that workbuf is being used as both the input and output
-		result := generalItemsCompress(s.k, s.m, provisionalNumLevels, workbuf, worklevels, workbuf, outlevels, s.isLevelZeroSorted, s.itemsSketchOp.lessFn())
+		result := generalItemsCompress(s.k, s.m, provisionalNumLevels, workbuf, worklevels, workbuf, outlevels, s.isLevelZeroSorted, s.itemsSketchOp.LessFn())
 		targetItemCount := result[1] //was finalCapacity. Max size given k, m, numLevels
 		curItemCount := result[2]    //was finalPop
 
@@ -674,7 +793,7 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 		s.minItem = other.minItem
 		s.maxItem = other.maxItem
 	} else {
-		less := s.itemsSketchOp.lessFn()
+		less := s.itemsSketchOp.LessFn()
 		if less(myMin, *other.minItem) {
 			s.minItem = &myMin
 		} else {
@@ -718,7 +837,7 @@ func (s *ItemsSketch[C]) compressWhileUpdatingSketch() {
 	//the following is specific to generic Items
 	myItemsArr := s.GetTotalItemsArray()
 	if level == 0 { // level zero might not be sorted, so we must sort it if we wish to compact it
-		lessFn := s.itemsSketchOp.lessFn()
+		lessFn := s.itemsSketchOp.LessFn()
 		tmpSlice := myItemsArr[adjBeg : adjBeg+adjPop]
 		sort.Slice(tmpSlice, func(a, b int) bool {
 			return lessFn(tmpSlice[a], tmpSlice[b])
@@ -731,7 +850,7 @@ func (s *ItemsSketch[C]) compressWhileUpdatingSketch() {
 		mergeSortedItemsArrays(
 			myItemsArr, adjBeg, halfAdjPop,
 			myItemsArr, rawEnd, popAbove,
-			myItemsArr, adjBeg+halfAdjPop, s.itemsSketchOp.lessFn())
+			myItemsArr, adjBeg+halfAdjPop, s.itemsSketchOp.LessFn())
 	}
 	newIndex := myLevelsArr[level+1] - halfAdjPop // adjust boundaries of the level above
 	s.levels[level+1] = newIndex

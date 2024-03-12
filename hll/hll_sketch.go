@@ -170,19 +170,9 @@ func NewHllSketch(lgConfigK int, tgtHllType TgtHllType) (HllSketch, error) {
 	return newHllSketchState(&couponList), nil
 }
 
-// NewHllSketchWithLgK constructs a new on-heap sketch with the default tgtHllType.
-//
-//   - lgConfigK, the Log2 of K for the target HLL sketch. This value must be between 4 and 21 inclusively.
-func NewHllSketchWithLgK(lgConfigK int) (HllSketch, error) {
-	lgK, err := checkLgK(lgConfigK)
-	if err != nil {
-		return nil, err
-	}
-	couponList, err := newCouponList(lgK, TgtHllTypeDefault, curModeList)
-	if err != nil {
-		return nil, err
-	}
-	return newHllSketchState(&couponList), nil
+// NewHllSketchWithDefault constructs a new on-heap sketch with the default lgK and tgtHllType.
+func NewHllSketchWithDefault() (HllSketch, error) {
+	return NewHllSketch(defaultLgK, TgtHllTypeDefault)
 }
 
 // NewHllSketchFromSlice deserialize a given byte slice, which must be a valid HllSketch image and may have data.

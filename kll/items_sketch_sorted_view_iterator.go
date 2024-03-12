@@ -42,6 +42,10 @@ func (i *ItemsSketchSortedViewIterator[C]) Next() bool {
 	return i.index < len(i.cumWeights)
 }
 
+// GetQuantile returns the quantile at the current index
+//
+// Don't call this before calling next() for the first time
+// or after getting false from next().
 func (i *ItemsSketchSortedViewIterator[C]) GetQuantile() C {
 	return i.quantiles[i.index]
 }

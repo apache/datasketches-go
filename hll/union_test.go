@@ -251,7 +251,7 @@ func TestUnionWithWrap(t *testing.T) {
 func TestUnionWithWrap2(t *testing.T) {
 	lgK := 10
 	n := 128
-	sk, err := NewHllSketchWithLgK(lgK)
+	sk, err := NewHllSketch(lgK, TgtHllTypeDefault)
 	assert.NoError(t, err)
 	for i := 0; i < n; i++ {
 		assert.NoError(t, sk.UpdateInt64(int64(i)))
@@ -310,9 +310,9 @@ func TestCheckUnionDeserializeRebuildAfterMerge(t *testing.T) {
 	lgK := 12
 	//Build 2 sketches in HLL (dense) mode.
 	u := 1 << (lgK - 3) //(lgK < 8) ? 16 : 1 << (lgK - 3) //allows changing lgK above
-	sk1, err := NewHllSketchWithLgK(lgK)
+	sk1, err := NewHllSketch(lgK, TgtHllTypeDefault)
 	assert.NoError(t, err)
-	sk2, err := NewHllSketchWithLgK(lgK)
+	sk2, err := NewHllSketch(lgK, TgtHllTypeDefault)
 	assert.NoError(t, err)
 	for i := 0; i < u; i++ {
 		assert.NoError(t, sk1.UpdateInt64(int64(i)))

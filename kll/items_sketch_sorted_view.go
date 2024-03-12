@@ -19,6 +19,7 @@ package kll
 
 import (
 	"errors"
+	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
 	"sort"
 )
@@ -29,7 +30,7 @@ type ItemsSketchSortedView[C comparable] struct {
 	totalN        uint64
 	maxItem       C
 	minItem       C
-	itemsSketchOp ItemSketchOp[C]
+	itemsSketchOp common.ItemSketchOp[C]
 }
 
 func newItemsSketchSortedView[C comparable](sketch *ItemsSketch[C]) (*ItemsSketchSortedView[C], error) {
@@ -52,9 +53,9 @@ func newItemsSketchSortedView[C comparable](sketch *ItemsSketch[C]) (*ItemsSketc
 	if totalN == 0 {
 		return nil, errors.New("empty sketch")
 	}
-	if !sketch.IsLevelZeroSorted() {
+	if !sketch.isLevelZeroSorted {
 		subSlice := srcQuantiles[srcLevels[0]:srcLevels[1]]
-		lessFn := sketch.itemsSketchOp.lessFn()
+		lessFn := sketch.itemsSketchOp.LessFn()
 		sort.Slice(subSlice, func(a, b int) bool {
 			return lessFn(subSlice[a], subSlice[b])
 		})
@@ -81,7 +82,7 @@ func (s *ItemsSketchSortedView[C]) GetRank(item C, inclusive bool) (float64, err
 	if inclusive {
 		crit = internal.InequalityLE
 	}
-	index := internal.FindWithInequality(s.quantiles, 0, length-1, item, crit, s.itemsSketchOp.lessFn())
+	index := internal.FindWithInequality(s.quantiles, 0, length-1, item, crit, s.itemsSketchOp.LessFn())
 	if index == -1 {
 		return 0, nil //EXCLUSIVE (LT) case: quantile <= minQuantile; INCLUSIVE (LE) case: quantile < minQuantile
 	}
@@ -90,11 +91,11 @@ func (s *ItemsSketchSortedView[C]) GetRank(item C, inclusive bool) (float64, err
 
 func (s *ItemsSketchSortedView[C]) GetQuantile(rank float64, inclusive bool) (C, error) {
 	if s.totalN == 0 {
-		return s.itemsSketchOp.identity(), errors.New("empty sketch")
+		return s.itemsSketchOp.Identity(), errors.New("empty sketch")
 	}
 	err := checkNormalizedRankBounds(rank)
 	if err != nil {
-		return s.itemsSketchOp.identity(), err
+		return s.itemsSketchOp.Identity(), err
 	}
 	index := s.getQuantileIndex(rank, inclusive)
 	return s.quantiles[index], nil
@@ -104,7 +105,7 @@ func (s *ItemsSketchSortedView[C]) GetPMF(splitPoints []C, inclusive bool) ([]fl
 	if s.totalN == 0 {
 		return nil, errors.New("empty sketch")
 	}
-	err := checkItems(splitPoints, s.itemsSketchOp.lessFn())
+	err := checkItems(splitPoints, s.itemsSketchOp.LessFn())
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +124,7 @@ func (s *ItemsSketchSortedView[C]) GetCDF(splitPoints []C, inclusive bool) ([]fl
 	if s.totalN == 0 {
 		return nil, errors.New("empty sketch")
 	}
-	err := checkItems(splitPoints, s.itemsSketchOp.lessFn())
+	err := checkItems(splitPoints, s.itemsSketchOp.LessFn())
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +182,7 @@ func (s *ItemsSketchSortedView[C]) GetPartitionBoundaries(numEquallySized int, i
 	return newItemsSketchPartitionBoundaries[C](s.totalN, evSpQuantiles, evSpNatRanks, evSpNormRanks, s.maxItem, s.minItem, inclusive)
 }
 
-func populateFromSketch[C comparable](srcQuantiles []C, levels []uint32, numLevels uint8, numQuantiles uint32, itemsSketchOp ItemSketchOp[C]) ([]C, []int64) {
+func populateFromSketch[C comparable](srcQuantiles []C, levels []uint32, numLevels uint8, numQuantiles uint32, itemsSketchOp common.ItemSketchOp[C]) ([]C, []int64) {
 	quantiles := make([]C, numQuantiles)
 	cumWeights := make([]int64, numQuantiles)
 	myLevels := make([]uint32, numLevels+1)
@@ -212,7 +213,7 @@ func populateFromSketch[C comparable](srcQuantiles []C, levels []uint32, numLeve
 	return quantiles, cumWeights
 }
 
-func blockyTandemMergeSort[C comparable](quantiles []C, weights []int64, levels []uint32, numLevels uint8, itemsSketchOp ItemSketchOp[C]) {
+func blockyTandemMergeSort[C comparable](quantiles []C, weights []int64, levels []uint32, numLevels uint8, itemsSketchOp common.ItemSketchOp[C]) {
 	if numLevels == 1 {
 		return
 	}
@@ -226,7 +227,7 @@ func blockyTandemMergeSort[C comparable](quantiles []C, weights []int64, levels 
 	blockyTandemMergeSortRecursion(quantilesTmp, weightsTmp, quantiles, weights, levels, 0, numLevels, itemsSketchOp)
 }
 
-func blockyTandemMergeSortRecursion[C comparable](quantilesSrc []C, weightsSrc []int64, quantilesDst []C, weightsDst []int64, levels []uint32, startingLevel uint8, numLevels uint8, itemsSketchOp ItemSketchOp[C]) {
+func blockyTandemMergeSortRecursion[C comparable](quantilesSrc []C, weightsSrc []int64, quantilesDst []C, weightsDst []int64, levels []uint32, startingLevel uint8, numLevels uint8, itemsSketchOp common.ItemSketchOp[C]) {
 	if numLevels == 1 {
 		return
 	}
@@ -240,7 +241,7 @@ func blockyTandemMergeSortRecursion[C comparable](quantilesSrc []C, weightsSrc [
 	tandemMerge(quantilesSrc, weightsSrc, quantilesDst, weightsDst, levels, startingLevel1, numLevels1, startingLevel2, numLevels2, itemsSketchOp)
 }
 
-func tandemMerge[C comparable](quantilesSrc []C, weightsSrc []int64, quantilesDst []C, weightsDst []int64, levels []uint32, startingLevel1 uint8, numLevels1 uint8, startingLevel2 uint8, numLevels2 uint8, itemsSketchOp ItemSketchOp[C]) {
+func tandemMerge[C comparable](quantilesSrc []C, weightsSrc []int64, quantilesDst []C, weightsDst []int64, levels []uint32, startingLevel1 uint8, numLevels1 uint8, startingLevel2 uint8, numLevels2 uint8, itemsSketchOp common.ItemSketchOp[C]) {
 	fromIndex1 := levels[startingLevel1]
 	toIndex1 := levels[startingLevel1+numLevels1] // exclusive
 	fromIndex2 := levels[startingLevel2]
@@ -249,7 +250,7 @@ func tandemMerge[C comparable](quantilesSrc []C, weightsSrc []int64, quantilesDs
 	iSrc2 := fromIndex2
 	iDst := fromIndex1
 
-	lessFn := itemsSketchOp.lessFn()
+	lessFn := itemsSketchOp.LessFn()
 	for iSrc1 < toIndex1 && iSrc2 < toIndex2 {
 		if lessFn(quantilesSrc[iSrc1], quantilesSrc[iSrc2]) || quantilesSrc[iSrc1] == quantilesSrc[iSrc2] {
 			quantilesDst[iDst] = quantilesSrc[iSrc1]

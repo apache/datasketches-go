@@ -17,6 +17,8 @@
 
 package kll
 
+import "github.com/apache/datasketches-go/common"
+
 type ItemsSketchIterator[C comparable] struct {
 	quantiles     []C
 	levelsArr     []uint32
@@ -25,10 +27,10 @@ type ItemsSketchIterator[C comparable] struct {
 	level         int
 	weight        int64
 	isInitialized bool
-	itemsSketchOp ItemSketchOp[C]
+	itemsSketchOp common.ItemSketchOp[C]
 }
 
-func NewItemsSketchIterator[C comparable](
+func newItemsSketchIterator[C comparable](
 	quantiles []C,
 	levelsArr []uint32,
 	numLevels int,
@@ -68,6 +70,10 @@ func (s *ItemsSketchIterator[C]) Next() bool {
 	return true
 }
 
+// GetQuantile return the generic quantile at the current index.
+//
+// Don't call this before calling next() for the first time
+// or after getting false from next().
 func (s *ItemsSketchIterator[C]) GetQuantile() C {
 	return s.quantiles[s.index]
 }

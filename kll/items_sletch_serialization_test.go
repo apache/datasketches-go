@@ -19,6 +19,7 @@ package kll
 
 import (
 	"fmt"
+	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
 	"os"
@@ -33,7 +34,7 @@ func TestGenerateGoFiles(t *testing.T) {
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	for _, n := range nArr {
 		digits := numDigits(n)
-		sk, err := NewItemsSketch[string](_DEFAULT_K, stringItemsSketchOp{})
+		sk, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 		assert.NoError(t, err)
 		for i := 1; i <= n; i++ {
 			sk.Update(intToFixedLengthString(i, digits))
@@ -48,11 +49,12 @@ func TestGenerateGoFiles(t *testing.T) {
 func TestJavaCompat(t *testing.T) {
 	t.Run("Java KLL String", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+		serde := common.ArrayOfStringsSerDe{}
 		for _, n := range nArr {
 			digits := numDigits(n)
 			bytes, err := os.ReadFile(fmt.Sprintf("%s/kll_string_n%d_java.sk", internal.JavaPath, n))
 			assert.NoError(t, err)
-			sketch, err := NewItemsSketchFromSlice[string](bytes, stringItemsSketchOp{})
+			sketch, err := NewKllItemsSketchFromSlice[string](bytes, serde)
 			if err != nil {
 				return
 			}
@@ -81,7 +83,7 @@ func TestJavaCompat(t *testing.T) {
 
 				weight := int64(0)
 				it := sketch.GetIterator()
-				lessFn := stringItemsSketchOp{}.lessFn()
+				lessFn := serde.LessFn()
 				for it.Next() {
 					qut := it.GetQuantile()
 					assert.True(t, lessFn(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))

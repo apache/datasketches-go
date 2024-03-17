@@ -835,7 +835,7 @@ func TestItemsSketch_SerializeDeserializeMultipleValue(t *testing.T) {
 	assert.Equal(t, mem, mem2)
 }
 
-func TestSerializeDeserialize(t *testing.T) {
+func TestSerializeDeserializeString(t *testing.T) {
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	serde := common.ArrayOfStringsSerDe{}
 	for _, n := range nArr {
@@ -874,6 +874,59 @@ func TestSerializeDeserialize(t *testing.T) {
 			maxV, err := sketch.GetMaxItem()
 			assert.NoError(t, err)
 			assert.Equal(t, maxV, intToFixedLengthString(n, digits))
+
+			weight := int64(0)
+			it := sketch.GetIterator()
+			lessFn := serde.LessFn()
+			for it.Next() {
+				qut := it.GetQuantile()
+				assert.True(t, lessFn(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
+				assert.True(t, !lessFn(maxV, qut) || maxV == qut, fmt.Sprintf("max: \"%v\" \"%v\"", maxV, qut))
+				weight += it.GetWeight()
+			}
+			assert.Equal(t, weight, int64(n))
+		}
+	}
+}
+
+func TestSerializeDeserializeFloat(t *testing.T) {
+	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+	serde := common.ArrayOfDoublesSerDe{}
+	for _, n := range nArr {
+		sk, err := NewKllItemsSketchWithDefault[float64](serde)
+		assert.NoError(t, err)
+		for i := 1; i <= n; i++ {
+			sk.Update(float64(i))
+		}
+		slc, err := sk.ToSlice()
+		assert.NoError(t, err)
+
+		sketch, err := NewKllItemsSketchFromSlice[float64](slc, serde)
+		if err != nil {
+			return
+		}
+
+		assert.Equal(t, sketch.GetK(), uint16(200))
+		if n == 0 {
+			assert.True(t, sketch.IsEmpty())
+		} else {
+			assert.False(t, sketch.IsEmpty())
+		}
+
+		if n > 100 {
+			assert.True(t, sketch.IsEstimationMode())
+		} else {
+			assert.False(t, sketch.IsEstimationMode())
+		}
+
+		if n > 0 {
+			minV, err := sketch.GetMinItem()
+			assert.NoError(t, err)
+			assert.Equal(t, minV, float64(1))
+
+			maxV, err := sketch.GetMaxItem()
+			assert.NoError(t, err)
+			assert.Equal(t, maxV, float64(n))
 
 			weight := int64(0)
 			it := sketch.GetIterator()

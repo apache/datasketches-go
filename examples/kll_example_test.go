@@ -30,7 +30,7 @@ func TestKllItemsSketch(t *testing.T) {
 	sketch, err := kll.NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 
-	// Update the sketch with 100 items
+	// Update the sketch with 1000 items
 	for i := 0; i < 1000; i++ {
 		sketch.Update(fmt.Sprintf("item_%012d", i))
 	}
@@ -39,6 +39,11 @@ func TestKllItemsSketch(t *testing.T) {
 	quantiles := []float64{0.0, 0.5, 1.0}
 	values, err := sketch.GetQuantiles(quantiles, true)
 	assert.NoError(t, err)
+
+	// Kll sketch is a stochastic data structure, so we can't validate the exact values
+	// Additionally when the sketch recompress, it randomly picks a pivot point meaning
+	// we can only validate the range of the values.
+	// This is not more or less wrong, just not comparable deterministically
 
 	// Validate the quantiles
 	assert.LessOrEqual(t, values[0], "item_000000000003")

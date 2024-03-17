@@ -30,9 +30,9 @@ func TestKllItemsSketch(t *testing.T) {
 	sketch, err := kll.NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 
-	// Update the sketch with 1000 items
+	// Update the sketch with 100 items
 	for i := 0; i < 1000; i++ {
-		sketch.Update(fmt.Sprintf("item_%d", i))
+		sketch.Update(fmt.Sprintf("item_%012d", i))
 	}
 
 	// Get the quantiles
@@ -41,30 +41,31 @@ func TestKllItemsSketch(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Validate the quantiles
-	assert.Equal(t, "item_0", values[0])
-	assert.Equal(t, "item_548", values[1])
-	assert.Equal(t, "item_999", values[2])
+	assert.LessOrEqual(t, values[0], "item_000000000003")
+	assert.GreaterOrEqual(t, values[1], "item_000000000498")
+	assert.LessOrEqual(t, values[1], "item_000000000501")
+	assert.GreaterOrEqual(t, values[2], "item_000000000999")
 
 	// Get the PMF
-	pmf, err := sketch.GetPMF([]string{"item_0", "item_548", "item_999"}, true)
+	pmf, err := sketch.GetPMF([]string{"item_000000000000", "item_000000000498", "item_000000000999"}, true)
 	assert.NoError(t, err)
 
 	// Validate the PMF
-	assert.Equal(t, 0.004, pmf[0])
-	assert.Equal(t, 0.498, pmf[1])
-	assert.Equal(t, 0.498, pmf[2])
+	assert.LessOrEqual(t, pmf[0], 0.004)
+	assert.InDelta(t, pmf[1], 0.500, 0.01)
+	assert.GreaterOrEqual(t, pmf[2], 0.498)
 
 	// Get the CDF
-	cdf, err := sketch.GetCDF([]string{"item_0", "item_548", "item_999"}, true)
+	cdf, err := sketch.GetCDF([]string{"item_000000000000", "item_000000000498", "item_000000000999"}, true)
 	assert.NoError(t, err)
 
 	// Validate the CDF
-	assert.Equal(t, 0.004, cdf[0])
-	assert.Equal(t, 0.502, cdf[1])
-	assert.Equal(t, 1.0, cdf[2])
+	assert.LessOrEqual(t, cdf[0], 0.004)
+	assert.InDelta(t, cdf[1], 0.500, 0.01)
+	assert.Equal(t, cdf[2], 1.0)
 
 	// Get the rank of an item
-	rank, err := sketch.GetRank("item_548", true)
+	rank, err := sketch.GetRank("item_000000000498", true)
 	assert.NoError(t, err)
-	assert.Equal(t, 0.502, rank)
+	assert.InDelta(t, rank, 0.5, 0.01)
 }

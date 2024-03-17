@@ -27,9 +27,9 @@ import (
 )
 
 func TestGenerateGoFiles(t *testing.T) {
-	//if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
-	//	t.Skipf("%s not set", internal.DSketchTestGenerateGo)
-	//}
+	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
+		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
+	}
 
 	os.Mkdir(internal.GoPath, 0755)
 

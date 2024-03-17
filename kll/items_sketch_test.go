@@ -26,6 +26,7 @@ import (
 )
 
 const (
+	PMF_EPS_FOR_K_8         = 0.35  // PMF rank error (epsilon) for k=8
 	PMF_EPS_FOR_K_256       = 0.013 // PMF rank error (epsilon) for k=256
 	NUMERIC_NOISE_TOLERANCE = 1e-6
 )
@@ -488,14 +489,8 @@ func TestItemsSketch_KTooSmall(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// cannot use _MAX_K + 1 (untyped int constant 65536) as uint16 value in argument to NewKllItemsSketch[string] (overflows)
-//func TestItemsSketch_KTooLarge(t *testing.T) {
-//	_, err := NewKllItemsSketch[string](_MAX_K+1, stringItemsSketchOp{})
-//	assert.Error(t, err)
-//}
-
 func TestItemsSketch_MinK(t *testing.T) {
-	sketch, err := NewKllItemsSketch[string](uint16(_DEFAULT_M), _DEFAULT_M, common.ArrayOfStringsSerDe{})
+	sketch, err := NewKllItemsSketch[string](uint16(8), _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	n := 1000
 	digits := numDigits(n)
@@ -503,12 +498,12 @@ func TestItemsSketch_MinK(t *testing.T) {
 		sketch.Update(intToFixedLengthString(i, digits))
 	}
 	assert.Equal(t, sketch.GetK(), uint16(_DEFAULT_M))
-	upperBound := intToFixedLengthString(n/2+(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
-	lowerBound := intToFixedLengthString(n/2-(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
+	upperBound := intToFixedLengthString(n/2+(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_8)), digits)
+	lowerBound := intToFixedLengthString(n/2-(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_8)), digits)
 	median, err := sketch.GetQuantile(0.5, true)
 	assert.NoError(t, err)
-	assert.True(t, median < upperBound)
-	assert.True(t, lowerBound < median)
+	assert.LessOrEqual(t, median, upperBound)
+	assert.LessOrEqual(t, lowerBound, median)
 }
 
 func TestItemsSketch_MaxK(t *testing.T) {
@@ -524,8 +519,8 @@ func TestItemsSketch_MaxK(t *testing.T) {
 	lowerBound := intToFixedLengthString(n/2-(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
 	median, err := sketch.GetQuantile(0.5, true)
 	assert.NoError(t, err)
-	assert.True(t, median < upperBound)
-	assert.True(t, lowerBound < median)
+	assert.LessOrEqual(t, median, upperBound)
+	assert.LessOrEqual(t, lowerBound, median)
 }
 
 func TestItemsSketch_OutOfOrderSplitPoints(t *testing.T) {

@@ -31,8 +31,8 @@ import (
 	"fmt"
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
+	"math/rand"
 	"sort"
-	"unsafe"
 )
 
 type ItemsSketch[C comparable] struct {
@@ -51,6 +51,9 @@ type ItemsSketch[C comparable] struct {
 	maxItem           *C
 	sortedView        *ItemsSketchSortedView[C]
 	itemsSketchOp     common.ItemSketchOp[C]
+
+	// Force deterministic offset for test, so that we can compare results across implementation.
+	deterministicOffsetForTest bool
 }
 
 const (
@@ -68,6 +71,9 @@ var (
 		3486784401, 10460353203, 31381059609, 94143178827, 282429536481,
 		847288609443, 2541865828329, 7625597484987, 22876792454961, 68630377364883,
 		205891132094649}
+
+	// Used for deterministic rand behavior in tests
+	nextOffsetForTest = 0
 )
 
 // NewKllItemsSketch create a new ItemsSketch with the given k and m.
@@ -498,7 +504,6 @@ func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
 			return nil, err
 		}
 		copy(bytesOut[_DATA_START_ADR_SINGLE_ITEM:], siByteArr)
-		//wbuf.incrementPosition(-len);
 		return bytesOut, nil
 	}
 
@@ -607,7 +612,7 @@ func (s *ItemsSketch[C]) getSingleItemSizeBytes() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return s.itemsSketchOp.SizeOf(v) + int(unsafe.Sizeof(uint32(1))), nil
+	return s.itemsSketchOp.SizeOf(v), nil
 }
 
 func (s *ItemsSketch[C]) getSingleItemByteArr() ([]byte, error) {
@@ -736,7 +741,7 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 			otherNumLevels, otherLevelsArr, otherItemsArr, s.itemsSketchOp.LessFn())
 
 		// notice that workbuf is being used as both the input and output
-		result := generalItemsCompress(s.k, s.m, provisionalNumLevels, workbuf, worklevels, workbuf, outlevels, s.isLevelZeroSorted, s.itemsSketchOp.LessFn())
+		result := generalItemsCompress(s.k, s.m, provisionalNumLevels, workbuf, worklevels, workbuf, outlevels, s.isLevelZeroSorted, s.itemsSketchOp.LessFn(), s.deterministicOffsetForTest)
 		targetItemCount := result[1] //was finalCapacity. Max size given k, m, numLevels
 		curItemCount := result[2]    //was finalPop
 
@@ -844,9 +849,9 @@ func (s *ItemsSketch[C]) compressWhileUpdatingSketch() {
 		})
 	}
 	if popAbove == 0 {
-		randomlyHalveUpItems(myItemsArr, adjBeg, adjPop)
+		randomlyHalveUpItems(myItemsArr, adjBeg, adjPop, s.deterministicOffsetForTest)
 	} else {
-		randomlyHalveDownItems(myItemsArr, adjBeg, adjPop)
+		randomlyHalveDownItems(myItemsArr, adjBeg, adjPop, s.deterministicOffsetForTest)
 		mergeSortedItemsArrays(
 			myItemsArr, adjBeg, halfAdjPop,
 			myItemsArr, rawEnd, popAbove,
@@ -980,10 +985,12 @@ func intCapAuxAux(k uint16, depth uint8) uint32 {
 	return uint32(k)
 }
 
-func randomlyHalveUpItems[C comparable](buf []C, start uint32, length uint32) {
+func randomlyHalveUpItems[C comparable](buf []C, start uint32, length uint32, deterministicOffsetForTest bool) {
 	halfLength := length / 2
-	//offset := rand.Intn(2)
-	offset := 1
+	offset := rand.Intn(2)
+	if deterministicOffsetForTest {
+		offset = deterministicOffset()
+	}
 	j := (start + length) - 1 - uint32(offset)
 	for i := (start + length) - 1; i >= (start + halfLength); i-- {
 		buf[i] = buf[j]
@@ -991,10 +998,12 @@ func randomlyHalveUpItems[C comparable](buf []C, start uint32, length uint32) {
 	}
 }
 
-func randomlyHalveDownItems[C comparable](buf []C, start uint32, length uint32) {
+func randomlyHalveDownItems[C comparable](buf []C, start uint32, length uint32, deterministicOffsetForTest bool) {
 	halfLength := length / 2
-	//offset := rand.Intn(2)
-	offset := 1
+	offset := rand.Intn(2)
+	if deterministicOffsetForTest {
+		offset = deterministicOffset()
+	}
 	j := start + uint32(offset)
 	for i := start; i < (start + halfLength); i++ {
 		buf[i] = buf[j]
@@ -1074,7 +1083,9 @@ func generalItemsCompress[C comparable](
 	outBuf []C,
 	outLevels []uint32,
 	isLevelZeroSorted bool,
-	lessFn common.LessFn[C]) []uint32 {
+	lessFn common.LessFn[C],
+	deterministicOffsetForTest bool,
+) []uint32 {
 	numLevels := numLevelsIn
 	currentItemCount := inLevels[numLevels] - inLevels[0]        // decreases with each compaction
 	targetItemCount := computeTotalItemCapacity(k, m, numLevels) // increases if we add levels
@@ -1131,9 +1142,9 @@ func generalItemsCompress[C comparable](
 			}
 
 			if popAbove == 0 {
-				randomlyHalveUpItems(inBuf, adjBeg, adjPop)
+				randomlyHalveUpItems(inBuf, adjBeg, adjPop, deterministicOffsetForTest)
 			} else {
-				randomlyHalveDownItems(inBuf, adjBeg, adjPop)
+				randomlyHalveDownItems(inBuf, adjBeg, adjPop, deterministicOffsetForTest)
 				mergeSortedItemsArrays(
 					inBuf, adjBeg, halfAdjPop,
 					inBuf, rawLim, popAbove,
@@ -1161,4 +1172,10 @@ func generalItemsCompress[C comparable](
 	} // end of loop over levels
 
 	return []uint32{uint32(numLevels), targetItemCount, currentItemCount}
+}
+
+func deterministicOffset() int {
+	result := nextOffsetForTest
+	nextOffsetForTest = 1 - nextOffsetForTest
+	return result
 }

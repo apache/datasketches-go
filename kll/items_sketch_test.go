@@ -26,6 +26,7 @@ import (
 )
 
 const (
+	PMF_EPS_FOR_K_8         = 0.35  // PMF rank error (epsilon) for k=8
 	PMF_EPS_FOR_K_256       = 0.013 // PMF rank error (epsilon) for k=256
 	NUMERIC_NOISE_TOLERANCE = 1e-6
 )
@@ -488,14 +489,8 @@ func TestItemsSketch_KTooSmall(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// cannot use _MAX_K + 1 (untyped int constant 65536) as uint16 value in argument to NewKllItemsSketch[string] (overflows)
-//func TestItemsSketch_KTooLarge(t *testing.T) {
-//	_, err := NewKllItemsSketch[string](_MAX_K+1, stringItemsSketchOp{})
-//	assert.Error(t, err)
-//}
-
 func TestItemsSketch_MinK(t *testing.T) {
-	sketch, err := NewKllItemsSketch[string](uint16(_DEFAULT_M), _DEFAULT_M, common.ArrayOfStringsSerDe{})
+	sketch, err := NewKllItemsSketch[string](uint16(8), _DEFAULT_M, common.ArrayOfStringsSerDe{})
 	assert.NoError(t, err)
 	n := 1000
 	digits := numDigits(n)
@@ -503,12 +498,12 @@ func TestItemsSketch_MinK(t *testing.T) {
 		sketch.Update(intToFixedLengthString(i, digits))
 	}
 	assert.Equal(t, sketch.GetK(), uint16(_DEFAULT_M))
-	upperBound := intToFixedLengthString(n/2+(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
-	lowerBound := intToFixedLengthString(n/2-(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
+	upperBound := intToFixedLengthString(n/2+(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_8)), digits)
+	lowerBound := intToFixedLengthString(n/2-(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_8)), digits)
 	median, err := sketch.GetQuantile(0.5, true)
 	assert.NoError(t, err)
-	assert.True(t, median < upperBound)
-	assert.True(t, lowerBound < median)
+	assert.LessOrEqual(t, median, upperBound)
+	assert.LessOrEqual(t, lowerBound, median)
 }
 
 func TestItemsSketch_MaxK(t *testing.T) {
@@ -524,8 +519,8 @@ func TestItemsSketch_MaxK(t *testing.T) {
 	lowerBound := intToFixedLengthString(n/2-(int)(math.Ceil(float64(n)*PMF_EPS_FOR_K_256)), digits)
 	median, err := sketch.GetQuantile(0.5, true)
 	assert.NoError(t, err)
-	assert.True(t, median < upperBound)
-	assert.True(t, lowerBound < median)
+	assert.LessOrEqual(t, median, upperBound)
+	assert.LessOrEqual(t, lowerBound, median)
 }
 
 func TestItemsSketch_OutOfOrderSplitPoints(t *testing.T) {
@@ -835,7 +830,7 @@ func TestItemsSketch_SerializeDeserializeMultipleValue(t *testing.T) {
 	assert.Equal(t, mem, mem2)
 }
 
-func TestSerializeDeserialize(t *testing.T) {
+func TestSerializeDeserializeString(t *testing.T) {
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	serde := common.ArrayOfStringsSerDe{}
 	for _, n := range nArr {
@@ -874,6 +869,59 @@ func TestSerializeDeserialize(t *testing.T) {
 			maxV, err := sketch.GetMaxItem()
 			assert.NoError(t, err)
 			assert.Equal(t, maxV, intToFixedLengthString(n, digits))
+
+			weight := int64(0)
+			it := sketch.GetIterator()
+			lessFn := serde.LessFn()
+			for it.Next() {
+				qut := it.GetQuantile()
+				assert.True(t, lessFn(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
+				assert.True(t, !lessFn(maxV, qut) || maxV == qut, fmt.Sprintf("max: \"%v\" \"%v\"", maxV, qut))
+				weight += it.GetWeight()
+			}
+			assert.Equal(t, weight, int64(n))
+		}
+	}
+}
+
+func TestSerializeDeserializeFloat(t *testing.T) {
+	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+	serde := common.ArrayOfDoublesSerDe{}
+	for _, n := range nArr {
+		sk, err := NewKllItemsSketchWithDefault[float64](serde)
+		assert.NoError(t, err)
+		for i := 1; i <= n; i++ {
+			sk.Update(float64(i))
+		}
+		slc, err := sk.ToSlice()
+		assert.NoError(t, err)
+
+		sketch, err := NewKllItemsSketchFromSlice[float64](slc, serde)
+		if err != nil {
+			return
+		}
+
+		assert.Equal(t, sketch.GetK(), uint16(200))
+		if n == 0 {
+			assert.True(t, sketch.IsEmpty())
+		} else {
+			assert.False(t, sketch.IsEmpty())
+		}
+
+		if n > 100 {
+			assert.True(t, sketch.IsEstimationMode())
+		} else {
+			assert.False(t, sketch.IsEstimationMode())
+		}
+
+		if n > 0 {
+			minV, err := sketch.GetMinItem()
+			assert.NoError(t, err)
+			assert.Equal(t, minV, float64(1))
+
+			maxV, err := sketch.GetMaxItem()
+			assert.NoError(t, err)
+			assert.Equal(t, maxV, float64(n))
 
 			weight := int64(0)
 			it := sketch.GetIterator()

@@ -36,7 +36,7 @@ func TestGenerateGoFiles(t *testing.T) {
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	for _, n := range nArr {
 		digits := numDigits(n)
-		sk, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
+		sk, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsOps{})
 		sk.deterministicOffsetForTest = true
 		assert.NoError(t, err)
 		for i := 1; i <= n; i++ {
@@ -49,7 +49,7 @@ func TestGenerateGoFiles(t *testing.T) {
 	}
 
 	for _, n := range nArr {
-		sk, err := NewKllItemsSketchWithDefault[float64](common.ArrayOfDoublesSerDe{})
+		sk, err := NewKllItemsSketchWithDefault[float64](common.ArrayOfDoublesOps{})
 		sk.deterministicOffsetForTest = true
 		assert.NoError(t, err)
 		for i := 1; i <= n; i++ {
@@ -65,7 +65,7 @@ func TestGenerateGoFiles(t *testing.T) {
 func TestJavaCompat(t *testing.T) {
 	t.Run("Java KLL String", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
-		serde := common.ArrayOfStringsSerDe{}
+		serde := common.ArrayOfStringsOps{}
 		for _, n := range nArr {
 			digits := numDigits(n)
 			bytes, err := os.ReadFile(fmt.Sprintf("%s/kll_string_n%d_java.sk", internal.JavaPath, n))
@@ -113,7 +113,7 @@ func TestJavaCompat(t *testing.T) {
 
 	t.Run("Java KLL Double", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
-		serde := common.ArrayOfDoublesSerDe{}
+		serde := common.ArrayOfDoublesOps{}
 		for _, n := range nArr {
 			bytes, err := os.ReadFile(fmt.Sprintf("%s/kll_double_n%d_java.sk", internal.JavaPath, n))
 			assert.NoError(t, err)

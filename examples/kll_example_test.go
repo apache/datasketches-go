@@ -27,7 +27,7 @@ import (
 
 func TestKllItemsSketch(t *testing.T) {
 	// Create a new KLL sketch
-	sketch, err := kll.NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
+	sketch, err := kll.NewKllItemsSketchWithDefault[string](common.ArrayOfStringsOps{})
 	assert.NoError(t, err)
 
 	// Update the sketch with 1000 items

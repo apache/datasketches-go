@@ -23,22 +23,22 @@ import (
 	"math"
 )
 
-type ArrayOfDoublesSerDe struct {
+type ArrayOfDoublesOps struct {
 	ReverseOrder bool
 
 	scratch [8]byte
 }
 
-func (f ArrayOfDoublesSerDe) Identity() float64 {
+func (f ArrayOfDoublesOps) Identity() float64 {
 	return 0
 }
 
-func (f ArrayOfDoublesSerDe) Hash(item float64) uint64 {
+func (f ArrayOfDoublesOps) Hash(item float64) uint64 {
 	binary.LittleEndian.PutUint64(f.scratch[:], math.Float64bits(item))
 	return murmur3.SeedSum64(_DEFAULT_SERDE_HASH_SEED, f.scratch[:])
 }
 
-func (f ArrayOfDoublesSerDe) LessFn() LessFn[float64] {
+func (f ArrayOfDoublesOps) LessFn() LessFn[float64] {
 	return func(a float64, b float64) bool {
 		if f.ReverseOrder {
 			return a > b
@@ -47,21 +47,21 @@ func (f ArrayOfDoublesSerDe) LessFn() LessFn[float64] {
 	}
 }
 
-func (f ArrayOfDoublesSerDe) SizeOf(item float64) int {
+func (f ArrayOfDoublesOps) SizeOf(item float64) int {
 	return 8
 }
 
-func (f ArrayOfDoublesSerDe) SizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error) {
+func (f ArrayOfDoublesOps) SizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error) {
 	return numItems * 8, nil
 }
 
-func (f ArrayOfDoublesSerDe) SerializeOneToSlice(item float64) []byte {
+func (f ArrayOfDoublesOps) SerializeOneToSlice(item float64) []byte {
 	bytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(bytes, math.Float64bits(item))
 	return bytes
 }
 
-func (f ArrayOfDoublesSerDe) SerializeManyToSlice(item []float64) []byte {
+func (f ArrayOfDoublesOps) SerializeManyToSlice(item []float64) []byte {
 	if len(item) == 0 {
 		return []byte{}
 	}
@@ -74,7 +74,7 @@ func (f ArrayOfDoublesSerDe) SerializeManyToSlice(item []float64) []byte {
 	return bytes
 }
 
-func (f ArrayOfDoublesSerDe) DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]float64, error) {
+func (f ArrayOfDoublesOps) DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]float64, error) {
 	if numItems == 0 {
 		return []float64{}, nil
 	}

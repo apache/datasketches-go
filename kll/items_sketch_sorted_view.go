@@ -55,9 +55,9 @@ func newItemsSketchSortedView[C comparable](sketch *ItemsSketch[C]) (*ItemsSketc
 	}
 	if !sketch.isLevelZeroSorted {
 		subSlice := srcQuantiles[srcLevels[0]:srcLevels[1]]
-		lessFn := sketch.itemsSketchOp.LessFn()
+		compFn := sketch.itemsSketchOp.CompareFn()
 		sort.Slice(subSlice, func(a, b int) bool {
-			return lessFn(subSlice[a], subSlice[b])
+			return compFn(subSlice[a], subSlice[b])
 		})
 	}
 	numQuantiles := srcLevels[srcNumLevels] - srcLevels[0]
@@ -82,7 +82,7 @@ func (s *ItemsSketchSortedView[C]) GetRank(item C, inclusive bool) (float64, err
 	if inclusive {
 		crit = internal.InequalityLE
 	}
-	index := internal.FindWithInequality(s.quantiles, 0, length-1, item, crit, s.itemsSketchOp.LessFn())
+	index := internal.FindWithInequality(s.quantiles, 0, length-1, item, crit, s.itemsSketchOp.CompareFn())
 	if index == -1 {
 		return 0, nil //EXCLUSIVE (LT) case: quantile <= minQuantile; INCLUSIVE (LE) case: quantile < minQuantile
 	}
@@ -105,7 +105,7 @@ func (s *ItemsSketchSortedView[C]) GetPMF(splitPoints []C, inclusive bool) ([]fl
 	if s.totalN == 0 {
 		return nil, errors.New("empty sketch")
 	}
-	err := checkItems(splitPoints, s.itemsSketchOp.LessFn())
+	err := checkItems(splitPoints, s.itemsSketchOp.CompareFn())
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func (s *ItemsSketchSortedView[C]) GetCDF(splitPoints []C, inclusive bool) ([]fl
 	if s.totalN == 0 {
 		return nil, errors.New("empty sketch")
 	}
-	err := checkItems(splitPoints, s.itemsSketchOp.LessFn())
+	err := checkItems(splitPoints, s.itemsSketchOp.CompareFn())
 	if err != nil {
 		return nil, err
 	}
@@ -250,9 +250,9 @@ func tandemMerge[C comparable](quantilesSrc []C, weightsSrc []int64, quantilesDs
 	iSrc2 := fromIndex2
 	iDst := fromIndex1
 
-	lessFn := itemsSketchOp.LessFn()
+	compFn := itemsSketchOp.CompareFn()
 	for iSrc1 < toIndex1 && iSrc2 < toIndex2 {
-		if lessFn(quantilesSrc[iSrc1], quantilesSrc[iSrc2]) || quantilesSrc[iSrc1] == quantilesSrc[iSrc2] {
+		if compFn(quantilesSrc[iSrc1], quantilesSrc[iSrc2]) || quantilesSrc[iSrc1] == quantilesSrc[iSrc2] {
 			quantilesDst[iDst] = quantilesSrc[iSrc1]
 			weightsDst[iDst] = weightsSrc[iSrc1]
 			iSrc1++

@@ -38,7 +38,7 @@ func (f ArrayOfStringsOps) Hash(item string) uint64 {
 	return murmur3.SeedSum64(_DEFAULT_SERDE_HASH_SEED, datum[:])
 }
 
-func (f ArrayOfStringsOps) LessFn() LessFn[string] {
+func (f ArrayOfStringsOps) CompareFn() CompareFn[string] {
 	return func(a string, b string) bool {
 		if f.ReverseOrder {
 			return a > b

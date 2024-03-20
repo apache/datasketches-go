@@ -38,7 +38,7 @@ func (f ArrayOfDoublesOps) Hash(item float64) uint64 {
 	return murmur3.SeedSum64(_DEFAULT_SERDE_HASH_SEED, f.scratch[:])
 }
 
-func (f ArrayOfDoublesOps) LessFn() LessFn[float64] {
+func (f ArrayOfDoublesOps) CompareFn() CompareFn[float64] {
 	return func(a float64, b float64) bool {
 		if f.ReverseOrder {
 			return a > b

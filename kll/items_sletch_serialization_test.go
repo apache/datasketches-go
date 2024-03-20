@@ -99,11 +99,11 @@ func TestJavaCompat(t *testing.T) {
 
 				weight := int64(0)
 				it := sketch.GetIterator()
-				lessFn := serde.LessFn()
+				compFn := serde.CompareFn()
 				for it.Next() {
 					qut := it.GetQuantile()
-					assert.True(t, lessFn(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
-					assert.True(t, !lessFn(maxV, qut) || maxV == qut, fmt.Sprintf("max: \"%v\" \"%v\"", maxV, qut))
+					assert.True(t, compFn(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
+					assert.True(t, !compFn(maxV, qut) || maxV == qut, fmt.Sprintf("max: \"%v\" \"%v\"", maxV, qut))
 					weight += it.GetWeight()
 				}
 				assert.Equal(t, weight, int64(n))
@@ -146,11 +146,11 @@ func TestJavaCompat(t *testing.T) {
 
 				weight := int64(0)
 				it := sketch.GetIterator()
-				lessFn := serde.LessFn()
+				compFn := serde.CompareFn()
 				for it.Next() {
 					qut := it.GetQuantile()
-					assert.True(t, lessFn(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
-					assert.True(t, !lessFn(maxV, qut) || maxV == qut, fmt.Sprintf("max: \"%v\" \"%v\"", maxV, qut))
+					assert.True(t, compFn(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
+					assert.True(t, !compFn(maxV, qut) || maxV == qut, fmt.Sprintf("max: \"%v\" \"%v\"", maxV, qut))
 					weight += it.GetWeight()
 				}
 				assert.Equal(t, weight, int64(n))

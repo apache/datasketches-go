@@ -37,7 +37,7 @@ func (f ArrayOfLongsOps) Hash(item int64) uint64 {
 	return murmur3.SeedSum64(_DEFAULT_SERDE_HASH_SEED, f.scratch[:])
 }
 
-func (f ArrayOfLongsOps) LessFn() LessFn[int64] {
+func (f ArrayOfLongsOps) CompareFn() CompareFn[int64] {
 	return func(a int64, b int64) bool {
 		if f.ReverseOrder {
 			return a > b

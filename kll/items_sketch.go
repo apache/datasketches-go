@@ -430,7 +430,7 @@ func (s *ItemsSketch[C]) GetSortedView() (*ItemsSketchSortedView[C], error) {
 
 // Update this sketch with the given item.
 func (s *ItemsSketch[C]) Update(item C) {
-	s.updateItem(item, s.itemsSketchOp.LessFn())
+	s.updateItem(item, s.itemsSketchOp.CompareFn())
 	s.sortedView = nil
 }
 
@@ -657,7 +657,7 @@ func (s *ItemsSketch[C]) setupSortedView() error {
 	return nil
 }
 
-func (s *ItemsSketch[C]) updateItem(item C, lessFn common.LessFn[C]) {
+func (s *ItemsSketch[C]) updateItem(item C, compFn common.CompareFn[C]) {
 	if internal.IsNil(item) {
 		return
 	}
@@ -665,10 +665,10 @@ func (s *ItemsSketch[C]) updateItem(item C, lessFn common.LessFn[C]) {
 		s.minItem = &item
 		s.maxItem = &item
 	} else {
-		if lessFn(item, *s.minItem) {
+		if compFn(item, *s.minItem) {
 			s.minItem = &item
 		}
-		if lessFn(*s.maxItem, item) {
+		if compFn(*s.maxItem, item) {
 			s.maxItem = &item
 		}
 	}
@@ -713,7 +713,7 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 	// MERGE: update this sketch with level0 items from the other sketch
 	otherItemsArr = other.GetTotalItemsArray()
 	for i := otherLevelsArr[0]; i < otherLevelsArr[1]; i++ {
-		s.updateItem(otherItemsArr[i], s.itemsSketchOp.LessFn())
+		s.updateItem(otherItemsArr[i], s.itemsSketchOp.CompareFn())
 	}
 
 	// After the level 0 update, we capture the intermediate state of levels and items arrays...
@@ -738,10 +738,10 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 
 		populateItemWorkArrays(workbuf, worklevels, provisionalNumLevels,
 			myCurNumLevels, myCurLevelsArr, myCurItemsArr,
-			otherNumLevels, otherLevelsArr, otherItemsArr, s.itemsSketchOp.LessFn())
+			otherNumLevels, otherLevelsArr, otherItemsArr, s.itemsSketchOp.CompareFn())
 
 		// notice that workbuf is being used as both the input and output
-		result := generalItemsCompress(s.k, s.m, provisionalNumLevels, workbuf, worklevels, workbuf, outlevels, s.isLevelZeroSorted, s.itemsSketchOp.LessFn(), s.deterministicOffsetForTest)
+		result := generalItemsCompress(s.k, s.m, provisionalNumLevels, workbuf, worklevels, workbuf, outlevels, s.isLevelZeroSorted, s.itemsSketchOp.CompareFn(), s.deterministicOffsetForTest)
 		targetItemCount := result[1] //was finalCapacity. Max size given k, m, numLevels
 		curItemCount := result[2]    //was finalPop
 
@@ -798,7 +798,7 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 		s.minItem = other.minItem
 		s.maxItem = other.maxItem
 	} else {
-		less := s.itemsSketchOp.LessFn()
+		less := s.itemsSketchOp.CompareFn()
 		if less(myMin, *other.minItem) {
 			s.minItem = &myMin
 		} else {
@@ -842,10 +842,10 @@ func (s *ItemsSketch[C]) compressWhileUpdatingSketch() {
 	//the following is specific to generic Items
 	myItemsArr := s.GetTotalItemsArray()
 	if level == 0 { // level zero might not be sorted, so we must sort it if we wish to compact it
-		lessFn := s.itemsSketchOp.LessFn()
+		compFn := s.itemsSketchOp.CompareFn()
 		tmpSlice := myItemsArr[adjBeg : adjBeg+adjPop]
 		sort.Slice(tmpSlice, func(a, b int) bool {
-			return lessFn(tmpSlice[a], tmpSlice[b])
+			return compFn(tmpSlice[a], tmpSlice[b])
 		})
 	}
 	if popAbove == 0 {
@@ -855,7 +855,7 @@ func (s *ItemsSketch[C]) compressWhileUpdatingSketch() {
 		mergeSortedItemsArrays(
 			myItemsArr, adjBeg, halfAdjPop,
 			myItemsArr, rawEnd, popAbove,
-			myItemsArr, adjBeg+halfAdjPop, s.itemsSketchOp.LessFn())
+			myItemsArr, adjBeg+halfAdjPop, s.itemsSketchOp.CompareFn())
 	}
 	newIndex := myLevelsArr[level+1] - halfAdjPop // adjust boundaries of the level above
 	s.levels[level+1] = newIndex
@@ -1013,7 +1013,7 @@ func randomlyHalveDownItems[C comparable](buf []C, start uint32, length uint32, 
 
 func mergeSortedItemsArrays[C comparable](bufA []C, startA uint32, lenA uint32,
 	bufB []C, startB uint32, lenB uint32,
-	bufC []C, startC uint32, lessFn common.LessFn[C]) {
+	bufC []C, startC uint32, compFn common.CompareFn[C]) {
 	lenC := lenA + lenB
 	limA := startA + lenA
 	limB := startB + lenB
@@ -1029,7 +1029,7 @@ func mergeSortedItemsArrays[C comparable](bufA []C, startA uint32, lenA uint32,
 		} else if b == limB {
 			bufC[c] = bufA[a]
 			a++
-		} else if lessFn(bufA[a], bufB[b]) {
+		} else if compFn(bufA[a], bufB[b]) {
 			bufC[c] = bufA[a]
 			a++
 		} else {
@@ -1042,7 +1042,7 @@ func mergeSortedItemsArrays[C comparable](bufA []C, startA uint32, lenA uint32,
 func populateItemWorkArrays[C comparable](workbuf []C, worklevels []uint32, provisionalNumLevels uint8,
 	myCurNumLevels uint8, myCurLevelsArr []uint32, myCurItemsArr []C,
 	otherNumLevels uint8, otherLevelsArr []uint32, otherItemsArr []C,
-	lessFn common.LessFn[C]) {
+	compFn common.CompareFn[C]) {
 
 	worklevels[0] = 0
 	// Note: the level zero data from "other" was already inserted into "self"
@@ -1069,7 +1069,7 @@ func populateItemWorkArrays[C comparable](workbuf []C, worklevels []uint32, prov
 			mergeSortedItemsArrays(
 				myCurItemsArr, myCurLevelsArr[lvl], selfPop,
 				otherItemsArr, otherLevelsArr[lvl], otherPop,
-				workbuf, worklevels[lvl], lessFn)
+				workbuf, worklevels[lvl], compFn)
 		}
 	}
 }
@@ -1083,7 +1083,7 @@ func generalItemsCompress[C comparable](
 	outBuf []C,
 	outLevels []uint32,
 	isLevelZeroSorted bool,
-	lessFn common.LessFn[C],
+	compFn common.CompareFn[C],
 	deterministicOffsetForTest bool,
 ) []uint32 {
 	numLevels := numLevelsIn
@@ -1137,7 +1137,7 @@ func generalItemsCompress[C comparable](
 			if (curLevel == 0) && !isLevelZeroSorted {
 				tmpSlice := inBuf[adjBeg : adjBeg+adjPop]
 				sort.Slice(tmpSlice, func(a, b int) bool {
-					return lessFn(tmpSlice[a], tmpSlice[b])
+					return compFn(tmpSlice[a], tmpSlice[b])
 				})
 			}
 
@@ -1148,7 +1148,7 @@ func generalItemsCompress[C comparable](
 				mergeSortedItemsArrays(
 					inBuf, adjBeg, halfAdjPop,
 					inBuf, rawLim, popAbove,
-					inBuf, adjBeg+halfAdjPop, lessFn)
+					inBuf, adjBeg+halfAdjPop, compFn)
 			}
 
 			// track the fact that we just eliminated some data

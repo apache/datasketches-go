@@ -30,7 +30,7 @@ const (
 	InequalityGT
 )
 
-func FindWithInequality[C comparable](arr []C, low int, high int, v C, crit Inequality, lessFn common.LessFn[C]) int {
+func FindWithInequality[C comparable](arr []C, low int, high int, v C, crit Inequality, compFn common.CompareFn[C]) int {
 	if len(arr) == 0 {
 		return -1
 	}
@@ -38,35 +38,35 @@ func FindWithInequality[C comparable](arr []C, low int, high int, v C, crit Ineq
 	hi := high
 	for lo <= hi {
 		if hi-lo <= 1 {
-			return resolve(arr, lo, hi, v, crit, lessFn)
+			return resolve(arr, lo, hi, v, crit, compFn)
 		}
 		mid := lo + (hi-lo)/2
-		ret := compare(arr, mid, mid+1, v, crit, lessFn)
+		ret := compare(arr, mid, mid+1, v, crit, compFn)
 		if ret == -1 {
 			hi = mid
 		} else if ret == 1 {
 			lo = mid + 1
 		} else {
-			return getIndex(arr, mid, mid+1, v, crit, lessFn)
+			return getIndex(arr, mid, mid+1, v, crit, compFn)
 		}
 	}
 	return -1
 }
 
-func resolve[C comparable](arr []C, lo int, hi int, v C, crit Inequality, lessFn common.LessFn[C]) int {
+func resolve[C comparable](arr []C, lo int, hi int, v C, crit Inequality, compFn common.CompareFn[C]) int {
 	result := 0
 	switch crit {
 	case InequalityLT:
 		if lo == hi {
-			if lessFn(v, arr[hi]) == false && v != arr[hi] {
+			if compFn(v, arr[hi]) == false && v != arr[hi] {
 				result = lo
 			} else {
 				result = -1
 			}
 		} else {
-			if lessFn(v, arr[hi]) == false && v != arr[hi] {
+			if compFn(v, arr[hi]) == false && v != arr[hi] {
 				result = hi
-			} else if lessFn(v, arr[lo]) == false && v != arr[lo] {
+			} else if compFn(v, arr[lo]) == false && v != arr[lo] {
 				result = lo
 			} else {
 				result = -1
@@ -74,15 +74,15 @@ func resolve[C comparable](arr []C, lo int, hi int, v C, crit Inequality, lessFn
 		}
 	case InequalityLE:
 		if lo == hi {
-			if lessFn(v, arr[lo]) == false {
+			if compFn(v, arr[lo]) == false {
 				result = lo
 			} else {
 				result = -1
 			}
 		} else {
-			if lessFn(v, arr[hi]) == false {
+			if compFn(v, arr[hi]) == false {
 				result = hi
-			} else if lessFn(v, arr[lo]) == false {
+			} else if compFn(v, arr[lo]) == false {
 				result = lo
 			} else {
 				result = -1
@@ -91,15 +91,15 @@ func resolve[C comparable](arr []C, lo int, hi int, v C, crit Inequality, lessFn
 
 	case InequalityGE:
 		if lo == hi {
-			if lessFn(v, arr[lo]) || v == arr[lo] {
+			if compFn(v, arr[lo]) || v == arr[lo] {
 				result = lo
 			} else {
 				result = -1
 			}
 		} else {
-			if lessFn(v, arr[lo]) || v == arr[lo] {
+			if compFn(v, arr[lo]) || v == arr[lo] {
 				result = lo
-			} else if lessFn(v, arr[hi]) || v == arr[hi] {
+			} else if compFn(v, arr[hi]) || v == arr[hi] {
 				result = hi
 			} else {
 				result = -1
@@ -107,15 +107,15 @@ func resolve[C comparable](arr []C, lo int, hi int, v C, crit Inequality, lessFn
 		}
 	case InequalityGT:
 		if lo == hi {
-			if lessFn(v, arr[lo]) {
+			if compFn(v, arr[lo]) {
 				result = lo
 			} else {
 				result = -1
 			}
 		} else {
-			if lessFn(v, arr[lo]) {
+			if compFn(v, arr[lo]) {
 				result = lo
-			} else if lessFn(v, arr[hi]) {
+			} else if compFn(v, arr[hi]) {
 				result = hi
 			} else {
 				result = -1
@@ -128,21 +128,21 @@ func resolve[C comparable](arr []C, lo int, hi int, v C, crit Inequality, lessFn
 	return result
 }
 
-func compare[C comparable](arr []C, a int, b int, v C, crit Inequality, lessFn common.LessFn[C]) int {
+func compare[C comparable](arr []C, a int, b int, v C, crit Inequality, compFn common.CompareFn[C]) int {
 	result := 0
 	switch crit {
 	case InequalityLT, InequalityGE:
-		if lessFn(v, arr[a]) || arr[a] == v {
+		if compFn(v, arr[a]) || arr[a] == v {
 			result = -1
-		} else if lessFn(arr[b], v) {
+		} else if compFn(arr[b], v) {
 			result = 1
 		} else {
 			result = 0
 		}
 	case InequalityLE, InequalityGT:
-		if lessFn(v, arr[a]) {
+		if compFn(v, arr[a]) {
 			result = -1
-		} else if lessFn(arr[b], v) || arr[b] == v {
+		} else if compFn(arr[b], v) || arr[b] == v {
 			result = 1
 		} else {
 			result = 0
@@ -153,7 +153,7 @@ func compare[C comparable](arr []C, a int, b int, v C, crit Inequality, lessFn c
 	return result
 }
 
-func getIndex[C comparable](arr []C, a int, b int, v C, crit Inequality, lessFn common.LessFn[C]) int {
+func getIndex[C comparable](arr []C, a int, b int, v C, crit Inequality, compFn common.CompareFn[C]) int {
 	result := 0
 	switch crit {
 	case InequalityLT, InequalityLE:

@@ -22,6 +22,9 @@ import (
 	"github.com/apache/datasketches-go/common"
 	"github.com/stretchr/testify/assert"
 	"math"
+	"math/rand"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -936,3 +939,68 @@ func TestSerializeDeserializeFloat(t *testing.T) {
 		}
 	}
 }
+
+// There is no guarantee that L0 is sorted after a merge.
+// The issue is, during a merge, L0 must be sorted prior to a compaction to a higher level.
+// Otherwise the higher levels would not be sorted properly.
+func TestL0SortDuringMerge(t *testing.T) {
+	sk1, err := NewKllItemsSketch[string](8, _DEFAULT_M, common.ArrayOfStringsSerDe{
+		ReverseOrder: true,
+	})
+	assert.NoError(t, err)
+	sk2, err := NewKllItemsSketch[string](8, _DEFAULT_M, common.ArrayOfStringsSerDe{
+		ReverseOrder: true,
+	})
+	assert.NoError(t, err)
+	n := 26 //don't change this
+	for i := 1; i <= n; i++ {
+		j := rand.Intn(n) + 1
+		sk1.Update(intToFixedLengthString(j, 3))
+		sk2.Update(intToFixedLengthString(j+100, 3))
+	}
+	sk1.Merge(sk2)
+	//println(sk1.String(true, true)) //L1 and above should be sorted in reverse. Ignore L0.
+	lvl1size := sk1.levels[2] - sk1.levels[1]
+	itr := sk1.GetIterator()
+	itr.Next()
+	prev, _ := strconv.Atoi(strings.TrimSpace(itr.GetQuantile()))
+	for i := uint32(1); i < lvl1size; i++ {
+		if itr.Next() {
+			v, _ := strconv.Atoi(strings.TrimSpace(itr.GetQuantile()))
+			assert.True(t, v <= prev)
+			prev = v
+		}
+	}
+
+}
+
+/*
+  @Test
+  //There is no guarantee that L0 is sorted after a merge.
+  //The issue is, during a merge, L0 must be sorted prior to a compaction to a higher level.
+  //Otherwise the higher levels would not be sorted properly.
+  public void checkL0SortDuringMerge() throws NumberFormatException {
+    final Random rand = new Random();
+    final KllItemsSketch<String> sk1 = KllItemsSketch.newHeapInstance(8, Comparator.reverseOrder(), serDe);
+    final KllItemsSketch<String> sk2 = KllItemsSketch.newHeapInstance(8, Comparator.reverseOrder(), serDe);
+    final int n = 26; //don't change this
+    for (int i = 1; i <= n; i++ ) {
+      final int j = rand.nextInt(n) + 1;
+      sk1.update(getString(j, 3));
+      sk2.update(getString(j +100, 3));
+    }
+    sk1.merge(sk2);
+    println(sk1.toString(true, true)); //L1 and above should be sorted in reverse. Ignore L0.
+    final int lvl1size = sk1.levelsArr[2] - sk1.levelsArr[1];
+    final QuantilesGenericSketchIterator<String> itr = sk1.iterator();
+    itr.next();
+    int prev = Integer.parseInt(itr.getQuantile().trim());
+    for (int i = 1; i < lvl1size; i++) {
+      if (itr.next()) {
+        int v = Integer.parseInt(itr.getQuantile().trim());
+        assertTrue(v <= prev);
+        prev = v;
+      }
+    }
+  }
+*/

@@ -26,6 +26,7 @@ import (
 )
 
 type ArrayOfStringsSerDe struct {
+	ReverseOrder bool
 }
 
 func (f ArrayOfStringsSerDe) Identity() string {
@@ -39,6 +40,9 @@ func (f ArrayOfStringsSerDe) Hash(item string) uint64 {
 
 func (f ArrayOfStringsSerDe) LessFn() LessFn[string] {
 	return func(a string, b string) bool {
+		if f.ReverseOrder {
+			return a > b
+		}
 		return a < b
 	}
 }

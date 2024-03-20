@@ -24,6 +24,8 @@ import (
 )
 
 type ArrayOfDoublesSerDe struct {
+	ReverseOrder bool
+
 	scratch [8]byte
 }
 
@@ -38,6 +40,9 @@ func (f ArrayOfDoublesSerDe) Hash(item float64) uint64 {
 
 func (f ArrayOfDoublesSerDe) LessFn() LessFn[float64] {
 	return func(a float64, b float64) bool {
+		if f.ReverseOrder {
+			return a > b
+		}
 		return a < b
 	}
 }

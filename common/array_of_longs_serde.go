@@ -23,6 +23,8 @@ import (
 )
 
 type ArrayOfLongsSerDe struct {
+	ReverseOrder bool
+
 	scratch [8]byte
 }
 
@@ -37,6 +39,9 @@ func (f ArrayOfLongsSerDe) Hash(item int64) uint64 {
 
 func (f ArrayOfLongsSerDe) LessFn() LessFn[int64] {
 	return func(a int64, b int64) bool {
+		if f.ReverseOrder {
+			return a > b
+		}
 		return a < b
 	}
 }

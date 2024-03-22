@@ -26,7 +26,7 @@ import (
 
 func TestFrequencyItemsSketch(t *testing.T) {
 	// Create a new sketch with a maximum of 16 items
-	sketch, err := frequencies.NewFrequencyItemsSketchWithMaxMapSize[string](16, common.ArrayOfStringsSerDe{})
+	sketch, err := frequencies.NewFrequencyItemsSketchWithMaxMapSize[string](16, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 
 	// Update the sketch with some items

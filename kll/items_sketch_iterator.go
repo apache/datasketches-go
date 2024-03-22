@@ -27,7 +27,7 @@ type ItemsSketchIterator[C comparable] struct {
 	level         int
 	weight        int64
 	isInitialized bool
-	itemsSketchOp common.ItemSketchOp[C]
+	itemsSketchOp common.ItemSketchSerde[C]
 }
 
 func newItemsSketchIterator[C comparable](

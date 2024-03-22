@@ -26,7 +26,7 @@ import (
 
 type itemsSketchMemoryValidate[C comparable] struct {
 	srcMem          []byte
-	itemSketchOp    common.ItemSketchOp[C]
+	serde           common.ItemSketchSerde[C]
 	sketchStructure sketchStructure
 
 	// first 8 bytes of preamble
@@ -55,7 +55,7 @@ type itemsSketchMemoryValidate[C comparable] struct {
 	typeBytes   int //always 0 for generic
 }
 
-func newItemsSketchMemoryValidate[C comparable](srcMem []byte, itemSketchOp common.ItemSketchOp[C]) (*itemsSketchMemoryValidate[C], error) {
+func newItemsSketchMemoryValidate[C comparable](srcMem []byte, serde common.ItemSketchSerde[C]) (*itemsSketchMemoryValidate[C], error) {
 	capa := cap(srcMem)
 	if capa < 8 {
 		return nil, fmt.Errorf("Memory too small: %d", capa)
@@ -84,7 +84,7 @@ func newItemsSketchMemoryValidate[C comparable](srcMem []byte, itemSketchOp comm
 	typeBytes := 0
 	vlid := &itemsSketchMemoryValidate[C]{
 		srcMem:           srcMem,
-		itemSketchOp:     itemSketchOp,
+		serde:            serde,
 		sketchStructure:  sketchStructure,
 		preInts:          preInts,
 		serVer:           serVer,
@@ -116,7 +116,7 @@ func (vlid *itemsSketchMemoryValidate[C]) validate() error {
 		}
 		capacityItems := computeTotalItemCapacity(uint16(vlid.k), uint8(vlid.m), uint8(vlid.numLevels))
 		vlid.levelsArr[vlid.numLevels] = capacityItems //load the last one
-		sb, err := computeSketchBytes(vlid.srcMem, vlid.levelsArr, vlid.typeBytes, vlid.itemSketchOp)
+		sb, err := computeSketchBytes(vlid.srcMem, vlid.levelsArr, vlid.typeBytes, vlid.serde)
 		if err != nil {
 			return err
 		}
@@ -139,7 +139,7 @@ func (vlid *itemsSketchMemoryValidate[C]) validate() error {
 		vlid.minK = uint16(vlid.k)
 		vlid.numLevels = 1 //assumed
 		vlid.levelsArr = []uint32{uint32(vlid.k) - 1, uint32(vlid.k)}
-		v, err := vlid.itemSketchOp.SizeOfMany(vlid.srcMem, _DATA_START_ADR_SINGLE_ITEM, 1)
+		v, err := vlid.serde.SizeOfMany(vlid.srcMem, _DATA_START_ADR_SINGLE_ITEM, 1)
 		if err != nil {
 			return err
 		}
@@ -150,20 +150,20 @@ func (vlid *itemsSketchMemoryValidate[C]) validate() error {
 	return nil
 }
 
-func computeSketchBytes[C comparable](srcMem []byte, levelsArr []uint32, typeBytes int, itemSketchOp common.ItemSketchOp[C]) (int, error) {
+func computeSketchBytes[C comparable](srcMem []byte, levelsArr []uint32, typeBytes int, serde common.ItemSketchSerde[C]) (int, error) {
 	numLevels := len(levelsArr) - 1
 	retainedItems := levelsArr[numLevels] - levelsArr[0]
 	levelsLen := len(levelsArr) - 1
 	numItems := retainedItems
 	offsetBytes := _DATA_START_ADR + levelsLen*4
 	if typeBytes == 1 {
-		v, err := itemSketchOp.SizeOfMany(srcMem, offsetBytes, int(numItems))
+		v, err := serde.SizeOfMany(srcMem, offsetBytes, int(numItems))
 		if err != nil {
 			return 0, err
 		}
 		offsetBytes += v + 2 //2 for min & max
 	} else {
-		v, err := itemSketchOp.SizeOfMany(srcMem, offsetBytes, int(numItems)+2) //2 for min & max
+		v, err := serde.SizeOfMany(srcMem, offsetBytes, int(numItems)+2) //2 for min & max
 		if err != nil {
 			return 0, err
 		}

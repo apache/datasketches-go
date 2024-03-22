@@ -50,7 +50,8 @@ type ItemsSketch[C comparable] struct {
 	minItem           *C
 	maxItem           *C
 	sortedView        *ItemsSketchSortedView[C]
-	itemsSketchOp     common.ItemSketchOp[C]
+	serde             common.ItemSketchSerde[C]
+	compareFn         common.CompareFn[C]
 
 	// Force deterministic offset for test, so that we can compare results across implementation.
 	deterministicOffsetForTest bool
@@ -79,31 +80,42 @@ var (
 // NewKllItemsSketch create a new ItemsSketch with the given k and m.
 // The default k = 200 results in a normalized rank error of about 1.65%.
 // Larger K will have smaller error but the sketch will be larger (and slower).
-func NewKllItemsSketch[C comparable](k uint16, m uint8, itemsSketchOp common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewKllItemsSketch[C comparable](k uint16, m uint8, compareFn common.CompareFn[C], serde common.ItemSketchSerde[C]) (*ItemsSketch[C], error) {
 	if k < _MIN_K || k > _MAX_K {
 		return nil, fmt.Errorf("k must be >= %d and <= %d: %d", _MIN_K, _MAX_K, k)
 	}
+	if compareFn == nil {
+		return nil, fmt.Errorf("no compare function provided")
+	}
 	return &ItemsSketch[C]{
-		k:             k,
-		m:             m,
-		minK:          k,
-		numLevels:     uint8(1),
-		levels:        []uint32{uint32(k), uint32(k)},
-		items:         make([]C, k),
-		itemsSketchOp: itemsSketchOp,
+		k:         k,
+		m:         m,
+		minK:      k,
+		numLevels: uint8(1),
+		levels:    []uint32{uint32(k), uint32(k)},
+		items:     make([]C, k),
+		serde:     serde,
+		compareFn: compareFn,
 	}, nil
 }
 
 // NewKllItemsSketchWithDefault create a new ItemsSketch with default k and m.
 // The default k = 200 results in a normalized rank error of about 1.65%.
-func NewKllItemsSketchWithDefault[C comparable](itemsSketchOp common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
-	return NewKllItemsSketch[C](_DEFAULT_K, _DEFAULT_M, itemsSketchOp)
+func NewKllItemsSketchWithDefault[C comparable](compareFn common.CompareFn[C], serde common.ItemSketchSerde[C]) (*ItemsSketch[C], error) {
+	return NewKllItemsSketch[C](_DEFAULT_K, _DEFAULT_M, compareFn, serde)
 }
 
 // NewKllItemsSketchFromSlice create a new ItemsSketch from the given byte slice (serialized sketch).
-func NewKllItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewKllItemsSketchFromSlice[C comparable](sl []byte, compareFn common.CompareFn[C], serde common.ItemSketchSerde[C]) (*ItemsSketch[C], error) {
+	if serde == nil {
+		return nil, fmt.Errorf("no SerDe provided")
+	}
 
-	memVal, err := newItemsSketchMemoryValidate(sl, itemsSketchOp)
+	if compareFn == nil {
+		return nil, fmt.Errorf("no compare function provided")
+	}
+
+	memVal, err := newItemsSketchMemoryValidate(sl, serde)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +139,7 @@ func NewKllItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp common.It
 		items = make([]C, k)
 	case _COMPACT_SINGLE:
 		offset := _N_LONG_ADR
-		deserItems, err := itemsSketchOp.DeserializeManyFromSlice(sl, offset, 1)
+		deserItems, err := serde.DeserializeManyFromSlice(sl, offset, 1)
 		if err != nil {
 			return nil, err
 		}
@@ -137,20 +149,20 @@ func NewKllItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp common.It
 		items[k-1] = deserItems[0]
 	case _COMPACT_FULL:
 		offset := int(_DATA_START_ADR + memVal.numLevels*4)
-		deserMinItems, err := itemsSketchOp.DeserializeManyFromSlice(sl, offset, 1)
+		deserMinItems, err := serde.DeserializeManyFromSlice(sl, offset, 1)
 		minItem = &deserMinItems[0]
 		if err != nil {
 			return nil, err
 		}
-		offset += itemsSketchOp.SizeOf(*minItem)
-		deserMaxItems, err := itemsSketchOp.DeserializeManyFromSlice(sl, offset, 1)
+		offset += serde.SizeOf(*minItem)
+		deserMaxItems, err := serde.DeserializeManyFromSlice(sl, offset, 1)
 		maxItem = &deserMaxItems[0]
 		if err != nil {
 			return nil, err
 		}
-		offset += itemsSketchOp.SizeOf(*maxItem)
+		offset += serde.SizeOf(*maxItem)
 		numRetained := levelsArr[memVal.numLevels] - levelsArr[0]
-		deseRetItems, err := itemsSketchOp.DeserializeManyFromSlice(sl, offset, int(numRetained))
+		deseRetItems, err := serde.DeserializeManyFromSlice(sl, offset, int(numRetained))
 		if err != nil {
 			return nil, err
 		}
@@ -170,7 +182,8 @@ func NewKllItemsSketchFromSlice[C comparable](sl []byte, itemsSketchOp common.It
 		items:             items,
 		minItem:           minItem,
 		maxItem:           maxItem,
-		itemsSketchOp:     itemsSketchOp,
+		serde:             serde,
+		compareFn:         compareFn,
 	}, nil
 }
 
@@ -197,7 +210,7 @@ func (s *ItemsSketch[C]) GetNumRetained() uint32 {
 // GetMinItem returns the minimum item of the stream. This may be distinct from the smallest item retained by the sketch algorithm.
 func (s *ItemsSketch[C]) GetMinItem() (C, error) {
 	if s.IsEmpty() {
-		return s.itemsSketchOp.Identity(), fmt.Errorf("operation is undefined for an empty sketch")
+		return *new(C), fmt.Errorf("operation is undefined for an empty sketch")
 	}
 	return *s.minItem, nil
 }
@@ -205,7 +218,7 @@ func (s *ItemsSketch[C]) GetMinItem() (C, error) {
 // GetMaxItem returns the maximum item of the stream. This may be distinct from the largest item retained by the sketch algorithm.
 func (s *ItemsSketch[C]) GetMaxItem() (C, error) {
 	if s.IsEmpty() {
-		return s.itemsSketchOp.Identity(), fmt.Errorf("operation is undefined for an empty sketch")
+		return *new(C), fmt.Errorf("operation is undefined for an empty sketch")
 	}
 	return *s.maxItem, nil
 }
@@ -265,14 +278,14 @@ func (s *ItemsSketch[C]) GetRanks(item []C, inclusive bool) ([]float64, error) {
 // If EXCLUSIVE, the given rank includes all quantiles < the quantile directly corresponding to the given rank.
 func (s *ItemsSketch[C]) GetQuantile(rank float64, inclusive bool) (C, error) {
 	if s.IsEmpty() {
-		return s.itemsSketchOp.Identity(), fmt.Errorf("operation is undefined for an empty sketch")
+		return *new(C), fmt.Errorf("operation is undefined for an empty sketch")
 	}
 	if rank < 0.0 || rank > 1.0 {
-		return s.itemsSketchOp.Identity(), fmt.Errorf("normalized rank cannot be less than zero or greater than 1.0: %f", rank)
+		return *new(C), fmt.Errorf("normalized rank cannot be less than zero or greater than 1.0: %f", rank)
 	}
 	err := s.setupSortedView()
 	if err != nil {
-		return s.itemsSketchOp.Identity(), err
+		return *new(C), err
 	}
 	return s.sortedView.GetQuantile(rank, inclusive)
 }
@@ -430,7 +443,7 @@ func (s *ItemsSketch[C]) GetSortedView() (*ItemsSketchSortedView[C], error) {
 
 // Update this sketch with the given item.
 func (s *ItemsSketch[C]) Update(item C) {
-	s.updateItem(item, s.itemsSketchOp.LessFn())
+	s.updateItem(item, s.compareFn)
 	s.sortedView = nil
 }
 
@@ -457,6 +470,10 @@ func (s *ItemsSketch[C]) Reset() {
 
 // ToSlice returns the serialized byte array of this sketch.
 func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
+	if s.serde == nil {
+		return nil, fmt.Errorf("no SerDe provided")
+	}
+
 	srcN := s.n
 	var tgtStructure = _COMPACT_FULL
 	if srcN == 0 {
@@ -531,6 +548,9 @@ func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
 
 // GetSerializedSizeBytes Returns the current number of bytes this Sketch would require if serialized in compact form.
 func (s *ItemsSketch[C]) GetSerializedSizeBytes() (int, error) {
+	if s.serde == nil {
+		return 0, fmt.Errorf("no SerDe provided")
+	}
 	return s.currentSerializedSizeBytes()
 }
 
@@ -595,12 +615,12 @@ func (s *ItemsSketch[C]) getLevelsArrSizeBytes(structure sketchStructure) int {
 }
 
 func (s *ItemsSketch[C]) getMinMaxSizeBytes() int {
-	return s.itemsSketchOp.SizeOf(*s.minItem) + s.itemsSketchOp.SizeOf(*s.maxItem)
+	return s.serde.SizeOf(*s.minItem) + s.serde.SizeOf(*s.maxItem)
 }
 
 func (s *ItemsSketch[C]) getMinMaxByteArr() []byte {
-	minBytes := s.itemsSketchOp.SerializeOneToSlice(*s.minItem)
-	maxBytes := s.itemsSketchOp.SerializeOneToSlice(*s.maxItem)
+	minBytes := s.serde.SerializeOneToSlice(*s.minItem)
+	maxBytes := s.serde.SerializeOneToSlice(*s.maxItem)
 	minMaxBytes := make([]byte, len(minBytes)+len(maxBytes))
 	copy(minMaxBytes, minBytes)
 	copy(minMaxBytes[len(minBytes):], maxBytes)
@@ -612,7 +632,7 @@ func (s *ItemsSketch[C]) getSingleItemSizeBytes() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return s.itemsSketchOp.SizeOf(v), nil
+	return s.serde.SizeOf(v), nil
 }
 
 func (s *ItemsSketch[C]) getSingleItemByteArr() ([]byte, error) {
@@ -620,12 +640,12 @@ func (s *ItemsSketch[C]) getSingleItemByteArr() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s.itemsSketchOp.SerializeOneToSlice(v), nil
+	return s.serde.SerializeOneToSlice(v), nil
 }
 
 func (s *ItemsSketch[C]) getSingleItem() (C, error) {
 	if s.n != 1 {
-		return s.itemsSketchOp.Identity(), fmt.Errorf("sketch must have exactly one item")
+		return *new(C), fmt.Errorf("sketch must have exactly one item")
 	}
 	return s.items[s.k-1], nil
 }
@@ -639,7 +659,7 @@ func (s *ItemsSketch[C]) getRetainedItemsArray() []C {
 
 func (s *ItemsSketch[C]) getRetainedItemsByteArr() []byte {
 	retArr := s.getRetainedItemsArray()
-	return s.itemsSketchOp.SerializeManyToSlice(retArr)
+	return s.serde.SerializeManyToSlice(retArr)
 }
 
 func (s *ItemsSketch[C]) getRetainedItemsSizeBytes() int {
@@ -657,7 +677,7 @@ func (s *ItemsSketch[C]) setupSortedView() error {
 	return nil
 }
 
-func (s *ItemsSketch[C]) updateItem(item C, lessFn common.LessFn[C]) {
+func (s *ItemsSketch[C]) updateItem(item C, compareFn common.CompareFn[C]) {
 	if internal.IsNil(item) {
 		return
 	}
@@ -665,10 +685,10 @@ func (s *ItemsSketch[C]) updateItem(item C, lessFn common.LessFn[C]) {
 		s.minItem = &item
 		s.maxItem = &item
 	} else {
-		if lessFn(item, *s.minItem) {
+		if compareFn(item, *s.minItem) {
 			s.minItem = &item
 		}
-		if lessFn(*s.maxItem, item) {
+		if compareFn(*s.maxItem, item) {
 			s.maxItem = &item
 		}
 	}
@@ -713,7 +733,7 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 	// MERGE: update this sketch with level0 items from the other sketch
 	otherItemsArr = other.GetTotalItemsArray()
 	for i := otherLevelsArr[0]; i < otherLevelsArr[1]; i++ {
-		s.updateItem(otherItemsArr[i], s.itemsSketchOp.LessFn())
+		s.updateItem(otherItemsArr[i], s.compareFn)
 	}
 
 	// After the level 0 update, we capture the intermediate state of levels and items arrays...
@@ -738,10 +758,10 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 
 		populateItemWorkArrays(workbuf, worklevels, provisionalNumLevels,
 			myCurNumLevels, myCurLevelsArr, myCurItemsArr,
-			otherNumLevels, otherLevelsArr, otherItemsArr, s.itemsSketchOp.LessFn())
+			otherNumLevels, otherLevelsArr, otherItemsArr, s.compareFn)
 
 		// notice that workbuf is being used as both the input and output
-		result := generalItemsCompress(s.k, s.m, provisionalNumLevels, workbuf, worklevels, workbuf, outlevels, s.isLevelZeroSorted, s.itemsSketchOp.LessFn(), s.deterministicOffsetForTest)
+		result := generalItemsCompress(s.k, s.m, provisionalNumLevels, workbuf, worklevels, workbuf, outlevels, s.isLevelZeroSorted, s.compareFn, s.deterministicOffsetForTest)
 		targetItemCount := result[1] //was finalCapacity. Max size given k, m, numLevels
 		curItemCount := result[2]    //was finalPop
 
@@ -798,14 +818,13 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 		s.minItem = other.minItem
 		s.maxItem = other.maxItem
 	} else {
-		less := s.itemsSketchOp.LessFn()
-		if less(myMin, *other.minItem) {
+		if s.compareFn(myMin, *other.minItem) {
 			s.minItem = &myMin
 		} else {
 			s.minItem = other.minItem
 		}
 
-		if less(*other.maxItem, myMax) {
+		if s.compareFn(*other.maxItem, myMax) {
 			s.maxItem = &myMax
 		} else {
 			s.maxItem = other.maxItem
@@ -842,10 +861,9 @@ func (s *ItemsSketch[C]) compressWhileUpdatingSketch() {
 	//the following is specific to generic Items
 	myItemsArr := s.GetTotalItemsArray()
 	if level == 0 { // level zero might not be sorted, so we must sort it if we wish to compact it
-		lessFn := s.itemsSketchOp.LessFn()
 		tmpSlice := myItemsArr[adjBeg : adjBeg+adjPop]
 		sort.Slice(tmpSlice, func(a, b int) bool {
-			return lessFn(tmpSlice[a], tmpSlice[b])
+			return s.compareFn(tmpSlice[a], tmpSlice[b])
 		})
 	}
 	if popAbove == 0 {
@@ -855,7 +873,7 @@ func (s *ItemsSketch[C]) compressWhileUpdatingSketch() {
 		mergeSortedItemsArrays(
 			myItemsArr, adjBeg, halfAdjPop,
 			myItemsArr, rawEnd, popAbove,
-			myItemsArr, adjBeg+halfAdjPop, s.itemsSketchOp.LessFn())
+			myItemsArr, adjBeg+halfAdjPop, s.compareFn)
 	}
 	newIndex := myLevelsArr[level+1] - halfAdjPop // adjust boundaries of the level above
 	s.levels[level+1] = newIndex
@@ -1013,7 +1031,7 @@ func randomlyHalveDownItems[C comparable](buf []C, start uint32, length uint32, 
 
 func mergeSortedItemsArrays[C comparable](bufA []C, startA uint32, lenA uint32,
 	bufB []C, startB uint32, lenB uint32,
-	bufC []C, startC uint32, lessFn common.LessFn[C]) {
+	bufC []C, startC uint32, compareFn common.CompareFn[C]) {
 	lenC := lenA + lenB
 	limA := startA + lenA
 	limB := startB + lenB
@@ -1029,7 +1047,7 @@ func mergeSortedItemsArrays[C comparable](bufA []C, startA uint32, lenA uint32,
 		} else if b == limB {
 			bufC[c] = bufA[a]
 			a++
-		} else if lessFn(bufA[a], bufB[b]) {
+		} else if compareFn(bufA[a], bufB[b]) {
 			bufC[c] = bufA[a]
 			a++
 		} else {
@@ -1042,7 +1060,7 @@ func mergeSortedItemsArrays[C comparable](bufA []C, startA uint32, lenA uint32,
 func populateItemWorkArrays[C comparable](workbuf []C, worklevels []uint32, provisionalNumLevels uint8,
 	myCurNumLevels uint8, myCurLevelsArr []uint32, myCurItemsArr []C,
 	otherNumLevels uint8, otherLevelsArr []uint32, otherItemsArr []C,
-	lessFn common.LessFn[C]) {
+	compareFn common.CompareFn[C]) {
 
 	worklevels[0] = 0
 	// Note: the level zero data from "other" was already inserted into "self"
@@ -1069,7 +1087,7 @@ func populateItemWorkArrays[C comparable](workbuf []C, worklevels []uint32, prov
 			mergeSortedItemsArrays(
 				myCurItemsArr, myCurLevelsArr[lvl], selfPop,
 				otherItemsArr, otherLevelsArr[lvl], otherPop,
-				workbuf, worklevels[lvl], lessFn)
+				workbuf, worklevels[lvl], compareFn)
 		}
 	}
 }
@@ -1083,7 +1101,7 @@ func generalItemsCompress[C comparable](
 	outBuf []C,
 	outLevels []uint32,
 	isLevelZeroSorted bool,
-	lessFn common.LessFn[C],
+	compareFn common.CompareFn[C],
 	deterministicOffsetForTest bool,
 ) []uint32 {
 	numLevels := numLevelsIn
@@ -1137,7 +1155,7 @@ func generalItemsCompress[C comparable](
 			if (curLevel == 0) && !isLevelZeroSorted {
 				tmpSlice := inBuf[adjBeg : adjBeg+adjPop]
 				sort.Slice(tmpSlice, func(a, b int) bool {
-					return lessFn(tmpSlice[a], tmpSlice[b])
+					return compareFn(tmpSlice[a], tmpSlice[b])
 				})
 			}
 
@@ -1148,7 +1166,7 @@ func generalItemsCompress[C comparable](
 				mergeSortedItemsArrays(
 					inBuf, adjBeg, halfAdjPop,
 					inBuf, rawLim, popAbove,
-					inBuf, adjBeg+halfAdjPop, lessFn)
+					inBuf, adjBeg+halfAdjPop, compareFn)
 			}
 
 			// track the fact that we just eliminated some data

@@ -26,8 +26,8 @@ import (
 )
 
 func TestEmpty(t *testing.T) {
-	h := common.ArrayOfStringsSerDe{}
-	sketch, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, h)
+	h := common.ItemSketchStringHasher{}
+	sketch, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, h, nil)
 	assert.NoError(t, err)
 	assert.True(t, sketch.IsEmpty())
 	assert.Equal(t, sketch.GetNumActiveItems(), 0)
@@ -41,7 +41,7 @@ func TestEmpty(t *testing.T) {
 }
 
 func TestOneItem(t *testing.T) {
-	sketch, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ArrayOfStringsSerDe{})
+	sketch, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ItemSketchStringHasher{}, nil)
 	assert.NoError(t, err)
 	err = sketch.Update("a")
 	assert.NoError(t, err)
@@ -57,7 +57,7 @@ func TestOneItem(t *testing.T) {
 }
 
 func TestSeveralItem(t *testing.T) {
-	sketch, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ArrayOfStringsSerDe{})
+	sketch, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ItemSketchStringHasher{}, nil)
 	assert.NoError(t, err)
 	err = sketch.Update("a")
 	assert.NoError(t, err)
@@ -106,7 +106,7 @@ func TestSeveralItem(t *testing.T) {
 }
 
 func TestEstimationMode(t *testing.T) {
-	sketch, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ArrayOfLongsSerDe{})
+	sketch, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ItemSketchLongHasher{}, nil)
 	assert.NoError(t, err)
 	err = sketch.UpdateMany(1, 10)
 	assert.NoError(t, err)
@@ -165,11 +165,22 @@ func TestEstimationMode(t *testing.T) {
 	}
 }
 
-func TestSerializeStringDeserializeEmpty(t *testing.T) {
-	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ArrayOfStringsSerDe{})
+func TestSerializeStringDeserializeNoSerde(t *testing.T) {
+	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ItemSketchStringHasher{}, nil)
 	assert.NoError(t, err)
-	bytes := sketch1.ToSlice()
-	sketch2, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
+	_, err = sketch1.ToSlice()
+	assert.Error(t, err)
+
+	_, err = NewFrequencyItemsSketchFromSlice[string](nil, common.ItemSketchStringHasher{}, nil)
+	assert.Error(t, err)
+}
+
+func TestSerializeStringDeserializeEmpty(t *testing.T) {
+	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
+	assert.NoError(t, err)
+	bytes, err := sketch1.ToSlice()
+	assert.NoError(t, err)
+	sketch2, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	assert.True(t, sketch2.IsEmpty())
 	assert.Equal(t, sketch2.GetNumActiveItems(), 0)
@@ -177,7 +188,7 @@ func TestSerializeStringDeserializeEmpty(t *testing.T) {
 }
 
 func TestSerializeDeserializeUtf8Strings(t *testing.T) {
-	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ArrayOfStringsSerDe{})
+	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	err = sketch1.Update("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	assert.NoError(t, err)
@@ -188,8 +199,9 @@ func TestSerializeDeserializeUtf8Strings(t *testing.T) {
 	err = sketch1.Update("ddddddddddddddddddddddddddddd")
 	assert.NoError(t, err)
 
-	bytes := sketch1.ToSlice()
-	sketch2, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
+	bytes, err := sketch1.ToSlice()
+	assert.NoError(t, err)
+	sketch2, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	err = sketch2.Update("bbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 	assert.NoError(t, err)
@@ -216,14 +228,15 @@ func TestSerializeDeserializeUtf8Strings(t *testing.T) {
 }
 
 func TestSerializeDeserializeLong(t *testing.T) {
-	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ArrayOfLongsSerDe{})
+	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ItemSketchLongHasher{}, common.ItemSketchLongSerDe{})
 	sketch1.Update(1)
 	sketch1.Update(2)
 	sketch1.Update(3)
 	sketch1.Update(4)
 
-	bytes := sketch1.ToSlice()
-	sketch2, err := NewFrequencyItemsSketchFromSlice[int64](bytes, common.ArrayOfLongsSerDe{})
+	bytes, err := sketch1.ToSlice()
+	assert.NoError(t, err)
+	sketch2, err := NewFrequencyItemsSketchFromSlice[int64](bytes, common.ItemSketchLongHasher{}, common.ItemSketchLongSerDe{})
 	sketch2.Update(2)
 	sketch2.Update(3)
 	sketch2.Update(2)
@@ -246,7 +259,7 @@ func TestSerializeDeserializeLong(t *testing.T) {
 }
 
 func TestResize(t *testing.T) {
-	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](2<<_LG_MIN_MAP_SIZE, common.ArrayOfStringsSerDe{})
+	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](2<<_LG_MIN_MAP_SIZE, common.ItemSketchStringHasher{}, nil)
 	for i := 0; i < 32; i++ {
 		err = sketch1.UpdateMany(strconv.Itoa(i), int64(i*i))
 		assert.NoError(t, err)
@@ -254,7 +267,7 @@ func TestResize(t *testing.T) {
 }
 
 func TestMergeExact(t *testing.T) {
-	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ArrayOfStringsSerDe{})
+	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ItemSketchStringHasher{}, nil)
 	assert.NoError(t, err)
 	err = sketch1.Update("a")
 	assert.NoError(t, err)
@@ -265,7 +278,7 @@ func TestMergeExact(t *testing.T) {
 	err = sketch1.Update("d")
 	assert.NoError(t, err)
 
-	sketch2, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ArrayOfStringsSerDe{})
+	sketch2, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ItemSketchStringHasher{}, nil)
 	assert.NoError(t, err)
 	err = sketch2.Update("b")
 	assert.NoError(t, err)
@@ -294,20 +307,20 @@ func TestMergeExact(t *testing.T) {
 }
 
 func TestNullMapReturns(t *testing.T) {
-	map1, err := newReversePurgeItemHashMap[int64](1<<_LG_MIN_MAP_SIZE, common.ArrayOfLongsSerDe{})
+	map1, err := newReversePurgeItemHashMap[int64](1<<_LG_MIN_MAP_SIZE, common.ItemSketchLongHasher{}, nil)
 	assert.NoError(t, err)
 	assert.Nil(t, map1.getActiveKeys())
 	assert.Nil(t, map1.getActiveValues())
 }
 
 func TestMisc(t *testing.T) {
-	sk1, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ArrayOfLongsSerDe{})
+	sk1, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ItemSketchLongHasher{}, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, sk1.GetCurrentMapCapacity(), 6)
 	est, err := sk1.GetEstimate(1)
 	assert.NoError(t, err)
 	assert.Equal(t, est, int64(0))
-	sk2, err := NewFrequencyItemsSketchWithMaxMapSize[int64](8, common.ArrayOfLongsSerDe{})
+	sk2, err := NewFrequencyItemsSketchWithMaxMapSize[int64](8, common.ItemSketchLongHasher{}, nil)
 	assert.NoError(t, err)
 	_, err = sk1.Merge(sk2)
 	assert.NoError(t, err)
@@ -328,14 +341,14 @@ func TestMisc(t *testing.T) {
 }
 
 func TestToString(t *testing.T) {
-	sk, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ArrayOfLongsSerDe{})
+	sk, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ItemSketchLongHasher{}, nil)
 	assert.NoError(t, err)
 	err = sk.Update(1)
 	t.Log(sk.ToString())
 }
 
 func TestFrequentItems1(t *testing.T) {
-	fis, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ArrayOfLongsSerDe{})
+	fis, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ItemSketchLongHasher{}, nil)
 	assert.NoError(t, err)
 	fis.Update(1)
 	rows, err := fis.GetFrequentItems(ErrorTypeEnum.NoFalsePositives)
@@ -352,17 +365,18 @@ func TestFrequentItems1(t *testing.T) {
 }
 
 func TestUpdateExceptions(t *testing.T) {
-	sk1, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ArrayOfLongsSerDe{})
+	sk1, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ItemSketchLongHasher{}, nil)
 	assert.NoError(t, err)
 	err = sk1.UpdateMany(1, -1)
 	assert.Error(t, err)
 }
 
 func TestMemExceptions(t *testing.T) {
-	sk1, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ArrayOfLongsSerDe{})
+	sk1, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ItemSketchLongHasher{}, common.ItemSketchLongSerDe{})
 	assert.NoError(t, err)
 	sk1.Update(1)
-	bytes := sk1.ToSlice()
+	bytes, err := sk1.ToSlice()
+	assert.NoError(t, err)
 	pre0 := binary.LittleEndian.Uint64(bytes)
 	//Now start corrupting
 	tryBadMem(t, bytes, _PREAMBLE_LONGS_BYTE, 2) //Corrupt
@@ -379,7 +393,7 @@ func TestMemExceptions(t *testing.T) {
 }
 
 func TestOneItemUtf8(t *testing.T) {
-	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ArrayOfStringsSerDe{})
+	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	err = sketch1.Update("\u5fb5")
 	assert.NoError(t, err)
@@ -390,8 +404,9 @@ func TestOneItemUtf8(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, est, int64(1))
 
-	bytes := sketch1.ToSlice()
-	sketch2, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ArrayOfStringsSerDe{})
+	bytes, err := sketch1.ToSlice()
+	assert.NoError(t, err)
+	sketch2, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	assert.False(t, sketch2.IsEmpty())
 	assert.Equal(t, sketch2.GetNumActiveItems(), 1)
@@ -418,7 +433,7 @@ func TestItemGetAprioriError(t *testing.T) {
 }
 
 func BenchmarkItemSketch(b *testing.B) {
-	sketch, err := NewFrequencyItemsSketch[int64](128, 8, common.ArrayOfLongsSerDe{})
+	sketch, err := NewFrequencyItemsSketch[int64](128, 8, common.ItemSketchLongHasher{}, nil)
 	assert.NoError(b, err)
 	for i := 0; i < b.N; i++ {
 		sketch.Update(int64(i))

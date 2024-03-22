@@ -25,32 +25,34 @@ import (
 	"github.com/twmb/murmur3"
 )
 
-type ArrayOfStringsSerDe struct {
+type ItemSketchStringComparator struct {
+	ReverseOrder bool
 }
+type ItemSketchStringHasher struct{}
+type ItemSketchStringSerDe struct{}
 
-func (f ArrayOfStringsSerDe) Identity() string {
-	return ""
-}
-
-func (f ArrayOfStringsSerDe) Hash(item string) uint64 {
-	datum := unsafe.Slice(unsafe.StringData(item), len(item))
-	return murmur3.SeedSum64(_DEFAULT_SERDE_HASH_SEED, datum[:])
-}
-
-func (f ArrayOfStringsSerDe) LessFn() LessFn[string] {
-	return func(a string, b string) bool {
+func (f ItemSketchStringComparator) CompareFn() CompareFn[string] {
+	return func(a, b string) bool {
+		if f.ReverseOrder {
+			return a > b
+		}
 		return a < b
 	}
 }
 
-func (f ArrayOfStringsSerDe) SizeOf(item string) int {
+func (f ItemSketchStringHasher) Hash(item string) uint64 {
+	datum := unsafe.Slice(unsafe.StringData(item), len(item))
+	return murmur3.SeedSum64(_DEFAULT_SERDE_HASH_SEED, datum[:])
+}
+
+func (f ItemSketchStringSerDe) SizeOf(item string) int {
 	if len(item) == 0 {
 		return int(unsafe.Sizeof(uint32(0)))
 	}
 	return len(item) + int(unsafe.Sizeof(uint32(0)))
 }
 
-func (f ArrayOfStringsSerDe) SizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error) {
+func (f ItemSketchStringSerDe) SizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error) {
 	if numItems <= 0 {
 		return 0, nil
 	}
@@ -71,7 +73,7 @@ func (f ArrayOfStringsSerDe) SizeOfMany(mem []byte, offsetBytes int, numItems in
 	return offset - offsetBytes, nil
 }
 
-func (f ArrayOfStringsSerDe) SerializeOneToSlice(item string) []byte {
+func (f ItemSketchStringSerDe) SerializeOneToSlice(item string) []byte {
 	if len(item) == 0 {
 		return []byte{}
 	}
@@ -82,7 +84,7 @@ func (f ArrayOfStringsSerDe) SerializeOneToSlice(item string) []byte {
 	return bytesOut
 }
 
-func (f ArrayOfStringsSerDe) SerializeManyToSlice(item []string) []byte {
+func (f ItemSketchStringSerDe) SerializeManyToSlice(item []string) []byte {
 	if len(item) == 0 {
 		return []byte{}
 	}
@@ -105,7 +107,7 @@ func (f ArrayOfStringsSerDe) SerializeManyToSlice(item []string) []byte {
 	return bytesOut
 }
 
-func (f ArrayOfStringsSerDe) DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]string, error) {
+func (f ItemSketchStringSerDe) DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]string, error) {
 	if numItems <= 0 {
 		return []string{}, nil
 	}

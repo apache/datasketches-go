@@ -35,18 +35,18 @@ const (
 )
 
 func TestItemsSketch_KLimits(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	_, err := NewKllItemsSketch[string](_MIN_K, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	_, err := NewKllItemsSketch[string](_MIN_K, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
-	_, err = NewKllItemsSketch[string](uint16(_MAX_K), _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	_, err = NewKllItemsSketch[string](uint16(_MAX_K), _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
-	_, err = NewKllItemsSketch[string](_MIN_K-1, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	_, err = NewKllItemsSketch[string](_MIN_K-1, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.Error(t, err)
 }
 
 func TestItemsSketch_Empty(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch, err := NewKllItemsSketch[string](200, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch, err := NewKllItemsSketch[string](200, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	assert.True(t, sketch.IsEmpty())
 	assert.False(t, sketch.IsEstimationMode())
@@ -68,8 +68,8 @@ func TestItemsSketch_Empty(t *testing.T) {
 }
 
 func TestItemsSketch_BadQuantile(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch, err := NewKllItemsSketch[string](200, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch, err := NewKllItemsSketch[string](200, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	sketch.Update("") // has to be non-empty to reach the check
 	_, err = sketch.GetQuantile(-1, true)
@@ -77,8 +77,8 @@ func TestItemsSketch_BadQuantile(t *testing.T) {
 }
 
 func TestItemsSketch_OneValue(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch, err := NewKllItemsSketch[string](200, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch, err := NewKllItemsSketch[string](200, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	sketch.Update("A")
 	assert.False(t, sketch.IsEmpty())
@@ -107,9 +107,9 @@ func TestItemsSketch_OneValue(t *testing.T) {
 }
 
 func TestItemsSketch_TenValues(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
+	comparator := common.ItemSketchStringComparator(false)
 	tenStr := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"}
-	sketch, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	sketch, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	strLen := len(tenStr)
 	dblStrLen := float64(strLen)
@@ -184,8 +184,8 @@ func TestItemsSketch_TenValues(t *testing.T) {
 }
 
 func TestItemsSketch_ManyValuesEstimationMode(T *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(T, err)
 	n := 1_000_000
 	digits := numDigits(n)
@@ -245,8 +245,8 @@ func TestItemsSketch_ManyValuesEstimationMode(T *testing.T) {
 }
 
 func TestItemsSketch_GetRankGetCdfGetPmfConsistency(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	n := 1000
 	digits := numDigits(n)
@@ -293,10 +293,10 @@ func TestItemsSketch_GetRankGetCdfGetPmfConsistency(t *testing.T) {
 }
 
 func TestItemsSketch_Merge(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch1, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch1, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
-	sketch2, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	sketch2, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	n := 10000
 	digits := numDigits(2 * n)
@@ -337,10 +337,10 @@ func TestItemsSketch_Merge(t *testing.T) {
 }
 
 func TestItemsSketch_MergeLowerK(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch1, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch1, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
-	sketch2, err := NewKllItemsSketch[string](_DEFAULT_K/2, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	sketch2, err := NewKllItemsSketch[string](_DEFAULT_K/2, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	n := 10000
 	digits := numDigits(2 * n)
@@ -386,10 +386,10 @@ func TestItemsSketch_MergeLowerK(t *testing.T) {
 }
 
 func TestItemsSketch_MergeEmptyLowerK(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch1, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch1, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
-	sketch2, err := NewKllItemsSketch[string](_DEFAULT_K/2, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	sketch2, err := NewKllItemsSketch[string](_DEFAULT_K/2, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	n := 10000
 	digits := numDigits(n)
@@ -448,10 +448,10 @@ func TestItemsSketch_MergeEmptyLowerK(t *testing.T) {
 }
 
 func TestItemsSketch_MergeExactModeLowerK(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch1, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch1, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
-	sketch2, err := NewKllItemsSketch[string](_DEFAULT_K/2, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	sketch2, err := NewKllItemsSketch[string](_DEFAULT_K/2, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	n := 10000
 	digits := numDigits(n)
@@ -467,10 +467,10 @@ func TestItemsSketch_MergeExactModeLowerK(t *testing.T) {
 }
 
 func TestItemsSketch_MergeMinMinValueFromOther(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch1, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch1, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
-	sketch2, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	sketch2, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	sketch1.Update(intToFixedLengthString(1, 1))
 	sketch2.Update(intToFixedLengthString(2, 1))
@@ -481,10 +481,10 @@ func TestItemsSketch_MergeMinMinValueFromOther(t *testing.T) {
 }
 
 func TestItemsSketch_MergeMinAndMaxFromOther(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch1, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch1, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
-	sketch2, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	sketch2, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	n := 1_000_000
 	digits := numDigits(n)
@@ -501,14 +501,14 @@ func TestItemsSketch_MergeMinAndMaxFromOther(t *testing.T) {
 }
 
 func TestItemsSketch_KTooSmall(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	_, err := NewKllItemsSketch[string](_MIN_K-1, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	_, err := NewKllItemsSketch[string](_MIN_K-1, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.Error(t, err)
 }
 
 func TestItemsSketch_MinK(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch, err := NewKllItemsSketch[string](uint16(8), _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch, err := NewKllItemsSketch[string](uint16(8), _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	n := 1000
 	digits := numDigits(n)
@@ -525,8 +525,8 @@ func TestItemsSketch_MinK(t *testing.T) {
 }
 
 func TestItemsSketch_MaxK(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch, err := NewKllItemsSketch[string](uint16(_MAX_K), _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch, err := NewKllItemsSketch[string](uint16(_MAX_K), _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	n := 1000
 	digits := numDigits(n)
@@ -543,8 +543,8 @@ func TestItemsSketch_MaxK(t *testing.T) {
 }
 
 func TestItemsSketch_OutOfOrderSplitPoints(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	s0 := intToFixedLengthString(0, 1)
 	s1 := intToFixedLengthString(1, 1)
@@ -554,8 +554,8 @@ func TestItemsSketch_OutOfOrderSplitPoints(t *testing.T) {
 }
 
 func TestItemsSketch_DuplicateSplitPoints(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	sketch.Update("A")
 	sketch.Update("B")
@@ -570,8 +570,8 @@ func TestItemsSketch_DuplicateSplitPoints(t *testing.T) {
 }
 
 func TestItemsSketch_CheckReset(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	n := 100
 	digits := numDigits(n)
@@ -598,8 +598,8 @@ func TestItemsSketch_CheckReset(t *testing.T) {
 }
 
 func TestItemsSketch_SortedView(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sketch, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	sketch.Update("A")
 	sketch.Update("AB")
@@ -627,13 +627,13 @@ func TestItemsSketch_SortedView(t *testing.T) {
 }
 
 func TestItemsSketch_CDF_PDF(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
+	comparator := common.ItemSketchStringComparator(false)
 	cdfI := []float64{.25, .50, .75, 1.0, 1.0}
 	cdfE := []float64{0.0, .25, .50, .75, 1.0}
 	pmfI := []float64{.25, .25, .25, .25, 0.0}
 	pmfE := []float64{0.0, .25, .25, .25, .25}
 	toll := 1e-10
-	sketch, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	sketch, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	strIn := []string{"A", "AB", "ABC", "ABCD"}
 	for i := 0; i < len(strIn); i++ {
@@ -670,8 +670,8 @@ func TestItemsSketch_CDF_PDF(t *testing.T) {
 }
 
 func TestItemsSketch_DeserializeEmpty(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	mem, err := sk1.ToSlice()
 	assert.NoError(t, err)
@@ -681,7 +681,7 @@ func TestItemsSketch_DeserializeEmpty(t *testing.T) {
 	assert.Equal(t, memVal.sketchStructure, _COMPACT_EMPTY)
 	assert.Equal(t, len(mem), 8)
 
-	sk2, err := NewKllItemsSketchFromSlice[string](mem, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	sk2, err := NewKllItemsSketchFromSlice[string](mem, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	assert.Equal(t, sk2.GetN(), uint64(0))
 	_, err = sk2.GetMinItem()
@@ -691,8 +691,8 @@ func TestItemsSketch_DeserializeEmpty(t *testing.T) {
 }
 
 func TestItemsSketch_DeserializeSingleItem(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	sk1.Update("A")
 	mem, err := sk1.ToSlice()
@@ -701,7 +701,7 @@ func TestItemsSketch_DeserializeSingleItem(t *testing.T) {
 	memVal, err := newItemsSketchMemoryValidate[string](mem, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	assert.Equal(t, memVal.sketchStructure, _COMPACT_SINGLE)
-	sk2, err := NewKllItemsSketchFromSlice[string](mem, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	sk2, err := NewKllItemsSketchFromSlice[string](mem, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	assert.Equal(t, sk2.GetN(), uint64(1))
 	minV, err := sk2.GetMinItem()
@@ -713,8 +713,8 @@ func TestItemsSketch_DeserializeSingleItem(t *testing.T) {
 }
 
 func TestItemsSketch_FewItems(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	sk1.Update("A")
 	sk1.Update("AB")
@@ -729,8 +729,8 @@ func TestItemsSketch_FewItems(t *testing.T) {
 }
 
 func TestItemsSketch_ManyItems(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	n := 109
 	digits := numDigits(n)
@@ -747,8 +747,8 @@ func TestItemsSketch_ManyItems(t *testing.T) {
 }
 
 func TestItemsSketch_SortedViewAfterReset(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sk, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sk, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	sk.Update("1")
 	sv, err := sk.GetSortedView()
@@ -762,13 +762,13 @@ func TestItemsSketch_SortedViewAfterReset(t *testing.T) {
 }
 
 func TestItemsSketch_SerializeDeserializeEmpty(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	mem, err := sk1.ToSlice()
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
-	sk2, err := NewKllItemsSketchFromSlice[string](mem, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	sk2, err := NewKllItemsSketchFromSlice[string](mem, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	s, err := sk1.GetSerializedSizeBytes()
 	assert.NoError(t, err)
@@ -792,14 +792,14 @@ func TestItemsSketch_SerializeDeserializeEmpty(t *testing.T) {
 }
 
 func TestItemsSketch_SerializeDeserializeOneValue(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sk1, err := NewKllItemsSketch[string](20, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	sk1.Update(" 1")
 	mem, err := sk1.ToSlice()
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
-	sk2, err := NewKllItemsSketchFromSlice[string](mem, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	sk2, err := NewKllItemsSketchFromSlice[string](mem, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	s1SizeBytes, err := sk1.GetSerializedSizeBytes()
 	assert.Equal(t, len(mem), s1SizeBytes)
@@ -824,8 +824,8 @@ func TestItemsSketch_SerializeDeserializeOneValue(t *testing.T) {
 }
 
 func TestItemsSketch_SerializeDeserializeMultipleValue(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sk1, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(false)
+	sk1, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	n := 1000
 	for i := 0; i < n; i++ {
@@ -840,7 +840,7 @@ func TestItemsSketch_SerializeDeserializeMultipleValue(t *testing.T) {
 	mem, err := sk1.ToSlice()
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
-	sk2, err := NewKllItemsSketchFromSlice[string](mem, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	sk2, err := NewKllItemsSketchFromSlice[string](mem, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	s1, err := sk2.GetSerializedSizeBytes()
 	assert.NoError(t, err)
@@ -864,10 +864,10 @@ func TestItemsSketch_SerializeDeserializeMultipleValue(t *testing.T) {
 
 func TestSerializeDeserializeString(t *testing.T) {
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
-	comparator := common.ItemSketchStringComparator{}
+	comparator := common.ItemSketchStringComparator(false)
 	for _, n := range nArr {
 		digits := numDigits(n)
-		sk, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), common.ItemSketchStringSerDe{})
+		sk, err := NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 		assert.NoError(t, err)
 		for i := 1; i <= n; i++ {
 			sk.Update(intToFixedLengthString(i, digits))
@@ -875,7 +875,7 @@ func TestSerializeDeserializeString(t *testing.T) {
 		slc, err := sk.ToSlice()
 		assert.NoError(t, err)
 
-		sketch, err := NewKllItemsSketchFromSlice[string](slc, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+		sketch, err := NewKllItemsSketchFromSlice[string](slc, comparator, common.ItemSketchStringSerDe{})
 		if err != nil {
 			return
 		}
@@ -904,7 +904,7 @@ func TestSerializeDeserializeString(t *testing.T) {
 
 			weight := int64(0)
 			it := sketch.GetIterator()
-			compareFn := comparator.CompareFn()
+			compareFn := comparator
 			for it.Next() {
 				qut := it.GetQuantile()
 				assert.True(t, compareFn(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
@@ -918,9 +918,9 @@ func TestSerializeDeserializeString(t *testing.T) {
 
 func TestSerializeDeserializeFloat(t *testing.T) {
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
-	comparator := common.ItemSketchDoubleComparator{}
+	comparator := common.ItemSketchDoubleComparator(false)
 	for _, n := range nArr {
-		sk, err := NewKllItemsSketchWithDefault[float64](comparator.CompareFn(), common.ItemSketchDoubleSerDe{})
+		sk, err := NewKllItemsSketchWithDefault[float64](comparator, common.ItemSketchDoubleSerDe{})
 		assert.NoError(t, err)
 		for i := 1; i <= n; i++ {
 			sk.Update(float64(i))
@@ -928,7 +928,7 @@ func TestSerializeDeserializeFloat(t *testing.T) {
 		slc, err := sk.ToSlice()
 		assert.NoError(t, err)
 
-		sketch, err := NewKllItemsSketchFromSlice[float64](slc, comparator.CompareFn(), common.ItemSketchDoubleSerDe{})
+		sketch, err := NewKllItemsSketchFromSlice[float64](slc, comparator, common.ItemSketchDoubleSerDe{})
 		if err != nil {
 			return
 		}
@@ -957,7 +957,7 @@ func TestSerializeDeserializeFloat(t *testing.T) {
 
 			weight := int64(0)
 			it := sketch.GetIterator()
-			compareFn := comparator.CompareFn()
+			compareFn := comparator
 			for it.Next() {
 				qut := it.GetQuantile()
 				assert.True(t, compareFn(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
@@ -970,13 +970,13 @@ func TestSerializeDeserializeFloat(t *testing.T) {
 }
 
 func TestSerializeStringDeserializeNoSerde(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{}
-	sketch1, err := NewKllItemsSketchWithDefault[string](comparator.CompareFn(), nil)
+	comparator := common.ItemSketchStringComparator(false)
+	sketch1, err := NewKllItemsSketchWithDefault[string](comparator, nil)
 	assert.NoError(t, err)
 	_, err = sketch1.ToSlice()
 	assert.Error(t, err)
 
-	_, err = NewKllItemsSketchFromSlice[string](nil, comparator.CompareFn(), nil)
+	_, err = NewKllItemsSketchFromSlice[string](nil, comparator, nil)
 	assert.Error(t, err)
 }
 
@@ -989,12 +989,10 @@ func TestNoCompare(t *testing.T) {
 // The issue is, during a merge, L0 must be sorted prior to a compaction to a higher level.
 // Otherwise the higher levels would not be sorted properly.
 func TestL0SortDuringMerge(t *testing.T) {
-	comparator := common.ItemSketchStringComparator{
-		ReverseOrder: true,
-	}
-	sk1, err := NewKllItemsSketch[string](8, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	comparator := common.ItemSketchStringComparator(true)
+	sk1, err := NewKllItemsSketch[string](8, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
-	sk2, err := NewKllItemsSketch[string](8, _DEFAULT_M, comparator.CompareFn(), common.ItemSketchStringSerDe{})
+	sk2, err := NewKllItemsSketch[string](8, _DEFAULT_M, comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 	n := 26 //don't change this
 	for i := 1; i <= n; i++ {

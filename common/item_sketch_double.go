@@ -23,17 +23,14 @@ import (
 	"math"
 )
 
-type ItemSketchDoubleComparator struct {
-	ReverseOrder bool
-}
 type ItemSketchDoubleHasher struct {
 	scratch [8]byte
 }
 type ItemSketchDoubleSerDe struct{}
 
-func (f ItemSketchDoubleComparator) CompareFn() CompareFn[float64] {
+var ItemSketchDoubleComparator = func(reverseOrder bool) CompareFn[float64] {
 	return func(a float64, b float64) bool {
-		if f.ReverseOrder {
+		if reverseOrder {
 			return a > b
 		}
 		return a < b

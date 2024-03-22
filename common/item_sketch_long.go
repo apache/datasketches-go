@@ -22,17 +22,14 @@ import (
 	"github.com/twmb/murmur3"
 )
 
-type ItemSketchLongComparator struct {
-	ReverseOrder bool
-}
 type ItemSketchLongHasher struct {
 	scratch [8]byte
 }
 type ItemSketchLongSerDe struct{}
 
-func (f ItemSketchLongComparator) CompareFn() CompareFn[int64] {
+var ItemSketchLongComparator = func(reverseOrder bool) CompareFn[int64] {
 	return func(a, b int64) bool {
-		if f.ReverseOrder {
+		if reverseOrder {
 			return a > b
 		}
 		return a < b

@@ -25,15 +25,12 @@ import (
 	"github.com/twmb/murmur3"
 )
 
-type ItemSketchStringComparator struct {
-	ReverseOrder bool
-}
 type ItemSketchStringHasher struct{}
 type ItemSketchStringSerDe struct{}
 
-func (f ItemSketchStringComparator) CompareFn() CompareFn[string] {
+var ItemSketchStringComparator = func(reverseOrder bool) CompareFn[string] {
 	return func(a, b string) bool {
-		if f.ReverseOrder {
+		if reverseOrder {
 			return a > b
 		}
 		return a < b

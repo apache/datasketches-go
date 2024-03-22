@@ -19,10 +19,6 @@ package common
 
 type CompareFn[C comparable] func(C, C) bool
 
-type ItemSketchComparator[C comparable] interface {
-	CompareFn() CompareFn[C]
-}
-
 type ItemSketchHasher[C comparable] interface {
 	Hash(item C) uint64
 }

@@ -61,10 +61,10 @@ type ItemsSketch[C comparable] struct {
 //     Both the ultimate accuracy and size of this sketch are functions of lgMaxMapSize.
 //   - lgCurMapSize, log2 of the starting (current) physical size of the internal hashFn
 //     map managed by this sketch.
-func NewFrequencyItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, operations common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewFrequencyItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, hasher common.ItemSketchHasher[C], serde common.ItemSketchSerde[C]) (*ItemsSketch[C], error) {
 	lgMaxMapSz := max(lgMaxMapSize, _LG_MIN_MAP_SIZE)
 	lgCurMapSz := max(lgCurMapSize, _LG_MIN_MAP_SIZE)
-	hashMap, err := newReversePurgeItemHashMap[C](1<<lgCurMapSz, operations)
+	hashMap, err := newReversePurgeItemHashMap[C](1<<lgCurMapSz, hasher, serde)
 	if err != nil {
 		return nil, err
 	}
@@ -89,12 +89,12 @@ func NewFrequencyItemsSketch[C comparable](lgMaxMapSize int, lgCurMapSize int, o
 //     sketch and must be a power of 2. The maximum capacity of this internal hash map is
 //     0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are
 //     functions of maxMapSize.
-func NewFrequencyItemsSketchWithMaxMapSize[C comparable](maxMapSize int, operations common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewFrequencyItemsSketchWithMaxMapSize[C comparable](maxMapSize int, hasher common.ItemSketchHasher[C], serde common.ItemSketchSerde[C]) (*ItemsSketch[C], error) {
 	maxMapSz, err := internal.ExactLog2(maxMapSize)
 	if err != nil {
 		return nil, err
 	}
-	return NewFrequencyItemsSketch[C](maxMapSz, _LG_MIN_MAP_SIZE, operations)
+	return NewFrequencyItemsSketch[C](maxMapSz, _LG_MIN_MAP_SIZE, hasher, serde)
 }
 
 // NewFrequencyItemsSketchFromSlice constructs a new ItemsSketch with the given maxMapSize and the
@@ -104,7 +104,11 @@ func NewFrequencyItemsSketchWithMaxMapSize[C comparable](maxMapSize int, operati
 // sketch and must be a power of 2.  The maximum capacity of this internal hash map is
 // 0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are a
 // function of maxMapSize.
-func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, operations common.ItemSketchOp[C]) (*ItemsSketch[C], error) {
+func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, hasher common.ItemSketchHasher[C], serde common.ItemSketchSerde[C]) (*ItemsSketch[C], error) {
+	if serde == nil {
+		return nil, errors.New("no SerDe provided")
+	}
+
 	pre0, err := checkPreambleSize(slc) //make sure preamble will fit
 	maxPreLongs := internal.FamilyEnum.Frequency.MaxPreLongs
 
@@ -132,7 +136,7 @@ func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, operations commo
 		return nil, fmt.Errorf("(preLongs == 1) ^ empty == true")
 	}
 	if empty {
-		return NewFrequencyItemsSketchWithMaxMapSize[C](1<<_LG_MIN_MAP_SIZE, operations)
+		return NewFrequencyItemsSketchWithMaxMapSize[C](1<<_LG_MIN_MAP_SIZE, hasher, serde)
 	}
 	// Get full preamble
 	preArr := make([]int64, preLongs)
@@ -140,7 +144,7 @@ func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, operations commo
 		preArr[j] = int64(binary.LittleEndian.Uint64(slc[j<<3:]))
 	}
 
-	fis, err := NewFrequencyItemsSketch[C](int(lgMaxMapSize), int(lgCurMapSize), operations)
+	fis, err := NewFrequencyItemsSketch[C](lgMaxMapSize, lgCurMapSize, hasher, serde)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +165,7 @@ func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, operations commo
 	}
 	// Get itemArray
 	itemsOffset := preBytes + (8 * activeItems)
-	itemArray, err := operations.DeserializeManyFromSlice(slc[itemsOffset:], 0, activeItems)
+	itemArray, err := serde.DeserializeManyFromSlice(slc[itemsOffset:], 0, activeItems)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +395,10 @@ func (i *ItemsSketch[C]) ToString() (string, error) {
 }
 
 // ToSlice returns a slice representation of this sketch
-func (i *ItemsSketch[C]) ToSlice() []byte {
+func (i *ItemsSketch[C]) ToSlice() ([]byte, error) {
+	if i.hashMap.serde == nil {
+		return nil, errors.New("no SerDe provided")
+	}
 	preLongs := 0
 	outBytes := 0
 	empty := i.IsEmpty()
@@ -402,7 +409,7 @@ func (i *ItemsSketch[C]) ToSlice() []byte {
 		outBytes = 8
 	} else {
 		preLongs = internal.FamilyEnum.Frequency.MaxPreLongs
-		bytes = i.hashMap.operations.SerializeManyToSlice(i.hashMap.getActiveKeys())
+		bytes = i.hashMap.serde.SerializeManyToSlice(i.hashMap.getActiveKeys())
 		outBytes = ((preLongs + activeItems) << 3) + len(bytes)
 	}
 
@@ -437,12 +444,12 @@ func (i *ItemsSketch[C]) ToSlice() []byte {
 		}
 		copy(outArr[preBytes+(activeItems<<3):], bytes)
 	}
-	return outArr
+	return outArr, nil
 }
 
 // Reset resets this sketch to a virgin state.
 func (i *ItemsSketch[C]) Reset() error {
-	hashMap, err := newReversePurgeItemHashMap[C](1<<_LG_MIN_MAP_SIZE, i.hashMap.operations)
+	hashMap, err := newReversePurgeItemHashMap[C](1<<_LG_MIN_MAP_SIZE, i.hashMap.hasher, i.hashMap.serde)
 	if err != nil {
 		return err
 	}

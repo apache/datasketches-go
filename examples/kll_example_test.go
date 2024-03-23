@@ -26,8 +26,11 @@ import (
 )
 
 func TestKllItemsSketch(t *testing.T) {
+	// Create a comparison function for strings (or use common.ItemSketchStringComparator{})
+	comparator := common.ItemSketchStringComparator(false)
+
 	// Create a new KLL sketch
-	sketch, err := kll.NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
+	sketch, err := kll.NewKllItemsSketchWithDefault[string](comparator, common.ItemSketchStringSerDe{})
 	assert.NoError(t, err)
 
 	// Update the sketch with 1000 items

@@ -34,9 +34,10 @@ func TestGenerateGoFiles(t *testing.T) {
 	os.Mkdir(internal.GoPath, 0755)
 
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+	comparatorString := common.ItemSketchStringComparator(false)
 	for _, n := range nArr {
 		digits := numDigits(n)
-		sk, err := NewKllItemsSketchWithDefault[string](common.ArrayOfStringsSerDe{})
+		sk, err := NewKllItemsSketchWithDefault[string](comparatorString, common.ItemSketchStringSerDe{})
 		sk.deterministicOffsetForTest = true
 		assert.NoError(t, err)
 		for i := 1; i <= n; i++ {
@@ -48,8 +49,9 @@ func TestGenerateGoFiles(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
+	comparatorDouble := common.ItemSketchDoubleComparator(false)
 	for _, n := range nArr {
-		sk, err := NewKllItemsSketchWithDefault[float64](common.ArrayOfDoublesSerDe{})
+		sk, err := NewKllItemsSketchWithDefault[float64](comparatorDouble, common.ItemSketchDoubleSerDe{})
 		sk.deterministicOffsetForTest = true
 		assert.NoError(t, err)
 		for i := 1; i <= n; i++ {
@@ -65,12 +67,13 @@ func TestGenerateGoFiles(t *testing.T) {
 func TestJavaCompat(t *testing.T) {
 	t.Run("Java KLL String", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
-		serde := common.ArrayOfStringsSerDe{}
+		serde := common.ItemSketchStringSerDe{}
+		comparatorString := common.ItemSketchStringComparator(false)
 		for _, n := range nArr {
 			digits := numDigits(n)
 			bytes, err := os.ReadFile(fmt.Sprintf("%s/kll_string_n%d_java.sk", internal.JavaPath, n))
 			assert.NoError(t, err)
-			sketch, err := NewKllItemsSketchFromSlice[string](bytes, serde)
+			sketch, err := NewKllItemsSketchFromSlice[string](bytes, comparatorString, serde)
 			if err != nil {
 				return
 			}
@@ -99,11 +102,11 @@ func TestJavaCompat(t *testing.T) {
 
 				weight := int64(0)
 				it := sketch.GetIterator()
-				lessFn := serde.LessFn()
+				compareFn := comparatorString
 				for it.Next() {
 					qut := it.GetQuantile()
-					assert.True(t, lessFn(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
-					assert.True(t, !lessFn(maxV, qut) || maxV == qut, fmt.Sprintf("max: \"%v\" \"%v\"", maxV, qut))
+					assert.True(t, compareFn(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
+					assert.True(t, !compareFn(maxV, qut) || maxV == qut, fmt.Sprintf("max: \"%v\" \"%v\"", maxV, qut))
 					weight += it.GetWeight()
 				}
 				assert.Equal(t, weight, int64(n))
@@ -113,11 +116,12 @@ func TestJavaCompat(t *testing.T) {
 
 	t.Run("Java KLL Double", func(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
-		serde := common.ArrayOfDoublesSerDe{}
+		serde := common.ItemSketchDoubleSerDe{}
+		comparatorDouble := common.ItemSketchDoubleComparator(false)
 		for _, n := range nArr {
 			bytes, err := os.ReadFile(fmt.Sprintf("%s/kll_double_n%d_java.sk", internal.JavaPath, n))
 			assert.NoError(t, err)
-			sketch, err := NewKllItemsSketchFromSlice[float64](bytes, serde)
+			sketch, err := NewKllItemsSketchFromSlice[float64](bytes, comparatorDouble, serde)
 			if err != nil {
 				return
 			}
@@ -146,11 +150,10 @@ func TestJavaCompat(t *testing.T) {
 
 				weight := int64(0)
 				it := sketch.GetIterator()
-				lessFn := serde.LessFn()
 				for it.Next() {
 					qut := it.GetQuantile()
-					assert.True(t, lessFn(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
-					assert.True(t, !lessFn(maxV, qut) || maxV == qut, fmt.Sprintf("max: \"%v\" \"%v\"", maxV, qut))
+					assert.True(t, comparatorDouble(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
+					assert.True(t, !comparatorDouble(maxV, qut) || maxV == qut, fmt.Sprintf("max: \"%v\" \"%v\"", maxV, qut))
 					weight += it.GetWeight()
 				}
 				assert.Equal(t, weight, int64(n))

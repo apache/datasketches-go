@@ -76,13 +76,13 @@ func checkNormalizedRankBounds(rank float64) error {
 	return nil
 }
 
-func checkItems[C comparable](items []C, lessFn common.LessFn[C]) error {
+func checkItems[C comparable](items []C, compareFn common.CompareFn[C]) error {
 	if len(items) == 1 && internal.IsNil(items[0]) {
 		return errors.New("items must be unique, monotonically increasing and not nil")
 	}
 
 	for i := 0; i < len(items)-1; i++ {
-		if !internal.IsNil(items[i]) && !internal.IsNil(items[i+1]) && lessFn(items[i], items[i+1]) {
+		if !internal.IsNil(items[i]) && !internal.IsNil(items[i+1]) && compareFn(items[i], items[i+1]) {
 			continue
 		}
 		return errors.New("items must be unique, monotonically increasing and not nil")

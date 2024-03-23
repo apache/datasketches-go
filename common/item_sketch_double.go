@@ -23,40 +23,40 @@ import (
 	"math"
 )
 
-type ArrayOfDoublesSerDe struct {
+type ItemSketchDoubleHasher struct {
 	scratch [8]byte
 }
+type ItemSketchDoubleSerDe struct{}
 
-func (f ArrayOfDoublesSerDe) Identity() float64 {
-	return 0
-}
-
-func (f ArrayOfDoublesSerDe) Hash(item float64) uint64 {
-	binary.LittleEndian.PutUint64(f.scratch[:], math.Float64bits(item))
-	return murmur3.SeedSum64(_DEFAULT_SERDE_HASH_SEED, f.scratch[:])
-}
-
-func (f ArrayOfDoublesSerDe) LessFn() LessFn[float64] {
+var ItemSketchDoubleComparator = func(reverseOrder bool) CompareFn[float64] {
 	return func(a float64, b float64) bool {
+		if reverseOrder {
+			return a > b
+		}
 		return a < b
 	}
 }
 
-func (f ArrayOfDoublesSerDe) SizeOf(item float64) int {
+func (f ItemSketchDoubleHasher) Hash(item float64) uint64 {
+	binary.LittleEndian.PutUint64(f.scratch[:], math.Float64bits(item))
+	return murmur3.SeedSum64(_DEFAULT_SERDE_HASH_SEED, f.scratch[:])
+}
+
+func (f ItemSketchDoubleSerDe) SizeOf(item float64) int {
 	return 8
 }
 
-func (f ArrayOfDoublesSerDe) SizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error) {
+func (f ItemSketchDoubleSerDe) SizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error) {
 	return numItems * 8, nil
 }
 
-func (f ArrayOfDoublesSerDe) SerializeOneToSlice(item float64) []byte {
+func (f ItemSketchDoubleSerDe) SerializeOneToSlice(item float64) []byte {
 	bytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(bytes, math.Float64bits(item))
 	return bytes
 }
 
-func (f ArrayOfDoublesSerDe) SerializeManyToSlice(item []float64) []byte {
+func (f ItemSketchDoubleSerDe) SerializeManyToSlice(item []float64) []byte {
 	if len(item) == 0 {
 		return []byte{}
 	}
@@ -69,7 +69,7 @@ func (f ArrayOfDoublesSerDe) SerializeManyToSlice(item []float64) []byte {
 	return bytes
 }
 
-func (f ArrayOfDoublesSerDe) DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]float64, error) {
+func (f ItemSketchDoubleSerDe) DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]float64, error) {
 	if numItems == 0 {
 		return []float64{}, nil
 	}

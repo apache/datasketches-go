@@ -32,7 +32,8 @@ type reversePurgeItemHashMap[C comparable] struct {
 	values        []int64
 	states        []int16
 	numActive     int
-	operations    common.ItemSketchOp[C]
+	hasher        common.ItemSketchHasher[C]
+	serde         common.ItemSketchSerde[C]
 }
 
 type iteratorItemHashMap[C comparable] struct {
@@ -58,7 +59,7 @@ const (
 //   - mapSize, This determines the number of cells in the arrays underlying the
 //     HashMap implementation and must be a power of 2.
 //     The hashFn table will be expected to store reversePurgeItemHashMapLoadFactor * mapSize (key, value) pairs.
-func newReversePurgeItemHashMap[C comparable](mapSize int, operations common.ItemSketchOp[C]) (*reversePurgeItemHashMap[C], error) {
+func newReversePurgeItemHashMap[C comparable](mapSize int, hasher common.ItemSketchHasher[C], serde common.ItemSketchSerde[C]) (*reversePurgeItemHashMap[C], error) {
 	lgLength, err := internal.ExactLog2(mapSize)
 	if err != nil {
 		return nil, err
@@ -70,7 +71,8 @@ func newReversePurgeItemHashMap[C comparable](mapSize int, operations common.Ite
 		make([]int64, mapSize),
 		make([]int16, mapSize),
 		0,
-		operations,
+		hasher,
+		serde,
 	}, nil
 }
 
@@ -103,7 +105,7 @@ func (r *reversePurgeItemHashMap[C]) getCapacity() int {
 func (r *reversePurgeItemHashMap[C]) adjustOrPutValue(key C, adjustAmount int64) error {
 	var (
 		arrayMask = len(r.keys) - 1
-		probe     = r.operations.Hash(key) & uint64(arrayMask)
+		probe     = r.hasher.Hash(key) & uint64(arrayMask)
 		drift     = 1
 	)
 
@@ -279,7 +281,7 @@ func (r *reversePurgeItemHashMap[C]) iterator() *iteratorItemHashMap[C] {
 func (r *reversePurgeItemHashMap[C]) hashProbe(key C) int {
 	arrayMask := uint64(len(r.keys) - 1)
 
-	probe := r.operations.Hash(key) & arrayMask
+	probe := r.hasher.Hash(key) & arrayMask
 	for r.states[probe] > 0 && r.keys[probe] != key {
 		probe = (probe + 1) & arrayMask
 	}

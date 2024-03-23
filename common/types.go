@@ -17,12 +17,13 @@
 
 package common
 
-type LessFn[C comparable] func(C, C) bool
+type CompareFn[C comparable] func(C, C) bool
 
-type ItemSketchOp[C comparable] interface {
-	Identity() C
+type ItemSketchHasher[C comparable] interface {
 	Hash(item C) uint64
-	LessFn() LessFn[C]
+}
+
+type ItemSketchSerde[C comparable] interface {
 	SizeOf(item C) int
 	SizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error)
 	SerializeManyToSlice(items []C) []byte

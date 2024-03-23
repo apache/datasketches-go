@@ -22,40 +22,40 @@ import (
 	"github.com/twmb/murmur3"
 )
 
-type ArrayOfLongsSerDe struct {
+type ItemSketchLongHasher struct {
 	scratch [8]byte
 }
+type ItemSketchLongSerDe struct{}
 
-func (f ArrayOfLongsSerDe) Identity() int64 {
-	return 0
-}
-
-func (f ArrayOfLongsSerDe) Hash(item int64) uint64 {
-	binary.LittleEndian.PutUint64(f.scratch[:], uint64(item))
-	return murmur3.SeedSum64(_DEFAULT_SERDE_HASH_SEED, f.scratch[:])
-}
-
-func (f ArrayOfLongsSerDe) LessFn() LessFn[int64] {
-	return func(a int64, b int64) bool {
+var ItemSketchLongComparator = func(reverseOrder bool) CompareFn[int64] {
+	return func(a, b int64) bool {
+		if reverseOrder {
+			return a > b
+		}
 		return a < b
 	}
 }
 
-func (f ArrayOfLongsSerDe) SizeOf(item int64) int {
+func (f ItemSketchLongHasher) Hash(item int64) uint64 {
+	binary.LittleEndian.PutUint64(f.scratch[:], uint64(item))
+	return murmur3.SeedSum64(_DEFAULT_SERDE_HASH_SEED, f.scratch[:])
+}
+
+func (f ItemSketchLongSerDe) SizeOf(item int64) int {
 	return 8
 }
 
-func (f ArrayOfLongsSerDe) SizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error) {
+func (f ItemSketchLongSerDe) SizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error) {
 	return numItems * 8, nil
 }
 
-func (f ArrayOfLongsSerDe) SerializeOneToSlice(item int64) []byte {
+func (f ItemSketchLongSerDe) SerializeOneToSlice(item int64) []byte {
 	bytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(bytes, uint64(item))
 	return bytes
 }
 
-func (f ArrayOfLongsSerDe) SerializeManyToSlice(item []int64) []byte {
+func (f ItemSketchLongSerDe) SerializeManyToSlice(item []int64) []byte {
 	if len(item) == 0 {
 		return []byte{}
 	}
@@ -68,7 +68,7 @@ func (f ArrayOfLongsSerDe) SerializeManyToSlice(item []int64) []byte {
 	return bytes
 }
 
-func (f ArrayOfLongsSerDe) DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]int64, error) {
+func (f ItemSketchLongSerDe) DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]int64, error) {
 	if numItems == 0 {
 		return []int64{}, nil
 	}

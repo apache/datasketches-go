@@ -24,14 +24,15 @@ import (
 )
 
 func TestItemsToLongs(t *testing.T) {
-	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[int64](8, common.ArrayOfLongsSerDe{})
+	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[int64](8, common.ItemSketchLongHasher{}, common.ItemSketchLongSerDe{})
 	assert.NoError(t, err)
 	sketch1.Update(1)
 	sketch1.Update(2)
 	sketch1.Update(3)
 	sketch1.Update(4)
 
-	bytes := sketch1.ToSlice()
+	bytes, err := sketch1.ToSlice()
+	assert.NoError(t, err)
 	sketch2, err := NewLongsSketchFromSlice(bytes)
 	assert.NoError(t, err)
 	sketch2.Update(2)
@@ -64,7 +65,7 @@ func TestLongToItems(t *testing.T) {
 	sketch1.Update(4)
 
 	bytes := sketch1.ToSlice()
-	sketch2, err := NewFrequencyItemsSketchFromSlice[int64](bytes, common.ArrayOfLongsSerDe{})
+	sketch2, err := NewFrequencyItemsSketchFromSlice[int64](bytes, common.ItemSketchLongHasher{}, common.ItemSketchLongSerDe{})
 	assert.NoError(t, err)
 	sketch2.Update(2)
 	sketch2.Update(3)

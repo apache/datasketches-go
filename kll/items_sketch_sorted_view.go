@@ -159,6 +159,10 @@ func (s *ItemsSketchSortedView[C]) getQuantileIndex(rank float64, inclusive bool
 	return index
 }
 
+func (s *ItemsSketchSortedView[C]) GetNumRetained() int {
+	return len(s.quantiles)
+}
+
 func (s *ItemsSketchSortedView[C]) GetPartitionBoundaries(numEquallySized int, inclusive bool) (*ItemsSketchPartitionBoundaries[C], error) {
 	if s.totalN == 0 {
 		return nil, errors.New("empty sketch")

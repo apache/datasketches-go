@@ -24,6 +24,7 @@ import (
 // hll8ArrayImpl Uses 6 bits per slot in a packed byte array
 type hll8ArrayImpl struct {
 	hllArrayImpl
+	configKMask int
 }
 
 type hll8Iterator struct {
@@ -79,6 +80,7 @@ func newHll8Array(lgConfigK int) hllArray {
 			kxq1:        0,
 			hllByteArr:  make([]byte, 1<<lgConfigK),
 			auxStart:    hllByteArrStart + 1<<(lgConfigK-1),
+			configKMask: (1 << lgConfigK) - 1,
 		},
 	}
 }
@@ -122,8 +124,7 @@ func convertToHll8(srcAbsHllArr hllArray) (hllSketchStateI, error) {
 
 func (h *hll8ArrayImpl) couponUpdate(coupon int) (hllSketchStateI, error) {
 	newValue := coupon >> keyBits26
-	configKmask := (1 << h.lgConfigK) - 1
-	slotNo := coupon & configKmask
+	slotNo := coupon & h.configKMask
 	err := h.updateSlotWithKxQ(slotNo, newValue)
 	return h, err
 }

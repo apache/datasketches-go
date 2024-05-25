@@ -244,61 +244,81 @@ func TestHLLDataSketchT(b *testing.T) {
 }
 
 func BenchmarkHLLDataSketch(b *testing.B) {
+	const iter = 2_000_000
+
 	// HLL uint64 BenchMark
 	b.Run("lgK4 HLL4 uint", func(b *testing.B) {
 		hll, _ := NewHllSketch(4, TgtHllTypeHll4)
 		for i := 0; i < b.N; i++ {
-			_ = hll.UpdateUInt64(uint64(i))
+			for j := 0; j < iter; j++ {
+				_ = hll.UpdateUInt64(uint64(j))
+			}
 		}
 	})
 	b.Run("lgK16 HLL4 uint", func(b *testing.B) {
 		hll, _ := NewHllSketch(16, TgtHllTypeHll4)
 		for i := 0; i < b.N; i++ {
-			_ = hll.UpdateUInt64(uint64(i))
+			for j := 0; j < iter; j++ {
+				_ = hll.UpdateUInt64(uint64(j))
+			}
 		}
 	})
 	b.Run("lgK21 HLL4 uint", func(b *testing.B) {
 		hll, _ := NewHllSketch(21, TgtHllTypeHll4)
 		for i := 0; i < b.N; i++ {
-			_ = hll.UpdateUInt64(uint64(i))
+			for j := 0; j < iter; j++ {
+				_ = hll.UpdateUInt64(uint64(j))
+			}
 		}
 	})
 
 	b.Run("lgK4 HLL6 uint", func(b *testing.B) {
 		hll, _ := NewHllSketch(11, TgtHllTypeHll6)
 		for i := 0; i < b.N; i++ {
-			_ = hll.UpdateUInt64(uint64(i))
+			for j := 0; j < iter; j++ {
+				_ = hll.UpdateUInt64(uint64(j))
+			}
 		}
 	})
 	b.Run("lgK16 HLL6 uint", func(b *testing.B) {
 		hll, _ := NewHllSketch(16, TgtHllTypeHll6)
 		for i := 0; i < b.N; i++ {
-			_ = hll.UpdateUInt64(uint64(i))
+			for j := 0; j < iter; j++ {
+				_ = hll.UpdateUInt64(uint64(j))
+			}
 		}
 	})
 	b.Run("lgK21 HLL6 uint", func(b *testing.B) {
 		hll, _ := NewHllSketch(21, TgtHllTypeHll6)
 		for i := 0; i < b.N; i++ {
-			_ = hll.UpdateUInt64(uint64(i))
+			for j := 0; j < iter; j++ {
+				_ = hll.UpdateUInt64(uint64(j))
+			}
 		}
 	})
 
 	b.Run("lgK4 HLL8 uint", func(b *testing.B) {
 		hll, _ := NewHllSketch(11, TgtHllTypeHll8)
 		for i := 0; i < b.N; i++ {
-			_ = hll.UpdateUInt64(uint64(i))
+			for j := 0; j < iter; j++ {
+				_ = hll.UpdateUInt64(uint64(j))
+			}
 		}
 	})
 	b.Run("lgK16 HLL8 uint", func(b *testing.B) {
 		hll, _ := NewHllSketch(16, TgtHllTypeHll8)
 		for i := 0; i < b.N; i++ {
-			_ = hll.UpdateUInt64(uint64(i))
+			for j := 0; j < iter; j++ {
+				_ = hll.UpdateUInt64(uint64(j))
+			}
 		}
 	})
 	b.Run("lgK21 HLL8 uint", func(b *testing.B) {
 		hll, _ := NewHllSketch(21, TgtHllTypeHll8)
 		for i := 0; i < b.N; i++ {
-			_ = hll.UpdateUInt64(uint64(i))
+			for j := 0; j < iter; j++ {
+				_ = hll.UpdateUInt64(uint64(j))
+			}
 		}
 	})
 
@@ -307,66 +327,84 @@ func BenchmarkHLLDataSketch(b *testing.B) {
 	b.Run("lgK4 HLL4 slice", func(b *testing.B) {
 		hll, _ := NewHllSketch(11, TgtHllTypeHll4)
 		for i := 0; i < b.N; i++ {
-			binary.LittleEndian.PutUint64(bs, uint64(i))
-			_ = hll.UpdateSlice(bs)
+			for j := 0; j < iter; j++ {
+				binary.LittleEndian.PutUint64(bs, uint64(j))
+				_ = hll.UpdateSlice(bs)
+			}
 		}
 	})
 	b.Run("lgK16 HLL4 slice", func(b *testing.B) {
 		hll, _ := NewHllSketch(16, TgtHllTypeHll4)
 		for i := 0; i < b.N; i++ {
-			binary.LittleEndian.PutUint64(bs, uint64(i))
-			_ = hll.UpdateSlice(bs)
+			for j := 0; j < iter; j++ {
+				binary.LittleEndian.PutUint64(bs, uint64(j))
+				_ = hll.UpdateSlice(bs)
+			}
 		}
 	})
 	b.Run("lgK21 HLL4 slice", func(b *testing.B) {
 		hll, _ := NewHllSketch(21, TgtHllTypeHll4)
 		for i := 0; i < b.N; i++ {
-			binary.LittleEndian.PutUint64(bs, uint64(i))
-			_ = hll.UpdateSlice(bs)
+			for j := 0; j < iter; j++ {
+				binary.LittleEndian.PutUint64(bs, uint64(j))
+				_ = hll.UpdateSlice(bs)
+			}
 		}
 	})
 
 	b.Run("lgK4 HLL6 slice", func(b *testing.B) {
 		hll, _ := NewHllSketch(11, TgtHllTypeHll6)
 		for i := 0; i < b.N; i++ {
-			binary.LittleEndian.PutUint64(bs, uint64(i))
-			_ = hll.UpdateSlice(bs)
+			for j := 0; j < iter; j++ {
+				binary.LittleEndian.PutUint64(bs, uint64(j))
+				_ = hll.UpdateSlice(bs)
+			}
 		}
 	})
 	b.Run("lgK16 HLL6 slice", func(b *testing.B) {
 		hll, _ := NewHllSketch(16, TgtHllTypeHll6)
 		for i := 0; i < b.N; i++ {
-			binary.LittleEndian.PutUint64(bs, uint64(i))
-			_ = hll.UpdateSlice(bs)
+			for j := 0; j < iter; j++ {
+				binary.LittleEndian.PutUint64(bs, uint64(j))
+				_ = hll.UpdateSlice(bs)
+			}
 		}
 	})
 	b.Run("lgK21 HLL6 slice", func(b *testing.B) {
 		hll, _ := NewHllSketch(21, TgtHllTypeHll6)
 		for i := 0; i < b.N; i++ {
-			binary.LittleEndian.PutUint64(bs, uint64(i))
-			_ = hll.UpdateSlice(bs)
+			for j := 0; j < iter; j++ {
+				binary.LittleEndian.PutUint64(bs, uint64(j))
+				_ = hll.UpdateSlice(bs)
+			}
 		}
 	})
 
 	b.Run("lgK4 HLL8 slice", func(b *testing.B) {
 		hll, _ := NewHllSketch(11, TgtHllTypeHll8)
 		for i := 0; i < b.N; i++ {
-			binary.LittleEndian.PutUint64(bs, uint64(i))
-			_ = hll.UpdateSlice(bs)
+			for j := 0; j < iter; j++ {
+				binary.LittleEndian.PutUint64(bs, uint64(j))
+				_ = hll.UpdateSlice(bs)
+			}
 		}
 	})
 	b.Run("lgK16 HLL8 slice", func(b *testing.B) {
 		hll, _ := NewHllSketch(16, TgtHllTypeHll8)
 		for i := 0; i < b.N; i++ {
-			binary.LittleEndian.PutUint64(bs, uint64(i))
-			_ = hll.UpdateSlice(bs)
+			for j := 0; j < iter; j++ {
+				binary.LittleEndian.PutUint64(bs, uint64(j))
+				_ = hll.UpdateSlice(bs)
+			}
 		}
 	})
 	b.Run("lgK21 HLL8 slice", func(b *testing.B) {
 		hll, _ := NewHllSketch(21, TgtHllTypeHll8)
 		for i := 0; i < b.N; i++ {
-			binary.LittleEndian.PutUint64(bs, uint64(i))
-			_ = hll.UpdateSlice(bs)
+			for j := 0; j < iter; j++ {
+				binary.LittleEndian.PutUint64(bs, uint64(j))
+				_ = hll.UpdateSlice(bs)
+			}
 		}
 	})
 

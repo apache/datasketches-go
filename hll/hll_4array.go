@@ -100,6 +100,7 @@ func newHll4Array(lgConfigK int) hllArray {
 			kxq1:        0,
 			hllByteArr:  make([]byte, 1<<(lgConfigK-1)),
 			auxStart:    hllByteArrStart + 1<<(lgConfigK-1),
+			configKMask: (1 << lgConfigK) - 1,
 		},
 	}
 }
@@ -176,8 +177,7 @@ func convertToHll4(srcAbsHllArr hllArray) (hllSketchStateI, error) {
 // couponUpdate updates the Hll4Array with the given coupon and returns the updated Hll4Array.
 func (h *hll4ArrayImpl) couponUpdate(coupon int) (hllSketchStateI, error) {
 	newValue := coupon >> keyBits26
-	configKmask := (1 << h.lgConfigK) - 1
-	slotNo := coupon & configKmask
+	slotNo := coupon & h.configKMask
 	err := internalHll4Update(h, slotNo, newValue)
 	return h, err
 }

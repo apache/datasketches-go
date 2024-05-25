@@ -63,6 +63,8 @@ type hllArrayImpl struct {
 
 	auxHashMap *auxHashMap
 	auxStart   int //used for direct HLL4
+
+	configKMask int // mask from lgConfigK
 }
 
 // newHllArray returns a new hllArray of the given lgConfigK and tgtHllType.

@@ -82,6 +82,7 @@ func newHll6Array(lgConfigK int) hllArray {
 			kxq1:        0,
 			hllByteArr:  make([]byte, (((1<<lgConfigK)*3)>>2)+1),
 			auxStart:    hllByteArrStart + 1<<(lgConfigK-1),
+			configKMask: (1 << lgConfigK) - 1,
 		},
 	}
 }
@@ -96,8 +97,7 @@ func deserializeHll6(byteArray []byte) hllArray {
 
 func (h *hll6ArrayImpl) couponUpdate(coupon int) (hllSketchStateI, error) {
 	newValue := coupon >> keyBits26
-	configKmask := (1 << h.lgConfigK) - 1
-	slotNo := coupon & configKmask
+	slotNo := coupon & h.configKMask
 	err := h.updateSlotWithKxQ(slotNo, newValue)
 	return h, err
 }

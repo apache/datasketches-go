@@ -21,6 +21,8 @@ type hllSketchConfig struct { // extends hllSketchConfig
 	lgConfigK  int
 	tgtHllType TgtHllType
 	curMode    curMode
+
+	slotNoMask int // mask from lgConfigK to extract slotNo
 }
 
 func newHllSketchConfig(lgConfigK int, tgtHllType TgtHllType, curMode curMode) hllSketchConfig {
@@ -28,6 +30,7 @@ func newHllSketchConfig(lgConfigK int, tgtHllType TgtHllType, curMode curMode) h
 		lgConfigK:  lgConfigK,
 		tgtHllType: tgtHllType,
 		curMode:    curMode,
+		slotNoMask: (1 << lgConfigK) - 1,
 	}
 }
 

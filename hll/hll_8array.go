@@ -67,18 +67,14 @@ func (h *hll8ArrayImpl) ToUpdatableSlice() ([]byte, error) {
 func newHll8Array(lgConfigK int) hllArray {
 	return &hll8ArrayImpl{
 		hllArrayImpl: hllArrayImpl{
-			hllSketchConfig: hllSketchConfig{
-				lgConfigK:  lgConfigK,
-				tgtHllType: TgtHllTypeHll8,
-				curMode:    curModeHll,
-			},
-			curMin:      0,
-			numAtCurMin: 1 << lgConfigK,
-			hipAccum:    0,
-			kxq0:        float64(uint64(1 << lgConfigK)),
-			kxq1:        0,
-			hllByteArr:  make([]byte, 1<<lgConfigK),
-			auxStart:    hllByteArrStart + 1<<(lgConfigK-1),
+			hllSketchConfig: newHllSketchConfig(lgConfigK, TgtHllTypeHll8, curModeHll),
+			curMin:          0,
+			numAtCurMin:     1 << lgConfigK,
+			hipAccum:        0,
+			kxq0:            float64(uint64(1 << lgConfigK)),
+			kxq1:            0,
+			hllByteArr:      make([]byte, 1<<lgConfigK),
+			auxStart:        hllByteArrStart + 1<<(lgConfigK-1),
 		},
 	}
 }
@@ -122,8 +118,7 @@ func convertToHll8(srcAbsHllArr hllArray) (hllSketchStateI, error) {
 
 func (h *hll8ArrayImpl) couponUpdate(coupon int) (hllSketchStateI, error) {
 	newValue := coupon >> keyBits26
-	configKmask := (1 << h.lgConfigK) - 1
-	slotNo := coupon & configKmask
+	slotNo := coupon & h.slotNoMask
 	err := h.updateSlotWithKxQ(slotNo, newValue)
 	return h, err
 }

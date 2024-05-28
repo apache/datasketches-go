@@ -88,18 +88,14 @@ func (h *hll4ArrayImpl) copy() (hllSketchStateI, error) {
 func newHll4Array(lgConfigK int) hllArray {
 	return &hll4ArrayImpl{
 		hllArrayImpl: hllArrayImpl{
-			hllSketchConfig: hllSketchConfig{
-				lgConfigK:  lgConfigK,
-				tgtHllType: TgtHllTypeHll4,
-				curMode:    curModeHll,
-			},
-			curMin:      0,
-			numAtCurMin: 1 << lgConfigK,
-			hipAccum:    0,
-			kxq0:        float64(uint64(1 << lgConfigK)),
-			kxq1:        0,
-			hllByteArr:  make([]byte, 1<<(lgConfigK-1)),
-			auxStart:    hllByteArrStart + 1<<(lgConfigK-1),
+			hllSketchConfig: newHllSketchConfig(lgConfigK, TgtHllTypeHll4, curModeHll),
+			curMin:          0,
+			numAtCurMin:     1 << lgConfigK,
+			hipAccum:        0,
+			kxq0:            float64(uint64(1 << lgConfigK)),
+			kxq1:            0,
+			hllByteArr:      make([]byte, 1<<(lgConfigK-1)),
+			auxStart:        hllByteArrStart + 1<<(lgConfigK-1),
 		},
 	}
 }
@@ -176,8 +172,7 @@ func convertToHll4(srcAbsHllArr hllArray) (hllSketchStateI, error) {
 // couponUpdate updates the Hll4Array with the given coupon and returns the updated Hll4Array.
 func (h *hll4ArrayImpl) couponUpdate(coupon int) (hllSketchStateI, error) {
 	newValue := coupon >> keyBits26
-	configKmask := (1 << h.lgConfigK) - 1
-	slotNo := coupon & configKmask
+	slotNo := coupon & h.slotNoMask
 	err := internalHll4Update(h, slotNo, newValue)
 	return h, err
 }

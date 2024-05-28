@@ -377,10 +377,12 @@ func mergeHlltoHLLmode(src HllSketch, tgt HllSketch, srcLgK int, tgtLgK int) err
 		{
 			srcArr := src.(*hllSketchState).sketch.(*hll8ArrayImpl).hllByteArr
 			tgtArr := tgt.(*hllSketchState).sketch.(*hll8ArrayImpl).hllByteArr
-			for i := 0; i < srcK; i++ {
-				srcV := srcArr[i]
-				tgtV := tgtArr[i]
-				tgtArr[i] = max(srcV, tgtV)
+			// Hack to trigger the bound check only once on tgtArr
+			_ = tgtArr[len(srcArr)-1]
+			for i, srcV := range srcArr {
+				if srcV > tgtArr[i] {
+					tgtArr[i] = srcV
+				}
 			}
 		}
 	case 8, 9: //!HLL_8, srcLgK=tgtLgK, src=heap, tgt=heap/mem

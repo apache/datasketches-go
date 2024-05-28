@@ -420,3 +420,18 @@ func TestHLL4RawStoredOldNibbleAndShiftedNewValueAuxToken(t *testing.T) {
 	err := hll.UpdateUInt64(29197004)
 	assert.NoError(t, err)
 }
+
+func BenchmarkHLLMerge(b *testing.B) {
+	hll1, err := NewHllSketch(11, TgtHllTypeHll8)
+	for i := uint64(0); i < 29197004; i++ {
+		err = hll1.UpdateUInt64(i)
+		assert.NoError(b, err)
+	}
+	u, _ := NewUnion(11)
+
+	b.Run("merge", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			u.UpdateSketch(hll1)
+		}
+	})
+}

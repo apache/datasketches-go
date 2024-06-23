@@ -26,6 +26,8 @@ func TestCPCCheckUpdatesEstimate(t *testing.T) {
 	sk, err := NewCpcSketch(10, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, sk.getFormat(), format_empty_hip)
+	err = sk.Update(1)
+	assert.NoError(t, err)
 }
 
 /*

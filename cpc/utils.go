@@ -48,22 +48,29 @@ func checkLgK(lgK int) error {
 	return nil
 }
 
-func determineFlavor(lgK int, numCoupons int64) cpcFlavor {
+func checkLgSizeInts(lgSizeInts int) error {
+	if lgSizeInts < 2 || lgSizeInts > 26 {
+		return fmt.Errorf("Illegal LgSizeInts: %d", lgSizeInts)
+	}
+	return nil
+}
+
+func determineFlavor(lgK int, numCoupons uint64) cpcFlavor {
 	c := numCoupons
-	k := int64(1) << lgK
+	k := uint64(1) << lgK
 	c2 := c << 1
 	c8 := c << 3
 	c32 := c << 5
 	if c == 0 {
 		return flavor_empty //    0  == C <    1
 	}
-	if c32 < (int64(3) * k) {
+	if c32 < (3 * k) {
 		return flavor_sparse //    1  <= C <   3K/32
 	}
 	if c2 < k {
 		return flavor_hybrid // 3K/32 <= C <   K/2
 	}
-	if c8 < (int64(27) * k) {
+	if c8 < (27 * k) {
 		return flavor_pinned //   K/2 <= C < 27K/8
 	}
 	return flavor_sliding // 27K/8 <= C

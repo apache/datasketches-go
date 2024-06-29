@@ -21,7 +21,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/twmb/murmur3"
+	"math"
 	"math/bits"
+	"unsafe"
 )
 
 const (
@@ -61,10 +63,30 @@ func NewCpcSketch(lgK int, seed uint64) (*CpcSketch, error) {
 	}, nil
 }
 
-func (c *CpcSketch) Update(datum int64) error {
-	binary.LittleEndian.PutUint64(c.scratch[:], uint64(datum))
+func (c *CpcSketch) UpdateUint64(datum uint64) error {
+	binary.LittleEndian.PutUint64(c.scratch[:], datum)
 	hashLo, hashHi := hash(c.scratch[:], c.seed)
 	return c.hashUpdate(hashLo, hashHi)
+}
+
+func (c *CpcSketch) UpdateInt64(datum int64) error {
+	return c.UpdateUint64(uint64(datum))
+}
+
+func (c *CpcSketch) UpdateFloat64(datum float64) error {
+	binary.LittleEndian.PutUint64(c.scratch[:], math.Float64bits(datum))
+	hashLo, hashHi := hash(c.scratch[:], c.seed)
+	return c.hashUpdate(hashLo, hashHi)
+}
+
+func (c *CpcSketch) UpdateSlice(datum []byte) error {
+	hashLo, hashHi := hash(datum, c.seed)
+	return c.hashUpdate(hashLo, hashHi)
+}
+
+func (c *CpcSketch) UpdateString(datum string) error {
+	// get a slice to the string data (avoiding a copy to heap)
+	return c.UpdateSlice(unsafe.Slice(unsafe.StringData(datum), len(datum)))
 }
 
 func (c *CpcSketch) hashUpdate(hash0, hash1 uint64) error {

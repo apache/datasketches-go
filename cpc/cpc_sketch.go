@@ -20,6 +20,7 @@ package cpc
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/apache/datasketches-go/internal"
 	"github.com/twmb/murmur3"
 	"math"
 	"math/bits"
@@ -81,6 +82,11 @@ func (c *CpcSketch) UpdateFloat64(datum float64) error {
 
 func (c *CpcSketch) UpdateSlice(datum []byte) error {
 	hashLo, hashHi := hash(datum, c.seed)
+	return c.hashUpdate(hashLo, hashHi)
+}
+
+func (c *CpcSketch) UpdateInt64Slice(datum []int64) error {
+	hashLo, hashHi := internal.HashInt64SliceMurmur3(datum, 0, len(datum), c.seed)
 	return c.hashUpdate(hashLo, hashHi)
 }
 

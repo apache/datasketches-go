@@ -35,6 +35,9 @@ func TestCPCCheckUpdatesEstimate(t *testing.T) {
 	bytes := []byte{4, 4}
 	err = sk.UpdateSlice(bytes)
 	assert.NoError(t, err)
+
+	err = sk.UpdateInt64Slice([]int64{7})
+	assert.NoError(t, err)
 }
 
 /*

@@ -54,6 +54,49 @@ func HashInt64SliceMurmur3(key []int64, offsetLongs int, lengthLongs int, seed u
 	return hashState.finalMix128(k1, 0, uint64(lengthLongs)<<3)
 }
 
+func HashByteArrMurmur3(key []byte, offsetBytes int, lengthBytes int, seed uint64) (uint64, uint64) {
+	hashState := SimpleMurmur3{h1: seed, h2: seed}
+
+	// Number of full 128-bit blocks of 16 bytes.
+	// Possible exclusion of a remainder of up to 15 bytes.
+	nblocks := lengthBytes >> 4 //bytes / 16
+
+	// Process the 128-bit blocks (the body) into the hash
+	for i := 0; i < nblocks; i++ {
+		k1 := getUint64(key, offsetBytes+(i<<4), 8)   //0, 16, 32, ...
+		k2 := getUint64(key, offsetBytes+(i<<4)+8, 8) //8, 24, 40, ...
+		hashState.blockMix128(k1, k2)
+	}
+
+	// Get the tail index wrt hashed portion, remainder length
+	tail := nblocks << 4      // 16 bytes / block
+	rem := lengthBytes - tail // remainder bytes: 0,1,...,15
+
+	// Get the tail
+	k1 := uint64(0)
+	k2 := uint64(0)
+	if rem > 8 {
+		k1 = getUint64(key, offsetBytes+tail, 8)
+		k2 = getUint64(key, offsetBytes+tail+8, rem-8)
+	} else {
+		if rem != 0 {
+			k1 = getUint64(key, offsetBytes+tail, rem)
+		}
+	}
+
+	// Mix the tail into the hash and return
+	return hashState.finalMix128(k1, k2, uint64(lengthBytes))
+}
+
+func getUint64(bArr []byte, index int, rem int) uint64 {
+	var out uint64
+	for i := rem - 1; i >= 0; i-- { //i= 7,6,5,4,3,2,1,0
+		b := bArr[index+i]
+		out ^= uint64(b&0xFF) << uint(i*8) //equivalent to |=
+	}
+	return out
+}
+
 func mixK1(k1 uint64) uint64 {
 	k1 *= C1
 	k1 = (k1 << 31) | (k1 >> (64 - 31))

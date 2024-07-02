@@ -64,6 +64,27 @@ func NewCpcSketch(lgK int, seed uint64) (*CpcSketch, error) {
 	}, nil
 }
 
+func (c *CpcSketch) GetEstimate() float64 {
+	if c.mergeFlag {
+		return iconEstimate(c.lgK, c.numCoupons)
+	}
+	return c.hipEstAccum
+}
+
+func (c *CpcSketch) GetLowerBound(kappa int) float64 {
+	if c.mergeFlag {
+		return iconConfidenceLB(c.lgK, c.numCoupons, kappa)
+	}
+	return hipConfidenceLB(c.lgK, c.numCoupons, c.hipEstAccum, kappa)
+}
+
+func (c *CpcSketch) GetUpperBound(kappa int) float64 {
+	if c.mergeFlag {
+		return iconConfidenceUB(c.lgK, c.numCoupons, kappa)
+	}
+	return hipConfidenceUB(c.lgK, c.numCoupons, c.hipEstAccum, kappa)
+}
+
 func (c *CpcSketch) UpdateUint64(datum uint64) error {
 	binary.LittleEndian.PutUint64(c.scratch[:], datum)
 	hashLo, hashHi := hash(c.scratch[:], c.seed)
@@ -80,7 +101,7 @@ func (c *CpcSketch) UpdateFloat64(datum float64) error {
 	return c.hashUpdate(hashLo, hashHi)
 }
 
-func (c *CpcSketch) UpdateSlice(datum []byte) error {
+func (c *CpcSketch) UpdateByteSlice(datum []byte) error {
 	hashLo, hashHi := hash(datum, c.seed)
 	return c.hashUpdate(hashLo, hashHi)
 }
@@ -90,9 +111,19 @@ func (c *CpcSketch) UpdateInt64Slice(datum []int64) error {
 	return c.hashUpdate(hashLo, hashHi)
 }
 
+func (c *CpcSketch) UpdateInt32Slice(datum []int32) error {
+	hashLo, hashHi := internal.HashInt32SliceMurmur3(datum, 0, len(datum), c.seed)
+	return c.hashUpdate(hashLo, hashHi)
+}
+
+func (c *CpcSketch) UpdateCharSlice(datum []byte) error {
+	hashLo, hashHi := internal.HashCharSliceMurmur3(datum, 0, len(datum), c.seed)
+	return c.hashUpdate(hashLo, hashHi)
+}
+
 func (c *CpcSketch) UpdateString(datum string) error {
 	// get a slice to the string data (avoiding a copy to heap)
-	return c.UpdateSlice(unsafe.Slice(unsafe.StringData(datum), len(datum)))
+	return c.UpdateByteSlice(unsafe.Slice(unsafe.StringData(datum), len(datum)))
 }
 
 func (c *CpcSketch) hashUpdate(hash0, hash1 uint64) error {

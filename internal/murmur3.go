@@ -27,6 +27,75 @@ type SimpleMurmur3 struct {
 	h2 uint64
 }
 
+func HashCharSliceMurmur3(key []byte, offsetChars int, lengthChars int, seed uint64) (uint64, uint64) {
+	hashState := SimpleMurmur3{h1: seed, h2: seed}
+
+	// Number of full 128-bit blocks of 8 chars.
+	// Possible exclusion of a remainder of up to 7 chars.
+	nblocks := lengthChars >> 3 //chars / 8
+
+	// Process the 128-bit blocks (the body) into the hash
+	for i := 0; i < nblocks; i++ {
+		k1 := getUint64(key, offsetChars+(i<<3), 4)   //offsetChars + 0, 8, 16, ...
+		k2 := getUint64(key, offsetChars+(i<<3)+4, 4) //offsetChars + 4, 12, 20, ...
+		hashState.blockMix128(k1, k2)
+	}
+
+	// Get the tail index wrt hashed portion, remainder length
+	tail := nblocks << 3      // 8 chars per block
+	rem := lengthChars - tail // remainder chars: 0,1,2,3,4,5,6,7
+
+	// Get the tail
+	k1 := uint64(0)
+	k2 := uint64(0)
+	if rem > 4 {
+		k1 = getUint64(key, offsetChars+tail, 4)
+		k2 = getUint64(key, offsetChars+tail+4, rem-4)
+	} else {
+		if rem != 0 {
+			k1 = getUint64(key, offsetChars+tail, rem)
+		}
+	}
+
+	// Mix the tail into the hash and return
+	return hashState.finalMix128(k1, k2, uint64(lengthChars)<<1) //convert to bytes
+
+}
+
+func HashInt32SliceMurmur3(key []int32, offsetInts int, lengthInts int, seed uint64) (uint64, uint64) {
+	hashState := SimpleMurmur3{h1: seed, h2: seed}
+
+	// Number of full 128-bit blocks of 4 ints.
+	// Possible exclusion of a remainder of up to 3 ints.
+	nblocks := lengthInts >> 2 //ints / 4
+
+	// Process the 128-bit blocks (the body) into the hash
+	for i := 0; i < nblocks; i++ {
+		k1 := uint64(key[offsetInts+(i<<2)])   //offsetInts + 0, 4, 8, ...
+		k2 := uint64(key[offsetInts+(i<<2)+2]) //offsetInts + 2, 6, 10, ...
+		hashState.blockMix128(k1, k2)
+	}
+
+	// Get the tail index wrt hashed portion, remainder length
+	tail := nblocks << 2     // 4 ints per block
+	rem := lengthInts - tail // remainder ints: 0,1,2,3
+
+	// Get the tail
+	k1 := uint64(0)
+	k2 := uint64(0)
+	if rem > 2 {
+		k1 = uint64(key[offsetInts+tail]) //k2 -> whole; k1 -> partial
+		k2 = uint64(key[offsetInts+tail+2])
+	} else {
+		if rem != 0 {
+			k1 = uint64(key[offsetInts+tail]) //k1 -> whole(2), partial(1) or 0; k2 == 0
+		}
+	}
+
+	// Mix the tail into the hash and return
+	return hashState.finalMix128(k1, k2, uint64(lengthInts)<<2) //convert to bytes
+}
+
 func HashInt64SliceMurmur3(key []int64, offsetLongs int, lengthLongs int, seed uint64) (uint64, uint64) {
 	hashState := SimpleMurmur3{h1: seed, h2: seed}
 

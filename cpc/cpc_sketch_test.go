@@ -33,11 +33,20 @@ func TestCPCCheckUpdatesEstimate(t *testing.T) {
 	err = sk.UpdateString("3")
 	assert.NoError(t, err)
 	bytes := []byte{4, 4}
-	err = sk.UpdateSlice(bytes)
+	err = sk.UpdateByteSlice(bytes)
 	assert.NoError(t, err)
-
+	err = sk.UpdateCharSlice([]byte{5})
+	assert.NoError(t, err)
+	err = sk.UpdateInt32Slice([]int32{6})
+	assert.NoError(t, err)
 	err = sk.UpdateInt64Slice([]int64{7})
 	assert.NoError(t, err)
+	est := sk.GetEstimate()
+	lb := sk.GetLowerBound(2)
+	ub := sk.GetUpperBound(2)
+	assert.True(t, lb >= 0)
+	assert.True(t, lb <= est)
+	assert.True(t, est <= ub)
 }
 
 /*

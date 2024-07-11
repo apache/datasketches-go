@@ -56,18 +56,17 @@ func (p *pairTable) maybeInsert(item int) (bool, error) {
 	//rtAssert(shift > 0)
 	probe := item >> shift
 	//rtAssert((probe >= 0) && (probe <= mask))
-	arr := p.slotsArr
-	fetched := arr[probe]
+	fetched := p.slotsArr[probe]
 	for fetched != item && fetched != -1 {
 		probe = (probe + 1) & mask
-		fetched = arr[probe]
+		fetched = p.slotsArr[probe]
 	}
 	//END SHARED CODE
-	if fetched != item {
+	if fetched == item {
 		return false, nil
 	} else {
 		//assert (fetched == -1)
-		arr[probe] = item
+		p.slotsArr[probe] = item
 		p.numPairs++
 		for (upsizeDenom * p.numPairs) > (upsizeNumer * (1 << p.lgSizeInts)) {
 			if err := p.rebuild(p.lgSizeInts + 1); err != nil {

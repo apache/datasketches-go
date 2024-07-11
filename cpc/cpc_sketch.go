@@ -127,7 +127,7 @@ func (c *CpcSketch) UpdateString(datum string) error {
 }
 
 func (c *CpcSketch) hashUpdate(hash0, hash1 uint64) error {
-	col := 64 - bits.LeadingZeros64(hash1)
+	col := bits.LeadingZeros64(hash1)
 	if col < c.fiCol {
 		return nil // important speed optimization
 	}
@@ -186,14 +186,11 @@ func (c *CpcSketch) updateSparse(rowCol int) error {
 	}
 	if isNovel {
 		c.numCoupons++
-		// TODO (pierre)
-		//c.updateHIP(rowCol)
+		c.updateHIP(rowCol)
 		c32post := c.numCoupons << 5
 		if c32post >= (3 * k) {
-			// TODO (pierre)
-			// c.promoteSparseToWindowed() // C >= 3K/32
+			c.promoteSparseToWindowed() // C >= 3K/32
 		}
-
 	}
 	return nil
 }
@@ -228,6 +225,80 @@ func (c *CpcSketch) getFormat() cpcFormat {
 func (c *CpcSketch) getFlavor() cpcFlavor {
 	return determineFlavor(c.lgK, c.numCoupons)
 }
+
+func (c *CpcSketch) updateHIP(rowCol int) {
+	k := 1 << c.lgK
+	col := rowCol & 63
+	oneOverP := float64(k) / c.kxp
+	c.hipEstAccum += oneOverP
+	kxp, _ := internal.InvPow2(col + 1)
+	c.kxp -= kxp
+}
+
+func (c *CpcSketch) promoteSparseToWindowed() {
+	window := make([]byte, 1<<c.lgK)
+	newTable, _ := NewPairTable(2, 6+c.lgK)
+	oldTable := c.pairTable
+
+	oldSlots := oldTable.slotsArr
+	oldNumSlots := 1 << oldTable.lgSizeInts
+
+	for i := 0; i < oldNumSlots; i++ {
+		rowCol := oldSlots[i]
+		if rowCol != -1 {
+			col := rowCol & 63
+			if col < 8 {
+				row := rowCol >> 6
+				window[row] |= 1 << col
+			} else {
+				newTable.mustInsert(rowCol)
+			}
+		}
+	}
+
+	c.slidingWindow = window
+	c.pairTable = newTable
+}
+
+/*
+  //In terms of flavor, this promotes SPARSE to HYBRID.
+  private static void promoteSparseToWindowed(final CpcSketch sketch) {
+    final int lgK = sketch.lgK;
+    final int k = (1 << lgK);
+    final long c32 = sketch.numCoupons << 5;
+    assert ((c32 == (3 * k)) || ((lgK == 4) && (c32 > (3 * k))));
+
+    final byte[] window = new byte[k];
+
+    final PairTable newTable = new PairTable(2, 6 + lgK);
+    final PairTable oldTable = sketch.pairTable;
+
+    final int[] oldSlots = oldTable.getSlotsArr();
+    final int oldNumSlots = (1 << oldTable.getLgSizeInts());
+
+    assert (sketch.windowOffset == 0);
+
+    for (int i = 0; i < oldNumSlots; i++) {
+      final int rowCol = oldSlots[i];
+      if (rowCol != -1) {
+        final int col = rowCol & 63;
+        if (col < 8) {
+          final int  row = rowCol >>> 6;
+          window[row] |= (1 << col);
+        }
+        else {
+          // cannot use Table.mustInsert(), because it doesn't provide for growth
+          final boolean isNovel = PairTable.maybeInsert(newTable, rowCol);
+          assert (isNovel == true);
+        }
+      }
+    }
+
+    assert (sketch.slidingWindow == null);
+    sketch.slidingWindow = window;
+    sketch.pairTable = newTable;
+  }
+*/
 
 func (c *CpcSketch) reset() {
 	c.numCoupons = 0

@@ -19,26 +19,30 @@ package cpc
 
 import "fmt"
 
-type cpcFormat int
-type cpcFlavor int
+type CpcFormat int
+type CpcFlavor int
 
 const (
-	format_empty_merged               cpcFormat = 0
-	format_empty_hip                  cpcFormat = 1
-	format_sparse_hybrid_merged       cpcFormat = 2
-	format_sparce_hybrid_hip          cpcFormat = 3
-	format_pinned_sliding_merged_nosv cpcFormat = 4
-	format_pinned_sliding_hip_nosv    cpcFormat = 5
-	format_pinned_sliding_merged      cpcFormat = 6
-	format_pinned_sliding_hip         cpcFormat = 7
+	CpcformatEmptyMerged             CpcFormat = 0
+	CpcFormatEmptyHip                CpcFormat = 1
+	CpcFormatSparseHybridMerged      CpcFormat = 2
+	CpcFormatSparceHybridHip         CpcFormat = 3
+	CpcFormatPinnedSlidingMergedNosv CpcFormat = 4
+	CpcFormatPinnedSlidingHipNosv    CpcFormat = 5
+	CpcFormatPinnedSlidingMerged     CpcFormat = 6
+	CpcFormatPinnedSlidingHip        CpcFormat = 7
 )
 
 const (
-	flavor_empty   cpcFlavor = 0 //    0  == C <    1
-	flavor_sparse  cpcFlavor = 1 //    1  <= C <   3K/32
-	flavor_hybrid  cpcFlavor = 2 // 3K/32 <= C <   K/2
-	flavor_pinned  cpcFlavor = 3 //   K/2 <= C < 27K/8  [NB: 27/8 = 3 + 3/8]
-	flavor_sliding cpcFlavor = 4 // 27K/8 <= C
+	CpcFlavorEmpty   CpcFlavor = 0 //    0  == C <    1
+	CpcFlavorSparse  CpcFlavor = 1 //    1  <= C <   3K/32
+	CpcFlavorHybrid  CpcFlavor = 2 // 3K/32 <= C <   K/2
+	CpcFlavorPinned  CpcFlavor = 3 //   K/2 <= C < 27K/8  [NB: 27/8 = 3 + 3/8]
+	CpcFlavorSliding CpcFlavor = 4 // 27K/8 <= C
+)
+
+const (
+	CpcDefaultUpdateSeed = 9001
 )
 
 func checkLgK(lgK int) error {
@@ -55,23 +59,23 @@ func checkLgSizeInts(lgSizeInts int) error {
 	return nil
 }
 
-func determineFlavor(lgK int, numCoupons uint64) cpcFlavor {
+func determineFlavor(lgK int, numCoupons uint64) CpcFlavor {
 	c := numCoupons
 	k := uint64(1) << lgK
 	c2 := c << 1
 	c8 := c << 3
 	c32 := c << 5
 	if c == 0 {
-		return flavor_empty //    0  == C <    1
+		return CpcFlavorEmpty //    0  == C <    1
 	}
 	if c32 < (3 * k) {
-		return flavor_sparse //    1  <= C <   3K/32
+		return CpcFlavorSparse //    1  <= C <   3K/32
 	}
 	if c2 < k {
-		return flavor_hybrid // 3K/32 <= C <   K/2
+		return CpcFlavorHybrid // 3K/32 <= C <   K/2
 	}
 	if c8 < (27 * k) {
-		return flavor_pinned //   K/2 <= C < 27K/8
+		return CpcFlavorPinned //   K/2 <= C < 27K/8
 	}
-	return flavor_sliding // 27K/8 <= C
+	return CpcFlavorSliding // 27K/8 <= C
 }

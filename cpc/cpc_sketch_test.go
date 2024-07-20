@@ -25,7 +25,7 @@ import (
 func TestCPCCheckUpdatesEstimate(t *testing.T) {
 	sk, err := NewCpcSketch(10, 0)
 	assert.NoError(t, err)
-	assert.Equal(t, sk.getFormat(), format_empty_hip)
+	assert.Equal(t, sk.getFormat(), CpcFormatEmptyHip)
 	err = sk.UpdateUint64(1)
 	assert.NoError(t, err)
 	err = sk.UpdateFloat64(2.0)
@@ -50,33 +50,47 @@ func TestCPCCheckUpdatesEstimate(t *testing.T) {
 	assert.True(t, lb >= 0)
 	assert.True(t, lb <= est)
 	assert.True(t, est <= ub)
+	assert.Equal(t, sk.GetFlavor(), CpcFlavorSparse)
+	assert.Equal(t, sk.getFormat(), CpcFormatSparceHybridHip)
+}
+
+func TestCPCCheckEstimatesWithMerge(t *testing.T) {
+	lgk := 4
+	sk1, err := NewCpcSketch(lgk, CpcDefaultUpdateSeed)
+	assert.NoError(t, err)
+	sk2, err := NewCpcSketch(lgk, CpcDefaultUpdateSeed)
+	assert.NoError(t, err)
+	n := 1 << lgk
+	for i := 0; i < n; i++ {
+		err = sk1.UpdateUint64(uint64(i))
+		assert.NoError(t, err)
+		err = sk2.UpdateUint64(uint64(i + n))
+		assert.NoError(t, err)
+	}
 }
 
 /*
   @Test
-  public void checkUpdatesEstimate() {
-    final CpcSketch sk = new CpcSketch(10, 0);
-    println(sk.toString(true));
-    assertEquals(sk.getFormat(), Format.EMPTY_HIP);
-    sk.update(1L);
-    sk.update(2.0);
-    sk.update("3");
-    byte[] bytes = new byte[] { 4, 4 };
-    sk.update(bytes);
-    sk.update(ByteBuffer.wrap(bytes));  // same as previous
-    sk.update(ByteBuffer.wrap(bytes, 0, 1));
-    sk.update(new char[] { 5 });
-    sk.update(new int[] { 6 });
-    sk.update(new long[] { 7 });
-    final double est = sk.getEstimate();
-    final double lb = sk.getLowerBound(2);
-    final double ub = sk.getUpperBound(2);
+  public void checkEstimatesWithMerge() {
+    final int lgK = 4;
+    final CpcSketch sk1 = new CpcSketch(lgK);
+    final CpcSketch sk2 = new CpcSketch(lgK);
+    final int n = 1 << lgK;
+    for (int i = 0; i < n; i++ ) {
+      sk1.update(i);
+      sk2.update(i + n);
+    }
+    final CpcUnion union = new CpcUnion(lgK);
+    union.update(sk1);
+    union.update(sk2);
+    final CpcSketch result = union.getResult();
+    final double est = result.getEstimate();
+    final double lb = result.getLowerBound(2);
+    final double ub = result.getUpperBound(2);
     assertTrue(lb >= 0);
     assertTrue(lb <= est);
     assertTrue(est <= ub);
-    assertEquals(sk.getFlavor(), Flavor.SPARSE);
-    assertEquals(sk.getFormat(), Format.SPARSE_HYBRID_HIP);
-    println(sk.toString());
-    println(sk.toString(true));
+    assertTrue(result.validate());
+    println(result.toString(true));
   }
 */

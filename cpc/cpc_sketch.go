@@ -199,10 +199,10 @@ func hash(bs []byte, seed uint64) (uint64, uint64) {
 	return murmur3.SeedSum128(seed, seed, bs)
 }
 
-func (c *CpcSketch) getFormat() cpcFormat {
+func (c *CpcSketch) getFormat() CpcFormat {
 	ordinal := 0
-	f := c.getFlavor()
-	if f == flavor_hybrid || f == flavor_sparse {
+	f := c.GetFlavor()
+	if f == CpcFlavorHybrid || f == CpcFlavorSparse {
 		ordinal = 2
 		if !c.mergeFlag {
 			ordinal |= 1
@@ -219,10 +219,10 @@ func (c *CpcSketch) getFormat() cpcFormat {
 			ordinal |= 1
 		}
 	}
-	return cpcFormat(ordinal)
+	return CpcFormat(ordinal)
 }
 
-func (c *CpcSketch) getFlavor() cpcFlavor {
+func (c *CpcSketch) GetFlavor() CpcFlavor {
 	return determineFlavor(c.lgK, c.numCoupons)
 }
 

@@ -48,7 +48,7 @@ If you are interested in making contributions to this site please see our [Commu
 | 	            | CormodeItemsSketch<T>   | ❌ |
 | 	            | KllDoublesSketch        | ❌ |
 | 	            | KllFloatsSketch         | ❌ |
-| 	            | KllSketch<T>            | ❌ |
+| 	            | KllSketch<T>            | ⚠️ |
 | 	            | ReqFloatsSketch         | ❌ |
 | Frequencies  |              | ️ |
 |              | LongsSketch             | ⚠️ |
@@ -77,4 +77,4 @@ If you are interested in making contributions to this site please see our [Commu
 
 =================
 
-This code requires Go 1.21
+This code requires Go 1.22

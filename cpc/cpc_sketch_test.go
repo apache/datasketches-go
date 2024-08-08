@@ -67,6 +67,12 @@ func TestCPCCheckEstimatesWithMerge(t *testing.T) {
 		err = sk2.UpdateUint64(uint64(i + n))
 		assert.NoError(t, err)
 	}
+	union, err := NewCpcUnionSketchWithDefault(lgk)
+	assert.NoError(t, err)
+	err = union.Update(sk1)
+	assert.NoError(t, err)
+	err = union.Update(sk2)
+	assert.NoError(t, err)
 }
 
 /*

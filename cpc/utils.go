@@ -59,6 +59,13 @@ func checkLgSizeInts(lgSizeInts int) error {
 	return nil
 }
 
+func checkSeeds(seedA uint64, seedB uint64) error {
+	if seedA != seedB {
+		return fmt.Errorf("Incompatible seeds: %d %d", seedA, seedB)
+	}
+	return nil
+}
+
 func determineFlavor(lgK int, numCoupons uint64) CpcFlavor {
 	c := numCoupons
 	k := uint64(1) << lgK
@@ -78,4 +85,54 @@ func determineFlavor(lgK int, numCoupons uint64) CpcFlavor {
 		return CpcFlavorPinned //   K/2 <= C < 27K/8
 	}
 	return CpcFlavorSliding // 27K/8 <= C
+}
+
+func orMatrixIntoMatrix(destMatrix []uint64, destLgK int, srcMatrix []uint64, srcLgK int) {
+	//assert(destLgK <= srcLgK)
+	destMask := (1 << destLgK) - 1
+	srcK := 1 << srcLgK
+	for srcRow := 0; srcRow < srcK; srcRow++ {
+		destMatrix[srcRow&destMask] |= srcMatrix[srcRow]
+	}
+}
+
+func bitMatrixOfSketch(sketch CpcSketch) []uint64 {
+	k := uint64(1) << sketch.lgK
+	offset := sketch.windowOffset
+	if offset < 0 || offset > 56 {
+		panic("offset < 0 || offset > 56")
+	}
+	matrix := make([]uint64, k)
+	if sketch.numCoupons == 0 {
+		return matrix // Returning a matrix of zeros rather than NULL.
+	}
+	//Fill the matrix with default rows in which the "early zone" is filled with ones.
+	//This is essential for the routine's O(k) time cost (as opposed to O(C)).
+	defaultRow := (1 << offset) - 1
+	for i := range matrix {
+		matrix[i] = uint64(defaultRow)
+	}
+	if sketch.slidingWindow != nil { // In other words, we are in window mode, not sparse mode.
+		for i, v := range sketch.slidingWindow { // set the window bits, trusting the sketch's current offset.
+			matrix[i] |= (uint64(v) << offset)
+		}
+	}
+	table := sketch.pairTable
+	if table == nil {
+		panic("table == nil")
+	}
+	slots := table.slotsArr
+	numSlots := 1 << table.lgSizeInts
+	for i := 0; i < numSlots; i++ {
+		rowCol := slots[i]
+		if rowCol != -1 {
+			col := rowCol & 63
+			row := rowCol >> 6
+			// Flip the specified matrix bit from its default value.
+			// In the "early" zone the bit changes from 1 to 0.
+			// In the "late" zone the bit changes from 0 to 1.
+			matrix[row] ^= (1 << col)
+		}
+	}
+	return matrix
 }

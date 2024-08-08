@@ -52,12 +52,12 @@ type CpcSketch struct {
 	scratch [8]byte
 }
 
-func NewCpcSketch(lgK int, seed uint64) (*CpcSketch, error) {
+func NewCpcSketch(lgK int, seed uint64) (CpcSketch, error) {
 	if err := checkLgK(lgK); err != nil {
-		return nil, err
+		return CpcSketch{}, err
 	}
 
-	return &CpcSketch{
+	return CpcSketch{
 		lgK:  lgK,
 		seed: seed,
 		kxp:  float64(int64(1) << lgK),
@@ -260,46 +260,6 @@ func (c *CpcSketch) promoteSparseToWindowed() {
 	c.pairTable = newTable
 }
 
-/*
-  //In terms of flavor, this promotes SPARSE to HYBRID.
-  private static void promoteSparseToWindowed(final CpcSketch sketch) {
-    final int lgK = sketch.lgK;
-    final int k = (1 << lgK);
-    final long c32 = sketch.numCoupons << 5;
-    assert ((c32 == (3 * k)) || ((lgK == 4) && (c32 > (3 * k))));
-
-    final byte[] window = new byte[k];
-
-    final PairTable newTable = new PairTable(2, 6 + lgK);
-    final PairTable oldTable = sketch.pairTable;
-
-    final int[] oldSlots = oldTable.getSlotsArr();
-    final int oldNumSlots = (1 << oldTable.getLgSizeInts());
-
-    assert (sketch.windowOffset == 0);
-
-    for (int i = 0; i < oldNumSlots; i++) {
-      final int rowCol = oldSlots[i];
-      if (rowCol != -1) {
-        final int col = rowCol & 63;
-        if (col < 8) {
-          final int  row = rowCol >>> 6;
-          window[row] |= (1 << col);
-        }
-        else {
-          // cannot use Table.mustInsert(), because it doesn't provide for growth
-          final boolean isNovel = PairTable.maybeInsert(newTable, rowCol);
-          assert (isNovel == true);
-        }
-      }
-    }
-
-    assert (sketch.slidingWindow == null);
-    sketch.slidingWindow = window;
-    sketch.pairTable = newTable;
-  }
-*/
-
 func (c *CpcSketch) reset() {
 	c.numCoupons = 0
 	c.mergeFlag = false
@@ -309,4 +269,25 @@ func (c *CpcSketch) reset() {
 	c.pairTable = nil
 	c.kxp = float64(int64(1) << c.lgK)
 	c.hipEstAccum = 0
+}
+
+func (c *CpcSketch) rowColUpdate(rowCol int) error {
+	col := rowCol & 63
+	if col < c.fiCol {
+		return nil
+	}
+	if c.numCoupons == 0 {
+		err := c.promoteEmptyToSparse()
+		if err != nil {
+			return err
+		}
+	}
+	k := uint64(1) << c.lgK
+	if (c.numCoupons << 5) < (3 * k) {
+		return c.updateSparse(rowCol)
+	} else {
+		// TODO(pierre)
+		// return c.updateWindowed(rowCol)
+	}
+	return nil
 }

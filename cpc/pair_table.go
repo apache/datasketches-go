@@ -47,6 +47,13 @@ func NewPairTable(lgSizeInts, numValidBits int) (*pairTable, error) {
 	return &pairTable{lgSizeInts, validBits, numPairs, slotsArr}, nil
 }
 
+func (p *pairTable) clear() {
+	for i := range p.slotsArr {
+		p.slotsArr[i] = -1
+	}
+	p.numPairs = 0
+}
+
 func (p *pairTable) maybeInsert(item int) (bool, error) {
 	//SHARED CODE (implemented as a macro in C and expanded here)
 	lgSizeInts := p.lgSizeInts
@@ -76,6 +83,50 @@ func (p *pairTable) maybeInsert(item int) (bool, error) {
 		}
 		return true, nil
 	}
+}
+
+func (p *pairTable) maybeDelete(item int) (bool, error) {
+	lgSizeInts := p.lgSizeInts
+	sizeInts := 1 << lgSizeInts
+	mask := sizeInts - 1
+	shift := p.validBits - lgSizeInts
+	//rtAssert(shift > 0)
+	probe := item >> shift
+	//rtAssert((probe >= 0) && (probe <= mask))
+	arr := p.slotsArr
+	fetched := arr[probe]
+	for fetched != item && fetched != -1 {
+		probe = (probe + 1) & mask
+		fetched = arr[probe]
+	}
+	//END SHARED CODE
+	if fetched == -1 {
+		return false, nil
+	} else {
+		//assert (fetched == item)
+		// delete the item
+		arr[probe] = -1
+		p.numPairs--
+		// re-insert all items between the freed slot and the next empty slot
+		probe = (probe + 1) & mask
+		fetched = arr[probe]
+		for fetched != -1 {
+			arr[probe] = -1
+			if _, err := p.maybeInsert(fetched); err != nil {
+				return false, err
+			}
+			probe = (probe + 1) & mask
+			fetched = arr[probe]
+		}
+		// shrink if necessary
+		for (downsizeDenom*p.numPairs) < (downsizeNumer*(1<<p.lgSizeInts)) && p.lgSizeInts > 2 {
+			if err := p.rebuild(p.lgSizeInts - 1); err != nil {
+				return false, err
+			}
+		}
+		return true, nil
+	}
+
 }
 
 func (p *pairTable) mustInsert(item int) {

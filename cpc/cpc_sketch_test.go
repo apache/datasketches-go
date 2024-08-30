@@ -73,6 +73,14 @@ func TestCPCCheckEstimatesWithMerge(t *testing.T) {
 	assert.NoError(t, err)
 	err = union.Update(sk2)
 	assert.NoError(t, err)
+	result, err := union.GetResult()
+	assert.NoError(t, err)
+	est := result.GetEstimate()
+	lb := result.GetLowerBound(2)
+	ub := result.GetUpperBound(2)
+	assert.True(t, lb >= 0)
+	assert.True(t, lb <= est)
+	assert.True(t, est <= ub)
 }
 
 /*

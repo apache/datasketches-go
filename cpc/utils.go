@@ -17,7 +17,11 @@
 
 package cpc
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/apache/datasketches-go/internal"
+	"math/bits"
+)
 
 type CpcFormat int
 type CpcFlavor int
@@ -43,6 +47,10 @@ const (
 
 const (
 	CpcDefaultUpdateSeed = 9001
+)
+
+var (
+	kxpByteLookup = makeKxpByteLookup()
 )
 
 func checkLgK(lgK int) error {
@@ -135,4 +143,63 @@ func bitMatrixOfSketch(sketch CpcSketch) []uint64 {
 		}
 	}
 	return matrix
+}
+
+func countBitsSetInMatrix(matrix []uint64) uint64 {
+	count := uint64(0)
+	for _, v := range matrix {
+		count += uint64(bits.OnesCount64(v))
+	}
+	return count
+}
+
+func determineCorrectOffset(lgK int, numCoupons uint64) int {
+	c := numCoupons
+	k := uint64(1) << lgK
+	tmp := (c << 3) - (19 * k) // 8C - 19K
+	if tmp < 0 {
+		return 0
+	}
+	return int(tmp >> (lgK + 3)) // tmp / 8K
+
+}
+
+func walkTableUpdatingSketch(dest *CpcSketch, table *pairTable) error {
+	slots := table.slotsArr
+	numSlots := 1 << table.lgSizeInts
+	destMask := ((1<<dest.lgK)-1)<<6 | 63 // downsamples when dest.lgK < srcLgK
+
+	stride := int(internal.InverseGolden * float64(numSlots))
+	if stride == (stride >> 1 << 1) {
+		stride++
+	}
+
+	for i, j := 0, 0; i < numSlots; i, j = i+1, j+stride {
+		j &= numSlots - 1
+		rowCol := slots[j]
+		if rowCol != -1 {
+			if err := dest.rowColUpdate(rowCol & destMask); err != nil {
+				return err
+			}
+		}
+
+	}
+
+	return nil
+}
+
+func makeKxpByteLookup() []float64 {
+	lookup := make([]float64, 256)
+	for b := 0; b < 256; b++ {
+		sum := 0.0
+		for col := 0; col < 8; col++ {
+			bit := (b >> col) & 1
+			if bit == 0 {
+				sumI, _ := internal.InvPow2(col + 1)
+				sum += sumI
+			}
+		}
+		lookup[b] = sum
+	}
+	return lookup
 }

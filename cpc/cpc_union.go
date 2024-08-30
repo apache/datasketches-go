@@ -20,6 +20,7 @@ package cpc
 import (
 	"fmt"
 	"github.com/apache/datasketches-go/internal"
+	"math/bits"
 )
 
 type CpcUnion struct {
@@ -74,6 +75,51 @@ func (u *CpcUnion) Update(source CpcSketch) error {
 		if err := u.reduceUnionK(source.lgK); err != nil {
 			return err
 		}
+	}
+
+	// if source is past SPARSE mode, make sure that union is a bitMatrix.
+	if sourceFlavorOrd > CpcFlavorSparse && u.accumulator.lgK != 0 {
+		u.bitMatrix = bitMatrixOfSketch(u.accumulator)
+		u.accumulator = CpcSketch{}
+	}
+
+	state := (sourceFlavorOrd - 1) << 1
+	if u.bitMatrix != nil {
+		state |= 1
+	}
+
+	switch state {
+	case 0: //A: Sparse, bitMatrix == nil, accumulator valid
+		if u.accumulator.lgK == 0 {
+			return fmt.Errorf("union accumulator cannot be nil")
+		}
+		if u.accumulator.GetFlavor() == CpcFlavorEmpty && u.lgK == source.lgK {
+			u.accumulator = source
+			break
+		}
+		if err := walkTableUpdatingSketch(&u.accumulator, source.pairTable); err != nil {
+			return err
+		}
+		// if the accumulator has graduated beyond sparse, switch union to a bitMatrix
+		if u.accumulator.GetFlavor() > CpcFlavorSparse {
+			bitMatrix := bitMatrixOfSketch(u.accumulator)
+			u.bitMatrix = bitMatrix
+			u.accumulator = CpcSketch{}
+		}
+	case 1: //B: Sparse, bitMatrix valid, accumulator == nil
+		panic("not implemented")
+	case 3, 5:
+		//C: Hybrid, bitMatrix valid, accumulator == nil
+		//C: Pinned, bitMatrix valid, accumulator == nil
+		u.orWindowIntoMatrix(source.slidingWindow, source.windowOffset, source.lgK)
+		u.orTableIntoMatrix(source.pairTable)
+	case 7: //D: Sliding, bitMatrix valid, accumulator == null
+		// SLIDING mode involves inverted logic, so we can't just walk the source sketch.
+		// Instead, we convert it to a bitMatrix that can be OR'ed into the destination.
+		sourceMatrix := bitMatrixOfSketch(source)
+		u.orMatrixIntoMatrix(sourceMatrix, source.lgK)
+	default:
+		return fmt.Errorf("illegal Union state: %d", state)
 	}
 
 	/*
@@ -140,6 +186,99 @@ func (u *CpcUnion) Update(source CpcSketch) error {
 	return nil
 }
 
+func (u *CpcUnion) GetResult() (CpcSketch, error) {
+	if err := u.checkUnionState(); err != nil {
+		return CpcSketch{}, err
+	}
+
+	if u.lgK != 0 { // start of case where union contains a sketch
+		if u.accumulator.numCoupons == 0 {
+			result, err := NewCpcSketch(u.lgK, u.accumulator.seed)
+			if err != nil {
+				return CpcSketch{}, err
+			}
+			result.mergeFlag = true
+			return result, nil
+		}
+		if u.accumulator.GetFlavor() != CpcFlavorSparse {
+			return CpcSketch{}, fmt.Errorf("accumulator must be SPARSE")
+		}
+		result := u.accumulator // effectively a copy
+		result.mergeFlag = true
+		return result, nil
+	} // end of case where union contains a sketch
+
+	// start of case where union contains a bitMatrix
+	matrix := u.bitMatrix
+	lgK := u.lgK
+	result, err := NewCpcSketch(u.lgK, u.seed)
+	if err != nil {
+		return CpcSketch{}, err
+	}
+
+	numCoupons := countBitsSetInMatrix(matrix)
+	result.numCoupons = numCoupons
+
+	flavor := determineFlavor(lgK, numCoupons)
+	if flavor <= CpcFlavorSparse {
+		return CpcSketch{}, fmt.Errorf("flavor must be greater than SPARSE")
+	}
+
+	offset := determineCorrectOffset(lgK, numCoupons)
+	result.windowOffset = offset
+
+	//Build the window and pair table
+	k := 1 << lgK
+	window := make([]byte, k)
+	result.slidingWindow = window
+
+	// LgSize = K/16; in some cases this will end up being oversized
+	newTableLgSize := max(lgK-4, 2)
+	table, err := NewPairTable(newTableLgSize, 6+lgK)
+	if err != nil {
+		return CpcSketch{}, err
+	}
+	result.pairTable = table
+
+	// The following works even when the offset is zero.
+	maskForClearingWindow := (0xFF << offset) ^ -1
+	maskForFlippingEarlyZone := (1 << offset) - 1
+	allSurprisesORed := uint64(0)
+
+	// Using a sufficiently large hash table avoids the Snow Plow Effect
+	for i := 0; i < k; i++ {
+		pattern := matrix[i]
+		window[i] = byte((pattern >> offset) & 0xFF)
+		pattern &= uint64(maskForClearingWindow)
+		pattern ^= uint64(maskForFlippingEarlyZone) // This flipping converts surprising 0's to 1's.
+		allSurprisesORed |= pattern
+		for pattern != 0 {
+			col := bits.TrailingZeros64(pattern)
+			pattern ^= 1 << col // erase the 1.
+			rowCol := (i << 6) | col
+			isNovel, err := table.maybeInsert(rowCol)
+			if err != nil {
+				return CpcSketch{}, err
+			}
+			if !isNovel {
+				return CpcSketch{}, fmt.Errorf("isNovel must be true")
+			}
+		}
+	}
+
+	// At this point we could shrink an oversize hash table, but the relative waste isn't very big.
+	result.fiCol = bits.TrailingZeros64(allSurprisesORed)
+	if result.fiCol > offset {
+		result.fiCol = offset
+	} // corner case
+
+	// NB: the HIP-related fields will contain bogus values, but that is okay.
+
+	result.mergeFlag = true
+	return result, nil
+	// end of case where union contains a bitMatrix
+}
+
 func (u *CpcUnion) checkUnionState() error {
 	if u == nil {
 		return fmt.Errorf("union cannot be nil")
@@ -151,7 +290,7 @@ func (u *CpcUnion) checkUnionState() error {
 	if u.accumulator.lgK != 0 { // not nil
 		if u.accumulator.numCoupons > 0 {
 			if u.accumulator.slidingWindow != nil || u.accumulator.pairTable == nil {
-				return fmt.Errorf("Non-empty union accumulator must be SPARSE")
+				return fmt.Errorf("non-empty union accumulator must be SPARSE")
 			}
 		}
 		if u.lgK != u.accumulator.lgK {
@@ -205,26 +344,41 @@ func (u *CpcUnion) reduceUnionK(newLgK int) error {
 	return nil
 }
 
-func walkTableUpdatingSketch(dest *CpcSketch, table *pairTable) error {
-	slots := table.slotsArr
-	numSlots := 1 << table.lgSizeInts
-	destMask := ((1<<dest.lgK)-1)<<6 | 63 // downsamples when dest.lgK < srcLgK
-
-	stride := int(internal.InverseGolden * float64(numSlots))
-	if stride == (stride >> 1 << 1) {
-		stride++
+func (u *CpcUnion) orWindowIntoMatrix(srcWindow []byte, srcOffset int, srcLgK int) {
+	//assert(destLgK <= srcLgK)
+	if u.lgK > srcLgK {
+		panic("destLgK <= srcLgK")
 	}
+	destMask := (1 << u.lgK) - 1 // downsamples when destlgK < srcLgK
+	srcK := 1 << srcLgK
+	for srcRow := 0; srcRow < srcK; srcRow++ {
+		u.bitMatrix[srcRow&destMask] |= (uint64(srcWindow[srcRow]) << srcOffset)
+	}
+}
 
-	for i, j := 0, 0; i < numSlots; i, j = i+1, j+stride {
-		j &= numSlots - 1
-		rowCol := slots[j]
+func (u *CpcUnion) orTableIntoMatrix(srcTable *pairTable) {
+	slots := srcTable.slotsArr
+	numSlots := 1 << srcTable.lgSizeInts
+	destMask := (1 << u.lgK) - 1 // downsamples when destlgK < srcLgK
+	for i := 0; i < numSlots; i++ {
+		rowCol := slots[i]
 		if rowCol != -1 {
-			if err := dest.rowColUpdate(rowCol & destMask); err != nil {
-				return err
-			}
+			col := rowCol & 63
+			row := rowCol >> 6
+			u.bitMatrix[row&destMask] |= (1 << col) // Set the bit.
 		}
 
 	}
+}
 
-	return nil
+func (u *CpcUnion) orMatrixIntoMatrix(srcMatrix []uint64, srcLgK int) {
+	if u.lgK > srcLgK {
+		panic("destLgK <= srcLgK")
+	}
+	destMask := (1 << u.lgK) - 1 // downsamples when destlgK < srcLgK
+	srcK := 1 << srcLgK
+	for srcRow := 0; srcRow < srcK; srcRow++ {
+		u.bitMatrix[srcRow&destMask] |= srcMatrix[srcRow]
+	}
+
 }

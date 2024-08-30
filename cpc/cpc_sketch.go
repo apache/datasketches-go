@@ -154,11 +154,8 @@ func (c *CpcSketch) hashUpdate(hash0, hash1 uint64) error {
 
 	if (c.numCoupons << 5) < (uint64(3) * k) {
 		return c.updateSparse(rowCol)
-	} else {
-		// TODO(pierre)
-		// return c.updateWindowed(rowCol)
 	}
-	return nil
+	return c.updateWindowed(rowCol)
 }
 
 func (c *CpcSketch) promoteEmptyToSparse() error {
@@ -194,6 +191,109 @@ func (c *CpcSketch) updateSparse(rowCol int) error {
 	}
 	return nil
 }
+
+func (c *CpcSketch) updateWindowed(rowCol int) error {
+	if c.windowOffset < 0 || c.windowOffset > 56 {
+		return fmt.Errorf("windowOffset < 0 || windowOffset > 56")
+	}
+	k := uint64(1) << c.lgK
+	c32pre := c.numCoupons << 5
+	if c32pre < (3 * k) {
+		return fmt.Errorf("C < 3K/32")
+	}
+	c8pre := uint64(c.numCoupons << 3)
+	w8pre := uint64(c.windowOffset << 3)
+	if c8pre >= ((uint64(27) + w8pre) * k) {
+		return fmt.Errorf("C >= (K * 27/8) + (K * windowOffset)")
+	}
+
+	isNovel := false //novel if new coupon
+	err := error(nil)
+	col := rowCol & 63
+
+	if col < c.windowOffset { // track the surprising 0's "before" the window
+		isNovel, err = c.pairTable.maybeDelete(rowCol)
+		if err != nil {
+			return err
+		}
+	} else if col < (c.windowOffset + 8) { // track the 8 bits inside the window
+		row := rowCol >> 6
+		oldBits := c.slidingWindow[row]
+		newBits := oldBits | (1 << (col - c.windowOffset))
+		if newBits != oldBits {
+			c.slidingWindow[row] = newBits
+			isNovel = true
+		}
+	} else { // track the surprising 1's "after" the window
+		isNovel, err = c.pairTable.maybeInsert(rowCol)
+		if err != nil {
+			return err
+		}
+	}
+
+	if isNovel {
+		c.numCoupons++
+		c.updateHIP(rowCol)
+		c8post := c.numCoupons << 3
+		if c8post >= ((27 + w8pre) * k) {
+			c.modifyOffset(c.windowOffset + 1)
+			if c.windowOffset < 1 || c.windowOffset > 56 {
+				return fmt.Errorf("windowOffset < 1 || windowOffset > 56")
+			}
+			w8post := uint64(c.windowOffset << 3)
+			if c8post >= ((uint64(27) + w8post) * k) {
+				return fmt.Errorf("C < (K * 27/8) + (K * windowOffset)")
+			}
+		}
+
+	}
+	return nil
+}
+
+/*
+private static void updateWindowed(final CpcSketch sketch, final int rowCol) {
+    assert ((sketch.windowOffset >= 0) && (sketch.windowOffset <= 56));
+    final int k = 1 << sketch.lgK;
+    final long c32pre = sketch.numCoupons << 5;
+    assert c32pre >= (3L * k); // C < 3K/32, in other words flavor >= HYBRID
+    final long c8pre = sketch.numCoupons << 3;
+    final int w8pre = sketch.windowOffset << 3;
+    assert c8pre < ((27L + w8pre) * k); // C < (K * 27/8) + (K * windowOffset)
+
+    boolean isNovel = false; //novel if new coupon
+    final int col = rowCol & 63;
+
+    if (col < sketch.windowOffset) { // track the surprising 0's "before" the window
+      isNovel = PairTable.maybeDelete(sketch.pairTable, rowCol); // inverted logic
+    }
+    else if (col < (sketch.windowOffset + 8)) { // track the 8 bits inside the window
+      assert (col >= sketch.windowOffset);
+      final int row = rowCol >>> 6;
+      final byte oldBits = sketch.slidingWindow[row];
+      final byte newBits = (byte) (oldBits | (1 << (col - sketch.windowOffset)));
+      if (newBits != oldBits) {
+        sketch.slidingWindow[row] = newBits;
+        isNovel = true;
+      }
+    }
+    else { // track the surprising 1's "after" the window
+      assert col >= (sketch.windowOffset + 8);
+      isNovel = PairTable.maybeInsert(sketch.pairTable, rowCol); // normal logic
+    }
+
+    if (isNovel) {
+      sketch.numCoupons += 1;
+      updateHIP(sketch, rowCol);
+      final long c8post = sketch.numCoupons << 3;
+      if (c8post >= ((27L + w8pre) * k)) {
+        modifyOffset(sketch, sketch.windowOffset + 1);
+        assert (sketch.windowOffset >= 1) && (sketch.windowOffset <= 56);
+        final int w8post = sketch.windowOffset << 3;
+        assert c8post < ((27L + w8post) * k); // C < (K * 27/8) + (K * windowOffset)
+      }
+    }
+  }
+*/
 
 func hash(bs []byte, seed uint64) (uint64, uint64) {
 	return murmur3.SeedSum128(seed, seed, bs)
@@ -290,4 +390,69 @@ func (c *CpcSketch) rowColUpdate(rowCol int) error {
 		// return c.updateWindowed(rowCol)
 	}
 	return nil
+}
+
+func (c *CpcSketch) modifyOffset(newOffset int) error {
+	if newOffset < 0 || newOffset > 56 {
+		return fmt.Errorf("newOffset < 0 || newOffset > 56")
+	}
+	if newOffset != (c.windowOffset + 1) {
+		return fmt.Errorf("newOffset != (c.windowOffset + 1)")
+	}
+	if c.slidingWindow == nil || c.pairTable == nil {
+		return fmt.Errorf("slidingWindow == nil || pairTable == nil")
+	}
+	k := 1 << c.lgK
+	bitMatrix := bitMatrixOfSketch(*c)
+	if (newOffset & 0x7) == 0 {
+		c.refreshKXP(bitMatrix)
+	}
+	c.pairTable.clear()
+	maskForClearingWindow := (0xFF << newOffset) ^ -1
+	maskForFlippingEarlyZone := (1 << newOffset) - 1
+	allSurprisesORed := uint64(0)
+	for i := 0; i < k; i++ {
+		pattern := bitMatrix[i]
+		c.slidingWindow[i] = byte((pattern >> newOffset) & 0xFF)
+		pattern &= uint64(maskForClearingWindow)
+		pattern ^= uint64(maskForFlippingEarlyZone)
+		allSurprisesORed |= pattern
+		for pattern != 0 {
+			col := bits.TrailingZeros64(pattern)
+			pattern ^= 1 << col
+			rowCol := (i << 6) | col
+			isNovel, err := c.pairTable.maybeInsert(rowCol)
+			if err != nil {
+				return err
+			}
+			if !isNovel {
+				return nil
+			}
+		}
+	}
+	c.windowOffset = newOffset
+	c.fiCol = bits.TrailingZeros64(allSurprisesORed)
+	if c.fiCol > newOffset {
+		c.fiCol = newOffset
+	}
+	return nil
+}
+
+func (c *CpcSketch) refreshKXP(bitMatrix []uint64) {
+	k := 1 << c.lgK
+	byteSums := make([]float64, 8)
+	for i := 0; i < k; i++ {
+		row := bitMatrix[i]
+		for j := 0; j < 8; j++ {
+			byteIdx := int(row & 0xFF)
+			byteSums[j] += kxpByteLookup[byteIdx]
+			row >>= 8
+		}
+	}
+	total := 0.0
+	for j := 7; j >= 0; j-- {
+		factor, _ := internal.InvPow2(8 * j)
+		total += factor * byteSums[j]
+	}
+	c.kxp = total
 }

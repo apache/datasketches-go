@@ -122,6 +122,9 @@ func (c *CpcSketch) UpdateCharSlice(datum []byte) error {
 }
 
 func (c *CpcSketch) UpdateString(datum string) error {
+	if len(datum) == 0 {
+		return nil
+	}
 	// get a slice to the string data (avoiding a copy to heap)
 	return c.UpdateByteSlice(unsafe.Slice(unsafe.StringData(datum), len(datum)))
 }

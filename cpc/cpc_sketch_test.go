@@ -83,28 +83,71 @@ func TestCPCCheckEstimatesWithMerge(t *testing.T) {
 	assert.True(t, est <= ub)
 }
 
+func TestCPCCheckCornerCaseUpdates(t *testing.T) {
+	lgK := 4
+	sk, err := NewCpcSketch(lgK, CpcDefaultUpdateSeed)
+	assert.NoError(t, err)
+	err = sk.UpdateFloat64(0.0)
+	assert.NoError(t, err)
+	err = sk.UpdateFloat64(-0.0)
+	assert.NoError(t, err)
+	assert.Equal(t, sk.GetEstimate(), float64(1))
+	err = sk.UpdateString("")
+	assert.NoError(t, err)
+	assert.Equal(t, sk.GetEstimate(), float64(1))
+}
+
 /*
-  @Test
-  public void checkEstimatesWithMerge() {
+@Test
+  public void checkCornerCaseUpdates() {
     final int lgK = 4;
-    final CpcSketch sk1 = new CpcSketch(lgK);
-    final CpcSketch sk2 = new CpcSketch(lgK);
-    final int n = 1 << lgK;
-    for (int i = 0; i < n; i++ ) {
-      sk1.update(i);
-      sk2.update(i + n);
-    }
-    final CpcUnion union = new CpcUnion(lgK);
-    union.update(sk1);
-    union.update(sk2);
-    final CpcSketch result = union.getResult();
-    final double est = result.getEstimate();
-    final double lb = result.getLowerBound(2);
-    final double ub = result.getUpperBound(2);
-    assertTrue(lb >= 0);
-    assertTrue(lb <= est);
-    assertTrue(est <= ub);
-    assertTrue(result.validate());
-    println(result.toString(true));
+    final CpcSketch sk = new CpcSketch(lgK);
+    sk.update(0.0);
+    sk.update(-0.0);
+    int est = (int) Math.round(sk.getEstimate());
+    assertEquals(est, 1);
+    String s = null;
+    sk.update(s);
+    s = "";
+    sk.update(s);
+    est = (int) Math.round(sk.getEstimate());
+    assertEquals(est, 1);
+
+    byte[] barr = null;
+    sk.update(barr);
+    est = (int) Math.round(sk.getEstimate());
+    assertEquals(est, 1);
+    barr = new byte[0];
+    sk.update(barr);
+    est = (int) Math.round(sk.getEstimate());
+    assertEquals(est, 1);
+
+    char[] carr = null;
+    sk.update(carr);
+    est = (int) Math.round(sk.getEstimate());
+    assertEquals(est, 1);
+    carr = new char[0];
+    sk.update(carr);
+    est = (int) Math.round(sk.getEstimate());
+    assertEquals(est, 1);
+
+    int[] iarr = null;
+    sk.update(iarr);
+    est = (int) Math.round(sk.getEstimate());
+    assertEquals(est, 1);
+    iarr = new int[0];
+    sk.update(iarr);
+    est = (int) Math.round(sk.getEstimate());
+    assertEquals(est, 1);
+
+    long[] larr = null;
+    sk.update(larr);
+    est = (int) Math.round(sk.getEstimate());
+    assertEquals(est, 1);
+    larr = new long[0];
+    sk.update(larr);
+    est = (int) Math.round(sk.getEstimate());
+    assertEquals(est, 1);
   }
+
 */

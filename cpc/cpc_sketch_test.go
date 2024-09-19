@@ -95,6 +95,10 @@ func TestCPCCheckCornerCaseUpdates(t *testing.T) {
 	err = sk.UpdateString("")
 	assert.NoError(t, err)
 	assert.Equal(t, sk.GetEstimate(), float64(1))
+
+	err = sk.UpdateByteSlice(nil)
+	assert.NoError(t, err)
+	assert.Equal(t, sk.GetEstimate(), float64(1))
 }
 
 /*

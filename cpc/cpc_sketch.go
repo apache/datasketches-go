@@ -110,16 +110,25 @@ func (c *CpcSketch) UpdateByteSlice(datum []byte) error {
 }
 
 func (c *CpcSketch) UpdateInt64Slice(datum []int64) error {
+	if len(datum) == 0 {
+		return nil
+	}
 	hashLo, hashHi := internal.HashInt64SliceMurmur3(datum, 0, len(datum), c.seed)
 	return c.hashUpdate(hashLo, hashHi)
 }
 
 func (c *CpcSketch) UpdateInt32Slice(datum []int32) error {
+	if len(datum) == 0 {
+		return nil
+	}
 	hashLo, hashHi := internal.HashInt32SliceMurmur3(datum, 0, len(datum), c.seed)
 	return c.hashUpdate(hashLo, hashHi)
 }
 
 func (c *CpcSketch) UpdateCharSlice(datum []byte) error {
+	if len(datum) == 0 {
+		return nil
+	}
 	hashLo, hashHi := internal.HashCharSliceMurmur3(datum, 0, len(datum), c.seed)
 	return c.hashUpdate(hashLo, hashHi)
 }

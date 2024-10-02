@@ -38,7 +38,7 @@ func TestCPCCheckUpdatesEstimate(t *testing.T) {
 	bytes2 := []byte{4}
 	err = sk.UpdateByteSlice(bytes2)
 	assert.NoError(t, err)
-	err = sk.UpdateCharSlice([]byte{5})
+	err = sk.UpdateByteSlice([]byte{5})
 	assert.NoError(t, err)
 	err = sk.UpdateInt32Slice([]int32{6})
 	assert.NoError(t, err)
@@ -117,12 +117,4 @@ func TestCPCCheckCornerCaseUpdates(t *testing.T) {
 	emptyInt64Slice := make([]int64, 0)
 	err = sk.UpdateInt64Slice(emptyInt64Slice)
 	assert.NoError(t, err)
-
-	err = sk.UpdateCharSlice(nil)
-	assert.NoError(t, err)
-	assert.Equal(t, sk.GetEstimate(), float64(1))
-	emptyCharSlice := make([]byte, 0)
-	err = sk.UpdateCharSlice(emptyCharSlice)
-	assert.NoError(t, err)
-	assert.Equal(t, sk.GetEstimate(), float64(1))
 }

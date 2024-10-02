@@ -101,14 +101,6 @@ func (c *CpcSketch) UpdateFloat64(datum float64) error {
 	return c.hashUpdate(hashLo, hashHi)
 }
 
-func (c *CpcSketch) UpdateByteSlice(datum []byte) error {
-	if len(datum) == 0 {
-		return nil
-	}
-	hashLo, hashHi := hash(datum, c.seed)
-	return c.hashUpdate(hashLo, hashHi)
-}
-
 func (c *CpcSketch) UpdateInt64Slice(datum []int64) error {
 	if len(datum) == 0 {
 		return nil
@@ -125,7 +117,7 @@ func (c *CpcSketch) UpdateInt32Slice(datum []int32) error {
 	return c.hashUpdate(hashLo, hashHi)
 }
 
-func (c *CpcSketch) UpdateCharSlice(datum []byte) error {
+func (c *CpcSketch) UpdateByteSlice(datum []byte) error {
 	if len(datum) == 0 {
 		return nil
 	}

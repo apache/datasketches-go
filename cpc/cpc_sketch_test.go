@@ -118,3 +118,18 @@ func TestCPCCheckCornerCaseUpdates(t *testing.T) {
 	err = sk.UpdateInt64Slice(emptyInt64Slice)
 	assert.NoError(t, err)
 }
+
+func TestCPCCheckLgK(t *testing.T) {
+	sk, err := NewCpcSketch(10, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, sk.lgK, 10)
+	_, err = NewCpcSketch(3, 0)
+	assert.Error(t, err)
+}
+
+func TestCPCcheckIconHipUBLBLg15(t *testing.T) {
+	iconConfidenceUB(15, 1, 2)
+	iconConfidenceLB(15, 1, 2)
+	hipConfidenceUB(15, 1, 1.0, 2)
+	hipConfidenceLB(15, 1, 1.0, 2)
+}

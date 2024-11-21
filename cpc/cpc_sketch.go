@@ -52,6 +52,10 @@ type CpcSketch struct {
 	scratch [8]byte
 }
 
+func NewCpcSketchWithDefault() (CpcSketch, error) {
+	return NewCpcSketch(defaultLgK, internal.DEFAULT_UPDATE_SEED)
+}
+
 func NewCpcSketch(lgK int, seed uint64) (CpcSketch, error) {
 	if err := checkLgK(lgK); err != nil {
 		return CpcSketch{}, err
@@ -121,7 +125,7 @@ func (c *CpcSketch) UpdateByteSlice(datum []byte) error {
 	if len(datum) == 0 {
 		return nil
 	}
-	hashLo, hashHi := internal.HashCharSliceMurmur3(datum, 0, len(datum), c.seed)
+	hashLo, hashHi := murmur3.SeedSum128(c.seed, c.seed, datum)
 	return c.hashUpdate(hashLo, hashHi)
 }
 
@@ -243,7 +247,9 @@ func (c *CpcSketch) updateWindowed(rowCol int) error {
 		c.updateHIP(rowCol)
 		c8post := c.numCoupons << 3
 		if c8post >= ((27 + w8pre) * k) {
-			c.modifyOffset(c.windowOffset + 1)
+			if err := c.modifyOffset(c.windowOffset + 1); err != nil {
+				return err
+			}
 			if c.windowOffset < 1 || c.windowOffset > 56 {
 				return fmt.Errorf("windowOffset < 1 || windowOffset > 56")
 			}
@@ -256,51 +262,6 @@ func (c *CpcSketch) updateWindowed(rowCol int) error {
 	}
 	return nil
 }
-
-/*
-private static void updateWindowed(final CpcSketch sketch, final int rowCol) {
-    assert ((sketch.windowOffset >= 0) && (sketch.windowOffset <= 56));
-    final int k = 1 << sketch.lgK;
-    final long c32pre = sketch.numCoupons << 5;
-    assert c32pre >= (3L * k); // C < 3K/32, in other words flavor >= HYBRID
-    final long c8pre = sketch.numCoupons << 3;
-    final int w8pre = sketch.windowOffset << 3;
-    assert c8pre < ((27L + w8pre) * k); // C < (K * 27/8) + (K * windowOffset)
-
-    boolean isNovel = false; //novel if new coupon
-    final int col = rowCol & 63;
-
-    if (col < sketch.windowOffset) { // track the surprising 0's "before" the window
-      isNovel = PairTable.maybeDelete(sketch.pairTable, rowCol); // inverted logic
-    }
-    else if (col < (sketch.windowOffset + 8)) { // track the 8 bits inside the window
-      assert (col >= sketch.windowOffset);
-      final int row = rowCol >>> 6;
-      final byte oldBits = sketch.slidingWindow[row];
-      final byte newBits = (byte) (oldBits | (1 << (col - sketch.windowOffset)));
-      if (newBits != oldBits) {
-        sketch.slidingWindow[row] = newBits;
-        isNovel = true;
-      }
-    }
-    else { // track the surprising 1's "after" the window
-      assert col >= (sketch.windowOffset + 8);
-      isNovel = PairTable.maybeInsert(sketch.pairTable, rowCol); // normal logic
-    }
-
-    if (isNovel) {
-      sketch.numCoupons += 1;
-      updateHIP(sketch, rowCol);
-      final long c8post = sketch.numCoupons << 3;
-      if (c8post >= ((27L + w8pre) * k)) {
-        modifyOffset(sketch, sketch.windowOffset + 1);
-        assert (sketch.windowOffset >= 1) && (sketch.windowOffset <= 56);
-        final int w8post = sketch.windowOffset << 3;
-        assert c8post < ((27L + w8post) * k); // C < (K * 27/8) + (K * windowOffset)
-      }
-    }
-  }
-*/
 
 func hash(bs []byte, seed uint64) (uint64, uint64) {
 	return murmur3.SeedSum128(seed, seed, bs)

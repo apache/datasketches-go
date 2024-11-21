@@ -46,7 +46,7 @@ const (
 )
 
 const (
-	CpcDefaultUpdateSeed = 9001
+	defaultLgK = 11
 )
 
 var (

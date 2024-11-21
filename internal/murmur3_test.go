@@ -17,7 +17,10 @@
 
 package internal
 
-import "testing"
+import (
+	"github.com/twmb/murmur3"
+	"testing"
+)
 
 func TestByteArrRemainderGT8(t *testing.T) {
 	key := []byte("The quick brown fox jumps over the lazy dog")
@@ -30,4 +33,21 @@ func TestByteArrRemainderGT8(t *testing.T) {
 	if resultHi != h2 {
 		t.Errorf("expected %v, got %v", h2, resultHi)
 	}
+}
+
+func BenchmarkHashCharSliceMurmur3(b *testing.B) {
+	b.Run("custom murmur3", func(b *testing.B) {
+		key := []byte("The quick brown fox jumps over the lazy dog")
+		for i := 0; i < b.N; i++ {
+			HashCharSliceMurmur3(key, 0, len(key), 0)
+		}
+	})
+
+	b.Run("stdlib murmur3", func(b *testing.B) {
+		key := []byte("The quick brown fox jumps over the lazy dog")
+		for i := 0; i < b.N; i++ {
+			murmur3.SeedSum128(DEFAULT_UPDATE_SEED, DEFAULT_UPDATE_SEED, key)
+		}
+	})
+
 }

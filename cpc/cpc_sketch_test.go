@@ -18,6 +18,7 @@
 package cpc
 
 import (
+	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -56,9 +57,9 @@ func TestCPCCheckUpdatesEstimate(t *testing.T) {
 
 func TestCPCCheckEstimatesWithMerge(t *testing.T) {
 	lgk := 4
-	sk1, err := NewCpcSketch(lgk, CpcDefaultUpdateSeed)
+	sk1, err := NewCpcSketch(lgk, internal.DEFAULT_UPDATE_SEED)
 	assert.NoError(t, err)
-	sk2, err := NewCpcSketch(lgk, CpcDefaultUpdateSeed)
+	sk2, err := NewCpcSketch(lgk, internal.DEFAULT_UPDATE_SEED)
 	assert.NoError(t, err)
 	n := 1 << lgk
 	for i := 0; i < n; i++ {
@@ -85,7 +86,7 @@ func TestCPCCheckEstimatesWithMerge(t *testing.T) {
 
 func TestCPCCheckCornerCaseUpdates(t *testing.T) {
 	lgK := 4
-	sk, err := NewCpcSketch(lgK, CpcDefaultUpdateSeed)
+	sk, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
 	assert.NoError(t, err)
 	err = sk.UpdateFloat64(0.0)
 	assert.NoError(t, err)
@@ -125,6 +126,10 @@ func TestCPCCheckLgK(t *testing.T) {
 	assert.Equal(t, sk.lgK, 10)
 	_, err = NewCpcSketch(3, 0)
 	assert.Error(t, err)
+	sk, err = NewCpcSketchWithDefault()
+	assert.NoError(t, err)
+	assert.Equal(t, sk.lgK, defaultLgK)
+	assert.Equal(t, sk.seed, internal.DEFAULT_UPDATE_SEED)
 }
 
 func TestCPCcheckIconHipUBLBLg15(t *testing.T) {

@@ -54,6 +54,10 @@ func NewCpcUnionSketchWithDefault(lgK int) (CpcUnion, error) {
 	return NewCpcUnionSketch(lgK, internal.DEFAULT_UPDATE_SEED)
 }
 
+func (u *CpcUnion) GetFamilyId() int {
+	return internal.FamilyEnum.CPC.Id
+}
+
 func (u *CpcUnion) Update(source CpcSketch) error {
 	if err := checkSeeds(u.seed, source.seed); err != nil {
 		return err
@@ -381,4 +385,11 @@ func (u *CpcUnion) orMatrixIntoMatrix(srcMatrix []uint64, srcLgK int) {
 		u.bitMatrix[srcRow&destMask] |= srcMatrix[srcRow]
 	}
 
+}
+
+func (u *CpcUnion) getNumCoupons() uint64 {
+	if u.bitMatrix != nil {
+		return countBitsSetInMatrix(u.bitMatrix)
+	}
+	return u.accumulator.numCoupons
 }

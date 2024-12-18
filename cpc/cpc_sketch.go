@@ -52,8 +52,8 @@ type CpcSketch struct {
 	scratch [8]byte
 }
 
-func NewCpcSketchWithDefault() (CpcSketch, error) {
-	return NewCpcSketch(defaultLgK, internal.DEFAULT_UPDATE_SEED)
+func NewCpcSketchWithDefault(lgK int) (CpcSketch, error) {
+	return NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
 }
 
 func NewCpcSketch(lgK int, seed uint64) (CpcSketch, error) {

@@ -126,7 +126,7 @@ func TestCPCCheckLgK(t *testing.T) {
 	assert.Equal(t, sk.lgK, 10)
 	_, err = NewCpcSketch(3, 0)
 	assert.Error(t, err)
-	sk, err = NewCpcSketchWithDefault()
+	sk, err = NewCpcSketchWithDefault(defaultLgK)
 	assert.NoError(t, err)
 	assert.Equal(t, sk.lgK, defaultLgK)
 	assert.Equal(t, sk.seed, internal.DEFAULT_UPDATE_SEED)

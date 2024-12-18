@@ -51,7 +51,40 @@ func TestCpcGetters(t *testing.T) {
 	assert.True(t, union.getNumCoupons() > 0)
 	assert.NotNil(t, getBitMatrix(union))
 	assert.Equal(t, union.GetFamilyId(), internal.FamilyEnum.CPC.Id)
+}
 
+func TestCpcReduceK(t *testing.T) {
+	union, err := NewCpcUnionSketch(12, internal.DEFAULT_UPDATE_SEED)
+	assert.NoError(t, err)
+	sk, err := NewCpcSketch(11, internal.DEFAULT_UPDATE_SEED)
+	assert.NoError(t, err)
+	u := uint64(1)
+	err = sk.UpdateUint64(u)
+	assert.NoError(t, err)
+	err = union.Update(sk)
+	assert.NoError(t, err)
+	sk2, err := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+	assert.NoError(t, err)
+	shTrans := uint64((3 * 512) / 32) //sparse-hybrid transition for lgK=9
+	for sk2.numCoupons < shTrans {
+		u++
+		err = sk2.UpdateUint64(u)
+		assert.NoError(t, err)
+	}
+	err = union.Update(sk2)
+	assert.NoError(t, err)
+	sk3, err := NewCpcSketch(9, internal.DEFAULT_UPDATE_SEED)
+	assert.NoError(t, err)
+	u++
+	err = sk3.UpdateUint64(u)
+	assert.NoError(t, err)
+	err = union.Update(sk3)
+	assert.NoError(t, err)
+	sk4, err := NewCpcSketch(8, internal.DEFAULT_UPDATE_SEED)
+	assert.NoError(t, err)
+	u++
+	err = sk4.UpdateUint64(u)
+	assert.NoError(t, err)
 }
 
 func getBitMatrix(union CpcUnion) []uint64 {

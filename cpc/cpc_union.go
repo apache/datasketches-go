@@ -111,7 +111,7 @@ func (u *CpcUnion) Update(source CpcSketch) error {
 			u.accumulator = CpcSketch{}
 		}
 	case 1: //B: Sparse, bitMatrix valid, accumulator == nil
-		panic("not implemented")
+		u.orTableIntoMatrix(source.pairTable)
 	case 3, 5:
 		//C: Hybrid, bitMatrix valid, accumulator == nil
 		//C: Pinned, bitMatrix valid, accumulator == nil

@@ -17,7 +17,10 @@
 
 package cpc
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 const (
 	upsizeNumer   = 3
@@ -176,4 +179,61 @@ func (p *pairTable) rebuild(newLgSizeInts int) error {
 		}
 	}
 	return nil
+}
+
+func introspectiveInsertionSort(a []int, l, r int) {
+	length := (r - l) + 1
+	cost := 0
+	costLimit := 8 * length
+	for i := l + 1; i <= r; i++ {
+		j := i
+		v := int64(a[i]) & 0xFFFF_FFFF
+		for j >= (l+1) && v < (int64(a[j-1])&0xFFFF_FFFF) {
+			a[j] = a[j-1]
+			j--
+		}
+		a[j] = int(v)
+		cost += i - j
+		if cost > costLimit {
+			b := make([]int, len(a))
+			for m := 0; m < len(a); m++ {
+				b[m] = a[m] & 0xFFFF_FFFF
+			}
+			slices.Sort(b[j : r+1])
+			for m := 0; m < len(a); m++ {
+				a[m] = b[m]
+			}
+			return
+		}
+	}
+}
+
+func mergePairs(arrA []int, startA, lengthA int, arrB []int, startB, lengthB int, arrC []int, startC int) {
+	lengthC := lengthA + lengthB
+	limA := startA + lengthA
+	limB := startB + lengthB
+	limC := startC + lengthC
+	a := startA
+	b := startB
+	c := startC
+	for c < limC {
+		if b >= limB {
+			arrC[c] = arrA[a]
+			a++
+		} else if a >= limA {
+			arrC[c] = arrB[b]
+			b++
+		} else {
+			aa := int64(arrA[a]) & 0xFFFF_FFFF
+			bb := int64(arrB[b]) & 0xFFFF_FFFF
+			if aa < bb {
+				arrC[c] = arrA[a]
+				a++
+			} else {
+				arrC[c] = arrB[b]
+				b++
+			}
+		}
+		c++
+	}
 }

@@ -125,68 +125,6 @@ func (u *CpcUnion) Update(source CpcSketch) error {
 	default:
 		return fmt.Errorf("illegal Union state: %d", state)
 	}
-
-	/*
-	   	    if (source == null) { return; }
-	          checkSeeds(union.seed, source.seed);
-
-	          final int sourceFlavorOrd = source.getFlavor().ordinal();
-	          if (sourceFlavorOrd == 0) { return; } //EMPTY
-
-	          //Accumulator and bitMatrix must be mutually exclusive,
-	          //so bitMatrix != null => accumulator == null and visa versa
-	          //if (Accumulator != null) union must be EMPTY or SPARSE,
-	          checkUnionState(union);
-
-	          if (source.lgK < union.lgK) { reduceUnionK(union, source.lgK); }
-
-	          // if source is past SPARSE mode, make sure that union is a bitMatrix.
-	          if ((sourceFlavorOrd > 1) && (union.accumulator != null)) {
-	            union.bitMatrix = CpcUtil.bitMatrixOfSketch(union.accumulator);
-	            union.accumulator = null;
-	          }
-
-	          final int state = ((sourceFlavorOrd - 1) << 1) | ((union.bitMatrix != null) ? 1 : 0);
-	          switch (state) {
-	            case 0 : { //A: Sparse, bitMatrix == null, accumulator valid
-	              if (union.accumulator == null) {
-	                //CodeQL could not figure this out so I have to insert this.
-	                throw new SketchesStateException("union.accumulator can never be null here.");
-	              }
-	              if ((union.accumulator.getFlavor() == EMPTY)
-	                  && (union.lgK == source.lgK)) {
-	                union.accumulator = source.copy();
-	                break;
-	              }
-	              walkTableUpdatingSketch(union.accumulator, source.pairTable);
-	              // if the accumulator has graduated beyond sparse, switch union to a bitMatrix
-	              if (union.accumulator.getFlavor().ordinal() > 1) {
-	                union.bitMatrix = CpcUtil.bitMatrixOfSketch(union.accumulator);
-	                union.accumulator = null;
-	              }
-	              break;
-	            }
-	            case 1 : { //B: Sparse, bitMatrix valid, accumulator == null
-	              orTableIntoMatrix(union.bitMatrix, union.lgK, source.pairTable);
-	              break;
-	            }
-	            case 3 :   //C: Hybrid, bitMatrix valid, accumulator == null
-	            case 5 : { //C: Pinned, bitMatrix valid, accumulator == null
-	              orWindowIntoMatrix(union.bitMatrix, union.lgK, source.slidingWindow,
-	                  source.windowOffset, source.lgK);
-	              orTableIntoMatrix(union.bitMatrix, union.lgK, source.pairTable);
-	              break;
-	            }
-	            case 7 : { //D: Sliding, bitMatrix valid, accumulator == null
-	              // SLIDING mode involves inverted logic, so we can't just walk the source sketch.
-	              // Instead, we convert it to a bitMatrix that can be OR'ed into the destination.
-	              final long[] sourceMatrix = CpcUtil.bitMatrixOfSketch(source);
-	              orMatrixIntoMatrix(union.bitMatrix, union.lgK, sourceMatrix, source.lgK);
-	              break;
-	            }
-	            default: throw new SketchesStateException("Illegal Union state: " + state);
-	          }
-	*/
 	return nil
 }
 

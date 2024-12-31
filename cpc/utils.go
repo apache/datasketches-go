@@ -203,3 +203,67 @@ func makeKxpByteLookup() []float64 {
 	}
 	return lookup
 }
+
+func checkLoPreamble(bytes []byte) error {
+	panic("implement me")
+}
+
+/*
+  //basic checks of SerVer, Format, preInts, Family, fiCol, lgK.
+  static void checkLoPreamble(final Memory mem) {
+    Objects.requireNonNull(mem, "Source Memory must not be null");
+    checkBounds(0, 8, mem.getCapacity()); //need min 8 bytes
+    rtAssertEquals(getSerVer(mem), SER_VER & 0XFF);
+    final Format fmat = getFormat(mem);
+    final int preIntsDef = getDefinedPreInts(fmat) & 0XFF;
+    rtAssertEquals(getPreInts(mem), preIntsDef);
+    final Family fam = getFamily(mem);
+    rtAssert(fam == Family.CPC);
+    final int lgK = getLgK(mem);
+    rtAssert((lgK >= 4) && (lgK <= 26));
+    final int fiCol = getFiCol(mem);
+    rtAssert((fiCol <= 63) && (fiCol >= 0));
+  }
+*/
+
+func isCompressed(bytes []byte) bool {
+	panic("implement me")
+}
+
+/*
+  static final boolean isCompressed(final Memory mem) {
+    return (getFlags(mem) & COMPRESSED_FLAG_MASK) > 0;
+  }
+*/
+
+func getLgK(bytes []byte) int {
+	panic("implement me")
+}
+
+/*
+  static int getLgK(final Memory mem) {
+    return mem.getByte(getLoFieldOffset(LoField.LG_K)) & 0XFF;
+  }
+*/
+
+func getSeedHash(bytes []byte) int16 {
+	panic("implement me")
+}
+
+/*
+static short getSeedHash(final Memory mem) {
+    return mem.getShort(getLoFieldOffset(LoField.SEED_HASH));
+  }
+*/
+
+func getFormatOrdinal(bytes []byte) int {
+	panic("implement me")
+}
+
+/*
+  static int getFormatOrdinal(final Memory mem) {
+    final int flags = getFlags(mem);
+    return (flags >>> 2) & 0x7;
+  }
+
+*/

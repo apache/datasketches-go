@@ -68,6 +68,19 @@ func NewCpcSketch(lgK int, seed uint64) (CpcSketch, error) {
 	}, nil
 }
 
+func NewCpcSketchFromSlice(bytes []byte, seed uint64) (CpcSketch, error) {
+	_, err := importFromMemory(bytes)
+	if err != nil {
+		return CpcSketch{}, err
+	}
+	panic("implement me")
+	//return uncompress(state, seed);
+}
+
+func NewCpcSketchFromSliceWithDefault(bytes []byte) (CpcSketch, error) {
+	return NewCpcSketchFromSlice(bytes, internal.DEFAULT_UPDATE_SEED)
+}
+
 func (c *CpcSketch) GetEstimate() float64 {
 	if c.mergeFlag {
 		return iconEstimate(c.lgK, c.numCoupons)

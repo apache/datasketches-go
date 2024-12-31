@@ -21,12 +21,40 @@ type CpcCompressedState struct {
 	CwLengthInts  int
 }
 
+var (
+	// This defines the preamble space required by each of the formats in units of 4-byte integers.
+	preIntsDefs = []byte{2, 2, 4, 8, 4, 8, 6, 10}
+)
+
 func NewCpcCompressedState(lgK int, seedHash int16) *CpcCompressedState {
 	return &CpcCompressedState{
 		LgK:      lgK,
 		SeedHash: seedHash,
 		Kxp:      float64(int(1) << lgK),
 	}
+}
+
+func (c *CpcCompressedState) getRequiredSerializedBytes() int {
+	preInts := getDefinedPreInts(c.getFormat())
+	return 4 * (preInts + c.CsvLengthInts + c.CwLengthInts)
+}
+
+func getDefinedPreInts(format CpcFormat) int {
+	return int(preIntsDefs[format])
+}
+
+func (c *CpcCompressedState) getFormat() CpcFormat {
+	ordinal := 0
+	if c.CwLengthInts > 0 {
+		ordinal |= 4
+	}
+	if c.NumCsv > 0 {
+		ordinal |= 2
+	}
+	if c.MergeFlag {
+		ordinal |= 1
+	}
+	return CpcFormat(ordinal)
 }
 
 func importFromMemory(bytes []byte) (*CpcCompressedState, error) {
@@ -46,9 +74,23 @@ func importFromMemory(bytes []byte) (*CpcCompressedState, error) {
 	state.WindowIsValid = (fmtOrd & 4) > 0
 
 	switch format {
+	case CpcformatEmptyMerged, CpcFormatEmptyHip:
+		if err := checkCapacity(len(bytes), 8); err != nil {
+			return nil, err
+		}
+	case CpcFormatSparseHybridMerged:
+		state.NumCoupons = getNumCoupons(bytes)
+		state.NumCsv = int(state.NumCoupons)
+		state.CsvLengthInts = getSvLengthInts(bytes)
+		if err := checkCapacity(len(bytes), state.getRequiredSerializedBytes()); err != nil {
+			return nil, err
+		}
+		state.CsvStream = getSvStream(bytes)
+
 	default:
 		panic("not implemented")
 	}
+	return state, nil
 }
 
 /*

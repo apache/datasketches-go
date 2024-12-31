@@ -18,6 +18,7 @@
 package cpc
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/apache/datasketches-go/internal"
 	"math/bits"
@@ -46,6 +47,59 @@ const (
 )
 
 const (
+	loFieldPreInts = iota
+	loFieldSerVer
+	loFieldFamily
+	loFieldLgK
+	loFieldFiCol
+	LoFieldFlags
+	loFieldSeedHash
+)
+
+const (
+	// Preamble hi field definitions
+	// This defines the eight additional preamble fields located after the <i>LoField</i>.
+	// Do not change the order.
+	//
+	// Note: NUM_SV has dual meanings: In sparse and hybrid flavors it is equivalent to
+	// numCoupons so it isn't stored separately. In pinned and sliding flavors is is the
+	// numSV of the PairTable, which stores only surprising values.
+
+	hiFieldNumCoupons = iota
+	hiFieldNumSV
+	hiFieldKXP
+	hiFieldHipAccum
+	hiFieldSVLengthInts
+	hiFieldWLengthInts
+	hiFieldSVStream
+	hiFieldWStream
+)
+
+var (
+	// This defines the byte offset for each of the 8 <i>HiFields</i>
+	// given the Format ordinal (1st dimension) and the HiField ordinal (2nd dimension).
+	hiFieldOffset = [8][8]byte{
+		{0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0},
+		{8, 0, 0, 0, 12, 0, 16, 0},
+		{8, 0, 16, 24, 12, 0, 32, 0},
+		{8, 0, 0, 0, 0, 12, 0, 16},
+		{8, 0, 16, 24, 0, 12, 0, 32},
+		{8, 12, 0, 0, 16, 20, 24, 24},   //the 2nd 24 is not used.
+		{8, 12, 16, 24, 32, 36, 40, 40}, //the 2nd 40 is not used.
+	}
+)
+
+const (
+	serVer = 1
+
+	// Flags bit masks, Byte 5
+	bigEndianFlagMask  = 1  // Reserved.
+	compressedFlagMask = 2  // Compressed Flag
+	hipFlagMask        = 4  // HIP Flag
+	supValFlagMask     = 8  // num Suprising Values > 0
+	windowFlagMask     = 16 // window length > 0
+
 	defaultLgK = 11
 )
 
@@ -205,65 +259,99 @@ func makeKxpByteLookup() []float64 {
 }
 
 func checkLoPreamble(bytes []byte) error {
-	panic("implement me")
+	if err := checkBounds(0, 8, len(bytes)); err != nil {
+		return err
+	}
+	if bytes[loFieldSerVer] != (serVer & 0xFF) {
+		return fmt.Errorf("SerVer: %d, bytes[loFieldSerVer]: %d", serVer&0xFF, bytes[loFieldSerVer])
+	}
+	fmat := getFormat(bytes)
+	preIntsDef := preIntsDefs[fmat] & 0xFF
+	if bytes[loFieldPreInts] != preIntsDef {
+		return fmt.Errorf("preIntsDef: %d, bytes[loFieldPreInts]: %d", preIntsDef, bytes[loFieldPreInts])
+	}
+	fam := getFamilyId(bytes)
+	if fam != internal.FamilyEnum.CPC.Id {
+		return fmt.Errorf("Family: %d, bytes[loFieldFamily]: %d", internal.FamilyEnum.CPC.Id, fam)
+	}
+	lgK := getLgK(bytes)
+	if lgK < 4 || lgK > 26 {
+		return fmt.Errorf("lgK: %d", lgK)
+	}
+	fiCol := bytes[loFieldFiCol] & 0xFF
+	if fiCol > 63 {
+		return fmt.Errorf("fiCol: %d", fiCol)
+	}
+	return nil
 }
 
-/*
-  //basic checks of SerVer, Format, preInts, Family, fiCol, lgK.
-  static void checkLoPreamble(final Memory mem) {
-    Objects.requireNonNull(mem, "Source Memory must not be null");
-    checkBounds(0, 8, mem.getCapacity()); //need min 8 bytes
-    rtAssertEquals(getSerVer(mem), SER_VER & 0XFF);
-    final Format fmat = getFormat(mem);
-    final int preIntsDef = getDefinedPreInts(fmat) & 0XFF;
-    rtAssertEquals(getPreInts(mem), preIntsDef);
-    final Family fam = getFamily(mem);
-    rtAssert(fam == Family.CPC);
-    final int lgK = getLgK(mem);
-    rtAssert((lgK >= 4) && (lgK <= 26));
-    final int fiCol = getFiCol(mem);
-    rtAssert((fiCol <= 63) && (fiCol >= 0));
-  }
-*/
+func checkBounds(reqOff, reqLen, allocSize int) error {
+	if reqOff < 0 || reqLen < 0 || reqOff+reqLen < 0 || allocSize-(reqOff+reqLen) < 0 {
+		return fmt.Errorf("bounds Violation: reqOffset: %d, reqLength: %d, (reqOff + reqLen): %d, allocSize: %d", reqOff, reqLen, reqOff+reqLen, allocSize)
+	}
+	return nil
+}
+
+func checkCapacity(memCap, expectedCap int) error {
+	if memCap < expectedCap {
+		return fmt.Errorf("Insufficient Image Bytes = %d, Expected = %d", memCap, expectedCap)
+	}
+	return nil
+}
 
 func isCompressed(bytes []byte) bool {
-	panic("implement me")
+	return (getFlags(bytes) & compressedFlagMask) > 0
 }
 
-/*
-  static final boolean isCompressed(final Memory mem) {
-    return (getFlags(mem) & COMPRESSED_FLAG_MASK) > 0;
-  }
-*/
+func getFamilyId(bytes []byte) int {
+	return int(bytes[loFieldFamily] & 0xFF)
+}
 
 func getLgK(bytes []byte) int {
-	panic("implement me")
+	return int(bytes[loFieldLgK] & 0xFF)
 }
-
-/*
-  static int getLgK(final Memory mem) {
-    return mem.getByte(getLoFieldOffset(LoField.LG_K)) & 0XFF;
-  }
-*/
 
 func getSeedHash(bytes []byte) int16 {
-	panic("implement me")
+	return int16(bytes[loFieldSeedHash])
 }
 
-/*
-static short getSeedHash(final Memory mem) {
-    return mem.getShort(getLoFieldOffset(LoField.SEED_HASH));
-  }
-*/
+func getFormat(bytes []byte) CpcFormat {
+	ord := getFormatOrdinal(bytes)
+	return CpcFormat(ord)
+}
 
 func getFormatOrdinal(bytes []byte) int {
-	panic("implement me")
+	flags := getFlags(bytes)
+	return (flags >> 2) & 0x7
 }
 
-/*
-  static int getFormatOrdinal(final Memory mem) {
-    final int flags = getFlags(mem);
-    return (flags >>> 2) & 0x7;
-  }
+func getFlags(bytes []byte) int {
+	return int(bytes[LoFieldFlags] & 0xFF)
+}
 
-*/
+func getNumCoupons(bytes []byte) int64 {
+	offset := getHiFieldOffset(getFormat(bytes), hiFieldNumCoupons)
+	return int64(binary.LittleEndian.Uint32(bytes[offset : offset+4]))
+}
+
+func getSvLengthInts(bytes []byte) int {
+	offset := getHiFieldOffset(getFormat(bytes), hiFieldSVLengthInts)
+	return int(binary.LittleEndian.Uint32(bytes[offset : offset+4]))
+}
+
+func getSvStream(bytes []byte) []int {
+	offset := getHiFieldOffset(getFormat(bytes), hiFieldSVStream)
+	svLengthInts := getSvLengthInts(bytes)
+	svStream := make([]int, svLengthInts)
+	for i := 0; i < svLengthInts; i++ {
+		svStream[i] = int(binary.LittleEndian.Uint32(bytes[offset : offset+4]))
+		offset += 4
+	}
+	return svStream
+}
+
+// getHiFieldOffset returns the defined byte offset from the start of the preamble given the Format and the HiField.
+// Note this can not be used to obtain the stream offsets.
+func getHiFieldOffset(format CpcFormat, hiField int) int {
+	return int(hiFieldOffset[format][hiField])
+}

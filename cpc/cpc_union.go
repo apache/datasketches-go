@@ -82,7 +82,7 @@ func (u *CpcUnion) Update(source *CpcSketch) error {
 	}
 
 	// if source is past SPARSE mode, make sure that union is a bitMatrix.
-	if sourceFlavorOrd > CpcFlavorSparse && u.accumulator.lgK != 0 {
+	if sourceFlavorOrd > CpcFlavorSparse && u.accumulator != nil {
 		u.bitMatrix = u.accumulator.bitMatrixOfSketch()
 		u.accumulator = nil
 	}
@@ -133,7 +133,7 @@ func (u *CpcUnion) GetResult() (*CpcSketch, error) {
 		return nil, err
 	}
 
-	if u.lgK != 0 { // start of case where union contains a sketch
+	if u.accumulator != nil { // start of case where union contains a sketch
 		if u.accumulator.numCoupons == 0 {
 			result, err := NewCpcSketch(u.lgK, u.accumulator.seed)
 			if err != nil {
@@ -225,17 +225,17 @@ func (u *CpcUnion) checkUnionState() error {
 	if u == nil {
 		return fmt.Errorf("union cannot be nil")
 	}
-
-	if u.accumulator.lgK != 0 && u.bitMatrix != nil {
+	accumulator := u.accumulator
+	if (accumulator != nil) == (u.bitMatrix != nil) {
 		return fmt.Errorf("accumulator and bitMatrix cannot be both valid or both nil")
 	}
-	if u.accumulator.lgK != 0 { // not nil
-		if u.accumulator.numCoupons > 0 {
-			if u.accumulator.slidingWindow != nil || u.accumulator.pairTable == nil {
-				return fmt.Errorf("non-empty union accumulator must be SPARSE")
+	if accumulator != nil {
+		if accumulator.numCoupons > 0 {
+			if accumulator.slidingWindow != nil || accumulator.pairTable == nil {
+				return fmt.Errorf("Non-empty union accumulator must be SPARSE")
 			}
 		}
-		if u.lgK != u.accumulator.lgK {
+		if u.lgK != accumulator.lgK {
 			return fmt.Errorf("union LgK must equal accumulator LgK")
 		}
 	}

@@ -341,8 +341,8 @@ func getHiFieldOffset(format CpcFormat, hiField int) int {
 }
 
 func determineCorrectOffset(lgK int, numCoupons uint64) int {
-	c := numCoupons
-	k := uint64(1) << lgK
+	c := int(numCoupons)
+	k := int(1) << lgK
 	tmp := (c << 3) - (19 * k) // 8C - 19K
 	if tmp < 0 {
 		return 0

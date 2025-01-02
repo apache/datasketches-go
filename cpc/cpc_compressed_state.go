@@ -139,7 +139,16 @@ func importFromMemory(bytes []byte) (*CpcCompressedState, error) {
 			return nil, err
 		}
 		state.CsvStream = getSvStream(bytes)
-
+	case CpcFormatSparceHybridHip:
+		state.NumCoupons = getNumCoupons(bytes)
+		state.NumCsv = int(state.NumCoupons)
+		state.CsvLengthInts = getSvLengthInts(bytes)
+		state.Kxp = getKxP(bytes)
+		state.HipEstAccum = getHipAccum(bytes)
+		if err := checkCapacity(len(bytes), state.getRequiredSerializedBytes()); err != nil {
+			return nil, err
+		}
+		state.CsvStream = getSvStream(bytes)
 	default:
 		panic("not implemented")
 	}

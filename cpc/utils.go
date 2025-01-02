@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/apache/datasketches-go/internal"
+	"math"
 	"math/bits"
 )
 
@@ -257,6 +258,16 @@ func getFamilyId(bytes []byte) int {
 
 func getLgK(bytes []byte) int {
 	return int(bytes[loFieldLgK] & 0xFF)
+}
+
+func getKxP(bytes []byte) float64 {
+	kxpByte := bytes[hiFieldKXP]
+	return kxpByteLookup[kxpByte]
+}
+
+func getHipAccum(bytes []byte) float64 {
+	offset := getHiFieldOffset(getFormat(bytes), hiFieldHipAccum)
+	return math.Float64frombits(binary.LittleEndian.Uint64(bytes[offset : offset+8]))
 }
 
 func getSeedHash(bytes []byte) int16 {

@@ -293,9 +293,25 @@ func getNumCoupons(bytes []byte) uint64 {
 	return uint64(binary.LittleEndian.Uint32(bytes[offset : offset+4]))
 }
 
+func getNumSV(bytes []byte) uint64 {
+	offset := getHiFieldOffset(getFormat(bytes), hiFieldNumSV)
+	return uint64(binary.LittleEndian.Uint32(bytes[offset : offset+4]))
+}
+
 func getSvLengthInts(bytes []byte) int {
 	offset := getHiFieldOffset(getFormat(bytes), hiFieldSVLengthInts)
 	return int(binary.LittleEndian.Uint32(bytes[offset : offset+4]))
+}
+
+func getWStream(bytes []byte) []int {
+	offset := getHiFieldOffset(getFormat(bytes), hiFieldWStream)
+	wLength := getWLengthInts(bytes)
+	wStream := make([]int, wLength)
+	for i := 0; i < wLength; i++ {
+		wStream[i] = int(binary.LittleEndian.Uint32(bytes[offset : offset+4]))
+		offset += 4
+	}
+	return wStream
 }
 
 func getSvStream(bytes []byte) []int {
@@ -307,6 +323,15 @@ func getSvStream(bytes []byte) []int {
 		offset += 4
 	}
 	return svStream
+}
+
+func getWLengthInts(bytes []byte) int {
+	offset := getHiFieldOffset(getFormat(bytes), hiFieldWLengthInts)
+	return int(binary.LittleEndian.Uint32(bytes[offset : offset+4]))
+}
+
+func getFiCol(bytes []byte) int {
+	return int(bytes[loFieldFiCol] & 0xFF)
 }
 
 // getHiFieldOffset returns the defined byte offset from the start of the preamble given the Format and the HiField.

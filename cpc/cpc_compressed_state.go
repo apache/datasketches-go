@@ -31,7 +31,7 @@ type CpcCompressedState struct {
 	Kxp         float64
 	HipEstAccum float64
 
-	NumCsv        int
+	NumCsv        uint64
 	CsvStream     []int // may be longer than required
 	CsvLengthInts int
 	CwStream      []int // may be longer than required
@@ -133,7 +133,7 @@ func importFromMemory(bytes []byte) (*CpcCompressedState, error) {
 		}
 	case CpcFormatSparseHybridMerged:
 		state.NumCoupons = getNumCoupons(bytes)
-		state.NumCsv = int(state.NumCoupons)
+		state.NumCsv = state.NumCoupons
 		state.CsvLengthInts = getSvLengthInts(bytes)
 		if err := checkCapacity(len(bytes), state.getRequiredSerializedBytes()); err != nil {
 			return nil, err
@@ -141,13 +141,55 @@ func importFromMemory(bytes []byte) (*CpcCompressedState, error) {
 		state.CsvStream = getSvStream(bytes)
 	case CpcFormatSparceHybridHip:
 		state.NumCoupons = getNumCoupons(bytes)
-		state.NumCsv = int(state.NumCoupons)
+		state.NumCsv = state.NumCoupons
 		state.CsvLengthInts = getSvLengthInts(bytes)
 		state.Kxp = getKxP(bytes)
 		state.HipEstAccum = getHipAccum(bytes)
 		if err := checkCapacity(len(bytes), state.getRequiredSerializedBytes()); err != nil {
 			return nil, err
 		}
+		state.CsvStream = getSvStream(bytes)
+	case CpcFormatPinnedSlidingMergedNosv:
+		state.FiCol = getFiCol(bytes)
+		state.NumCoupons = getNumCoupons(bytes)
+		state.CwLengthInts = getWLengthInts(bytes)
+		if err := checkCapacity(len(bytes), state.getRequiredSerializedBytes()); err != nil {
+			return nil, err
+		}
+		state.CwStream = getWStream(bytes)
+	case CpcFormatPinnedSlidingHipNosv:
+		state.FiCol = getFiCol(bytes)
+		state.NumCoupons = getNumCoupons(bytes)
+		state.CwLengthInts = getWLengthInts(bytes)
+		state.Kxp = getKxP(bytes)
+		state.HipEstAccum = getHipAccum(bytes)
+		if err := checkCapacity(len(bytes), state.getRequiredSerializedBytes()); err != nil {
+			return nil, err
+		}
+		state.CwStream = getWStream(bytes)
+	case CpcFormatPinnedSlidingMerged:
+		state.FiCol = getFiCol(bytes)
+		state.NumCoupons = getNumCoupons(bytes)
+		state.NumCsv = getNumSV(bytes)
+		state.CsvLengthInts = getSvLengthInts(bytes)
+		state.CwLengthInts = getWLengthInts(bytes)
+		if err := checkCapacity(len(bytes), state.getRequiredSerializedBytes()); err != nil {
+			return nil, err
+		}
+		state.CwStream = getWStream(bytes)
+		state.CsvStream = getSvStream(bytes)
+	case CpcFormatPinnedSlidingHip:
+		state.FiCol = getFiCol(bytes)
+		state.NumCoupons = getNumCoupons(bytes)
+		state.NumCsv = getNumSV(bytes)
+		state.CsvLengthInts = getSvLengthInts(bytes)
+		state.CwLengthInts = getWLengthInts(bytes)
+		state.Kxp = getKxP(bytes)
+		state.HipEstAccum = getHipAccum(bytes)
+		if err := checkCapacity(len(bytes), state.getRequiredSerializedBytes()); err != nil {
+			return nil, err
+		}
+		state.CwStream = getWStream(bytes)
 		state.CsvStream = getSvStream(bytes)
 	default:
 		panic("not implemented")
@@ -169,37 +211,6 @@ static CompressedState importFromMemory(final Memory mem) {
     state.windowIsValid = (fmtOrd & 4) > 0;
 
     switch (format) {
-      case EMPTY_MERGED :
-      case EMPTY_HIP : {
-        checkCapacity(mem.getCapacity(), 8L);
-        break;
-      }
-      case SPARSE_HYBRID_MERGED : {
-        //state.fiCol = getFiCol(mem);
-        state.numCoupons = getNumCoupons(mem);
-        state.numCsv = (int) state.numCoupons; //only true for sparse_hybrid
-        state.csvLengthInts = getSvLengthInts(mem);
-        //state.cwLength = getCwLength(mem);
-        //state.kxp = getKxP(mem);
-        //state.hipEstAccum = getHipAccum(mem);
-        checkCapacity(mem.getCapacity(), state.getRequiredSerializedBytes());
-        //state.cwStream = getCwStream(mem);
-        state.csvStream = getSvStream(mem);
-        break;
-      }
-      case SPARSE_HYBRID_HIP : {
-        //state.fiCol = getFiCol(mem);
-        state.numCoupons = getNumCoupons(mem);
-        state.numCsv = (int) state.numCoupons; //only true for sparse_hybrid
-        state.csvLengthInts = getSvLengthInts(mem);
-        //state.cwLength = getCwLength(mem);
-        state.kxp = getKxP(mem);
-        state.hipEstAccum = getHipAccum(mem);
-        checkCapacity(mem.getCapacity(), state.getRequiredSerializedBytes());
-        //state.cwStream = getCwStream(mem);
-        state.csvStream = getSvStream(mem);
-        break;
-      }
       case PINNED_SLIDING_MERGED_NOSV : {
         state.fiCol = getFiCol(mem);
         state.numCoupons = getNumCoupons(mem);

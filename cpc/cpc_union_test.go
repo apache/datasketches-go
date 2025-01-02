@@ -94,5 +94,5 @@ func getBitMatrix(t *testing.T, union CpcUnion) []uint64 {
 	if union.bitMatrix != nil {
 		return union.bitMatrix
 	}
-	return bitMatrixOfSketch(union.accumulator)
+	return union.accumulator.bitMatrixOfSketch()
 }

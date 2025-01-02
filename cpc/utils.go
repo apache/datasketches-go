@@ -158,64 +158,12 @@ func orMatrixIntoMatrix(destMatrix []uint64, destLgK int, srcMatrix []uint64, sr
 	}
 }
 
-func bitMatrixOfSketch(sketch CpcSketch) []uint64 {
-	k := uint64(1) << sketch.lgK
-	offset := sketch.windowOffset
-	if offset < 0 || offset > 56 {
-		panic("offset < 0 || offset > 56")
-	}
-	matrix := make([]uint64, k)
-	if sketch.numCoupons == 0 {
-		return matrix // Returning a matrix of zeros rather than NULL.
-	}
-	//Fill the matrix with default rows in which the "early zone" is filled with ones.
-	//This is essential for the routine's O(k) time cost (as opposed to O(C)).
-	defaultRow := (1 << offset) - 1
-	for i := range matrix {
-		matrix[i] = uint64(defaultRow)
-	}
-	if sketch.slidingWindow != nil { // In other words, we are in window mode, not sparse mode.
-		for i, v := range sketch.slidingWindow { // set the window bits, trusting the sketch's current offset.
-			matrix[i] |= (uint64(v) << offset)
-		}
-	}
-	table := sketch.pairTable
-	if table == nil {
-		panic("table == nil")
-	}
-	slots := table.slotsArr
-	numSlots := 1 << table.lgSizeInts
-	for i := 0; i < numSlots; i++ {
-		rowCol := slots[i]
-		if rowCol != -1 {
-			col := rowCol & 63
-			row := rowCol >> 6
-			// Flip the specified matrix bit from its default value.
-			// In the "early" zone the bit changes from 1 to 0.
-			// In the "late" zone the bit changes from 0 to 1.
-			matrix[row] ^= (1 << col)
-		}
-	}
-	return matrix
-}
-
 func countBitsSetInMatrix(matrix []uint64) uint64 {
 	count := uint64(0)
 	for _, v := range matrix {
 		count += uint64(bits.OnesCount64(v))
 	}
 	return count
-}
-
-func determineCorrectOffset(lgK int, numCoupons uint64) int {
-	c := numCoupons
-	k := uint64(1) << lgK
-	tmp := (c << 3) - (19 * k) // 8C - 19K
-	if tmp < 0 {
-		return 0
-	}
-	return int(tmp >> (lgK + 3)) // tmp / 8K
-
 }
 
 func walkTableUpdatingSketch(dest *CpcSketch, table *pairTable) error {
@@ -329,9 +277,9 @@ func getFlags(bytes []byte) int {
 	return int(bytes[LoFieldFlags] & 0xFF)
 }
 
-func getNumCoupons(bytes []byte) int64 {
+func getNumCoupons(bytes []byte) uint64 {
 	offset := getHiFieldOffset(getFormat(bytes), hiFieldNumCoupons)
-	return int64(binary.LittleEndian.Uint32(bytes[offset : offset+4]))
+	return uint64(binary.LittleEndian.Uint32(bytes[offset : offset+4]))
 }
 
 func getSvLengthInts(bytes []byte) int {
@@ -354,4 +302,14 @@ func getSvStream(bytes []byte) []int {
 // Note this can not be used to obtain the stream offsets.
 func getHiFieldOffset(format CpcFormat, hiField int) int {
 	return int(hiFieldOffset[format][hiField])
+}
+
+func determineCorrectOffset(lgK int, numCoupons uint64) int {
+	c := numCoupons
+	k := uint64(1) << lgK
+	tmp := (c << 3) - (19 * k) // 8C - 19K
+	if tmp < 0 {
+		return 0
+	}
+	return int(tmp >> (lgK + 3)) // tmp / 8K
 }

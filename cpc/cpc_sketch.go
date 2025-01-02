@@ -52,32 +52,31 @@ type CpcSketch struct {
 	scratch [8]byte
 }
 
-func NewCpcSketchWithDefault(lgK int) (CpcSketch, error) {
+func NewCpcSketchWithDefault(lgK int) (*CpcSketch, error) {
 	return NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
 }
 
-func NewCpcSketch(lgK int, seed uint64) (CpcSketch, error) {
+func NewCpcSketch(lgK int, seed uint64) (*CpcSketch, error) {
 	if err := checkLgK(lgK); err != nil {
-		return CpcSketch{}, err
+		return nil, err
 	}
 
-	return CpcSketch{
+	return &CpcSketch{
 		lgK:  lgK,
 		seed: seed,
 		kxp:  float64(int64(1) << lgK),
 	}, nil
 }
 
-func NewCpcSketchFromSlice(bytes []byte, seed uint64) (CpcSketch, error) {
-	_, err := importFromMemory(bytes)
+func NewCpcSketchFromSlice(bytes []byte, seed uint64) (*CpcSketch, error) {
+	c, err := importFromMemory(bytes)
 	if err != nil {
-		return CpcSketch{}, err
+		return nil, err
 	}
-	panic("implement me")
-	//return uncompress(state, seed);
+	return c.uncompress(seed)
 }
 
-func NewCpcSketchFromSliceWithDefault(bytes []byte) (CpcSketch, error) {
+func NewCpcSketchFromSliceWithDefault(bytes []byte) (*CpcSketch, error) {
 	return NewCpcSketchFromSlice(bytes, internal.DEFAULT_UPDATE_SEED)
 }
 
@@ -384,7 +383,7 @@ func (c *CpcSketch) modifyOffset(newOffset int) error {
 		return fmt.Errorf("slidingWindow == nil || pairTable == nil")
 	}
 	k := 1 << c.lgK
-	bitMatrix := bitMatrixOfSketch(*c)
+	bitMatrix := c.bitMatrixOfSketch()
 	if (newOffset & 0x7) == 0 {
 		c.refreshKXP(bitMatrix)
 	}
@@ -436,4 +435,45 @@ func (c *CpcSketch) refreshKXP(bitMatrix []uint64) {
 		total += factor * byteSums[j]
 	}
 	c.kxp = total
+}
+
+func (c *CpcSketch) bitMatrixOfSketch() []uint64 {
+	k := uint64(1) << c.lgK
+	offset := c.windowOffset
+	if offset < 0 || offset > 56 {
+		panic("offset < 0 || offset > 56")
+	}
+	matrix := make([]uint64, k)
+	if c.numCoupons == 0 {
+		return matrix // Returning a matrix of zeros rather than NULL.
+	}
+	//Fill the matrix with default rows in which the "early zone" is filled with ones.
+	//This is essential for the routine'c O(k) time cost (as opposed to O(C)).
+	defaultRow := (1 << offset) - 1
+	for i := range matrix {
+		matrix[i] = uint64(defaultRow)
+	}
+	if c.slidingWindow != nil { // In other words, we are in window mode, not sparse mode.
+		for i, v := range c.slidingWindow { // set the window bits, trusting the sketch'c current offset.
+			matrix[i] |= (uint64(v) << offset)
+		}
+	}
+	table := c.pairTable
+	if table == nil {
+		panic("table == nil")
+	}
+	slots := table.slotsArr
+	numSlots := 1 << table.lgSizeInts
+	for i := 0; i < numSlots; i++ {
+		rowCol := slots[i]
+		if rowCol != -1 {
+			col := rowCol & 63
+			row := rowCol >> 6
+			// Flip the specified matrix bit from its default value.
+			// In the "early" zone the bit changes from 1 to 0.
+			// In the "late" zone the bit changes from 0 to 1.
+			matrix[row] ^= (1 << col)
+		}
+	}
+	return matrix
 }

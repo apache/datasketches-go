@@ -33,7 +33,7 @@ type CpcUnion struct {
 	// but doesn't maintain any of the "extra" fields of our sketch objects, so some additional work
 	// is required when getResult is called at the end.
 	bitMatrix   []uint64
-	accumulator CpcSketch
+	accumulator *CpcSketch
 }
 
 func NewCpcUnionSketch(lgK int, seed uint64) (CpcUnion, error) {
@@ -58,7 +58,7 @@ func (u *CpcUnion) GetFamilyId() int {
 	return internal.FamilyEnum.CPC.Id
 }
 
-func (u *CpcUnion) Update(source CpcSketch) error {
+func (u *CpcUnion) Update(source *CpcSketch) error {
 	if err := checkSeeds(u.seed, source.seed); err != nil {
 		return err
 	}
@@ -83,8 +83,8 @@ func (u *CpcUnion) Update(source CpcSketch) error {
 
 	// if source is past SPARSE mode, make sure that union is a bitMatrix.
 	if sourceFlavorOrd > CpcFlavorSparse && u.accumulator.lgK != 0 {
-		u.bitMatrix = bitMatrixOfSketch(u.accumulator)
-		u.accumulator = CpcSketch{}
+		u.bitMatrix = u.accumulator.bitMatrixOfSketch()
+		u.accumulator = nil
 	}
 
 	state := (sourceFlavorOrd - 1) << 1
@@ -101,14 +101,14 @@ func (u *CpcUnion) Update(source CpcSketch) error {
 			u.accumulator = source
 			break
 		}
-		if err := walkTableUpdatingSketch(&u.accumulator, source.pairTable); err != nil {
+		if err := walkTableUpdatingSketch(u.accumulator, source.pairTable); err != nil {
 			return err
 		}
 		// if the accumulator has graduated beyond sparse, switch union to a bitMatrix
 		if u.accumulator.GetFlavor() > CpcFlavorSparse {
-			bitMatrix := bitMatrixOfSketch(u.accumulator)
+			bitMatrix := u.accumulator.bitMatrixOfSketch()
 			u.bitMatrix = bitMatrix
-			u.accumulator = CpcSketch{}
+			u.accumulator = nil
 		}
 	case 1: //B: Sparse, bitMatrix valid, accumulator == nil
 		u.orTableIntoMatrix(source.pairTable)
@@ -120,7 +120,7 @@ func (u *CpcUnion) Update(source CpcSketch) error {
 	case 7: //D: Sliding, bitMatrix valid, accumulator == null
 		// SLIDING mode involves inverted logic, so we can't just walk the source sketch.
 		// Instead, we convert it to a bitMatrix that can be OR'ed into the destination.
-		sourceMatrix := bitMatrixOfSketch(source)
+		sourceMatrix := source.bitMatrixOfSketch()
 		u.orMatrixIntoMatrix(sourceMatrix, source.lgK)
 	default:
 		return fmt.Errorf("illegal Union state: %d", state)
@@ -128,22 +128,22 @@ func (u *CpcUnion) Update(source CpcSketch) error {
 	return nil
 }
 
-func (u *CpcUnion) GetResult() (CpcSketch, error) {
+func (u *CpcUnion) GetResult() (*CpcSketch, error) {
 	if err := u.checkUnionState(); err != nil {
-		return CpcSketch{}, err
+		return nil, err
 	}
 
 	if u.lgK != 0 { // start of case where union contains a sketch
 		if u.accumulator.numCoupons == 0 {
 			result, err := NewCpcSketch(u.lgK, u.accumulator.seed)
 			if err != nil {
-				return CpcSketch{}, err
+				return nil, err
 			}
 			result.mergeFlag = true
 			return result, nil
 		}
 		if u.accumulator.GetFlavor() != CpcFlavorSparse {
-			return CpcSketch{}, fmt.Errorf("accumulator must be SPARSE")
+			return nil, fmt.Errorf("accumulator must be SPARSE")
 		}
 		result := u.accumulator // effectively a copy
 		result.mergeFlag = true
@@ -155,7 +155,7 @@ func (u *CpcUnion) GetResult() (CpcSketch, error) {
 	lgK := u.lgK
 	result, err := NewCpcSketch(u.lgK, u.seed)
 	if err != nil {
-		return CpcSketch{}, err
+		return nil, err
 	}
 
 	numCoupons := countBitsSetInMatrix(matrix)
@@ -163,7 +163,7 @@ func (u *CpcUnion) GetResult() (CpcSketch, error) {
 
 	flavor := determineFlavor(lgK, numCoupons)
 	if flavor <= CpcFlavorSparse {
-		return CpcSketch{}, fmt.Errorf("flavor must be greater than SPARSE")
+		return nil, fmt.Errorf("flavor must be greater than SPARSE")
 	}
 
 	offset := determineCorrectOffset(lgK, numCoupons)
@@ -178,7 +178,7 @@ func (u *CpcUnion) GetResult() (CpcSketch, error) {
 	newTableLgSize := max(lgK-4, 2)
 	table, err := NewPairTable(newTableLgSize, 6+lgK)
 	if err != nil {
-		return CpcSketch{}, err
+		return nil, err
 	}
 	result.pairTable = table
 
@@ -200,10 +200,10 @@ func (u *CpcUnion) GetResult() (CpcSketch, error) {
 			rowCol := (i << 6) | col
 			isNovel, err := table.maybeInsert(rowCol)
 			if err != nil {
-				return CpcSketch{}, err
+				return nil, err
 			}
 			if !isNovel {
-				return CpcSketch{}, fmt.Errorf("isNovel must be true")
+				return nil, fmt.Errorf("isNovel must be true")
 			}
 		}
 	}
@@ -268,7 +268,7 @@ func (u *CpcUnion) reduceUnionK(newLgK int) error {
 				return err
 			}
 			newSketch := sk
-			if err := walkTableUpdatingSketch(&newSketch, oldSketch.pairTable); err != nil {
+			if err := walkTableUpdatingSketch(newSketch, oldSketch.pairTable); err != nil {
 				return err
 			}
 			finalNewFlavor := newSketch.GetFlavor()
@@ -279,7 +279,7 @@ func (u *CpcUnion) reduceUnionK(newLgK int) error {
 			}
 			// the new sketch has graduated beyond sparse, so convert to bitMatrix
 			//u.accumulator = nil
-			u.bitMatrix = bitMatrixOfSketch(newSketch)
+			u.bitMatrix = newSketch.bitMatrixOfSketch()
 			u.lgK = newLgK
 		}
 	}

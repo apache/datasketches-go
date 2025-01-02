@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cpc
 
 import "fmt"
@@ -9,7 +26,7 @@ type CpcCompressedState struct {
 	SeedHash      int16
 	FiCol         int
 	MergeFlag     bool // compliment of HIP Flag
-	NumCoupons    int64
+	NumCoupons    uint64
 
 	Kxp         float64
 	HipEstAccum float64
@@ -39,8 +56,8 @@ func (c *CpcCompressedState) getRequiredSerializedBytes() int {
 	return 4 * (preInts + c.CsvLengthInts + c.CwLengthInts)
 }
 
-func getDefinedPreInts(format CpcFormat) int {
-	return int(preIntsDefs[format])
+func (c *CpcCompressedState) getWindowOffset() int {
+	return determineCorrectOffset(c.LgK, c.NumCoupons)
 }
 
 func (c *CpcCompressedState) getFormat() CpcFormat {
@@ -56,6 +73,42 @@ func (c *CpcCompressedState) getFormat() CpcFormat {
 	}
 	return CpcFormat(ordinal)
 }
+
+func (c *CpcCompressedState) uncompress(seed uint64) (*CpcSketch, error) {
+	//ThetaUtil.checkSeedHashes(ThetaUtil.computeSeedHash(seed), c.SeedHash)
+	sketch, err := NewCpcSketch(c.LgK, seed)
+	if err != nil {
+		return nil, err
+	}
+	sketch.numCoupons = c.NumCoupons
+	sketch.windowOffset = c.getWindowOffset()
+	sketch.fiCol = c.FiCol
+	sketch.mergeFlag = c.MergeFlag
+	sketch.kxp = c.Kxp
+	sketch.hipEstAccum = c.HipEstAccum
+	sketch.slidingWindow = nil
+	sketch.pairTable = nil
+	//uncompress(c, sketch)
+	return sketch, err
+}
+
+/*
+  //also used in test
+  static CpcSketch uncompress(final CompressedState source, final long seed) {
+    ThetaUtil.checkSeedHashes(ThetaUtil.computeSeedHash(seed), source.seedHash);
+    final CpcSketch sketch = new CpcSketch(source.lgK, seed);
+    sketch.numCoupons = source.numCoupons;
+    sketch.windowOffset = source.getWindowOffset();
+    sketch.fiCol = source.fiCol;
+    sketch.mergeFlag = source.mergeFlag;
+    sketch.kxp = source.kxp;
+    sketch.hipEstAccum = source.hipEstAccum;
+    sketch.slidingWindow = null;
+    sketch.pairTable = null;
+    CpcCompression.uncompress(source, sketch);
+    return sketch;
+  }
+*/
 
 func importFromMemory(bytes []byte) (*CpcCompressedState, error) {
 	if err := checkLoPreamble(bytes); err != nil {
@@ -196,3 +249,7 @@ static CompressedState importFromMemory(final Memory mem) {
     return state;
   }
 */
+
+func getDefinedPreInts(format CpcFormat) int {
+	return int(preIntsDefs[format])
+}

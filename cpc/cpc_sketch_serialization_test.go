@@ -25,6 +25,23 @@ import (
 	"testing"
 )
 
+func TestGenerateGoFiles(t *testing.T) {
+	nArr := []int{0, 100, 200, 2000, 20000}
+	flavorArr := []CpcFlavor{CpcFlavorEmpty, CpcFlavorSparse, CpcFlavorHybrid, CpcFlavorPinned, CpcFlavorSliding}
+	for flavorIdx, n := range nArr {
+		sketch, err := NewCpcSketchWithDefault(11)
+		assert.NoError(t, err)
+		for i := 0; i < n; i++ {
+			assert.NoError(t, sketch.UpdateUint64(uint64(i)))
+		}
+		assert.Equal(t, sketch.GetFlavor(), flavorArr[flavorIdx])
+		sl, err := sketch.ToCompactSlice()
+		assert.NoError(t, err)
+		err = os.WriteFile(fmt.Sprintf("%s/cpc_n%d_go.sk", internal.GoPath, n), sl, 0644)
+		assert.NoError(t, err)
+	}
+}
+
 func TestJavaCompat(t *testing.T) {
 	t.Run("Java CPC", func(t *testing.T) {
 		nArr := []int{0, 100, 200, 2000, 20000}
@@ -36,7 +53,6 @@ func TestJavaCompat(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, sketch.GetFlavor(), flavorArr[flavorIdx])
 			assert.InDelta(t, float64(n), sketch.GetEstimate(), float64(n)*0.02)
-
 		}
 	})
 }

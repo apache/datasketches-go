@@ -73,7 +73,22 @@ func NewCpcSketchFromSlice(bytes []byte, seed uint64) (*CpcSketch, error) {
 	if err != nil {
 		return nil, err
 	}
-	return c.uncompress(seed)
+
+	sketch, err := NewCpcSketch(c.LgK, seed)
+	if err != nil {
+		return nil, err
+	}
+	sketch.numCoupons = c.NumCoupons
+	sketch.windowOffset = c.getWindowOffset()
+	sketch.fiCol = c.FiCol
+	sketch.mergeFlag = c.MergeFlag
+	sketch.kxp = c.Kxp
+	sketch.hipEstAccum = c.HipEstAccum
+	sketch.slidingWindow = nil
+	sketch.pairTable = nil
+
+	err = c.uncompress(sketch)
+	return sketch, err
 }
 
 func NewCpcSketchFromSliceWithDefault(bytes []byte) (*CpcSketch, error) {
@@ -477,3 +492,24 @@ func (c *CpcSketch) bitMatrixOfSketch() []uint64 {
 	}
 	return matrix
 }
+
+func (c *CpcSketch) ToCompactSlice() ([]byte, error) {
+	compressedState, err := NewCpcCompressedStateFromSketch(c)
+	if err != nil {
+		return nil, err
+	}
+	capa := compressedState.getRequiredSerializedBytes()
+	buf := make([]byte, capa)
+	// TODO seralize here
+	return buf, nil
+}
+
+/*
+  public byte[] toByteArray() {
+    final CompressedState state = CompressedState.compress(this);
+    final long cap = state.getRequiredSerializedBytes();
+    final WritableMemory wmem = WritableMemory.allocate((int) cap);
+    state.exportToMemory(wmem);
+    return (byte[]) wmem.getArray();
+  }
+*/

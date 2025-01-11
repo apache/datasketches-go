@@ -17,7 +17,10 @@
 
 package cpc
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/apache/datasketches-go/internal"
+)
 
 type CpcCompressedState struct {
 	CsvIsValid    bool
@@ -51,6 +54,24 @@ func NewCpcCompressedState(lgK int, seedHash int16) *CpcCompressedState {
 	}
 }
 
+func NewCpcCompressedStateFromSketch(sketch *CpcSketch) (*CpcCompressedState, error) {
+	seedHash, err := internal.ComputeSeedHash(int64(sketch.seed))
+	if err != nil {
+		return nil, err
+	}
+	state := NewCpcCompressedState(sketch.lgK, seedHash)
+	state.FiCol = sketch.fiCol
+	state.MergeFlag = sketch.mergeFlag
+	state.NumCoupons = sketch.numCoupons
+	state.Kxp = sketch.kxp
+	state.HipEstAccum = sketch.hipEstAccum
+	state.CsvIsValid = sketch.pairTable != nil
+	state.WindowIsValid = sketch.slidingWindow != nil
+
+	err = state.compress(sketch)
+	return state, err
+}
+
 func (c *CpcCompressedState) getRequiredSerializedBytes() int {
 	preInts := getDefinedPreInts(c.getFormat())
 	return 4 * (preInts + c.CsvLengthInts + c.CwLengthInts)
@@ -74,41 +95,49 @@ func (c *CpcCompressedState) getFormat() CpcFormat {
 	return CpcFormat(ordinal)
 }
 
-func (c *CpcCompressedState) uncompress(seed uint64) (*CpcSketch, error) {
-	//ThetaUtil.checkSeedHashes(ThetaUtil.computeSeedHash(seed), c.SeedHash)
-	sketch, err := NewCpcSketch(c.LgK, seed)
-	if err != nil {
-		return nil, err
+func (c *CpcCompressedState) uncompress(src *CpcSketch) error {
+	srcFlavor := src.GetFlavor()
+	switch srcFlavor {
+	case CpcFlavorEmpty:
+		return nil
+	case CpcFlavorSparse:
+		panic("not implemented")
+		//return c.uncompressSparseFlavor(target)
+	case CpcFlavorHybrid:
+		panic("not implemented")
+		//return c.uncompressHybridFlavor(target)
+	case CpcFlavorPinned:
+		panic("not implemented")
+		//return c.uncompressPinnedFlavor(target)
+	case CpcFlavorSliding:
+		panic("not implemented")
+		//return c.uncompressSlidingFlavor(target)
+	default:
+		return fmt.Errorf("unable to uncompress flavor %v", srcFlavor)
 	}
-	sketch.numCoupons = c.NumCoupons
-	sketch.windowOffset = c.getWindowOffset()
-	sketch.fiCol = c.FiCol
-	sketch.mergeFlag = c.MergeFlag
-	sketch.kxp = c.Kxp
-	sketch.hipEstAccum = c.HipEstAccum
-	sketch.slidingWindow = nil
-	sketch.pairTable = nil
-	//uncompress(c, sketch)
-	return sketch, err
 }
 
-/*
-  //also used in test
-  static CpcSketch uncompress(final CompressedState source, final long seed) {
-    ThetaUtil.checkSeedHashes(ThetaUtil.computeSeedHash(seed), source.seedHash);
-    final CpcSketch sketch = new CpcSketch(source.lgK, seed);
-    sketch.numCoupons = source.numCoupons;
-    sketch.windowOffset = source.getWindowOffset();
-    sketch.fiCol = source.fiCol;
-    sketch.mergeFlag = source.mergeFlag;
-    sketch.kxp = source.kxp;
-    sketch.hipEstAccum = source.hipEstAccum;
-    sketch.slidingWindow = null;
-    sketch.pairTable = null;
-    CpcCompression.uncompress(source, sketch);
-    return sketch;
-  }
-*/
+func (c *CpcCompressedState) compress(src *CpcSketch) error {
+	srcFlavor := src.GetFlavor()
+	switch srcFlavor {
+	case CpcFlavorEmpty:
+		return nil
+	case CpcFlavorSparse:
+		panic("not implemented")
+		//return c.uncompressSparseFlavor(target)
+	case CpcFlavorHybrid:
+		panic("not implemented")
+		//return c.uncompressHybridFlavor(target)
+	case CpcFlavorPinned:
+		panic("not implemented")
+		//return c.uncompressPinnedFlavor(target)
+	case CpcFlavorSliding:
+		panic("not implemented")
+		//return c.uncompressSlidingFlavor(target)
+	default:
+		return fmt.Errorf("unable to compress flavor %v", srcFlavor)
+	}
+}
 
 func importFromMemory(bytes []byte) (*CpcCompressedState, error) {
 	if err := checkLoPreamble(bytes); err != nil {

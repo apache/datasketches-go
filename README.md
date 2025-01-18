@@ -39,7 +39,7 @@ If you are interested in making contributions to this site please see our [Commu
 | Type         | Implementation          | Status |
 |--------------|-------------------------|--|
 | Cardinality	 |                         |  |
-| 	            | CpcSketch               | ❌ |
+| 	            | CpcSketch               | 🚧 |
 | 	            | HllSketch               | ⚠️ |
 | 	            | ThetaSketch             | ❌ |
 | 	            | TupleSketch<S>          | ❌ |
@@ -75,6 +75,8 @@ If you are interested in making contributions to this site please see our [Commu
 
 ⚠️ = Implemented but not officially released
 
+🚧 = In progress
+
 =================
 
-This code requires Go 1.22
+This code requires Go 1.23

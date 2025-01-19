@@ -113,3 +113,14 @@ func IsNil[T any](t T) bool {
 		kind == reflect.Func) &&
 		v.IsNil()
 }
+
+func ComputeSeedHash(seed int64) (int16, error) {
+	seedArr := []int64{seed}
+	seedHash, _ := HashInt64SliceMurmur3(seedArr, 0, 1, uint64(seed))
+	seedHash = seedHash & 0xFFFF
+
+	if seedHash == 0 {
+		return 0, fmt.Errorf("the given seed: %d produced a seedHash of zero. You must choose a different seed", seed)
+	}
+	return int16(seedHash), nil
+}

@@ -28,9 +28,31 @@ import (
 )
 
 const (
-	minLgK = 4
-	maxLgK = 26
+	minLgK                 = 4
+	maxLgK                 = 26
+	empiricalSizeMaxLgK    = 19
+	empiricalMaxSizeFactor = 0.6 // equals 0.6 = 4.8 / 8.0
+	maxPreambleSizeBytes   = 40
 )
+
+var empiricalMaxBytes = []int{
+	24,     // lgK = 4
+	36,     // lgK = 5
+	56,     // lgK = 6
+	100,    // lgK = 7
+	180,    // lgK = 8
+	344,    // lgK = 9
+	660,    // lgK = 10
+	1292,   // lgK = 11
+	2540,   // lgK = 12
+	5020,   // lgK = 13
+	9968,   // lgK = 14
+	19836,  // lgK = 15
+	39532,  // lgK = 16
+	78880,  // lgK = 17
+	157516, // lgK = 18
+	314656, // lgK = 19
+}
 
 type CpcSketch struct {
 	seed uint64
@@ -513,3 +535,149 @@ func (c *CpcSketch) ToCompactSlice() ([]byte, error) {
     return (byte[]) wmem.getArray();
   }
 */
+
+// GetFamily returns the CPC family identifier.
+func (c *CpcSketch) GetFamily() internal.Family {
+	return internal.FamilyEnum.CPC
+}
+
+// GetLgK returns the log-base-2 of K.
+func (c *CpcSketch) GetLgK() int {
+	return c.lgK
+}
+
+// IsEmpty returns true if no coupons have been collected.
+func (c *CpcSketch) IsEmpty() bool {
+	return c.numCoupons == 0
+}
+
+// Validate recomputes the coupon count from the bit matrix and returns true if it matches the sketch's numCoupons.
+func (c *CpcSketch) Validate() bool {
+	bitMatrix := c.bitMatrixOfSketch()
+	matrixCoupons := countBitsSetInMatrix(bitMatrix)
+	return matrixCoupons == c.numCoupons
+}
+
+// Copy creates and returns a deep copy of the CpcSketch.
+func (c *CpcSketch) Copy() *CpcSketch {
+	// Create a new sketch with the same lgK and seed.
+	copySketch, err := NewCpcSketch(c.lgK, c.seed)
+	if err != nil {
+		// This should never happen if the current sketch is valid.
+		panic(err)
+	}
+	// Copy basic fields.
+	copySketch.numCoupons = c.numCoupons
+	copySketch.mergeFlag = c.mergeFlag
+	copySketch.fiCol = c.fiCol
+	copySketch.windowOffset = c.windowOffset
+
+	// Clone the slidingWindow slice if present.
+	if c.slidingWindow != nil {
+		copySketch.slidingWindow = make([]byte, len(c.slidingWindow))
+		copy(copySketch.slidingWindow, c.slidingWindow)
+	} else {
+		copySketch.slidingWindow = nil
+	}
+
+	// Copy the pair table if present.
+	if c.pairTable != nil {
+		copySketch.pairTable = c.pairTable.Copy() // Assumes pairTable has a Copy() method.
+	} else {
+		copySketch.pairTable = nil
+	}
+
+	// Copy floating-point accumulators.
+	copySketch.kxp = c.kxp
+	copySketch.hipEstAccum = c.hipEstAccum
+
+	/*
+		Added the copy of the scratch buffer to ensure that every field, even temporary ones, in the struct is duplicated,
+		so that the copy is entirely independent of the original. Since the scratch buffer is part of the struct, we copy it too.
+	*/
+	copy(copySketch.scratch[:], c.scratch[:])
+
+	return copySketch
+}
+
+// RefreshKXP recalculates the KXP register of the sketch from the given bitMatrix.
+// It improves numerical accuracy by summing the contributions of each byte separately.
+func (c *CpcSketch) RefreshKXP(bitMatrix []uint64) error {
+	// k is the number of rows in the bitMatrix.
+	k := 1 << c.lgK
+
+	// Initialize an array of 8 float64 values (one per byte position).
+	byteSums := make([]float64, 8)
+	for i := 0; i < 8; i++ {
+		byteSums[i] = 0.0
+	}
+
+	// For each row in the matrix, extract each byte and accumulate its contribution.
+	for i := 0; i < k; i++ {
+		row := bitMatrix[i]
+		for j := 0; j < 8; j++ {
+			byteIdx := int(row & 0xFF)
+			byteSums[j] += kxpByteLookup[byteIdx]
+			row >>= 8 // Logical right shift.
+		}
+	}
+
+	total := 0.0
+	// Loop in reverse order: from j = 6 down to 0.
+	for j := 6; j >= 0; j-- {
+		factor, err := internal.InvPow2(8 * j)
+		if err != nil {
+			return err
+		}
+		total += factor * byteSums[j]
+	}
+	c.kxp = total
+	return nil
+}
+
+// RowColUpdate processes the given rowCol value and updates the sketch accordingly.
+// It returns an error if any sub-method fails.
+func (c *CpcSketch) RowColUpdate(rowCol int) error {
+	// Extract the column from the rowCol value.
+	col := rowCol & 63
+	// If the column is less than fiCol, exit early (speed optimization).
+	if col < c.fiCol {
+		return nil
+	}
+	// If no coupons have been collected, promote the sketch from empty to sparse.
+	if c.numCoupons == 0 {
+		if err := c.promoteEmptyToSparse(); err != nil {
+			return err
+		}
+	}
+	// Compute k = 1 << lgK.
+	k := uint64(1) << c.lgK
+	// If (numCoupons << 5) is less than (3 * k), update in sparse mode; otherwise, update in windowed mode.
+	if (c.numCoupons << 5) < (3 * k) {
+		return c.updateSparse(rowCol)
+	}
+	return c.updateWindowed(rowCol)
+}
+
+// GetMaxSerializedBytes returns the estimated maximum serialized size of a sketch
+// given lgK. It panics if lgK is out of bounds.
+func GetMaxSerializedBytes(lgK int) int {
+	// Verify that lgK is within valid bounds.
+	if err := checkLgK(lgK); err != nil {
+		panic(err)
+	}
+
+	// Use the empirical array if lgK is <= empiricalSizeMaxLgK.
+	if lgK <= empiricalSizeMaxLgK {
+		return empiricalMaxBytes[lgK-minLgK] + maxPreambleSizeBytes
+	}
+	// Otherwise, compute based on k = 1 << lgK.
+	k := 1 << lgK
+	return int(empiricalMaxSizeFactor*float64(k)) + maxPreambleSizeBytes
+}
+
+// Heapify creates a CpcSketch from the given byte array and seed.
+// It wraps the deserialization logic by calling NewCpcSketchFromSlice.
+func Heapify(byteArray []byte, seed uint64) (*CpcSketch, error) {
+	return NewCpcSketchFromSlice(byteArray, seed)
+}

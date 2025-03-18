@@ -120,6 +120,43 @@ func TestCPCCheckCornerCaseUpdates(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestCPCCheckCornerHashUpdates(t *testing.T) {
+	sk, err := NewCpcSketch(26, internal.DEFAULT_UPDATE_SEED)
+	assert.NoError(t, err)
+	// In Java, hash0 is -1; in Go we represent -1 as all ones.
+	hash0 := ^uint64(0)
+	hash1 := uint64(0)
+	err = sk.hashUpdate(hash0, hash1)
+	assert.NoError(t, err)
+	assert.NotNil(t, sk.pairTable)
+}
+
+// TestCPCCheckCopyWithWindow tests the Copy() method and then refreshes KXP.
+func TestCPCCheckCopyWithWindow(t *testing.T) {
+	lgK := 4
+	sk, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
+	assert.NoError(t, err)
+	sk2 := sk.Copy()
+	n := 1 << lgK
+	for i := 0; i < n; i++ {
+		err = sk.UpdateUint64(uint64(i))
+		assert.NoError(t, err)
+	}
+	sk2 = sk.Copy()
+	bitMatrix := sk.bitMatrixOfSketch()
+	err = sk.RefreshKXP(bitMatrix)
+	assert.NoError(t, err)
+	assert.True(t, specialEquals(sk2, sk, false, false))
+}
+
+// TestCPCCheckFamily verifies that GetFamily returns the CPC family enum.
+func TestCPCCheckFamily(t *testing.T) {
+	sk, err := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+	assert.NoError(t, err)
+	family := sk.GetFamily()
+	assert.Equal(t, internal.FamilyEnum.CPC, family)
+}
+
 func TestCPCCheckLgK(t *testing.T) {
 	sk, err := NewCpcSketch(10, 0)
 	assert.NoError(t, err)
@@ -137,4 +174,25 @@ func TestCPCcheckIconHipUBLBLg15(t *testing.T) {
 	iconConfidenceLB(15, 1, 2)
 	hipConfidenceUB(15, 1, 1.0, 2)
 	hipConfidenceLB(15, 1, 1.0, 2)
+}
+
+// TestCPCCheckRowColUpdate tests that rowColUpdate properly updates the sketch.
+func TestCPCCheckRowColUpdate(t *testing.T) {
+	lgK := 10
+	sk, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
+	assert.NoError(t, err)
+	err = sk.RowColUpdate(0)
+	assert.NoError(t, err)
+	assert.Equal(t, CpcFlavorSparse, sk.GetFlavor())
+}
+
+// TestCPCCheckGetMaxSize verifies the maximum serialized size calculations.
+func TestCPCCheckGetMaxSize(t *testing.T) {
+	size4 := GetMaxSerializedBytes(4)
+	size26 := GetMaxSerializedBytes(26)
+	assert.Equal(t, 24+40, size4)
+
+	expectedFloat := 0.6 * float64(1<<26)
+	expected := int(expectedFloat) + 40
+	assert.Equal(t, expected, size26)
 }

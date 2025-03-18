@@ -237,3 +237,63 @@ func mergePairs(arrA []int, startA, lengthA int, arrB []int, startB, lengthB int
 		c++
 	}
 }
+
+// Copy creates and returns a deep copy of the pairTable.
+func (p *pairTable) Copy() *pairTable {
+	// Create a new pairTable using the same lgSizeInts and validBits.
+	newPT, err := NewPairTable(p.lgSizeInts, p.validBits)
+	if err != nil {
+		// This should not happen if p is valid.
+		panic(err)
+	}
+	// Copy the number of pairs.
+	newPT.numPairs = p.numPairs
+	// Deep copy the slots array.
+	newPT.slotsArr = make([]int, len(p.slotsArr))
+	copy(newPT.slotsArr, p.slotsArr)
+	return newPT
+}
+
+// UnwrapItems extracts the valid items from the pair table using the unwrapping logic.
+// It returns a slice containing exactly numPairs items, or nil if numPairs < 1.
+func (p *pairTable) UnwrapItems(numPairs int) []int {
+	if numPairs < 1 {
+		return nil
+	}
+	tableSize := 1 << p.lgSizeInts
+	result := make([]int, numPairs)
+	i, l, r := 0, 0, numPairs-1
+
+	// hiBit is the highest bit based on validBits.
+	hiBit := 1 << (p.validBits - 1)
+
+	// Process the region before the first empty slot.
+	for i < tableSize && p.slotsArr[i] != -1 {
+		item := p.slotsArr[i]
+		i++
+		// If the high bit is set, this item was likely wrapped, so place it at the end.
+		if (item & hiBit) != 0 {
+			result[r] = item
+			r--
+		} else {
+			result[l] = item
+			l++
+		}
+	}
+
+	// Process the rest of the table normally.
+	for i < tableSize {
+		look := p.slotsArr[i]
+		i++
+		if look != -1 {
+			result[l] = look
+			l++
+		}
+	}
+
+	// The indices should meet in the middle.
+	if l != r+1 {
+		panic(fmt.Sprintf("UnwrapItems: inconsistent indices: l=%d, r=%d", l, r))
+	}
+	return result
+}

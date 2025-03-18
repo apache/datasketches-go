@@ -17,32 +17,32 @@
 
 package internal
 
-type family struct {
+type Family struct {
 	Id          int
 	MaxPreLongs int
 }
 
 type families struct {
-	HLL       family
-	Frequency family
-	Kll       family
-	CPC       family
+	HLL       Family
+	Frequency Family
+	Kll       Family
+	CPC       Family
 }
 
 var FamilyEnum = &families{
-	HLL: family{
+	HLL: Family{
 		Id:          7,
 		MaxPreLongs: 1,
 	},
-	Frequency: family{
+	Frequency: Family{
 		Id:          10,
 		MaxPreLongs: 4,
 	},
-	Kll: family{
+	Kll: Family{
 		Id:          15,
 		MaxPreLongs: 2,
 	},
-	CPC: family{
+	CPC: Family{
 		Id:          16,
 		MaxPreLongs: 5,
 	},

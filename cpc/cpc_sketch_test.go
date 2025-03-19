@@ -51,7 +51,7 @@ func TestCPCCheckUpdatesEstimate(t *testing.T) {
 	assert.True(t, lb >= 0)
 	assert.True(t, lb <= est)
 	assert.True(t, est <= ub)
-	assert.Equal(t, sk.GetFlavor(), CpcFlavorSparse)
+	assert.Equal(t, sk.getFlavor(), CpcFlavorSparse)
 	assert.Equal(t, sk.getFormat(), CpcFormatSparceHybridHip)
 }
 
@@ -131,21 +131,20 @@ func TestCPCCheckCornerHashUpdates(t *testing.T) {
 	assert.NotNil(t, sk.pairTable)
 }
 
-// TestCPCCheckCopyWithWindow tests the Copy() method and then refreshes KXP.
+// TestCPCCheckCopyWithWindow tests the copy() method and then refreshes KXP.
 func TestCPCCheckCopyWithWindow(t *testing.T) {
 	lgK := 4
 	sk, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
 	assert.NoError(t, err)
-	sk2 := sk.Copy()
+	sk2 := sk.copy()
 	n := 1 << lgK
 	for i := 0; i < n; i++ {
 		err = sk.UpdateUint64(uint64(i))
 		assert.NoError(t, err)
 	}
-	sk2 = sk.Copy()
+	sk2 = sk.copy()
 	bitMatrix := sk.bitMatrixOfSketch()
-	err = sk.RefreshKXP(bitMatrix)
-	assert.NoError(t, err)
+	sk.refreshKXP(bitMatrix)
 	assert.True(t, specialEquals(sk2, sk, false, false))
 }
 
@@ -153,8 +152,16 @@ func TestCPCCheckCopyWithWindow(t *testing.T) {
 func TestCPCCheckFamily(t *testing.T) {
 	sk, err := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
 	assert.NoError(t, err)
-	family := sk.GetFamily()
-	assert.Equal(t, internal.FamilyEnum.CPC, family)
+
+	family := sk.getFamily()
+
+	// Convert internal.family to cpc.Family before comparison
+	expectedFamily := Family{
+		ID:          internal.FamilyEnum.CPC.Id,
+		MaxPreLongs: internal.FamilyEnum.CPC.MaxPreLongs,
+	}
+
+	assert.Equal(t, expectedFamily, family)
 }
 
 func TestCPCCheckLgK(t *testing.T) {
@@ -181,15 +188,15 @@ func TestCPCCheckRowColUpdate(t *testing.T) {
 	lgK := 10
 	sk, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
 	assert.NoError(t, err)
-	err = sk.RowColUpdate(0)
+	err = sk.rowColUpdate(0)
 	assert.NoError(t, err)
-	assert.Equal(t, CpcFlavorSparse, sk.GetFlavor())
+	assert.Equal(t, CpcFlavorSparse, sk.getFlavor())
 }
 
 // TestCPCCheckGetMaxSize verifies the maximum serialized size calculations.
 func TestCPCCheckGetMaxSize(t *testing.T) {
-	size4 := GetMaxSerializedBytes(4)
-	size26 := GetMaxSerializedBytes(26)
+	size4 := getMaxSerializedBytes(4)
+	size26 := getMaxSerializedBytes(26)
 	assert.Equal(t, 24+40, size4)
 
 	expectedFloat := 0.6 * float64(1<<26)

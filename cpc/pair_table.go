@@ -238,40 +238,39 @@ func mergePairs(arrA []int, startA, lengthA int, arrB []int, startB, lengthB int
 	}
 }
 
-// Copy creates and returns a deep copy of the pairTable.
-func (p *pairTable) Copy() *pairTable {
+// copy creates and returns a deep copy of the pairTable.
+func (p *pairTable) copy() (*pairTable, error) {
 	// Create a new pairTable using the same lgSizeInts and validBits.
 	newPT, err := NewPairTable(p.lgSizeInts, p.validBits)
 	if err != nil {
 		// This should not happen if p is valid.
-		panic(err)
+		return nil, err
 	}
-	// Copy the number of pairs.
+	// copy the number of pairs.
 	newPT.numPairs = p.numPairs
 	// Deep copy the slots array.
 	newPT.slotsArr = make([]int, len(p.slotsArr))
 	copy(newPT.slotsArr, p.slotsArr)
-	return newPT
+	return newPT, nil
 }
 
-// UnwrapItems extracts the valid items from the pair table using the unwrapping logic.
-// It returns a slice containing exactly numPairs items, or nil if numPairs < 1.
-func (p *pairTable) UnwrapItems(numPairs int) []int {
+// unwrap extracts the valid items from the pair table using the unwrapping logic.
+func (p *pairTable) unwrap(numPairs int) ([]int, error) {
 	if numPairs < 1 {
-		return nil
+		return nil, nil
 	}
+
 	tableSize := 1 << p.lgSizeInts
 	result := make([]int, numPairs)
+
 	i, l, r := 0, 0, numPairs-1
+	hiBit := 1 << (p.validBits - 1) // Highest bit based on validBits.
 
-	// hiBit is the highest bit based on validBits.
-	hiBit := 1 << (p.validBits - 1)
-
-	// Process the region before the first empty slot.
+	// Process the region before the first empty slot (-1).
 	for i < tableSize && p.slotsArr[i] != -1 {
 		item := p.slotsArr[i]
 		i++
-		// If the high bit is set, this item was likely wrapped, so place it at the end.
+		// If the high bit is set, treat as wrapped item and place at the end.
 		if (item & hiBit) != 0 {
 			result[r] = item
 			r--
@@ -291,9 +290,10 @@ func (p *pairTable) UnwrapItems(numPairs int) []int {
 		}
 	}
 
-	// The indices should meet in the middle.
-	if l != r+1 {
-		panic(fmt.Sprintf("UnwrapItems: inconsistent indices: l=%d, r=%d", l, r))
+	// Check that we've distributed items exactly.
+	if l != (r + 1) {
+		return nil, fmt.Errorf("unwrap: inconsistent indices (l=%d, r=%d)", l, r)
 	}
-	return result
+
+	return result, nil
 }

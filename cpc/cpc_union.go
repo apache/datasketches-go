@@ -63,7 +63,7 @@ func (u *CpcUnion) Update(source *CpcSketch) error {
 		return err
 	}
 
-	sourceFlavorOrd := source.GetFlavor()
+	sourceFlavorOrd := source.getFlavor()
 	if sourceFlavorOrd == CpcFlavorEmpty {
 		return nil
 	}
@@ -97,7 +97,7 @@ func (u *CpcUnion) Update(source *CpcSketch) error {
 		if u.accumulator.lgK == 0 {
 			return fmt.Errorf("union accumulator cannot be nil")
 		}
-		if u.accumulator.GetFlavor() == CpcFlavorEmpty && u.lgK == source.lgK {
+		if u.accumulator.getFlavor() == CpcFlavorEmpty && u.lgK == source.lgK {
 			u.accumulator = source
 			break
 		}
@@ -105,7 +105,7 @@ func (u *CpcUnion) Update(source *CpcSketch) error {
 			return err
 		}
 		// if the accumulator has graduated beyond sparse, switch union to a bitMatrix
-		if u.accumulator.GetFlavor() > CpcFlavorSparse {
+		if u.accumulator.getFlavor() > CpcFlavorSparse {
 			bitMatrix := u.accumulator.bitMatrixOfSketch()
 			u.bitMatrix = bitMatrix
 			u.accumulator = nil
@@ -142,7 +142,7 @@ func (u *CpcUnion) GetResult() (*CpcSketch, error) {
 			result.mergeFlag = true
 			return result, nil
 		}
-		if u.accumulator.GetFlavor() != CpcFlavorSparse {
+		if u.accumulator.getFlavor() != CpcFlavorSparse {
 			return nil, fmt.Errorf("accumulator must be SPARSE")
 		}
 		result := u.accumulator // effectively a copy
@@ -271,7 +271,7 @@ func (u *CpcUnion) reduceUnionK(newLgK int) error {
 			if err := walkTableUpdatingSketch(newSketch, oldSketch.pairTable); err != nil {
 				return err
 			}
-			finalNewFlavor := newSketch.GetFlavor()
+			finalNewFlavor := newSketch.getFlavor()
 			if finalNewFlavor == CpcFlavorSparse {
 				u.accumulator = newSketch
 				u.lgK = newLgK

@@ -54,12 +54,6 @@ var empiricalMaxBytes = []int{
 	314656, // lgK = 19
 }
 
-// Family is a public type to expose only the fields/behavior we need.
-type Family struct {
-	ID          int
-	MaxPreLongs int
-}
-
 type CpcSketch struct {
 	seed uint64
 
@@ -529,13 +523,8 @@ func (c *CpcSketch) ToCompactSlice() ([]byte, error) {
 	return buf, nil
 }
 
-func (c *CpcSketch) getFamily() Family {
-	internalFam := internal.FamilyEnum.CPC
-	// Translate to public type
-	return Family{
-		ID:          internalFam.Id,
-		MaxPreLongs: internalFam.MaxPreLongs,
-	}
+func (c *CpcSketch) getFamily() int {
+	return internal.FamilyEnum.CPC.Id
 }
 
 // getLgK returns the log-base-2 of K.

@@ -155,13 +155,7 @@ func TestCPCCheckFamily(t *testing.T) {
 
 	family := sk.getFamily()
 
-	// Convert internal.family to cpc.Family before comparison
-	expectedFamily := Family{
-		ID:          internal.FamilyEnum.CPC.Id,
-		MaxPreLongs: internal.FamilyEnum.CPC.MaxPreLongs,
-	}
-
-	assert.Equal(t, expectedFamily, family)
+	assert.Equal(t, family, internal.FamilyEnum.CPC.Id)
 }
 
 func TestCPCCheckLgK(t *testing.T) {

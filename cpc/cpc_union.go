@@ -134,7 +134,10 @@ func (u *CpcUnion) Update(source *CpcSketch) error {
 		if err != nil {
 			return err
 		}
-		u.orMatrixIntoMatrix(sourceMatrix, source.lgK)
+		err := u.orMatrixIntoMatrix(sourceMatrix, source.lgK)
+		if err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("illegal Union state: %d", state)
 	}
@@ -331,15 +334,16 @@ func (u *CpcUnion) orTableIntoMatrix(srcTable *pairTable) {
 	}
 }
 
-func (u *CpcUnion) orMatrixIntoMatrix(srcMatrix []uint64, srcLgK int) {
+func (u *CpcUnion) orMatrixIntoMatrix(srcMatrix []uint64, srcLgK int) error {
 	if u.lgK > srcLgK {
-		panic("destLgK <= srcLgK")
+		return fmt.Errorf("destLgK <= srcLgK")
 	}
 	destMask := (1 << u.lgK) - 1 // downsamples when destlgK < srcLgK
 	srcK := 1 << srcLgK
 	for srcRow := 0; srcRow < srcK; srcRow++ {
 		u.bitMatrix[srcRow&destMask] |= srcMatrix[srcRow]
 	}
+	return nil
 
 }
 

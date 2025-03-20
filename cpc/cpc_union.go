@@ -134,7 +134,7 @@ func (u *CpcUnion) Update(source *CpcSketch) error {
 		if err != nil {
 			return err
 		}
-		err := u.orMatrixIntoMatrix(sourceMatrix, source.lgK)
+		err = u.orMatrixIntoMatrix(sourceMatrix, source.lgK)
 		if err != nil {
 			return err
 		}

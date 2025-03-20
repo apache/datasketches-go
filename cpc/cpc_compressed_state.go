@@ -96,7 +96,7 @@ func (c *CpcCompressedState) getFormat() CpcFormat {
 }
 
 func (c *CpcCompressedState) uncompress(src *CpcSketch) error {
-	srcFlavor := src.GetFlavor()
+	srcFlavor := src.getFlavor()
 	switch srcFlavor {
 	case CpcFlavorEmpty:
 		return nil
@@ -118,7 +118,7 @@ func (c *CpcCompressedState) uncompress(src *CpcSketch) error {
 }
 
 func (c *CpcCompressedState) compress(src *CpcSketch) error {
-	srcFlavor := src.GetFlavor()
+	srcFlavor := src.getFlavor()
 	switch srcFlavor {
 	case CpcFlavorEmpty:
 		return nil

@@ -51,7 +51,7 @@ func TestCPCCheckUpdatesEstimate(t *testing.T) {
 	assert.True(t, lb >= 0)
 	assert.True(t, lb <= est)
 	assert.True(t, est <= ub)
-	assert.Equal(t, sk.GetFlavor(), CpcFlavorSparse)
+	assert.Equal(t, sk.getFlavor(), CpcFlavorSparse)
 	assert.Equal(t, sk.getFormat(), CpcFormatSparceHybridHip)
 }
 
@@ -120,6 +120,47 @@ func TestCPCCheckCornerCaseUpdates(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestCPCCheckCornerHashUpdates(t *testing.T) {
+	sk, err := NewCpcSketch(26, internal.DEFAULT_UPDATE_SEED)
+	assert.NoError(t, err)
+	// In Java, hash0 is -1; in Go we represent -1 as all ones.
+	hash0 := ^uint64(0)
+	hash1 := uint64(0)
+	err = sk.hashUpdate(hash0, hash1)
+	assert.NoError(t, err)
+	assert.NotNil(t, sk.pairTable)
+}
+
+// TestCPCCheckCopyWithWindow tests the copy() method and then refreshes KXP.
+func TestCPCCheckCopyWithWindow(t *testing.T) {
+	lgK := 4
+	sk, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
+	assert.NoError(t, err)
+	sk2, err := sk.copy()
+	assert.NoError(t, err)
+	n := 1 << lgK
+	for i := 0; i < n; i++ {
+		err = sk.UpdateUint64(uint64(i))
+		assert.NoError(t, err)
+	}
+	sk2, err = sk.copy()
+	assert.NoError(t, err)
+	bitMatrix, err := sk.bitMatrixOfSketch()
+	assert.NoError(t, err)
+	sk.refreshKXP(bitMatrix)
+	assert.True(t, specialEquals(sk2, sk, false, false))
+}
+
+// TestCPCCheckFamily verifies that GetFamily returns the CPC family enum.
+func TestCPCCheckFamily(t *testing.T) {
+	sk, err := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+	assert.NoError(t, err)
+
+	family := sk.getFamily()
+
+	assert.Equal(t, family, internal.FamilyEnum.CPC.Id)
+}
+
 func TestCPCCheckLgK(t *testing.T) {
 	sk, err := NewCpcSketch(10, 0)
 	assert.NoError(t, err)
@@ -137,4 +178,27 @@ func TestCPCcheckIconHipUBLBLg15(t *testing.T) {
 	iconConfidenceLB(15, 1, 2)
 	hipConfidenceUB(15, 1, 1.0, 2)
 	hipConfidenceLB(15, 1, 1.0, 2)
+}
+
+// TestCPCCheckRowColUpdate tests that rowColUpdate properly updates the sketch.
+func TestCPCCheckRowColUpdate(t *testing.T) {
+	lgK := 10
+	sk, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
+	assert.NoError(t, err)
+	err = sk.rowColUpdate(0)
+	assert.NoError(t, err)
+	assert.Equal(t, CpcFlavorSparse, sk.getFlavor())
+}
+
+// TestCPCCheckGetMaxSize verifies the maximum serialized size calculations.
+func TestCPCCheckGetMaxSize(t *testing.T) {
+	size4, err := getMaxSerializedBytes(4)
+	assert.NoError(t, err)
+	size26, err := getMaxSerializedBytes(26)
+	assert.NoError(t, err)
+	assert.Equal(t, 24+40, size4)
+
+	expectedFloat := 0.6 * float64(1<<26)
+	expected := int(expectedFloat) + 40
+	assert.Equal(t, expected, size26)
 }

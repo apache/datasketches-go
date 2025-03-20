@@ -34,7 +34,7 @@ func TestGenerateGoFiles(t *testing.T) {
 		for i := 0; i < n; i++ {
 			assert.NoError(t, sketch.UpdateUint64(uint64(i)))
 		}
-		assert.Equal(t, sketch.GetFlavor(), flavorArr[flavorIdx])
+		assert.Equal(t, sketch.getFlavor(), flavorArr[flavorIdx])
 		sl, err := sketch.ToCompactSlice()
 		assert.NoError(t, err)
 		err = os.WriteFile(fmt.Sprintf("%s/cpc_n%d_go.sk", internal.GoPath, n), sl, 0644)
@@ -51,7 +51,7 @@ func TestJavaCompat(t *testing.T) {
 			assert.NoError(t, err)
 			sketch, err := NewCpcSketchFromSliceWithDefault(bytes)
 			assert.NoError(t, err)
-			assert.Equal(t, sketch.GetFlavor(), flavorArr[flavorIdx])
+			assert.Equal(t, sketch.getFlavor(), flavorArr[flavorIdx])
 			assert.InDelta(t, float64(n), sketch.GetEstimate(), float64(n)*0.02)
 		}
 	})

@@ -28,9 +28,31 @@ import (
 )
 
 const (
-	minLgK = 4
-	maxLgK = 26
+	minLgK                 = 4
+	maxLgK                 = 26
+	empiricalSizeMaxLgK    = 19
+	empiricalMaxSizeFactor = 0.6 // equals 0.6 = 4.8 / 8.0
+	maxPreambleSizeBytes   = 40
 )
+
+var empiricalMaxBytes = []int{
+	24,     // lgK = 4
+	36,     // lgK = 5
+	56,     // lgK = 6
+	100,    // lgK = 7
+	180,    // lgK = 8
+	344,    // lgK = 9
+	660,    // lgK = 10
+	1292,   // lgK = 11
+	2540,   // lgK = 12
+	5020,   // lgK = 13
+	9968,   // lgK = 14
+	19836,  // lgK = 15
+	39532,  // lgK = 16
+	78880,  // lgK = 17
+	157516, // lgK = 18
+	314656, // lgK = 19
+}
 
 type CpcSketch struct {
 	seed uint64
@@ -45,7 +67,7 @@ type CpcSketch struct {
 	slidingWindow []byte     //either null or size K bytes
 	pairTable     *pairTable //for sparse and surprising values, either null or variable size
 
-	//The following variables are only valid in HIP varients
+	//The following variables are only valid in HIP variants
 	kxp         float64 //used with HIP
 	hipEstAccum float64 //used with HIP
 
@@ -239,7 +261,7 @@ func (c *CpcSketch) updateWindowed(rowCol int) error {
 	if c32pre < (3 * k) {
 		return fmt.Errorf("C < 3K/32")
 	}
-	c8pre := uint64(c.numCoupons << 3)
+	c8pre := c.numCoupons << 3
 	w8pre := uint64(c.windowOffset << 3)
 	if c8pre >= ((uint64(27) + w8pre) * k) {
 		return fmt.Errorf("C >= (K * 27/8) + (K * windowOffset)")
@@ -296,7 +318,7 @@ func hash(bs []byte, seed uint64) (uint64, uint64) {
 
 func (c *CpcSketch) getFormat() CpcFormat {
 	ordinal := 0
-	f := c.GetFlavor()
+	f := c.getFlavor()
 	if f == CpcFlavorHybrid || f == CpcFlavorSparse {
 		ordinal = 2
 		if !c.mergeFlag {
@@ -317,7 +339,7 @@ func (c *CpcSketch) getFormat() CpcFormat {
 	return CpcFormat(ordinal)
 }
 
-func (c *CpcSketch) GetFlavor() CpcFlavor {
+func (c *CpcSketch) getFlavor() CpcFlavor {
 	return determineFlavor(c.lgK, c.numCoupons)
 }
 
@@ -380,11 +402,8 @@ func (c *CpcSketch) rowColUpdate(rowCol int) error {
 	k := uint64(1) << c.lgK
 	if (c.numCoupons << 5) < (3 * k) {
 		return c.updateSparse(rowCol)
-	} else {
-		// TODO(pierre)
-		// return c.updateWindowed(rowCol)
 	}
-	return nil
+	return c.updateWindowed(rowCol)
 }
 
 func (c *CpcSketch) modifyOffset(newOffset int) error {
@@ -398,7 +417,10 @@ func (c *CpcSketch) modifyOffset(newOffset int) error {
 		return fmt.Errorf("slidingWindow == nil || pairTable == nil")
 	}
 	k := 1 << c.lgK
-	bitMatrix := c.bitMatrixOfSketch()
+	bitMatrix, err := c.bitMatrixOfSketch()
+	if err != nil {
+		return err
+	}
 	if (newOffset & 0x7) == 0 {
 		c.refreshKXP(bitMatrix)
 	}
@@ -452,30 +474,30 @@ func (c *CpcSketch) refreshKXP(bitMatrix []uint64) {
 	c.kxp = total
 }
 
-func (c *CpcSketch) bitMatrixOfSketch() []uint64 {
+func (c *CpcSketch) bitMatrixOfSketch() ([]uint64, error) {
 	k := uint64(1) << c.lgK
 	offset := c.windowOffset
 	if offset < 0 || offset > 56 {
-		panic("offset < 0 || offset > 56")
+		return nil, fmt.Errorf("offset < 0 || offset > 56")
 	}
 	matrix := make([]uint64, k)
 	if c.numCoupons == 0 {
-		return matrix // Returning a matrix of zeros rather than NULL.
+		return matrix, nil // Returning a matrix of zeros rather than NULL.
 	}
 	//Fill the matrix with default rows in which the "early zone" is filled with ones.
-	//This is essential for the routine'c O(k) time cost (as opposed to O(C)).
+	//This is essential for the routine's O(k) time cost (as opposed to O(C)).
 	defaultRow := (1 << offset) - 1
 	for i := range matrix {
 		matrix[i] = uint64(defaultRow)
 	}
 	if c.slidingWindow != nil { // In other words, we are in window mode, not sparse mode.
-		for i, v := range c.slidingWindow { // set the window bits, trusting the sketch'c current offset.
-			matrix[i] |= (uint64(v) << offset)
+		for i, v := range c.slidingWindow { // set the window bits, trusting the sketch's current offset.
+			matrix[i] |= uint64(v) << offset
 		}
 	}
 	table := c.pairTable
 	if table == nil {
-		panic("table == nil")
+		return nil, fmt.Errorf("table == nil")
 	}
 	slots := table.slotsArr
 	numSlots := 1 << table.lgSizeInts
@@ -487,10 +509,10 @@ func (c *CpcSketch) bitMatrixOfSketch() []uint64 {
 			// Flip the specified matrix bit from its default value.
 			// In the "early" zone the bit changes from 1 to 0.
 			// In the "late" zone the bit changes from 0 to 1.
-			matrix[row] ^= (1 << col)
+			matrix[row] ^= 1 << col
 		}
 	}
-	return matrix
+	return matrix, nil
 }
 
 func (c *CpcSketch) ToCompactSlice() ([]byte, error) {
@@ -504,12 +526,88 @@ func (c *CpcSketch) ToCompactSlice() ([]byte, error) {
 	return buf, nil
 }
 
-/*
-  public byte[] toByteArray() {
-    final CompressedState state = CompressedState.compress(this);
-    final long cap = state.getRequiredSerializedBytes();
-    final WritableMemory wmem = WritableMemory.allocate((int) cap);
-    state.exportToMemory(wmem);
-    return (byte[]) wmem.getArray();
-  }
-*/
+func (c *CpcSketch) getFamily() int {
+	return internal.FamilyEnum.CPC.Id
+}
+
+// getLgK returns the log-base-2 of K.
+func (c *CpcSketch) getLgK() int {
+	return c.lgK
+}
+
+// isEmpty returns true if no coupons have been collected.
+func (c *CpcSketch) isEmpty() bool {
+	return c.numCoupons == 0
+}
+
+// validate recomputes the coupon count from the bit matrix and returns true if it matches the sketch's numCoupons.
+func (c *CpcSketch) validate() (bool, error) {
+	bitMatrix, err := c.bitMatrixOfSketch()
+	if err != nil {
+		return false, err
+	}
+	matrixCoupons := countBitsSetInMatrix(bitMatrix)
+	return matrixCoupons == c.numCoupons, nil
+}
+
+// copy creates and returns a deep copy of the CpcSketch.
+func (c *CpcSketch) copy() (*CpcSketch, error) {
+	// Create a new sketch with the same lgK and seed.
+	copySketch, err := NewCpcSketch(c.lgK, c.seed)
+	if err != nil {
+		// This should never happen if the current sketch is valid.
+		return nil, err
+	}
+	// copy basic fields.
+	copySketch.numCoupons = c.numCoupons
+	copySketch.mergeFlag = c.mergeFlag
+	copySketch.fiCol = c.fiCol
+	copySketch.windowOffset = c.windowOffset
+
+	// Clone the slidingWindow slice if present.
+	if c.slidingWindow != nil {
+		copySketch.slidingWindow = make([]byte, len(c.slidingWindow))
+		copy(copySketch.slidingWindow, c.slidingWindow)
+	} else {
+		copySketch.slidingWindow = nil
+	}
+
+	// Copy the pair table if present.
+	if c.pairTable != nil {
+		copySketch.pairTable, err = c.pairTable.copy()
+		if err != nil {
+			copySketch.pairTable = nil
+		}
+	} else {
+		copySketch.pairTable = nil
+	}
+
+	// copy floating-point accumulators.
+	copySketch.kxp = c.kxp
+	copySketch.hipEstAccum = c.hipEstAccum
+
+	/*
+		Added the copy of the scratch buffer to ensure that every field, even temporary ones, in the struct is duplicated,
+		so that the copy is entirely independent of the original. Since the scratch buffer is part of the struct, we copy it too.
+	*/
+	copy(copySketch.scratch[:], c.scratch[:])
+
+	return copySketch, nil
+}
+
+// getMaxSerializedBytes returns the estimated maximum serialized size of a sketch
+// given lgK.
+func getMaxSerializedBytes(lgK int) (int, error) {
+	// Verify that lgK is within valid bounds.
+	if err := checkLgK(lgK); err != nil {
+		return 0, err
+	}
+
+	// Use the empirical array if lgK is <= empiricalSizeMaxLgK.
+	if lgK <= empiricalSizeMaxLgK {
+		return empiricalMaxBytes[lgK-minLgK] + maxPreambleSizeBytes, nil
+	}
+	// Otherwise, compute based on k = 1 << lgK.
+	k := 1 << lgK
+	return int(empiricalMaxSizeFactor*float64(k)) + maxPreambleSizeBytes, nil
+}

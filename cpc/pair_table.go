@@ -132,7 +132,7 @@ func (p *pairTable) maybeDelete(item int) (bool, error) {
 
 }
 
-func (p *pairTable) mustInsert(item int) {
+func (p *pairTable) mustInsert(item int) error {
 	//SHARED CODE (implemented as a macro in C and expanded here)
 	lgSizeInts := p.lgSizeInts
 	sizeInts := 1 << lgSizeInts
@@ -149,12 +149,13 @@ func (p *pairTable) mustInsert(item int) {
 	}
 	//END SHARED CODE
 	if fetched == item {
-		panic("PairTable mustInsert() failed")
+		fmt.Errorf("PairTable mustInsert() failed")
 	} else {
 		//assert (fetched == -1)
 		arr[probe] = item
 		// counts and resizing must be handled by the caller.
 	}
+	return nil
 }
 
 func (p *pairTable) rebuild(newLgSizeInts int) error {
@@ -236,4 +237,64 @@ func mergePairs(arrA []int, startA, lengthA int, arrB []int, startB, lengthB int
 		}
 		c++
 	}
+}
+
+// copy creates and returns a deep copy of the pairTable.
+func (p *pairTable) copy() (*pairTable, error) {
+	// Create a new pairTable using the same lgSizeInts and validBits.
+	newPT, err := NewPairTable(p.lgSizeInts, p.validBits)
+	if err != nil {
+		// This should not happen if p is valid.
+		return nil, err
+	}
+	// copy the number of pairs.
+	newPT.numPairs = p.numPairs
+	// Deep copy the slots array.
+	newPT.slotsArr = make([]int, len(p.slotsArr))
+	copy(newPT.slotsArr, p.slotsArr)
+	return newPT, nil
+}
+
+// unwrap extracts the valid items from the pair table using the unwrapping logic.
+func (p *pairTable) unwrap(numPairs int) ([]int, error) {
+	if numPairs < 1 {
+		return nil, nil
+	}
+
+	tableSize := 1 << p.lgSizeInts
+	result := make([]int, numPairs)
+
+	i, l, r := 0, 0, numPairs-1
+	hiBit := 1 << (p.validBits - 1) // Highest bit based on validBits.
+
+	// Process the region before the first empty slot (-1).
+	for i < tableSize && p.slotsArr[i] != -1 {
+		item := p.slotsArr[i]
+		i++
+		// If the high bit is set, treat as wrapped item and place at the end.
+		if (item & hiBit) != 0 {
+			result[r] = item
+			r--
+		} else {
+			result[l] = item
+			l++
+		}
+	}
+
+	// Process the rest of the table normally.
+	for i < tableSize {
+		look := p.slotsArr[i]
+		i++
+		if look != -1 {
+			result[l] = look
+			l++
+		}
+	}
+
+	// Check that we've distributed items exactly.
+	if l != (r + 1) {
+		return nil, fmt.Errorf("unwrap: inconsistent indices (l=%d, r=%d)", l, r)
+	}
+
+	return result, nil
 }

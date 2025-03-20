@@ -132,7 +132,7 @@ func (p *pairTable) maybeDelete(item int) (bool, error) {
 
 }
 
-func (p *pairTable) mustInsert(item int) {
+func (p *pairTable) mustInsert(item int) error {
 	//SHARED CODE (implemented as a macro in C and expanded here)
 	lgSizeInts := p.lgSizeInts
 	sizeInts := 1 << lgSizeInts
@@ -149,12 +149,13 @@ func (p *pairTable) mustInsert(item int) {
 	}
 	//END SHARED CODE
 	if fetched == item {
-		panic("PairTable mustInsert() failed")
+		fmt.Errorf("PairTable mustInsert() failed")
 	} else {
 		//assert (fetched == -1)
 		arr[probe] = item
 		// counts and resizing must be handled by the caller.
 	}
+	return nil
 }
 
 func (p *pairTable) rebuild(newLgSizeInts int) error {

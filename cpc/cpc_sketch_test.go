@@ -136,14 +136,17 @@ func TestCPCCheckCopyWithWindow(t *testing.T) {
 	lgK := 4
 	sk, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
 	assert.NoError(t, err)
-	sk2 := sk.copy()
+	sk2, err := sk.copy()
+	assert.NoError(t, err)
 	n := 1 << lgK
 	for i := 0; i < n; i++ {
 		err = sk.UpdateUint64(uint64(i))
 		assert.NoError(t, err)
 	}
-	sk2 = sk.copy()
-	bitMatrix := sk.bitMatrixOfSketch()
+	sk2, err = sk.copy()
+	assert.NoError(t, err)
+	bitMatrix, err := sk.bitMatrixOfSketch()
+	assert.NoError(t, err)
 	sk.refreshKXP(bitMatrix)
 	assert.True(t, specialEquals(sk2, sk, false, false))
 }
@@ -189,8 +192,10 @@ func TestCPCCheckRowColUpdate(t *testing.T) {
 
 // TestCPCCheckGetMaxSize verifies the maximum serialized size calculations.
 func TestCPCCheckGetMaxSize(t *testing.T) {
-	size4 := getMaxSerializedBytes(4)
-	size26 := getMaxSerializedBytes(26)
+	size4, err := getMaxSerializedBytes(4)
+	assert.NoError(t, err)
+	size26, err := getMaxSerializedBytes(26)
+	assert.NoError(t, err)
 	assert.Equal(t, 24+40, size4)
 
 	expectedFloat := 0.6 * float64(1<<26)

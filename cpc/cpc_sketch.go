@@ -417,7 +417,10 @@ func (c *CpcSketch) modifyOffset(newOffset int) error {
 		return fmt.Errorf("slidingWindow == nil || pairTable == nil")
 	}
 	k := 1 << c.lgK
-	bitMatrix := c.bitMatrixOfSketch()
+	bitMatrix, err := c.bitMatrixOfSketch()
+	if err != nil {
+		return err
+	}
 	if (newOffset & 0x7) == 0 {
 		c.refreshKXP(bitMatrix)
 	}
@@ -471,15 +474,15 @@ func (c *CpcSketch) refreshKXP(bitMatrix []uint64) {
 	c.kxp = total
 }
 
-func (c *CpcSketch) bitMatrixOfSketch() []uint64 {
+func (c *CpcSketch) bitMatrixOfSketch() ([]uint64, error) {
 	k := uint64(1) << c.lgK
 	offset := c.windowOffset
 	if offset < 0 || offset > 56 {
-		panic("offset < 0 || offset > 56")
+		return nil, fmt.Errorf("offset < 0 || offset > 56")
 	}
 	matrix := make([]uint64, k)
 	if c.numCoupons == 0 {
-		return matrix // Returning a matrix of zeros rather than NULL.
+		return matrix, nil // Returning a matrix of zeros rather than NULL.
 	}
 	//Fill the matrix with default rows in which the "early zone" is filled with ones.
 	//This is essential for the routine's O(k) time cost (as opposed to O(C)).
@@ -494,7 +497,7 @@ func (c *CpcSketch) bitMatrixOfSketch() []uint64 {
 	}
 	table := c.pairTable
 	if table == nil {
-		panic("table == nil")
+		return nil, fmt.Errorf("table == nil")
 	}
 	slots := table.slotsArr
 	numSlots := 1 << table.lgSizeInts
@@ -509,7 +512,7 @@ func (c *CpcSketch) bitMatrixOfSketch() []uint64 {
 			matrix[row] ^= 1 << col
 		}
 	}
-	return matrix
+	return matrix, nil
 }
 
 func (c *CpcSketch) ToCompactSlice() ([]byte, error) {
@@ -538,19 +541,22 @@ func (c *CpcSketch) isEmpty() bool {
 }
 
 // validate recomputes the coupon count from the bit matrix and returns true if it matches the sketch's numCoupons.
-func (c *CpcSketch) validate() bool {
-	bitMatrix := c.bitMatrixOfSketch()
+func (c *CpcSketch) validate() (bool, error) {
+	bitMatrix, err := c.bitMatrixOfSketch()
+	if err != nil {
+		return false, err
+	}
 	matrixCoupons := countBitsSetInMatrix(bitMatrix)
-	return matrixCoupons == c.numCoupons
+	return matrixCoupons == c.numCoupons, nil
 }
 
 // copy creates and returns a deep copy of the CpcSketch.
-func (c *CpcSketch) copy() *CpcSketch {
+func (c *CpcSketch) copy() (*CpcSketch, error) {
 	// Create a new sketch with the same lgK and seed.
 	copySketch, err := NewCpcSketch(c.lgK, c.seed)
 	if err != nil {
 		// This should never happen if the current sketch is valid.
-		panic(err)
+		return nil, err
 	}
 	// copy basic fields.
 	copySketch.numCoupons = c.numCoupons
@@ -586,22 +592,22 @@ func (c *CpcSketch) copy() *CpcSketch {
 	*/
 	copy(copySketch.scratch[:], c.scratch[:])
 
-	return copySketch
+	return copySketch, nil
 }
 
 // getMaxSerializedBytes returns the estimated maximum serialized size of a sketch
-// given lgK. It panics if lgK is out of bounds.
-func getMaxSerializedBytes(lgK int) int {
+// given lgK.
+func getMaxSerializedBytes(lgK int) (int, error) {
 	// Verify that lgK is within valid bounds.
 	if err := checkLgK(lgK); err != nil {
-		panic(err)
+		return 0, err
 	}
 
 	// Use the empirical array if lgK is <= empiricalSizeMaxLgK.
 	if lgK <= empiricalSizeMaxLgK {
-		return empiricalMaxBytes[lgK-minLgK] + maxPreambleSizeBytes
+		return empiricalMaxBytes[lgK-minLgK] + maxPreambleSizeBytes, nil
 	}
 	// Otherwise, compute based on k = 1 << lgK.
 	k := 1 << lgK
-	return int(empiricalMaxSizeFactor*float64(k)) + maxPreambleSizeBytes
+	return int(empiricalMaxSizeFactor*float64(k)) + maxPreambleSizeBytes, nil
 }

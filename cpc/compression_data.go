@@ -25,7 +25,7 @@ import "fmt"
 
 // makeInversePermutation returns the inverse of the given permutation.
 // It assumes that encodePermu is a slice of bytes representing a permutation.
-func makeInversePermutation(encodePermu []byte) []byte {
+func makeInversePermutation(encodePermu []byte) ([]byte, error) {
 	length := len(encodePermu)
 	inverse := make([]byte, length)
 
@@ -36,10 +36,10 @@ func makeInversePermutation(encodePermu []byte) []byte {
 	// Verify correctness: for each index, the inverse permutation should undo the mapping.
 	for i := 0; i < length; i++ {
 		if encodePermu[inverse[i]] != byte(i) {
-			panic(fmt.Sprintf("makeInversePermutation: check failed at index %d", i))
+			return nil, fmt.Errorf("makeInversePermutation: check failed at index %d", i)
 		}
 	}
-	return inverse
+	return inverse, nil
 }
 
 // makeDecodingTable builds a decoding table (size 4096) from an encoding table.
@@ -66,7 +66,7 @@ func makeDecodingTable(encodingTable []uint16, numByteValues int) []uint16 {
 
 // validateDecodingTable checks that each entry in the decoding table correctly
 // inverts the encoding table.
-func validateDecodingTable(decodingTable, encodingTable []uint16) {
+func validateDecodingTable(decodingTable, encodingTable []uint16) error {
 	for decodeThis := 0; decodeThis < 4096; decodeThis++ {
 		tmpD := int(decodingTable[decodeThis]) & 0xFFFF
 		decodedByte := tmpD & 0xff
@@ -77,12 +77,13 @@ func validateDecodingTable(decodingTable, encodingTable []uint16) {
 		encodedLength := tmpE >> 12
 
 		if decodedLength != encodedLength {
-			panic(fmt.Sprintf("validateDecodingTable: decoded length %d != encoded length %d at decodeThis=%d", decodedLength, encodedLength, decodeThis))
+			return fmt.Errorf("validateDecodingTable: decoded length %d != encoded length %d at decodeThis=%d", decodedLength, encodedLength, decodeThis)
 		}
 		if encodedBitpattern != (decodeThis & ((1 << decodedLength) - 1)) {
-			panic(fmt.Sprintf("validateDecodingTable: encoded bitpattern mismatch at decodeThis=%d", decodeThis))
+			return fmt.Errorf("validateDecodingTable: encoded bitpattern mismatch at decodeThis=%d", decodeThis)
 		}
 	}
+	return nil
 }
 
 // -----------------------------------------------------------------------------
@@ -6058,7 +6059,7 @@ func makeTheDecodingTables() {
 
 	// Build the column permutations for decoding by inverting the encoding permutations.
 	for i := 0; i < 16; i++ {
-		columnPermutationsForDecoding[i] = makeInversePermutation(columnPermutationsForEncoding[i])
+		columnPermutationsForDecoding[i], _ = makeInversePermutation(columnPermutationsForEncoding[i])
 	}
 }
 

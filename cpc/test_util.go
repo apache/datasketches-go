@@ -196,3 +196,8 @@ func pairTableEquals(pt1, pt2 *pairTable) {
 		}
 	}
 }
+
+// fieldError panics with an error indicating an illegal operation for the given format and hi-field.
+func fieldError(format CpcFormat, hiField int) error {
+	return fmt.Errorf("operation is illegal: Format = %s, HiField = %d", format.String(), hiField)
+}

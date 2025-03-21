@@ -52,7 +52,7 @@ func TestCPCCheckUpdatesEstimate(t *testing.T) {
 	assert.True(t, lb <= est)
 	assert.True(t, est <= ub)
 	assert.Equal(t, sk.getFlavor(), CpcFlavorSparse)
-	assert.Equal(t, sk.getFormat(), CpcFormatSparceHybridHip)
+	assert.Equal(t, sk.getFormat(), CpcFormatSparseHybridHip)
 }
 
 func TestCPCCheckEstimatesWithMerge(t *testing.T) {

@@ -522,11 +522,20 @@ func putSparseHybridMerged(mem []byte, lgK int, numCoupons int, svLengthInts int
 	}
 
 	// Write the high preamble fields.
-	offset, _ := getHiFieldOffset(format, hiFieldNumCoupons)
+	offset, err := getHiFieldOffset(format, hiFieldNumCoupons)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint32(mem[offset:], uint32(numCoupons))
-	offset, _ = getHiFieldOffset(format, hiFieldSVLengthInts)
+	offset, err = getHiFieldOffset(format, hiFieldSVLengthInts)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint32(mem[offset:], uint32(svLengthInts))
-	offset, _ = getSvStreamOffset(mem)
+	offset, err = getSvStreamOffset(mem)
+	if err != nil {
+		return err
+	}
 	for i := 0; i < svLengthInts; i++ {
 		binary.LittleEndian.PutUint32(mem[offset+4*i:], uint32(svStream[i]))
 	}
@@ -551,20 +560,35 @@ func putSparseHybridHip(mem []byte, lgK int, numCoupons, svLengthInts int, kxp, 
 	}
 
 	// Write the high preamble fields.
-	offset, _ := getHiFieldOffset(format, hiFieldNumCoupons)
+	offset, err := getHiFieldOffset(format, hiFieldNumCoupons)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint32(mem[offset:], uint32(numCoupons))
 
-	offset, _ = getHiFieldOffset(format, hiFieldSVLengthInts)
+	offset, err = getHiFieldOffset(format, hiFieldSVLengthInts)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint32(mem[offset:], uint32(svLengthInts))
 
-	offset, _ = getHiFieldOffset(format, hiFieldKXP)
+	offset, err = getHiFieldOffset(format, hiFieldKXP)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint64(mem[offset:], math.Float64bits(kxp))
 
-	offset, _ = getHiFieldOffset(format, hiFieldHipAccum)
+	offset, err = getHiFieldOffset(format, hiFieldHipAccum)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint64(mem[offset:], math.Float64bits(hipAccum))
 
 	// Write the SV stream into memory.
-	offset, _ = getSvStreamOffset(mem)
+	offset, err = getSvStreamOffset(mem)
+	if err != nil {
+		return err
+	}
 	for i := 0; i < svLengthInts; i++ {
 		binary.LittleEndian.PutUint32(mem[offset+4*i:], uint32(svStream[i]))
 	}
@@ -589,14 +613,23 @@ func putPinnedSlidingMergedNoSv(mem []byte, lgK int, fiCol int, numCoupons int, 
 	}
 
 	// Write the high preamble fields.
-	offset, _ := getHiFieldOffset(format, hiFieldNumCoupons)
+	offset, err := getHiFieldOffset(format, hiFieldNumCoupons)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint32(mem[offset:], uint32(numCoupons))
 
-	offset, _ = getHiFieldOffset(format, hiFieldWLengthInts)
+	offset, err = getHiFieldOffset(format, hiFieldWLengthInts)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint32(mem[offset:], uint32(wLengthInts))
 
 	// Write the window stream array.
-	offset, _ = getWStreamOffset(mem)
+	offset, err = getWStreamOffset(mem)
+	if err != nil {
+		return err
+	}
 	for i := 0; i < wLengthInts; i++ {
 		binary.LittleEndian.PutUint32(mem[offset+4*i:], uint32(wStream[i]))
 	}
@@ -620,20 +653,35 @@ func putPinnedSlidingHipNoSv(mem []byte, lgK int, fiCol int, numCoupons int, wLe
 	}
 
 	// Write the high preamble fields.
-	offset, _ := getHiFieldOffset(format, hiFieldNumCoupons)
+	offset, err := getHiFieldOffset(format, hiFieldNumCoupons)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint32(mem[offset:], uint32(numCoupons))
 
-	offset, _ = getHiFieldOffset(format, hiFieldWLengthInts)
+	offset, err = getHiFieldOffset(format, hiFieldWLengthInts)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint32(mem[offset:], uint32(wLengthInts))
 
-	offset, _ = getHiFieldOffset(format, hiFieldKXP)
+	offset, err = getHiFieldOffset(format, hiFieldKXP)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint64(mem[offset:], math.Float64bits(kxp))
 
-	offset, _ = getHiFieldOffset(format, hiFieldHipAccum)
+	offset, err = getHiFieldOffset(format, hiFieldHipAccum)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint64(mem[offset:], math.Float64bits(hipAccum))
 
 	// Write the window stream array.
-	offset, _ = getWStreamOffset(mem)
+	offset, err = getWStreamOffset(mem)
+	if err != nil {
+		return err
+	}
 	for i := 0; i < wLengthInts; i++ {
 		binary.LittleEndian.PutUint32(mem[offset+4*i:], uint32(wStream[i]))
 	}
@@ -716,32 +764,56 @@ func putPinnedSlidingHip(mem []byte, lgK int, fiCol int, numCoupons int, numSv i
 	}
 
 	// Write high preamble fields.
-	offset, _ := getHiFieldOffset(format, hiFieldNumCoupons)
+	offset, err := getHiFieldOffset(format, hiFieldNumCoupons)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint32(mem[offset:], uint32(numCoupons))
 
-	offset, _ = getHiFieldOffset(format, hiFieldNumSV)
+	offset, err = getHiFieldOffset(format, hiFieldNumSV)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint32(mem[offset:], uint32(numSv))
 
-	offset, _ = getHiFieldOffset(format, hiFieldKXP)
+	offset, err = getHiFieldOffset(format, hiFieldKXP)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint64(mem[offset:], math.Float64bits(kxp))
 
-	offset, _ = getHiFieldOffset(format, hiFieldHipAccum)
+	offset, err = getHiFieldOffset(format, hiFieldHipAccum)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint64(mem[offset:], math.Float64bits(hipAccum))
 
-	offset, _ = getHiFieldOffset(format, hiFieldSVLengthInts)
+	offset, err = getHiFieldOffset(format, hiFieldSVLengthInts)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint32(mem[offset:], uint32(svLengthInts))
 
-	offset, _ = getHiFieldOffset(format, hiFieldWLengthInts)
+	offset, err = getHiFieldOffset(format, hiFieldWLengthInts)
+	if err != nil {
+		return err
+	}
 	binary.LittleEndian.PutUint32(mem[offset:], uint32(wLengthInts))
 
 	// Write the SV stream array.
-	offset, _ = getSvStreamOffset(mem)
+	offset, err = getSvStreamOffset(mem)
+	if err != nil {
+		return err
+	}
 	for i := 0; i < svLengthInts; i++ {
 		binary.LittleEndian.PutUint32(mem[offset+4*i:], uint32(svStream[i]))
 	}
 
 	// Write the W stream array.
-	offset, _ = getWStreamOffset(mem)
+	offset, err = getWStreamOffset(mem)
+	if err != nil {
+		return err
+	}
 	for i := 0; i < wLengthInts; i++ {
 		binary.LittleEndian.PutUint32(mem[offset+4*i:], uint32(wStream[i]))
 	}

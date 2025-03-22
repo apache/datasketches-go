@@ -5,18 +5,9 @@ import (
 	"testing"
 )
 
-// ---------------------
-// The "exact" reference logic from IconEstimatorTest.java
-// ---------------------
-
 const iconInversionTolerance = 1.0e-15
 
 // qnj is a helper function for exactCofN. It returns the quantity qnj(kf, nf, col).
-// In Java:
-//
-//	final double tmp1 = -1.0 / (kf * (Math.pow(2.0, col)));
-//	final double tmp2 = Math.log1p(tmp1);
-//	return (-1.0 * (Math.expm1(nf * tmp2)));
 func qnj(kf, nf float64, col int) float64 {
 	tmp1 := -1.0 / (kf * math.Pow(2.0, float64(col)))
 	tmp2 := math.Log1p(tmp1)
@@ -24,7 +15,6 @@ func qnj(kf, nf float64, col int) float64 {
 }
 
 // exactCofN is the "true" C(coupon count) as a function of N for a given k (kf).
-// In Java, it sums qnj from col=128 down to col=1, then multiplies by kf.
 func exactCofN(kf, nf float64) float64 {
 	total := 0.0
 	for col := 128; col >= 1; col-- {
@@ -82,7 +72,7 @@ func exactIconEstimatorBracketHi(kf, targetC, nLo float64) float64 {
 	return curN
 }
 
-// exactIconEstimator is the "exact" CPC ICON estimator from the Java code.
+// exactIconEstimator is the "exact" CPC ICON estimator.
 // It uses bracket + binary search to invert the function c(N).
 func exactIconEstimator(lgK int, c uint64) float64 {
 	targetC := float64(c)
@@ -104,7 +94,6 @@ func exactIconEstimator(lgK int, c uint64) float64 {
 // Tests
 // ---------------------
 
-// TestQuickIconEstimator replicates quickIconEstimatorTest() in Java.
 // It checks the approximate iconEstimate vs. the exact reference for various c values.
 func TestQuickIconEstimator(t *testing.T) {
 	for lgK := 4; lgK <= 26; lgK++ {
@@ -124,8 +113,6 @@ func TestQuickIconEstimator(t *testing.T) {
 			exact := exactIconEstimator(lgK, c)
 			approx := iconEstimate(lgK, c)
 			relDiff := math.Abs((approx - exact) / exact)
-
-			// The Java test uses assertTrue(relDiff < max(2E-6, 1.0/(80*k))).
 			threshold := math.Max(2e-6, 1.0/(80.0*float64(k)))
 			if relDiff >= threshold {
 				t.Errorf("lgK=%d, c=%d => exact=%g, approx=%g, relDiff=%g >= threshold=%g",
@@ -135,7 +122,6 @@ func TestQuickIconEstimator(t *testing.T) {
 	}
 }
 
-// TestIconEstimatorPrintlnTest replicates the Java printlnTest.
 func TestIconEstimatorPrintlnTest(t *testing.T) {
 	t.Logf("PRINTING: cpc.IconEstimatorTest (Go version). Class: %s", "cpc.icon_estimator_test")
 }

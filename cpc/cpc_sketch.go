@@ -548,7 +548,7 @@ func (c *CpcSketch) ToCompactSlice() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return compressedState.ExportToMemory()
+	return compressedState.exportToMemory()
 }
 
 func (c *CpcSketch) getFamily() int {

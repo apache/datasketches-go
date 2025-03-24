@@ -24,42 +24,42 @@ import (
 )
 
 func TestCpcCheckSort(t *testing.T) {
-	len := 10
+	length := 10
 	arr1 := []int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	rng := rand.New(rand.NewSource(0))
-	for i := 0; i < len; i++ {
+	for i := 0; i < length; i++ {
 		arr1[i] = rng.Intn(10000)
 	}
-	introspectiveInsertionSort(arr1, 0, len-1)
+	introspectiveInsertionSort(arr1, 0, length-1)
 	for _, i := range arr1 {
 		println(i)
 	}
 }
 
 func TestCpcCheckSort2(t *testing.T) {
-	len := 10
-	arr2 := make([]int, len)
+	length := 10
+	arr2 := make([]int, length)
 	rng := rand.New(rand.NewSource(0))
-	for i := 0; i < len; i++ {
+	for i := 0; i < length; i++ {
 		r1 := rng.Intn(10000)
 		r2 := 3_000_000_000
 		arr2[i] = r2 + r1
 	}
 	println("")
-	introspectiveInsertionSort(arr2, 0, len-1)
+	introspectiveInsertionSort(arr2, 0, length-1)
 	for _, i := range arr2 {
 		println(i & 0xFFFF_FFFF)
 	}
 }
 
 func TestCpcCheckSort3(t *testing.T) {
-	len := 20
-	arr3 := make([]int, len)
-	for i := 0; i < len; i++ {
-		arr3[i] = (len - i) + 1
+	length := 20
+	arr3 := make([]int, length)
+	for i := 0; i < length; i++ {
+		arr3[i] = (length - i) + 1
 	}
 	println("")
-	introspectiveInsertionSort(arr3, 0, len-1)
+	introspectiveInsertionSort(arr3, 0, length-1)
 	for _, i := range arr3 {
 		println(i)
 	}

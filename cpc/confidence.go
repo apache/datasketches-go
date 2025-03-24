@@ -25,7 +25,7 @@ var (
 
 	iconHighSideData = []int{
 		//1,    2,    3,   kappa
-		//                 lgK numtrials
+		//                 lgK numTrials
 		8031, 8559, 9309, // 4 1000000
 		7084, 7959, 8660, // 5 1000000
 		7141, 7514, 7876, // 6 1000000
@@ -41,7 +41,7 @@ var (
 
 	hipHighSideData = []int{
 		//1,    2,    3,   kappa
-		//                 lgK numtrials
+		//                 lgK numTrials
 		5855, 6688, 7391, // 4 1000000
 		5886, 6444, 6923, // 5 1000000
 		5885, 6254, 6594, // 6 1000000

@@ -123,7 +123,6 @@ func TestCPCCheckCornerCaseUpdates(t *testing.T) {
 func TestCPCCheckCornerHashUpdates(t *testing.T) {
 	sk, err := NewCpcSketch(26, internal.DEFAULT_UPDATE_SEED)
 	assert.NoError(t, err)
-	// In Java, hash0 is -1; in Go we represent -1 as all ones.
 	hash0 := ^uint64(0)
 	hash1 := uint64(0)
 	err = sk.hashUpdate(hash0, hash1)
@@ -173,7 +172,7 @@ func TestCPCCheckLgK(t *testing.T) {
 	assert.Equal(t, sk.seed, internal.DEFAULT_UPDATE_SEED)
 }
 
-func TestCPCcheckIconHipUBLBLg15(t *testing.T) {
+func TestCPCCheckIconHipUBLBLg15(t *testing.T) {
 	iconConfidenceUB(15, 1, 2)
 	iconConfidenceLB(15, 1, 2)
 	hipConfidenceUB(15, 1, 1.0, 2)

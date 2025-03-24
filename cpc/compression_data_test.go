@@ -20,16 +20,17 @@
 package cpc
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 // TestCompressionData validates encoding and decoding tables.
 func TestCompressionData(t *testing.T) {
 	// Validate the primary decoding table.
-	validateDecodingTable(lengthLimitedUnaryDecodingTable65, lengthLimitedUnaryEncodingTable65)
+	assert.NoError(t, validateDecodingTable(lengthLimitedUnaryDecodingTable65, lengthLimitedUnaryEncodingTable65))
 
 	// Validate decoding tables for high-entropy bytes.
 	for i := 0; i < (16 + 6); i++ {
-		validateDecodingTable(decodingTablesForHighEntropyByte[i], encodingTablesForHighEntropyByte[i])
+		assert.NoError(t, validateDecodingTable(decodingTablesForHighEntropyByte[i], encodingTablesForHighEntropyByte[i]))
 	}
 }

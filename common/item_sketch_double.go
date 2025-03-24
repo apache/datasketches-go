@@ -39,7 +39,7 @@ var ItemSketchDoubleComparator = func(reverseOrder bool) CompareFn[float64] {
 
 func (f ItemSketchDoubleHasher) Hash(item float64) uint64 {
 	binary.LittleEndian.PutUint64(f.scratch[:], math.Float64bits(item))
-	return murmur3.SeedSum64(_DEFAULT_SERDE_HASH_SEED, f.scratch[:])
+	return murmur3.SeedSum64(defaultSerdeHashSeed, f.scratch[:])
 }
 
 func (f ItemSketchDoubleSerDe) SizeOf(item float64) int {

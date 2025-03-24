@@ -25,11 +25,10 @@ import (
 
 func TestCpcUnionError(t *testing.T) {
 	sk, err := NewCpcSketch(10, 1)
+	assert.NoError(t, err)
 	union, err := NewCpcUnionSketchWithDefault(defaultLgK)
-	err = union.Update(sk)
-	if err == nil {
-		t.Errorf("Expected error")
-	}
+	assert.NoError(t, err)
+	assert.Error(t, union.Update(sk))
 }
 
 func TestCpcGetters(t *testing.T) {

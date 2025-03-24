@@ -39,7 +39,7 @@ var ItemSketchStringComparator = func(reverseOrder bool) CompareFn[string] {
 
 func (f ItemSketchStringHasher) Hash(item string) uint64 {
 	datum := unsafe.Slice(unsafe.StringData(item), len(item))
-	return murmur3.SeedSum64(_DEFAULT_SERDE_HASH_SEED, datum[:])
+	return murmur3.SeedSum64(defaultSerdeHashSeed, datum[:])
 }
 
 func (f ItemSketchStringSerDe) SizeOf(item string) int {

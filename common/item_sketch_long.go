@@ -38,7 +38,7 @@ var ItemSketchLongComparator = func(reverseOrder bool) CompareFn[int64] {
 
 func (f ItemSketchLongHasher) Hash(item int64) uint64 {
 	binary.LittleEndian.PutUint64(f.scratch[:], uint64(item))
-	return murmur3.SeedSum64(_DEFAULT_SERDE_HASH_SEED, f.scratch[:])
+	return murmur3.SeedSum64(defaultSerdeHashSeed, f.scratch[:])
 }
 
 func (f ItemSketchLongSerDe) SizeOf(item int64) int {

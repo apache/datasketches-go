@@ -35,6 +35,10 @@ func TestGenerateGoFiles(t *testing.T) {
 			assert.NoError(t, sketch.UpdateUint64(uint64(i)))
 		}
 		assert.Equal(t, sketch.getFlavor(), flavorArr[flavorIdx])
+
+		err = os.MkdirAll(internal.GoPath, os.ModePerm)
+		assert.NoError(t, err)
+
 		sl, err := sketch.ToCompactSlice()
 		assert.NoError(t, err)
 		err = os.WriteFile(fmt.Sprintf("%s/cpc_n%d_go.sk", internal.GoPath, n), sl, 0644)
@@ -55,4 +59,38 @@ func TestJavaCompat(t *testing.T) {
 			assert.InDelta(t, float64(n), sketch.GetEstimate(), float64(n)*0.02)
 		}
 	})
+}
+
+func TestNegativeIntEquivalence(t *testing.T) {
+	// Create a new CPC sketch with default parameters
+	sk, err := NewCpcSketchWithDefault(11)
+	assert.NoError(t, err)
+
+	// Update with -1 as a byte, short, int, and long
+	var b int8 = -1
+	err = sk.UpdateInt64(int64(b))
+	assert.NoError(t, err)
+
+	var s int16 = -1
+	err = sk.UpdateInt64(int64(s))
+	assert.NoError(t, err)
+
+	var i int32 = -1
+	err = sk.UpdateInt64(int64(i))
+	assert.NoError(t, err)
+
+	var l int64 = -1
+	err = sk.UpdateInt64(l)
+	assert.NoError(t, err)
+
+	// Check that the estimate is 1 (since -1 in all forms is the same hash)
+	assert.InDelta(t, 1.0, sk.GetEstimate(), 0.01)
+
+	// Write out the binary so that Java/C++ can read it
+	err = os.MkdirAll(internal.GoPath, os.ModePerm)
+	assert.NoError(t, err)
+	bytes, err := sk.ToCompactSlice()
+	assert.NoError(t, err)
+	err = os.WriteFile(fmt.Sprintf("%s/cpc_negative_one_go.sk", internal.GoPath), bytes, 0644)
+	assert.NoError(t, err)
 }

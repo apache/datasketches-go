@@ -149,7 +149,20 @@ func (c *CpcSketch) UpdateInt64(datum int64) error {
 }
 
 func (c *CpcSketch) UpdateFloat64(datum float64) error {
-	binary.LittleEndian.PutUint64(c.scratch[:], math.Float64bits(datum))
+	// Merge +0.0 and -0.0
+	if datum == 0.0 {
+		datum = 0.0 // ensures +0.0 == -0.0
+	}
+	datumBits := math.Float64bits(datum)
+
+	// Canonicalize all NaN forms to 0x7ff8000000000000
+	if (datumBits&0x7ff0000000000000) == 0x7ff0000000000000 && // exponent all 1's
+		(datumBits&0x000fffffffffffff) != 0 { // mantissa non-zero => NaN
+		datumBits = 0x7ff8000000000000
+	}
+
+	// Hash the canonicalized bits
+	binary.LittleEndian.PutUint64(c.scratch[:], datumBits)
 	hashLo, hashHi := hash(c.scratch[:], c.seed)
 	return c.hashUpdate(hashLo, hashHi)
 }
@@ -189,30 +202,32 @@ func (c *CpcSketch) UpdateString(datum string) error {
 func (c *CpcSketch) hashUpdate(hash0, hash1 uint64) error {
 	col := bits.LeadingZeros64(hash1)
 	if col < c.fiCol {
-		return nil // important speed optimization
+		return nil
 	}
 	if col > 63 {
-		col = 63 // clip so that 0 <= col <= 63
+		col = 63
 	}
 	if c.numCoupons == 0 {
-		err := c.promoteEmptyToSparse()
-		if err != nil {
+		if err := c.promoteEmptyToSparse(); err != nil {
 			return err
 		}
 	}
+
 	k := uint64(1) << c.lgK
 	row := int(hash0 & (k - 1))
-	rowCol := (row << 6) | col
 
-	// Avoid the hash table's "empty" value which is (2^26 -1, 63) (all ones) by changing it
-	// to the pair (2^26 - 2, 63), which effectively merges the two cells.
-	// This case is *extremely* unlikely, but we might as well handle it.
-	// It can't happen at all if lgK (or maxLgK) < 26.
-	if rowCol == -1 {
-		rowCol ^= 1 << 6 //set the LSB of row to 0
+	// Use a 64-bit intermediate to avoid sign overflow.
+	rowCol64 := (int64(row) << 6) | int64(col)
+
+	// Only apply the hack if lgK >= 26 and rowCol64 == 0xFFFFFFFF (which is -1 in signed 64-bit).
+	if c.lgK >= 26 && rowCol64 == -1 {
+		rowCol64 ^= 1 << 6 // flip the LSB of row
 	}
 
-	if (c.numCoupons << 5) < (uint64(3) * k) {
+	rowCol := int(rowCol64)
+
+	// Then proceed normally:
+	if (c.numCoupons << 5) < (3 * k) {
 		return c.updateSparse(rowCol)
 	}
 	return c.updateWindowed(rowCol)
@@ -246,7 +261,10 @@ func (c *CpcSketch) updateSparse(rowCol int) error {
 		c.updateHIP(rowCol)
 		c32post := c.numCoupons << 5
 		if c32post >= (3 * k) {
-			c.promoteSparseToWindowed() // C >= 3K/32
+			err = c.promoteSparseToWindowed() // C >= 3K/32
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -352,7 +370,7 @@ func (c *CpcSketch) updateHIP(rowCol int) {
 	c.kxp -= kxp
 }
 
-func (c *CpcSketch) promoteSparseToWindowed() {
+func (c *CpcSketch) promoteSparseToWindowed() error {
 	window := make([]byte, 1<<c.lgK)
 	newTable, _ := NewPairTable(2, 6+c.lgK)
 	oldTable := c.pairTable
@@ -368,13 +386,21 @@ func (c *CpcSketch) promoteSparseToWindowed() {
 				row := rowCol >> 6
 				window[row] |= 1 << col
 			} else {
-				newTable.mustInsert(rowCol)
+				isNovel, err := newTable.maybeInsert(rowCol)
+				if err != nil {
+					return fmt.Errorf("maybeInsert: %v", err)
+				}
+				if !isNovel {
+					return fmt.Errorf("promoteSparseToWindowed: unexpected collision")
+				}
 			}
 		}
 	}
 
 	c.slidingWindow = window
 	c.pairTable = newTable
+
+	return nil
 }
 
 func (c *CpcSketch) reset() {
@@ -467,7 +493,7 @@ func (c *CpcSketch) refreshKXP(bitMatrix []uint64) {
 		}
 	}
 	total := 0.0
-	for j := 7; j >= 0; j-- {
+	for j := 6; j >= 0; j-- {
 		factor, _ := internal.InvPow2(8 * j)
 		total += factor * byteSums[j]
 	}
@@ -515,15 +541,14 @@ func (c *CpcSketch) bitMatrixOfSketch() ([]uint64, error) {
 	return matrix, nil
 }
 
+// ToCompactSlice returns this sketch as a compressed byte slice.
 func (c *CpcSketch) ToCompactSlice() ([]byte, error) {
+	// Create the compressed state from the sketch.
 	compressedState, err := NewCpcCompressedStateFromSketch(c)
 	if err != nil {
 		return nil, err
 	}
-	capa := compressedState.getRequiredSerializedBytes()
-	buf := make([]byte, capa)
-	// TODO seralize here
-	return buf, nil
+	return compressedState.ExportToMemory()
 }
 
 func (c *CpcSketch) getFamily() int {
@@ -593,6 +618,12 @@ func (c *CpcSketch) copy() (*CpcSketch, error) {
 	copy(copySketch.scratch[:], c.scratch[:])
 
 	return copySketch, nil
+}
+
+func (c *CpcSketch) String() string {
+	mem, _ := c.ToCompactSlice()
+	str, _ := CpcSketchToString(mem, false)
+	return str
 }
 
 // getMaxSerializedBytes returns the estimated maximum serialized size of a sketch

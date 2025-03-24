@@ -43,12 +43,12 @@ func iconEstimate(lgK int, c uint64) float64 {
 		iconPolynomialCoefficents,
 		iconPolynomialNumCoefficients*(lgK-minLgK),
 		iconPolynomialNumCoefficients,
-		// The constant 2.0 is baked into the table iconPolynomialCoefficents[].
+		// The constant 2.0 is baked into the table iconPolynomialCoefficients[].
 		// This factor, although somewhat arbitrary, is based on extensive characterization studies
 		// and is considered a safe conservative factor.
 		doubleC/(2.0*doubleK))
 	ratio := doubleC / doubleK
-	// The constant 66.774757 is baked into the table iconPolynomialCoefficents[].
+	// The constant 66.774757 is baked into the table iconPolynomialCoefficients[].
 	// This factor, although somewhat arbitrary, is based on extensive characterization studies
 	// and is considered a safe conservative factor.
 	term := 1.0 + ((ratio * ratio * ratio) / 66.774757)

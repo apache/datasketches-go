@@ -96,7 +96,7 @@ func TestCheckNormalPutMemory(t *testing.T) {
 	t.Logf("SPARSE_HYBRID_MERGED (brief): %s", str)
 	checkFirst8(t, mem, format, lgK, 0)
 	assert.Equal(t, numCoupons, int(getNumCoupons(mem)))
-	assert.Equal(t, csvLength, int(getSvLengthInts(mem)))
+	assert.Equal(t, csvLength, getSvLengthInts(mem))
 
 	// 3) SPARSE_HYBRID_HIP
 	format = CpcFormatSparseHybridHip
@@ -111,7 +111,7 @@ func TestCheckNormalPutMemory(t *testing.T) {
 	t.Logf("SPARSE_HYBRID_HIP (brief): %s", str)
 	checkFirst8(t, mem, format, lgK, 0)
 	assert.Equal(t, numCoupons, int(getNumCoupons(mem)))
-	assert.Equal(t, csvLength, int(getSvLengthInts(mem)))
+	assert.Equal(t, csvLength, getSvLengthInts(mem))
 	assert.Equal(t, kxp, getKxP(mem))
 	assert.Equal(t, hipAccum, getHipAccum(mem))
 	assert.True(t, hasHip(mem), "expected hasHip=true for sparse hybrid HIP")
@@ -129,7 +129,7 @@ func TestCheckNormalPutMemory(t *testing.T) {
 	t.Logf("PINNED_SLIDING_MERGED_NOSV (brief): %s", str)
 	checkFirst8(t, mem, format, lgK, fiCol)
 	assert.Equal(t, numCoupons, int(getNumCoupons(mem)))
-	assert.Equal(t, cwLength, int(getWLengthInts(mem)))
+	assert.Equal(t, cwLength, getWLengthInts(mem))
 
 	// 5) PINNED_SLIDING_HIP_NOSV
 	format = CpcFormatPinnedSlidingHipNosv
@@ -144,7 +144,7 @@ func TestCheckNormalPutMemory(t *testing.T) {
 	t.Logf("PINNED_SLIDING_HIP_NOSV (brief): %s", str)
 	checkFirst8(t, mem, format, lgK, fiCol)
 	assert.Equal(t, numCoupons, int(getNumCoupons(mem)))
-	assert.Equal(t, cwLength, int(getWLengthInts(mem)))
+	assert.Equal(t, cwLength, getWLengthInts(mem))
 	assert.Equal(t, kxp, getKxP(mem))
 	assert.Equal(t, hipAccum, getHipAccum(mem))
 
@@ -162,8 +162,8 @@ func TestCheckNormalPutMemory(t *testing.T) {
 	checkFirst8(t, mem, format, lgK, fiCol)
 	assert.Equal(t, numCoupons, int(getNumCoupons(mem)))
 	assert.Equal(t, numSv, int(getNumSV(mem)))
-	assert.Equal(t, csvLength, int(getSvLengthInts(mem)))
-	assert.Equal(t, cwLength, int(getWLengthInts(mem)))
+	assert.Equal(t, csvLength, getSvLengthInts(mem))
+	assert.Equal(t, cwLength, getWLengthInts(mem))
 
 	// 7) PINNED_SLIDING_HIP
 	format = CpcFormatPinnedSlidingHip
@@ -179,8 +179,8 @@ func TestCheckNormalPutMemory(t *testing.T) {
 	checkFirst8(t, mem, format, lgK, fiCol)
 	assert.Equal(t, numCoupons, int(getNumCoupons(mem)))
 	assert.Equal(t, numSv, int(getNumSV(mem)))
-	assert.Equal(t, csvLength, int(getSvLengthInts(mem)))
-	assert.Equal(t, cwLength, int(getWLengthInts(mem)))
+	assert.Equal(t, csvLength, getSvLengthInts(mem))
+	assert.Equal(t, cwLength, getWLengthInts(mem))
 	assert.Equal(t, kxp, getKxP(mem))
 	assert.Equal(t, hipAccum, getHipAccum(mem))
 }

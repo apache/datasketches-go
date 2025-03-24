@@ -460,7 +460,7 @@ func getFiCol(bytes []byte) int {
 
 // getHiFieldOffset returns the defined byte offset from the start of the preamble given the Format and the HiField.
 func getHiFieldOffset(format CpcFormat, hiField int) (int, error) {
-	offset := int(hiFieldOffset[int(format)][hiField]) & 0xFF
+	offset := int(hiFieldOffset[format][hiField]) & 0xFF
 	if offset == 0 {
 		return 0, fmt.Errorf("illegal operation: Format = %s, HiField = %d", format.String(), hiField)
 	}
@@ -821,12 +821,13 @@ func putPinnedSlidingHip(mem []byte, lgK int, fiCol int, numCoupons int, numSv i
 }
 
 func putFirst8(mem []byte, preInts, lgK, fiCol, flags byte, seedHash int16) error {
-	const lowPreambleBytes = 8 // Only clear the low 8 bytes corresponding to the low preamble.
-	if err := checkCapacity(len(mem), lowPreambleBytes); err != nil {
+	// Compute the total number of bytes to clear (4 bytes per preInt)
+	requiredBytes := int(preInts) * 4
+	if err := checkCapacity(len(mem), requiredBytes); err != nil {
 		return err
 	}
-	// Clear only the low preamble bytes.
-	for i := 0; i < lowPreambleBytes; i++ {
+	// Clear the entire preamble region
+	for i := 0; i < requiredBytes; i++ {
 		mem[i] = 0
 	}
 

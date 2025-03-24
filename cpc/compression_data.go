@@ -24,18 +24,18 @@ import "fmt"
 // -----------------------------------------------------------------------------
 
 // makeInversePermutation returns the inverse of the given permutation.
-// It assumes that encodePermu is a slice of bytes representing a permutation.
-func makeInversePermutation(encodePermu []byte) ([]byte, error) {
-	length := len(encodePermu)
+// It assumes that encodePermutation is a slice of bytes representing a permutation.
+func makeInversePermutation(encodePermutation []byte) ([]byte, error) {
+	length := len(encodePermutation)
 	inverse := make([]byte, length)
 
-	for i, v := range encodePermu {
+	for i, v := range encodePermutation {
 		inverse[v] = byte(i)
 	}
 
 	// Verify correctness: for each index, the inverse permutation should undo the mapping.
 	for i := 0; i < length; i++ {
-		if encodePermu[inverse[i]] != byte(i) {
+		if encodePermutation[inverse[i]] != byte(i) {
 			return nil, fmt.Errorf("makeInversePermutation: check failed at index %d", i)
 		}
 	}
@@ -73,13 +73,13 @@ func validateDecodingTable(decodingTable, encodingTable []uint16) error {
 		decodedLength := tmpD >> 8
 
 		tmpE := int(encodingTable[decodedByte]) & 0xFFFF
-		encodedBitpattern := tmpE & 0xfff
+		encodedBitPattern := tmpE & 0xfff
 		encodedLength := tmpE >> 12
 
 		if decodedLength != encodedLength {
 			return fmt.Errorf("validateDecodingTable: decoded length %d != encoded length %d at decodeThis=%d", decodedLength, encodedLength, decodeThis)
 		}
-		if encodedBitpattern != (decodeThis & ((1 << decodedLength) - 1)) {
+		if encodedBitPattern != (decodeThis & ((1 << decodedLength) - 1)) {
 			return fmt.Errorf("validateDecodingTable: encoded bitpattern mismatch at decodeThis=%d", decodeThis)
 		}
 	}

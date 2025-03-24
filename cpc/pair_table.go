@@ -74,18 +74,17 @@ func (p *pairTable) maybeInsert(item int) (bool, error) {
 	//END SHARED CODE
 	if fetched == item {
 		return false, nil
-	} else {
-		//assert (fetched == -1)
-		p.slotsArr[probe] = item
-		p.numPairs++
-		for (upsizeDenom * p.numPairs) > (upsizeNumer * (1 << p.lgSizeInts)) {
-			if err := p.rebuild(p.lgSizeInts + 1); err != nil {
-				return false, err
-			}
-
-		}
-		return true, nil
 	}
+	//assert (fetched == -1)
+	p.slotsArr[probe] = item
+	p.numPairs++
+	for (upsizeDenom * p.numPairs) > (upsizeNumer * (1 << p.lgSizeInts)) {
+		if err := p.rebuild(p.lgSizeInts + 1); err != nil {
+			return false, err
+		}
+
+	}
+	return true, nil
 }
 
 func (p *pairTable) maybeDelete(item int) (bool, error) {
@@ -93,43 +92,51 @@ func (p *pairTable) maybeDelete(item int) (bool, error) {
 	sizeInts := 1 << lgSizeInts
 	mask := sizeInts - 1
 	shift := p.validBits - lgSizeInts
-	//rtAssert(shift > 0)
 	probe := item >> shift
-	//rtAssert((probe >= 0) && (probe <= mask))
 	arr := p.slotsArr
 	fetched := arr[probe]
 	for fetched != item && fetched != -1 {
 		probe = (probe + 1) & mask
 		fetched = arr[probe]
 	}
-	//END SHARED CODE
 	if fetched == -1 {
 		return false, nil
-	} else {
-		//assert (fetched == item)
-		// delete the item
+	}
+	// Remove the target item.
+	arr[probe] = -1
+	p.numPairs--
+
+	// Drain the cluster into a temporary slice.
+	var itemsToReinsert []int
+	probe = (probe + 1) & mask
+	fetched = arr[probe]
+	for fetched != -1 {
+		itemsToReinsert = append(itemsToReinsert, fetched)
+		// Mark the slot empty and subtract from count.
 		arr[probe] = -1
 		p.numPairs--
-		// re-insert all items between the freed slot and the next empty slot
 		probe = (probe + 1) & mask
 		fetched = arr[probe]
-		for fetched != -1 {
-			arr[probe] = -1
-			if _, err := p.maybeInsert(fetched); err != nil {
-				return false, err
-			}
-			probe = (probe + 1) & mask
-			fetched = arr[probe]
-		}
-		// shrink if necessary
-		for (downsizeDenom*p.numPairs) < (downsizeNumer*(1<<p.lgSizeInts)) && p.lgSizeInts > 2 {
-			if err := p.rebuild(p.lgSizeInts - 1); err != nil {
-				return false, err
-			}
-		}
-		return true, nil
 	}
 
+	// (Optional) Log the cluster before reinsertion:
+	// fmt.Printf("Reinserting cluster: %v, current p.numPairs=%d\n", itemsToReinsert, p.numPairs)
+
+	// Now reinsert all the items from the cluster.
+	for _, it := range itemsToReinsert {
+		_, err := p.maybeInsert(it)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// Attempt to shrink if necessary.
+	for (downsizeDenom*p.numPairs) < (downsizeNumer*(1<<p.lgSizeInts)) && p.lgSizeInts > 2 {
+		if err := p.rebuild(p.lgSizeInts - 1); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
 }
 
 func (p *pairTable) mustInsert(item int) error {
@@ -149,12 +156,11 @@ func (p *pairTable) mustInsert(item int) error {
 	}
 	//END SHARED CODE
 	if fetched == item {
-		fmt.Errorf("PairTable mustInsert() failed")
-	} else {
-		//assert (fetched == -1)
-		arr[probe] = item
-		// counts and resizing must be handled by the caller.
+		return fmt.Errorf("PairTable mustInsert() failed")
 	}
+	//assert (fetched == -1)
+	arr[probe] = item
+	// counts and resizing must be handled by the caller.
 	return nil
 }
 
@@ -165,7 +171,7 @@ func (p *pairTable) rebuild(newLgSizeInts int) error {
 	newSize := 1 << newLgSizeInts
 	oldSize := 1 << p.lgSizeInts
 	if newSize <= p.numPairs {
-		fmt.Errorf("newSize <= numPairs")
+		return fmt.Errorf("newSize <= numPairs")
 	}
 	oldSlotsArr := p.slotsArr
 	p.slotsArr = make([]int, newSize)
@@ -173,10 +179,17 @@ func (p *pairTable) rebuild(newLgSizeInts int) error {
 		p.slotsArr[i] = -1
 	}
 	p.lgSizeInts = newLgSizeInts
+
+	// Reset numPairs before reinsertion.
+	p.numPairs = 0
 	for i := 0; i < oldSize; i++ {
 		item := oldSlotsArr[i]
 		if item != -1 {
-			p.mustInsert(item)
+			// Use maybeInsert so that p.numPairs gets updated.
+			_, err := p.maybeInsert(item)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -297,4 +310,77 @@ func (p *pairTable) unwrap(numPairs int) ([]int, error) {
 	}
 
 	return result, nil
+}
+
+// newInstanceFromPairsArray creates a new pairTable from the given sorted pairs array.
+// It computes the necessary table size based on numPairs and lgK, then inserts all pairs.
+func newInstanceFromPairsArray(pairs []int, numPairs, lgK int) (*pairTable, error) {
+	lgNumSlots := 2
+	// Increase lgNumSlots until the table is large enough.
+	for (upsizeDenom * numPairs) > (upsizeNumer * (1 << lgNumSlots)) {
+		lgNumSlots++
+	}
+	// Create a new pairTable with validBits = 6 + lgK.
+	table, err := NewPairTable(lgNumSlots, 6+lgK)
+	if err != nil {
+		return nil, err
+	}
+	// Insert each pair into the table.
+	for i := 0; i < numPairs; i++ {
+		err = table.mustInsert(pairs[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	table.numPairs = numPairs
+	return table, nil
+}
+
+// unwrappingGetItems returns a slice containing exactly the valid pairs from slotsArr.
+// It assumes that unused entries are marked as -1.
+func (p *pairTable) unwrappingGetItems() []int {
+	result := make([]int, 0, p.numPairs)
+	for _, v := range p.slotsArr {
+		if v != -1 {
+			result = append(result, v)
+			if len(result) == p.numPairs {
+				break
+			}
+		}
+	}
+	return result
+}
+
+func (p *pairTable) equals(other *pairTable) bool {
+	if p == nil && other == nil {
+		return true
+	}
+	if p == nil || other == nil {
+		return false
+	}
+	if p.validBits != other.validBits {
+		return false
+	}
+	if p.numPairs != other.numPairs {
+		return false
+	}
+
+	// Extract the valid pairs from each table.
+	a := p.unwrappingGetItems()
+	b := other.unwrappingGetItems()
+
+	// Sort both arrays in canonical order.
+	introspectiveInsertionSort(a, 0, len(a)-1)
+	introspectiveInsertionSort(b, 0, len(b)-1)
+
+	// Compare the sorted arrays element-by-element.
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

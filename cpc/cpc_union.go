@@ -68,20 +68,18 @@ func (u *CpcUnion) Update(source *CpcSketch) error {
 		return nil
 	}
 
-	// Accumulator and bitMatrix must be mutually exclusive,
-	// so bitMatrix != nil => accumulator == nil and visa versa
-	// if (Accumulator != nil) union must be EMPTY or SPARSE,
 	if err := u.checkUnionState(); err != nil {
 		return err
 	}
 
+	// Downsample union if the source sketch has a smaller lgK.
 	if source.lgK < u.lgK {
 		if err := u.reduceUnionK(source.lgK); err != nil {
 			return err
 		}
 	}
 
-	// if source is past SPARSE mode, make sure that union is a bitMatrix.
+	// If the source is past SPARSE mode, ensure union is in bitMatrix mode.
 	if sourceFlavorOrd > CpcFlavorSparse && u.accumulator != nil {
 		bitMatrix, err := u.accumulator.bitMatrixOfSketch()
 		if err != nil {
@@ -90,25 +88,29 @@ func (u *CpcUnion) Update(source *CpcSketch) error {
 		u.bitMatrix = bitMatrix
 		u.accumulator = nil
 	}
-
 	state := (sourceFlavorOrd - 1) << 1
 	if u.bitMatrix != nil {
 		state |= 1
 	}
 
 	switch state {
-	case 0: //A: Sparse, bitMatrix == nil, accumulator valid
+	case 0: // Case A: source is SPARSE, union.accumulator valid, bitMatrix == nil.
 		if u.accumulator.lgK == 0 {
 			return fmt.Errorf("union accumulator cannot be nil")
 		}
+		// If the union is EMPTY and lgK matches, copy the source.
 		if u.accumulator.getFlavor() == CpcFlavorEmpty && u.lgK == source.lgK {
-			u.accumulator = source
+			cp, err := source.copy()
+			if err != nil {
+				return err
+			}
+			u.accumulator = cp
 			break
 		}
 		if err := walkTableUpdatingSketch(u.accumulator, source.pairTable); err != nil {
 			return err
 		}
-		// if the accumulator has graduated beyond sparse, switch union to a bitMatrix
+		// If accumulator has graduated beyond SPARSE, switch to bitMatrix.
 		if u.accumulator.getFlavor() > CpcFlavorSparse {
 			bitMatrix, err := u.accumulator.bitMatrixOfSketch()
 			if err != nil {
@@ -117,25 +119,19 @@ func (u *CpcUnion) Update(source *CpcSketch) error {
 			u.bitMatrix = bitMatrix
 			u.accumulator = nil
 		}
-	case 1: //B: Sparse, bitMatrix valid, accumulator == nil
+	case 1: // Case B: source is SPARSE, union already in bitMatrix mode.
 		u.orTableIntoMatrix(source.pairTable)
-	case 3, 5:
-		//C: Hybrid, bitMatrix valid, accumulator == nil
-		//C: Pinned, bitMatrix valid, accumulator == nil
-		err := u.orWindowIntoMatrix(source.slidingWindow, source.windowOffset, source.lgK)
-		if err != nil {
+	case 3, 5: // Case C: source is HYBRID or PINNED, union in bitMatrix mode.
+		if err := u.orWindowIntoMatrix(source.slidingWindow, 0, source.lgK); err != nil {
 			return err
 		}
 		u.orTableIntoMatrix(source.pairTable)
-	case 7: //D: Sliding, bitMatrix valid, accumulator == null
-		// SLIDING mode involves inverted logic, so we can't just walk the source sketch.
-		// Instead, we convert it to a bitMatrix that can be OR'ed into the destination.
+	case 7: // Case D: source is SLIDING, union in bitMatrix mode.
 		sourceMatrix, err := source.bitMatrixOfSketch()
 		if err != nil {
 			return err
 		}
-		err = u.orMatrixIntoMatrix(sourceMatrix, source.lgK)
-		if err != nil {
+		if err := u.orMatrixIntoMatrix(sourceMatrix, source.lgK); err != nil {
 			return err
 		}
 	default:
@@ -149,7 +145,7 @@ func (u *CpcUnion) GetResult() (*CpcSketch, error) {
 		return nil, err
 	}
 
-	if u.accumulator != nil { // start of case where union contains a sketch
+	if u.accumulator != nil {
 		if u.accumulator.numCoupons == 0 {
 			result, err := NewCpcSketch(u.lgK, u.accumulator.seed)
 			if err != nil {
@@ -161,12 +157,16 @@ func (u *CpcUnion) GetResult() (*CpcSketch, error) {
 		if u.accumulator.getFlavor() != CpcFlavorSparse {
 			return nil, fmt.Errorf("accumulator must be SPARSE")
 		}
-		result := u.accumulator // effectively a copy
+		// Return a copy of the accumulator.
+		result, err := u.accumulator.copy()
+		if err != nil {
+			return nil, err
+		}
 		result.mergeFlag = true
 		return result, nil
-	} // end of case where union contains a sketch
+	}
 
-	// start of case where union contains a bitMatrix
+	// Case: union contains a bitMatrix.
 	matrix := u.bitMatrix
 	lgK := u.lgK
 	result, err := NewCpcSketch(u.lgK, u.seed)
@@ -185,12 +185,10 @@ func (u *CpcUnion) GetResult() (*CpcSketch, error) {
 	offset := determineCorrectOffset(lgK, numCoupons)
 	result.windowOffset = offset
 
-	//Build the window and pair table
 	k := 1 << lgK
 	window := make([]byte, k)
 	result.slidingWindow = window
 
-	// LgSize = K/16; in some cases this will end up being oversized
 	newTableLgSize := max(lgK-4, 2)
 	table, err := NewPairTable(newTableLgSize, 6+lgK)
 	if err != nil {
@@ -198,21 +196,19 @@ func (u *CpcUnion) GetResult() (*CpcSketch, error) {
 	}
 	result.pairTable = table
 
-	// The following works even when the offset is zero.
 	maskForClearingWindow := (0xFF << offset) ^ -1
 	maskForFlippingEarlyZone := (1 << offset) - 1
 	allSurprisesORed := uint64(0)
 
-	// Using a sufficiently large hash table avoids the Snow Plow Effect
 	for i := 0; i < k; i++ {
 		pattern := matrix[i]
 		window[i] = byte((pattern >> offset) & 0xFF)
 		pattern &= uint64(maskForClearingWindow)
-		pattern ^= uint64(maskForFlippingEarlyZone) // This flipping converts surprising 0's to 1's.
+		pattern ^= uint64(maskForFlippingEarlyZone)
 		allSurprisesORed |= pattern
 		for pattern != 0 {
 			col := bits.TrailingZeros64(pattern)
-			pattern ^= 1 << col // erase the 1.
+			pattern ^= 1 << col
 			rowCol := (i << 6) | col
 			isNovel, err := table.maybeInsert(rowCol)
 			if err != nil {
@@ -224,17 +220,13 @@ func (u *CpcUnion) GetResult() (*CpcSketch, error) {
 		}
 	}
 
-	// At this point we could shrink an oversize hash table, but the relative waste isn't very big.
 	result.fiCol = bits.TrailingZeros64(allSurprisesORed)
 	if result.fiCol > offset {
 		result.fiCol = offset
-	} // corner case
-
-	// NB: the HIP-related fields will contain bogus values, but that is okay.
+	}
 
 	result.mergeFlag = true
 	return result, nil
-	// end of case where union contains a bitMatrix
 }
 
 func (u *CpcUnion) checkUnionState() error {
@@ -261,14 +253,12 @@ func (u *CpcUnion) checkUnionState() error {
 func (u *CpcUnion) reduceUnionK(newLgK int) error {
 	if newLgK < u.lgK {
 		if u.bitMatrix != nil {
-			// downsample the union's bit matrix
 			newK := 1 << newLgK
 			newMatrix := make([]uint64, newK)
 			orMatrixIntoMatrix(newMatrix, newLgK, u.bitMatrix, u.lgK)
 			u.bitMatrix = newMatrix
 			u.lgK = newLgK
 		} else {
-			// downsample the union's accumulator
 			oldSketch := u.accumulator
 			if oldSketch.numCoupons == 0 {
 				acc, err := NewCpcSketch(newLgK, oldSketch.seed)
@@ -279,11 +269,10 @@ func (u *CpcUnion) reduceUnionK(newLgK int) error {
 				u.lgK = newLgK
 				return nil
 			}
-			sk, err := NewCpcSketch(newLgK, oldSketch.seed)
+			newSketch, err := NewCpcSketch(newLgK, oldSketch.seed)
 			if err != nil {
 				return err
 			}
-			newSketch := sk
 			if err := walkTableUpdatingSketch(newSketch, oldSketch.pairTable); err != nil {
 				return err
 			}
@@ -293,14 +282,15 @@ func (u *CpcUnion) reduceUnionK(newLgK int) error {
 				u.lgK = newLgK
 				return nil
 			}
-			// the new sketch has graduated beyond sparse, so convert to bitMatrix
-			//u.accumulator = nil
+			// The new sketch has graduated beyond sparse, so convert to bitMatrix.
 			bitMatrix, err := newSketch.bitMatrixOfSketch()
 			if err != nil {
 				return err
 			}
 			u.bitMatrix = bitMatrix
 			u.lgK = newLgK
+			// Ensure that the accumulator is cleared.
+			u.accumulator = nil
 		}
 	}
 	return nil
@@ -311,7 +301,7 @@ func (u *CpcUnion) orWindowIntoMatrix(srcWindow []byte, srcOffset int, srcLgK in
 	if u.lgK > srcLgK {
 		return fmt.Errorf("destLgK <= srcLgK")
 	}
-	destMask := (1 << u.lgK) - 1 // downsamples when destlgK < srcLgK
+	destMask := (1 << u.lgK) - 1 // downsamples when destLgK < srcLgK
 	srcK := 1 << srcLgK
 	for srcRow := 0; srcRow < srcK; srcRow++ {
 		u.bitMatrix[srcRow&destMask] |= uint64(srcWindow[srcRow]) << srcOffset
@@ -322,7 +312,7 @@ func (u *CpcUnion) orWindowIntoMatrix(srcWindow []byte, srcOffset int, srcLgK in
 func (u *CpcUnion) orTableIntoMatrix(srcTable *pairTable) {
 	slots := srcTable.slotsArr
 	numSlots := 1 << srcTable.lgSizeInts
-	destMask := (1 << u.lgK) - 1 // downsamples when destlgK < srcLgK
+	destMask := (1 << u.lgK) - 1 // downsamples when destLgK < srcLgK
 	for i := 0; i < numSlots; i++ {
 		rowCol := slots[i]
 		if rowCol != -1 {
@@ -338,7 +328,7 @@ func (u *CpcUnion) orMatrixIntoMatrix(srcMatrix []uint64, srcLgK int) error {
 	if u.lgK > srcLgK {
 		return fmt.Errorf("destLgK <= srcLgK")
 	}
-	destMask := (1 << u.lgK) - 1 // downsamples when destlgK < srcLgK
+	destMask := (1 << u.lgK) - 1 // downsamples when destLgK < srcLgK
 	srcK := 1 << srcLgK
 	for srcRow := 0; srcRow < srcK; srcRow++ {
 		u.bitMatrix[srcRow&destMask] |= srcMatrix[srcRow]
@@ -352,4 +342,23 @@ func (u *CpcUnion) getNumCoupons() uint64 {
 		return countBitsSetInMatrix(u.bitMatrix)
 	}
 	return u.accumulator.numCoupons
+}
+
+func (u *CpcUnion) GetBitMatrix() ([]uint64, error) {
+	if err := u.checkUnionState(); err != nil {
+		return nil, err
+	}
+
+	if u.bitMatrix != nil {
+		return u.bitMatrix, nil
+	}
+
+	if u.accumulator == nil {
+		return nil, fmt.Errorf("both bitMatrix and accumulator are nil, invalid union state")
+	}
+	bm, err := u.accumulator.bitMatrixOfSketch()
+	if err != nil {
+		return nil, fmt.Errorf("accumulator.bitMatrixOfSketch failed: %v", err)
+	}
+	return bm, nil
 }

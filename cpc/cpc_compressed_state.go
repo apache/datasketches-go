@@ -612,7 +612,7 @@ func importFromMemory(bytes []byte) (*CpcCompressedState, error) {
 	return state, nil
 }
 
-func (c *CpcCompressedState) ExportToMemory() ([]byte, error) {
+func (c *CpcCompressedState) exportToMemory() ([]byte, error) {
 	// Determine the total number of bytes required.
 	totalBytes := c.getRequiredSerializedBytes()
 	// Allocate a byte slice (zero-filled by default).

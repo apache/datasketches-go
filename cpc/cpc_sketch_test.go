@@ -135,14 +135,14 @@ func TestCPCCheckCopyWithWindow(t *testing.T) {
 	lgK := 4
 	sk, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
 	assert.NoError(t, err)
-	sk2, err := sk.copy()
+	sk2, err := sk.Copy()
 	assert.NoError(t, err)
 	n := 1 << lgK
 	for i := 0; i < n; i++ {
 		err = sk.UpdateUint64(uint64(i))
 		assert.NoError(t, err)
 	}
-	sk2, err = sk.copy()
+	sk2, err = sk.Copy()
 	assert.NoError(t, err)
 	bitMatrix, err := sk.bitMatrixOfSketch()
 	assert.NoError(t, err)

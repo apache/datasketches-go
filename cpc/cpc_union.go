@@ -100,7 +100,7 @@ func (u *CpcUnion) Update(source *CpcSketch) error {
 		}
 		// If the union is EMPTY and lgK matches, copy the source.
 		if u.accumulator.getFlavor() == CpcFlavorEmpty && u.lgK == source.lgK {
-			cp, err := source.copy()
+			cp, err := source.Copy()
 			if err != nil {
 				return err
 			}
@@ -158,7 +158,7 @@ func (u *CpcUnion) GetResult() (*CpcSketch, error) {
 			return nil, fmt.Errorf("accumulator must be SPARSE")
 		}
 		// Return a copy of the accumulator.
-		result, err := u.accumulator.copy()
+		result, err := u.accumulator.Copy()
 		if err != nil {
 			return nil, err
 		}

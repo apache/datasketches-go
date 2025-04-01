@@ -37,7 +37,7 @@ type CpcUnion struct {
 }
 
 func NewCpcUnionSketch(lgK int, seed uint64) (CpcUnion, error) {
-	acc, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
+	acc, err := NewCpcSketch(lgK, seed)
 	if err != nil {
 		return CpcUnion{}, err
 	}

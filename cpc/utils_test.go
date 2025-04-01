@@ -40,7 +40,7 @@ func checkFirst8(t *testing.T, mem []byte, format CpcFormat, lgK, fiCol int) {
 		t.Errorf("getFamily: got %d, expected %d", got, internal.FamilyEnum.CPC.Id)
 	}
 	if got := getLgK(mem); got != lgK {
-		t.Errorf("getLgK: got %d, expected %d", got, lgK)
+		t.Errorf("GetLgK: got %d, expected %d", got, lgK)
 	}
 	if got := getFiCol(mem); got != fiCol {
 		t.Errorf("getFiCol: got %d, expected %d", got, fiCol)

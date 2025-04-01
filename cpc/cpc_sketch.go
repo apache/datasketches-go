@@ -555,8 +555,8 @@ func (c *CpcSketch) getFamily() int {
 	return internal.FamilyEnum.CPC.Id
 }
 
-// getLgK returns the log-base-2 of K.
-func (c *CpcSketch) getLgK() int {
+// GetLgK returns the log-base-2 of K.
+func (c *CpcSketch) GetLgK() int {
 	return c.lgK
 }
 
@@ -575,8 +575,8 @@ func (c *CpcSketch) validate() (bool, error) {
 	return matrixCoupons == c.numCoupons, nil
 }
 
-// copy creates and returns a deep copy of the CpcSketch.
-func (c *CpcSketch) copy() (*CpcSketch, error) {
+// Copy creates and returns a deep copy of the CpcSketch.
+func (c *CpcSketch) Copy() (*CpcSketch, error) {
 	// Create a new sketch with the same lgK and seed.
 	copySketch, err := NewCpcSketch(c.lgK, c.seed)
 	if err != nil {

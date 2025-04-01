@@ -18,9 +18,13 @@
 package cpc
 
 import (
+	"fmt"
+	"math"
+	"testing"
+
 	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
-	"testing"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCPCCheckUpdatesEstimate(t *testing.T) {
@@ -200,4 +204,195 @@ func TestCPCCheckGetMaxSize(t *testing.T) {
 	expectedFloat := 0.6 * float64(1<<26)
 	expected := int(expectedFloat) + 40
 	assert.Equal(t, expected, size26)
+}
+
+func TestAddIntSlice(t *testing.T) {
+	sk, err := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+	require.NoError(t, err)
+
+	// Add 100 different slices, each containing a single unique value
+	for i := 0; i < 100; i++ {
+		slice := []int64{int64(i)}
+		require.NoError(t, sk.UpdateInt64Slice(slice))
+	}
+
+	estimate := sk.GetEstimate()
+	require.InDelta(t, float64(100), estimate, 5.0)
+
+	// Test that identical slices are counted as a single value
+	sk2, err := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+	require.NoError(t, err)
+
+	sameSlice := []int64{42, 43, 44}
+	for i := 0; i < 10; i++ {
+		require.NoError(t, sk2.UpdateInt64Slice(sameSlice))
+	}
+
+	estimate = sk2.GetEstimate()
+	require.InDelta(t, float64(1), estimate, 0.01)
+}
+
+func TestEdgeCases(t *testing.T) {
+	sk, err := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+	require.NoError(t, err)
+
+	// Test extreme values
+	require.NoError(t, sk.UpdateInt64Slice([]int64{math.MinInt64}))
+	require.NoError(t, sk.UpdateInt64Slice([]int64{math.MaxInt64}))
+	require.NoError(t, sk.UpdateFloat64(math.SmallestNonzeroFloat64))
+	require.NoError(t, sk.UpdateFloat64(math.MaxFloat64))
+
+	// Empty string and empty bytes
+	require.NoError(t, sk.UpdateString(""))
+	require.NoError(t, sk.UpdateByteSlice([]byte{}))
+
+	// All these represent different values, so estimate should be > 0
+	require.Greater(t, sk.GetEstimate(), float64(0))
+}
+
+func TestLargeDataset(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	const numValues = 1000000
+
+	// Test with different lgK values
+	for _, lgK := range []int{8, 10, 12, 14} {
+		t.Run(fmt.Sprintf("lgK=%d", lgK), func(t *testing.T) {
+			sk, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
+			require.NoError(t, err)
+
+			for i := 0; i < numValues; i++ {
+				require.NoError(t, sk.UpdateUint64(uint64(i)))
+			}
+
+			estimate := sk.GetEstimate()
+			expected := float64(numValues)
+
+			// Calculate theoretical error bounds
+			// Use 3 std deviations for approximately 99.7% confidence
+			stdDevs := 3.0
+
+			// Get empirical relative error factor for low lgK values (≤14) or use theoretical for larger lgK
+			var relErrorFactor float64
+			if lgK <= 14 && lgK >= 4 {
+				// Index into hipHighSideData array (for 3 std deviations)
+				idx := (3 * (lgK - 4)) + 2 // +2 for 3 std deviations (3rd column in the data)
+				relErrorFactor = float64(hipHighSideData[idx]) / 10000.0
+			} else {
+				// Use theoretical formula for lgK > 14
+				relErrorFactor = hipErrorConstant
+			}
+
+			// Calculate relative error based on the formula: rel = factor / sqrt(2^lgK)
+			relError := relErrorFactor / math.Sqrt(float64(uint64(1)<<lgK))
+
+			// Multiply by standard deviations for confidence interval
+			maxRelError := stdDevs * relError
+
+			// Calculate allowed absolute error
+			maxAbsError := expected * maxRelError
+
+			// Actual difference between estimate and expected
+			absDiff := math.Abs(estimate - expected)
+
+			// Check if within error bounds
+			if absDiff > maxAbsError {
+				t.Errorf("lgK=%d: estimate=%f, expected=%f\n"+
+					"absDiff=%f exceeds theoretical max=%f\n"+
+					"relError=%f (%.2f%%)",
+					lgK, estimate, expected,
+					absDiff, maxAbsError,
+					maxRelError, maxRelError*100.0)
+			} else {
+				t.Logf("lgK=%d: estimate within %.2f%% error (theory allows %.2f%%)",
+					lgK, (absDiff/expected)*100.0, maxRelError*100.0)
+			}
+		})
+	}
+}
+
+func TestSketchWithDifferentLgK(t *testing.T) {
+	// Test different lgK values
+	for _, lgK := range []int{4, 8, 12, 16} {
+		sk, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
+		require.NoError(t, err)
+
+		for i := 0; i < 1000; i++ {
+			require.NoError(t, sk.UpdateUint64(uint64(i)))
+		}
+
+		estimate := sk.GetEstimate()
+		expected := float64(1000)
+
+		// Calculate theoretical error bounds
+		// Standard deviations for confidence level
+		stdDevs := 3.0 // Corresponds to ~99.7% confidence level
+
+		// Get empirical relative error factor for low lgK values (≤14) or use theoretical for larger lgK
+		var relErrorFactor float64
+		if lgK <= 14 && lgK >= 4 {
+			// Index into hipHighSideData array (for 3 std deviations)
+			idx := (3 * (lgK - 4)) + 2 // +2 for 3 std deviations
+			relErrorFactor = float64(hipHighSideData[idx]) / 10000.0
+		} else {
+			// Use theoretical formula for lgK > 14
+			relErrorFactor = hipErrorConstant // approximately 0.589
+		}
+
+		// Calculate relative error based on the formula: rel = factor / sqrt(2^lgK)
+		relError := relErrorFactor / math.Sqrt(float64(uint64(1)<<lgK))
+
+		// Multiply by standard deviations for confidence interval
+		maxRelError := stdDevs * relError
+
+		// Calculate allowed absolute error
+		maxAbsError := expected * maxRelError
+
+		// Actual difference between estimate and expected
+		absDiff := math.Abs(estimate - expected)
+
+		// Check if within error bounds and print detailed information
+		if absDiff > maxAbsError {
+			t.Errorf("For lgK=%d, estimate=%f, expected=%f\n"+
+				"absDiff=%f exceeds theoretical max=%f\n"+
+				"relError=%f (%.2f%%)",
+				lgK, estimate, expected,
+				absDiff, maxAbsError,
+				maxRelError, maxRelError*100.0)
+		} else {
+			t.Logf("lgK=%d: estimate within %.2f%% error (theory allows %.2f%%)",
+				lgK, (absDiff/expected)*100.0, maxRelError*100.0)
+		}
+	}
+}
+
+// Benchmark adding integers to sketch
+func BenchmarkAddInt(b *testing.B) {
+	sk, _ := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_ = sk.UpdateUint64(uint64(i))
+	}
+}
+
+// Benchmark merging sketches
+func BenchmarkMerge(b *testing.B) {
+	sk1, _ := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+	sk2, _ := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+
+	// Add some values to sketch2
+	for i := 0; i < 1000; i++ {
+		_ = sk2.UpdateUint64(uint64(i))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		union, _ := NewCpcUnionSketchWithDefault(10)
+		_ = union.Update(sk1)
+		_ = union.Update(sk2)
+		_, _ = union.GetResult()
+	}
 }

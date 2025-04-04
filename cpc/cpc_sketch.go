@@ -645,8 +645,8 @@ func getMaxSerializedBytes(lgK int) (int, error) {
 }
 
 func (c *CpcSketch) Equal(target *CpcSketch) bool {
-	c.scratch = [8]byte{}
-	target.scratch = [8]byte{}
+	clear(c.scratch[:])
+	clear(target.scratch[:])
 
 	return c.lgK == target.lgK
 }

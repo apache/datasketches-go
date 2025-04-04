@@ -644,9 +644,75 @@ func getMaxSerializedBytes(lgK int) (int, error) {
 	return int(empiricalMaxSizeFactor*float64(k)) + maxPreambleSizeBytes, nil
 }
 
+// Equals compares two CpcSketch instances for equality.
+// It clears the scratch buffers of both sketches before comparing since
+// scratch is a temporary buffer and should not affect equality.
 func (c *CpcSketch) Equal(target *CpcSketch) bool {
 	clear(c.scratch[:])
 	clear(target.scratch[:])
 
-	return c.lgK == target.lgK
+	// Compare basic properties
+	if c.seed != target.seed || c.lgK != target.lgK || c.numCoupons != target.numCoupons || c.windowOffset != target.windowOffset {
+		return false
+	}
+
+	// Compare sliding windows
+	if (c.slidingWindow == nil) != (target.slidingWindow == nil) {
+		return false
+	}
+	if c.slidingWindow != nil {
+		if len(c.slidingWindow) != len(target.slidingWindow) {
+			return false
+		}
+		for i := range c.slidingWindow {
+			if c.slidingWindow[i] != target.slidingWindow[i] {
+				return false
+			}
+		}
+	}
+
+	// Compare pair tables
+	if (c.pairTable == nil) != (target.pairTable == nil) {
+		return false
+	}
+	if c.pairTable != nil && !c.pairTable.equals(target.pairTable) {
+		return false
+	}
+
+	// Handle merge flag cases
+	if !c.mergeFlag && target.mergeFlag {
+		fiCol1 := calculateFirstInterestingColumn(c)
+		if fiCol1 == -1 {
+			return false
+		}
+		if fiCol1 != target.fiCol {
+			return false
+		}
+	} else if c.mergeFlag && !target.mergeFlag {
+		fiCol2 := calculateFirstInterestingColumn(target)
+		if fiCol2 == -1 {
+			return false
+		}
+		if fiCol2 != c.fiCol {
+			return false
+		}
+	} else {
+		// Both have same merge flag state
+		if c.mergeFlag != target.mergeFlag || c.fiCol != target.fiCol {
+			return false
+		}
+
+		// Compare floating point values with tolerance
+		kxpTolerance := 0.01 * math.Abs(c.kxp)
+		if math.Abs(c.kxp-target.kxp) > kxpTolerance {
+			return false
+		}
+
+		hipEstAccumTolerance := 0.01 * math.Abs(c.hipEstAccum)
+		if math.Abs(c.hipEstAccum-target.hipEstAccum) > hipEstAccumTolerance {
+			return false
+		}
+	}
+
+	return true
 }

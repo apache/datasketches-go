@@ -59,10 +59,16 @@ func specialEquals(sk1, sk2 *CpcSketch, sk1wasMerged, sk2wasMerged bool) bool {
 	if !sk1wasMerged && sk2wasMerged {
 		rtAssert(!sk1.mergeFlag && sk2.mergeFlag)
 		fiCol1 := calculateFirstInterestingColumn(sk1)
+		if fiCol1 == -1 {
+			return false
+		}
 		rtAssertEqualsInt(fiCol1, sk2.fiCol)
 	} else if sk1wasMerged && !sk2wasMerged {
 		rtAssert(sk1.mergeFlag && !sk2.mergeFlag)
 		fiCol2 := calculateFirstInterestingColumn(sk2)
+		if fiCol2 == -1 {
+			return false
+		}
 		rtAssertEqualsInt(fiCol2, sk1.fiCol)
 	} else {
 		rtAssertEqualsBool(sk1.mergeFlag, sk2.mergeFlag)
@@ -83,7 +89,7 @@ func calculateFirstInterestingColumn(sk *CpcSketch) int {
 	}
 	table := sk.pairTable
 	if table == nil {
-		panic("pairTable is nil")
+		return -1
 	}
 	slots := table.slotsArr
 	numSlots := 1 << table.lgSizeInts

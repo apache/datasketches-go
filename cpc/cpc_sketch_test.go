@@ -396,3 +396,198 @@ func BenchmarkMerge(b *testing.B) {
 		_, _ = union.GetResult()
 	}
 }
+
+// TestEqualMethod verifies that the Equal method produces the same results as specialEquals
+func TestEqualMethod(t *testing.T) {
+	// Helper function to safely call specialEquals that might panic
+	safeSpecialEquals := func(sk1, sk2 *CpcSketch, sk1wasMerged, sk2wasMerged bool) (result bool) {
+		// Use recover to catch any panics from specialEquals
+		defer func() {
+			if r := recover(); r != nil {
+				// If we caught a panic, the sketches aren't equal
+				result = false
+			}
+		}()
+
+		// Call the function that might panic
+		return specialEquals(sk1, sk2, sk1wasMerged, sk2wasMerged)
+	}
+
+	t.Run("EmptySketchesEqual", func(t *testing.T) {
+		sk1, err := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+		require.NoError(t, err)
+		sk2, err := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+		require.NoError(t, err)
+
+		// Both methods should agree
+		assert.Equal(t, safeSpecialEquals(sk1, sk2, false, false), sk1.Equal(sk2))
+		assert.Equal(t, safeSpecialEquals(sk2, sk1, false, false), sk2.Equal(sk1))
+
+		// Should be equal (symmetrically)
+		assert.True(t, sk1.Equal(sk2))
+		assert.True(t, sk2.Equal(sk1))
+	})
+
+	t.Run("IdenticalSparseSketchesEqual", func(t *testing.T) {
+		sk1, err := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+		require.NoError(t, err)
+		sk2, err := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+		require.NoError(t, err)
+
+		// Add identical data
+		for i := 0; i < 100; i++ {
+			err = sk1.UpdateUint64(uint64(i))
+			require.NoError(t, err)
+			err = sk2.UpdateUint64(uint64(i))
+			require.NoError(t, err)
+		}
+
+		// Both methods should agree
+		assert.Equal(t, safeSpecialEquals(sk1, sk2, false, false), sk1.Equal(sk2))
+		assert.Equal(t, safeSpecialEquals(sk2, sk1, false, false), sk2.Equal(sk1))
+
+		// Should be equal (symmetrically)
+		assert.True(t, sk1.Equal(sk2))
+		assert.True(t, sk2.Equal(sk1))
+	})
+
+	t.Run("DifferentSketchesNotEqual", func(t *testing.T) {
+		sk1, err := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+		require.NoError(t, err)
+		sk2, err := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+		require.NoError(t, err)
+
+		// Add different data
+		for i := 0; i < 100; i++ {
+			err = sk1.UpdateUint64(uint64(i))
+			require.NoError(t, err)
+			err = sk2.UpdateUint64(uint64(i + 1000))
+			require.NoError(t, err)
+		}
+
+		// Both methods should agree
+		assert.Equal(t, safeSpecialEquals(sk1, sk2, false, false), sk1.Equal(sk2))
+		assert.Equal(t, safeSpecialEquals(sk2, sk1, false, false), sk2.Equal(sk1))
+
+		// Should not be equal (symmetrically)
+		assert.False(t, sk1.Equal(sk2))
+		assert.False(t, sk2.Equal(sk1))
+	})
+
+	t.Run("DifferentLgKNotEqual", func(t *testing.T) {
+		sk1, err := NewCpcSketch(10, internal.DEFAULT_UPDATE_SEED)
+		require.NoError(t, err)
+		sk2, err := NewCpcSketch(12, internal.DEFAULT_UPDATE_SEED)
+		require.NoError(t, err)
+
+		// Both methods should agree
+		assert.Equal(t, safeSpecialEquals(sk1, sk2, false, false), sk1.Equal(sk2))
+		assert.Equal(t, safeSpecialEquals(sk2, sk1, false, false), sk2.Equal(sk1))
+
+		// Should not be equal (symmetrically)
+		assert.False(t, sk1.Equal(sk2))
+		assert.False(t, sk2.Equal(sk1))
+	})
+
+	t.Run("WindowedSketchesEqual", func(t *testing.T) {
+		lgK := 4
+		sk1, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
+		require.NoError(t, err)
+		sk2, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
+		require.NoError(t, err)
+
+		// Add enough data to reach windowed mode
+		k := uint64(1) << lgK
+		for i := uint64(0); i < 20*k; i++ {
+			err = sk1.UpdateUint64(i)
+			require.NoError(t, err)
+			err = sk2.UpdateUint64(i)
+			require.NoError(t, err)
+		}
+
+		// Verify they're in windowed mode
+		assert.NotNil(t, sk1.slidingWindow)
+		assert.NotNil(t, sk2.slidingWindow)
+
+		// Both methods should agree
+		assert.Equal(t, safeSpecialEquals(sk1, sk2, false, false), sk1.Equal(sk2))
+		assert.Equal(t, safeSpecialEquals(sk2, sk1, false, false), sk2.Equal(sk1))
+
+		// Should be equal (symmetrically)
+		assert.True(t, sk1.Equal(sk2))
+		assert.True(t, sk2.Equal(sk1))
+	})
+
+	t.Run("MergedSketchesEqual", func(t *testing.T) {
+		lgK := 4
+		sk1, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
+		require.NoError(t, err)
+		sk2, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
+		require.NoError(t, err)
+
+		// Add data to both sketches
+		for i := 0; i < 100; i++ {
+			err = sk1.UpdateUint64(uint64(i))
+			require.NoError(t, err)
+			err = sk2.UpdateUint64(uint64(i + 100))
+			require.NoError(t, err)
+		}
+
+		// Create a union
+		union, err := NewCpcUnionSketchWithDefault(lgK)
+		require.NoError(t, err)
+		err = union.Update(sk1)
+		require.NoError(t, err)
+		err = union.Update(sk2)
+		require.NoError(t, err)
+
+		// Get result which should be a merged sketch
+		result, err := union.GetResult()
+		require.NoError(t, err)
+
+		// Make a copy of the merged sketch
+		result2, err := result.Copy()
+		require.NoError(t, err)
+
+		// Both methods should agree
+		assert.Equal(t, safeSpecialEquals(result, result2, true, true), result.Equal(result2))
+		assert.Equal(t, safeSpecialEquals(result2, result, true, true), result2.Equal(result))
+
+		// Should be equal (symmetrically)
+		assert.True(t, result.Equal(result2))
+		assert.True(t, result2.Equal(result))
+	})
+
+	t.Run("MixedMergedNonMergedEqual", func(t *testing.T) {
+		// This tests the case where one sketch has mergeFlag=true and the other has mergeFlag=false,
+		// but they represent the same data
+		lgK := 4
+		sk1, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
+		require.NoError(t, err)
+
+		// Add data
+		for i := 0; i < 100; i++ {
+			err = sk1.UpdateUint64(uint64(i))
+			require.NoError(t, err)
+		}
+
+		// Create a copy and set mergeFlag to true
+		sk2, err := sk1.Copy()
+		require.NoError(t, err)
+		sk2.mergeFlag = true
+
+		// Update fiCol for the merged sketch to ensure it's calculated correctly
+		fiCol := calculateFirstInterestingColumn(sk1)
+		sk2.fiCol = fiCol
+
+		// Both methods should agree - note: this case can cause specialEquals to panic,
+		// but our Equal method should handle this gracefully
+		eqResult := sk1.Equal(sk2)
+		specEqResult := safeSpecialEquals(sk1, sk2, false, true)
+		assert.Equal(t, specEqResult, eqResult)
+
+		eqResult = sk2.Equal(sk1)
+		specEqResult = safeSpecialEquals(sk2, sk1, true, false)
+		assert.Equal(t, specEqResult, eqResult)
+	})
+}

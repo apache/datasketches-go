@@ -644,9 +644,9 @@ func getMaxSerializedBytes(lgK int) (int, error) {
 	return int(empiricalMaxSizeFactor*float64(k)) + maxPreambleSizeBytes, nil
 }
 
-// ResetScratchBuffer sets the internal scratch buffer to all zeros.
-// This is useful when comparing two sketches for equality, as the scratch
-// buffer is a temporary workspace and not part of the sketch's logical state.
-func (c *CpcSketch) ResetScratchBuffer() {
+func (c *CpcSketch) Equal(target *CpcSketch) bool {
 	c.scratch = [8]byte{}
+	target.scratch = [8]byte{}
+
+	return c.lgK == target.lgK
 }

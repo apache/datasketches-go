@@ -20,11 +20,12 @@ package cpc
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/apache/datasketches-go/internal"
-	"github.com/twmb/murmur3"
 	"math"
 	"math/bits"
 	"unsafe"
+
+	"github.com/apache/datasketches-go/internal"
+	"github.com/twmb/murmur3"
 )
 
 const (
@@ -641,4 +642,11 @@ func getMaxSerializedBytes(lgK int) (int, error) {
 	// Otherwise, compute based on k = 1 << lgK.
 	k := 1 << lgK
 	return int(empiricalMaxSizeFactor*float64(k)) + maxPreambleSizeBytes, nil
+}
+
+// ResetScratchBuffer sets the internal scratch buffer to all zeros.
+// This is useful when comparing two sketches for equality, as the scratch
+// buffer is a temporary workspace and not part of the sketch's logical state.
+func (c *CpcSketch) ResetScratchBuffer() {
+	c.scratch = [8]byte{}
 }

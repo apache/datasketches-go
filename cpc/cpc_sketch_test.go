@@ -20,6 +20,7 @@ package cpc
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"testing"
 
 	"github.com/apache/datasketches-go/internal"
@@ -395,4 +396,57 @@ func BenchmarkMerge(b *testing.B) {
 		_ = union.Update(sk2)
 		_, _ = union.GetResult()
 	}
+}
+
+// TestCPCSerializeDeserializeFloats tests encoding a sketch with float values to bytes,
+// decoding it, and verifying the sketches are equal.
+func TestCPCSerializeDeserializeFloats(t *testing.T) {
+	// Create a new sketch
+	lgK := 10
+	sk, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
+	require.NoError(t, err)
+
+	// Add 100 floats from 0 to 100.0
+	for i := 0; i < 100; i++ {
+		value := float64(i)
+		err = sk.UpdateFloat64(value)
+		require.NoError(t, err)
+	}
+
+	// Get an estimate to confirm values were added
+	estimate := sk.GetEstimate()
+	require.InDelta(t, float64(100), estimate, 5.0, "Estimate should be close to 100")
+
+	// Encode the sketch to bytes
+	bytes, err := sk.ToCompactSlice()
+	require.NoError(t, err, "Failed to serialize sketch")
+	require.NotEmpty(t, bytes, "Serialized bytes should not be empty")
+
+	// Decode the bytes back to a sketch
+	decodedSketch, err := NewCpcSketchFromSlice(bytes, internal.DEFAULT_UPDATE_SEED)
+	require.NoError(t, err, "Failed to deserialize sketch")
+
+	// Check that both sketches have the same estimate
+	decodedEstimate := decodedSketch.GetEstimate()
+	require.Equal(t, estimate, decodedEstimate, "Decoded sketch should have the same estimate")
+
+	// Compare the sketches for deep equality, but first zero out the scratch buffers
+	// since they are just temporary workspaces and not part of the sketch's logical state
+	skCopy := *sk
+	decodedCopy := *decodedSketch
+	skCopy.ResetScratchBuffer()
+	decodedCopy.ResetScratchBuffer()
+
+	// Now perform the deep comparison
+	require.True(t, reflect.DeepEqual(skCopy, decodedCopy),
+		"Original and decoded sketches should be identical after zeroing scratch buffers")
+
+	// Also verify the serialized bytes still match
+	decodedBytes, err := decodedSketch.ToCompactSlice()
+	require.NoError(t, err, "Failed to re-serialize decoded sketch")
+	require.NotEmpty(t, decodedBytes, "Re-serialized bytes should not be empty")
+
+	// Compare original bytes with re-serialized bytes
+	require.Equal(t, len(bytes), len(decodedBytes), "Serialized byte arrays should be the same length")
+	require.Equal(t, bytes, decodedBytes, "Serialized byte arrays should match exactly")
 }

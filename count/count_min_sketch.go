@@ -2,7 +2,6 @@ package count
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"math/rand"
 
@@ -17,7 +16,7 @@ type countMinSketch struct {
 	hashSeeds   []int64
 }
 
-func NewCountMinSketch(numBuckets int32, numHashes int8, seed int64) (*countMinSketch, error) {
+func NewCountMinSketch(numHashes int8, numBuckets int32, seed int64) (*countMinSketch, error) {
 	if numBuckets < 3 {
 		return nil, errors.New("using fewer than 3 buckets incurs relative error greater than 1.0")
 	}
@@ -63,7 +62,6 @@ func (c *countMinSketch) getHashes(item []byte) []int64 {
 	for i, s := range c.hashSeeds {
 		h1, _ := internal.HashByteArrMurmur3(item, 0, len(item), uint64(s))
 		bucketIndex = h1 % uint64(c.numBuckets)
-		fmt.Println(s, bucketIndex)
 		sketchUpdateLocations[i] = int64(hashSeedIndex)*int64(c.numBuckets) + int64(bucketIndex)
 		hashSeedIndex++
 	}
@@ -78,7 +76,6 @@ func (c *countMinSketch) Update(item []byte, size int, weight int64) error {
 
 	hashLocations := c.getHashes(item)
 	for _, h := range hashLocations {
-		fmt.Println(h)
 		c.sketchSlice[h] += weight
 	}
 	return nil

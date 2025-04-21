@@ -22,8 +22,8 @@ func Test_CountMinSketch(t *testing.T) {
 	})
 
 	t.Run("CM Init", func(t *testing.T) {
-		numHashes := 3
-		numBuckets := 5
+		numHashes := int8(3)
+		numBuckets := int32(5)
 		cms, err := NewCountMinSketch(int8(numHashes), int32(numBuckets), seed)
 		assert.NoError(t, err)
 
@@ -31,6 +31,59 @@ func Test_CountMinSketch(t *testing.T) {
 		assert.Equal(t, numBuckets, cms.getNumBuckets())
 		assert.Equal(t, seed, cms.getSeed())
 
+	})
+
+	t.Run("CM parameter suggestion", func(t *testing.T) {
+		var (
+			numBuckets int32
+			numHashes  int8
+			err        error
+		)
+
+		// Bucket suggestions
+		numBuckets, err = SuggestNumBuckets(-1.0)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "relative error must be greater than 0.0")
+		assert.Equal(t, int32(0), numBuckets)
+
+		numBuckets, err = SuggestNumBuckets(0.2)
+		assert.NoError(t, err)
+		assert.Equal(t, int32(14), numBuckets)
+
+		numBuckets, err = SuggestNumBuckets(0.1)
+		assert.NoError(t, err)
+		assert.Equal(t, int32(28), numBuckets)
+
+		numBuckets, err = SuggestNumBuckets(0.05)
+		assert.NoError(t, err)
+		assert.Equal(t, int32(55), numBuckets)
+
+		numBuckets, err = SuggestNumBuckets(0.01)
+		assert.NoError(t, err)
+		assert.Equal(t, int32(272), numBuckets)
+
+		// Hash suggestion
+		numHashes, err = SuggestNumHashes(-1.0)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "confidence must be between 0 and 1.0")
+		assert.Equal(t, int8(0), numHashes)
+
+		numHashes, err = SuggestNumHashes(10.0)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "confidence must be between 0 and 1.0")
+		assert.Equal(t, int8(0), numHashes)
+
+		numHashes, err = SuggestNumHashes(0.682689492)
+		assert.NoError(t, err)
+		assert.Equal(t, int8(2), numHashes)
+
+		numHashes, err = SuggestNumHashes(0.954499736)
+		assert.NoError(t, err)
+		assert.Equal(t, int8(4), numHashes)
+
+		numHashes, err = SuggestNumHashes(0.997300204)
+		assert.NoError(t, err)
+		assert.Equal(t, int8(6), numHashes)
 	})
 
 	t.Run("CM one update: uint64_t", func(t *testing.T) {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"unsafe"
 
 	"github.com/apache/datasketches-go/internal"
 )
@@ -90,7 +89,7 @@ func (c *countMinSketch) UpdateString(item string, weight int64) error {
 		return nil
 	}
 
-	return c.Update(unsafe.Slice(unsafe.StringData(item), len(item)), len(item), weight)
+	return c.Update([]byte(item), len(item), weight)
 }
 
 func (c *countMinSketch) GetEstimate(item []byte, size int) int64 {
@@ -110,5 +109,5 @@ func (c *countMinSketch) GetEstimateString(item string) int64 {
 	if len(item) == 0 {
 		return 0
 	}
-	return c.GetEstimate(unsafe.Slice(unsafe.StringData(item), len(item)), len(item))
+	return c.GetEstimate([]byte(item), len(item))
 }

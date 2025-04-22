@@ -128,4 +128,14 @@ func Test_CountMinSketch(t *testing.T) {
 		estimate = cms.GetEstimateString(x)
 		assert.Equal(t, insertedWeights, estimate)
 	})
+
+	t.Run("CM frequency cancellation", func(t *testing.T) {
+		cms, err := NewCountMinSketch(int8(1), int32(5), seed)
+		assert.NoError(t, err)
+		cms.UpdateString("x", 1)
+		cms.UpdateString("y", -1)
+		assert.Equal(t, int64(2), cms.getTotalWeights())
+		assert.Equal(t, int64(1), cms.GetEstimateString("x"))
+		assert.Equal(t, int64(-1), cms.GetEstimateString("y"))
+	})
 }

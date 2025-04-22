@@ -9,11 +9,12 @@ import (
 )
 
 type countMinSketch struct {
-	numBuckets  int32 // counter array for each of the hashing function
-	numHashes   int8  // number of hashing functions
-	sketchSlice []int64
-	seed        int64
-	hashSeeds   []int64
+	numBuckets    int32 // counter array for each of the hashing function
+	numHashes     int8  // number of hashing functions
+	sketchSlice   []int64
+	seed          int64
+	totatlWeights int64
+	hashSeeds     []int64
 }
 
 func NewCountMinSketch(numHashes int8, numBuckets int32, seed int64) (*countMinSketch, error) {
@@ -51,6 +52,10 @@ func (c *countMinSketch) getNumHashes() int8 {
 	return c.numHashes
 }
 
+func (c *countMinSketch) getTotalWeights() int64 {
+	return c.totatlWeights
+}
+
 func (c *countMinSketch) getSeed() int64 {
 	return c.seed
 }
@@ -76,6 +81,12 @@ func (c *countMinSketch) getHashes(item []byte) []int64 {
 func (c *countMinSketch) Update(item []byte, size int, weight int64) error {
 	if len(item) == 0 {
 		return nil
+	}
+
+	if weight < 0 {
+		c.totatlWeights += -weight
+	} else {
+		c.totatlWeights += weight
 	}
 
 	hashLocations := c.getHashes(item)

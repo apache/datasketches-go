@@ -62,6 +62,24 @@ func Test_CountMinSketch(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, int32(272), numBuckets)
 
+		// Check that the sketch get_epsilon acts inversely to suggest_num_buckets
+		numHashes = int8(3)
+		cms, err := NewCountMinSketch(numHashes, int32(14), seed)
+		assert.NoError(t, err)
+		assert.Less(t, cms.getRelativeError(), 0.2)
+
+		cms, err = NewCountMinSketch(numHashes, int32(28), seed)
+		assert.NoError(t, err)
+		assert.Less(t, cms.getRelativeError(), 0.1)
+
+		cms, err = NewCountMinSketch(numHashes, int32(55), seed)
+		assert.NoError(t, err)
+		assert.Less(t, cms.getRelativeError(), 0.05)
+
+		cms, err = NewCountMinSketch(numHashes, int32(272), seed)
+		assert.NoError(t, err)
+		assert.Less(t, cms.getRelativeError(), 0.01)
+
 		// Hash suggestion
 		numHashes, err = SuggestNumHashes(-1.0)
 		assert.Error(t, err)
@@ -104,4 +122,5 @@ func Test_CountMinSketch(t *testing.T) {
 		estimate = cms.GetEstimateString(x)
 		fmt.Println(estimate)
 	})
+
 }

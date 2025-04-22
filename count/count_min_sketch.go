@@ -55,6 +55,10 @@ func (c *countMinSketch) getSeed() int64 {
 	return c.seed
 }
 
+func (c *countMinSketch) getRelativeError() float64 {
+	return math.Exp(1.0) / float64(c.numBuckets)
+}
+
 func (c *countMinSketch) getHashes(item []byte) []int64 {
 	var bucketIndex, hashSeedIndex uint64
 	sketchUpdateLocations := make([]int64, c.numHashes)

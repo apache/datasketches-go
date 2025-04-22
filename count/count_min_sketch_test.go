@@ -173,4 +173,70 @@ func Test_CountMinSketch(t *testing.T) {
 			assert.GreaterOrEqual(t, est, low)
 		}
 	})
+
+	t.Run("CM merge - reject", func(t *testing.T) {
+		relativeError := 0.25
+		confidence := 0.9
+		numBuckets, err := SuggestNumBuckets(relativeError)
+		assert.NoError(t, err)
+		numHashes, err := SuggestNumHashes(confidence)
+		assert.NoError(t, err)
+
+		cms, err := NewCountMinSketch(numHashes, numBuckets, seed)
+		assert.NoError(t, err)
+		err = cms.Merge(cms)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "cannot merge sketch with itself")
+
+		s1, err := NewCountMinSketch(numHashes+1, numBuckets, seed)
+		assert.NoError(t, err)
+		err = cms.Merge(s1)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "sketches are incompatible")
+
+		s2, err := NewCountMinSketch(numHashes, numBuckets+1, seed)
+		assert.NoError(t, err)
+		err = cms.Merge(s2)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "sketches are incompatible")
+
+		s3, err := NewCountMinSketch(numHashes, numBuckets, 1)
+		assert.NoError(t, err)
+		err = cms.Merge(s3)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "sketches are incompatible")
+	})
+
+	t.Run("CM merge - pass", func(t *testing.T) {
+		relativeError := 0.25
+		confidence := 0.9
+		numBuckets, err := SuggestNumBuckets(relativeError)
+		assert.NoError(t, err)
+		numHashes, err := SuggestNumHashes(confidence)
+		assert.NoError(t, err)
+
+		cms, err := NewCountMinSketch(numHashes, numBuckets, seed)
+		assert.NoError(t, err)
+
+		otherCms, err := NewCountMinSketch(cms.getNumHashes(), cms.getNumBuckets(), seed)
+		assert.NoError(t, err)
+
+		err = cms.Merge(otherCms)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(0), cms.getTotalWeights())
+
+		data := []uint64{2, 3, 5, 7}
+		for _, d := range data {
+			cms.UpdateUint64(d, int64(1))
+			otherCms.UpdateUint64(d, int64(1))
+		}
+		err = cms.Merge(otherCms)
+		assert.NoError(t, err)
+		assert.Equal(t, cms.getTotalWeights(), 2*otherCms.getTotalWeights())
+
+		for _, d := range data {
+			assert.LessOrEqual(t, cms.GetEstimateUint64(d), cms.GetUpperBoundUint64(d))
+			assert.LessOrEqual(t, cms.GetEstimateUint64(d), int64(2))
+		}
+	})
 }

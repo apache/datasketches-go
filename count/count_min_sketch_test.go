@@ -1,7 +1,6 @@
 package count
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -107,20 +106,26 @@ func Test_CountMinSketch(t *testing.T) {
 	t.Run("CM one update: uint64_t", func(t *testing.T) {
 		numHashes := int8(3)
 		numBuckets := int32(5)
-		//insertedWeights := int64(0)
+		insertedWeights := int64(0)
 		cms, err := NewCountMinSketch(numHashes, numBuckets, seed)
 		assert.NoError(t, err)
 		x := "x"
 
 		estimate := cms.GetEstimateString(x)
-		assert.Equal(t, int64(0), estimate)
+		assert.Equal(t, int64(0), estimate) // no items in sketch so estimate should be zero
+
+		err = cms.UpdateString(x, int64(1))
+		assert.NoError(t, err)
+		insertedWeights += 1
+		estimate = cms.GetEstimateString(x)
+		assert.Equal(t, insertedWeights, estimate)
 
 		weight := int64(9)
+		insertedWeights += 9
 		err = cms.UpdateString(x, weight)
 		assert.NoError(t, err)
 
 		estimate = cms.GetEstimateString(x)
-		fmt.Println(estimate)
+		assert.Equal(t, insertedWeights, estimate)
 	})
-
 }

@@ -78,7 +78,7 @@ func (c *countMinSketch) getHashes(item []byte) []int64 {
 	return sketchUpdateLocations
 }
 
-func (c *countMinSketch) Update(item []byte, size int, weight int64) error {
+func (c *countMinSketch) Update(item []byte, weight int64) error {
 	if len(item) == 0 {
 		return nil
 	}
@@ -101,10 +101,10 @@ func (c *countMinSketch) UpdateString(item string, weight int64) error {
 		return nil
 	}
 
-	return c.Update([]byte(item), len(item), weight)
+	return c.Update([]byte(item), weight)
 }
 
-func (c *countMinSketch) GetEstimate(item []byte, size int) int64 {
+func (c *countMinSketch) GetEstimate(item []byte) int64 {
 	if len(item) == 0 {
 		return 0
 	}
@@ -121,5 +121,5 @@ func (c *countMinSketch) GetEstimateString(item string) int64 {
 	if len(item) == 0 {
 		return 0
 	}
-	return c.GetEstimate([]byte(item), len(item))
+	return c.GetEstimate([]byte(item))
 }

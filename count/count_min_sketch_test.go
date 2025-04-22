@@ -29,7 +29,7 @@ func Test_CountMinSketch(t *testing.T) {
 		assert.Equal(t, numHashes, cms.getNumHashes())
 		assert.Equal(t, numBuckets, cms.getNumBuckets())
 		assert.Equal(t, seed, cms.getSeed())
-
+		assert.True(t, cms.isEmpty())
 	})
 
 	t.Run("CM parameter suggestion", func(t *testing.T) {
@@ -111,11 +111,13 @@ func Test_CountMinSketch(t *testing.T) {
 		assert.NoError(t, err)
 		x := "x"
 
+		assert.True(t, cms.isEmpty())
 		estimate := cms.GetEstimateString(x)
 		assert.Equal(t, int64(0), estimate) // no items in sketch so estimate should be zero
 
 		err = cms.UpdateString(x, int64(1))
 		assert.NoError(t, err)
+		assert.False(t, cms.isEmpty())
 		insertedWeights += 1
 		estimate = cms.GetEstimateString(x)
 		assert.Equal(t, insertedWeights, estimate)

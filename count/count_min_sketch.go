@@ -156,3 +156,24 @@ func (c *countMinSketch) GetLowerBoundUint64(item uint64) int64 {
 	binary.LittleEndian.PutUint64(b, item)
 	return c.GetLowerBound(b)
 }
+
+func (c *countMinSketch) Merge(otherSketch *countMinSketch) error {
+	if c == otherSketch {
+		return errors.New("cannot merge sketch with itself")
+	}
+
+	canMerge := c.getNumHashes() == otherSketch.getNumHashes() &&
+		c.getNumBuckets() == otherSketch.getNumBuckets() &&
+		c.getSeed() == otherSketch.getSeed()
+
+	if !canMerge {
+		return errors.New("sketches are incompatible")
+	}
+
+	for i := range c.sketchSlice {
+		c.sketchSlice[i] += otherSketch.sketchSlice[i]
+	}
+	c.totatlWeights += otherSketch.totatlWeights
+
+	return nil
+}

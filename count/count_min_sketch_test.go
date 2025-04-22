@@ -138,4 +138,39 @@ func Test_CountMinSketch(t *testing.T) {
 		assert.Equal(t, int64(1), cms.GetEstimateString("x"))
 		assert.Equal(t, int64(-1), cms.GetEstimateString("y"))
 	})
+
+	t.Run("CM frequency estimates", func(t *testing.T) {
+		numItems := 10
+		data := make([]uint64, numItems)
+		frequencies := make([]int64, numItems)
+
+		// Populate data slices
+		for i := range numItems {
+			data[i] = uint64(i)
+			frequencies[i] = int64(uint64(1) << (uint64(numItems) - uint64(i)))
+		}
+
+		relativeError := 0.1
+		confidence := 0.99
+		numBuckets, err := SuggestNumBuckets(relativeError)
+		assert.NoError(t, err)
+		numHashes, err := SuggestNumHashes(confidence)
+		assert.NoError(t, err)
+
+		cms, err := NewCountMinSketch(numHashes, numBuckets, seed)
+		assert.NoError(t, err)
+		for i := range numItems {
+			value := data[i]
+			freq := frequencies[i]
+			cms.UpdateUint64(value, freq)
+		}
+
+		for _, d := range data {
+			est := cms.GetEstimateUint64(d)
+			upp := cms.GetUpperBoundUint64(d)
+			low := cms.GetLowerBoundUint64(d)
+			assert.LessOrEqual(t, est, upp)
+			assert.GreaterOrEqual(t, est, low)
+		}
+	})
 }

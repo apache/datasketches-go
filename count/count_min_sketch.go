@@ -1,6 +1,7 @@
 package count
 
 import (
+	"encoding/binary"
 	"errors"
 	"math"
 	"math/rand"
@@ -96,6 +97,12 @@ func (c *countMinSketch) Update(item []byte, weight int64) error {
 	return nil
 }
 
+func (c *countMinSketch) UpdateUint64(item uint64, weight int64) error {
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, item)
+	return c.Update(b, weight)
+}
+
 func (c *countMinSketch) UpdateString(item string, weight int64) error {
 	if len(item) == 0 {
 		return nil
@@ -117,9 +124,35 @@ func (c *countMinSketch) GetEstimate(item []byte) int64 {
 	return estimate
 }
 
+func (c *countMinSketch) GetEstimateUint64(item uint64) int64 {
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, item)
+	return c.GetEstimate(b)
+}
+
 func (c *countMinSketch) GetEstimateString(item string) int64 {
 	if len(item) == 0 {
 		return 0
 	}
 	return c.GetEstimate([]byte(item))
+}
+
+func (c *countMinSketch) GetUpperBound(item []byte) int64 {
+	return c.GetEstimate(item) + int64(c.getRelativeError()*float64(c.getTotalWeights()))
+}
+
+func (c *countMinSketch) GetUpperBoundUint64(item uint64) int64 {
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, item)
+	return c.GetUpperBound(b)
+}
+
+func (c *countMinSketch) GetLowerBound(item []byte) int64 {
+	return c.GetEstimate(item)
+}
+
+func (c *countMinSketch) GetLowerBoundUint64(item uint64) int64 {
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, item)
+	return c.GetLowerBound(b)
 }

@@ -27,3 +27,13 @@ func SuggestNumHashes(confidence float64) (int8, error) {
 	}
 	return Min(int8(math.Ceil(math.Log(1.0/(1.0-confidence)))), int8(math.MaxInt8)), nil
 }
+
+const (
+	PREAMBLE_LONGS_SHORT = 2
+	SERIAL_VERSION_1     = 1
+	FAMILY_ID            = 18
+	NULL_8               = 0
+	NULL_32              = 0
+
+	IS_EMPTY = 0
+)

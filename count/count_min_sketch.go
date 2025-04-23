@@ -3,6 +3,7 @@ package count
 import (
 	"encoding/binary"
 	"errors"
+	"io"
 	"math"
 	"math/rand"
 
@@ -178,6 +179,71 @@ func (c *countMinSketch) Merge(otherSketch *countMinSketch) error {
 		c.sketchSlice[i] += otherSketch.sketchSlice[i]
 	}
 	c.totatlWeights += otherSketch.totatlWeights
+
+	return nil
+}
+
+func (c *countMinSketch) Serialize(w io.Writer) error {
+	preambleLongs := byte(PREAMBLE_LONGS_SHORT)
+	serVer := byte(SERIAL_VERSION_1)
+	familyID := byte(FAMILY_ID)
+
+	var flagsByte byte
+	if c.isEmpty() {
+		flagsByte |= 1 << IS_EMPTY
+	}
+	unused32 := uint32(NULL_32)
+
+	if err := binary.Write(w, binary.LittleEndian, preambleLongs); err != nil {
+		return err
+	}
+	if err := binary.Write(w, binary.LittleEndian, serVer); err != nil {
+		return err
+	}
+	if err := binary.Write(w, binary.LittleEndian, familyID); err != nil {
+		return err
+	}
+	if err := binary.Write(w, binary.LittleEndian, flagsByte); err != nil {
+		return err
+	}
+	if err := binary.Write(w, binary.LittleEndian, unused32); err != nil {
+		return err
+	}
+
+	seedHash, err := internal.ComputeSeedHash(c.seed)
+	if err != nil {
+		return err
+	}
+	unused8 := byte(NULL_8)
+
+	if err := binary.Write(w, binary.LittleEndian, c.numBuckets); err != nil {
+		return err
+	}
+	if err := binary.Write(w, binary.LittleEndian, c.numHashes); err != nil {
+		return err
+	}
+	if err := binary.Write(w, binary.LittleEndian, seedHash); err != nil {
+		return err
+	}
+	if err := binary.Write(w, binary.LittleEndian, unused8); err != nil {
+		return err
+	}
+
+	// Skip rest if sketch is empty
+	if c.isEmpty() {
+		return nil
+	}
+
+	if err := binary.Write(w, binary.LittleEndian, c.totatlWeights); err != nil {
+		return err
+	}
+
+	for _, h := range c.sketchSlice {
+		err := binary.Write(w, binary.LittleEndian, h)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

@@ -1,6 +1,7 @@
 package count
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -229,8 +230,10 @@ func Test_CountMinSketch(t *testing.T) {
 
 		data := []uint64{2, 3, 5, 7}
 		for _, d := range data {
-			cms.UpdateUint64(d, int64(1))
-			otherCms.UpdateUint64(d, int64(1))
+			err = cms.UpdateUint64(d, int64(1))
+			assert.NoError(t, err)
+			err = otherCms.UpdateUint64(d, int64(1))
+			assert.NoError(t, err)
 		}
 		err = cms.Merge(otherCms)
 		assert.NoError(t, err)
@@ -240,5 +243,36 @@ func Test_CountMinSketch(t *testing.T) {
 			assert.LessOrEqual(t, cms.GetEstimateUint64(d), cms.GetUpperBoundUint64(d))
 			assert.LessOrEqual(t, cms.GetEstimateUint64(d), int64(2))
 		}
+	})
+
+	t.Run("CM serialize-deserialize", func(t *testing.T) {
+		numHashes := int8(3)
+		numBuckets := int32(5)
+		c, err := NewCountMinSketch(numHashes, numBuckets, seed)
+		assert.NoError(t, err)
+		var buf []byte
+		b := bytes.NewBuffer(buf)
+		err = c.Serialize(b)
+		assert.NoError(t, err)
+
+		d, err := c.deserialize(b.Bytes(), seed)
+		assert.NoError(t, err)
+		assert.Equal(t, c, d)
+		assert.NotEqual(t, &c, d)
+
+		data := []uint64{2, 3, 5, 7}
+		for _, d := range data {
+			err = c.UpdateUint64(d, int64(1))
+			assert.NoError(t, err)
+		}
+
+		b.Reset()
+		err = c.Serialize(b)
+		assert.NoError(t, err)
+
+		d, err = c.deserialize(b.Bytes(), seed)
+		assert.NoError(t, err)
+		assert.Equal(t, c, d)
+		assert.NotEqual(t, &c, d)
 	})
 }

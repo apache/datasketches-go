@@ -28,6 +28,10 @@ func SuggestNumHashes(confidence float64) (int8, error) {
 	return Min(int8(math.Ceil(math.Log(1.0/(1.0-confidence)))), int8(math.MaxInt8)), nil
 }
 
+func checkHeaderValidity(preamble, serVer, familyID, flagsByte byte) error {
+	return nil
+}
+
 const (
 	PREAMBLE_LONGS_SHORT = 2
 	SERIAL_VERSION_1     = 1

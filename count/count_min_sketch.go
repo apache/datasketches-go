@@ -1,6 +1,7 @@
 package count
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -11,7 +12,7 @@ import (
 )
 
 type countMinSketch struct {
-	numBuckets    int32 // counter array for each of the hashing function
+	numBuckets    int32 // counter array size for each of the hashing function
 	numHashes     int8  // number of hashing functions
 	sketchSlice   []int64
 	seed          int64
@@ -214,7 +215,6 @@ func (c *countMinSketch) Serialize(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	unused8 := byte(NULL_8)
 
 	if err := binary.Write(w, binary.LittleEndian, c.numBuckets); err != nil {
 		return err
@@ -225,6 +225,7 @@ func (c *countMinSketch) Serialize(w io.Writer) error {
 	if err := binary.Write(w, binary.LittleEndian, seedHash); err != nil {
 		return err
 	}
+	unused8 := byte(NULL_8)
 	if err := binary.Write(w, binary.LittleEndian, unused8); err != nil {
 		return err
 	}
@@ -246,4 +247,87 @@ func (c *countMinSketch) Serialize(w io.Writer) error {
 	}
 
 	return nil
+}
+
+func (c *countMinSketch) deserialize(b []byte, seed int64) (*countMinSketch, error) {
+	r := bytes.NewReader(b)
+	preamble, err := r.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	serVe, err := r.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	familyID, err := r.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	flag, err := r.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	err = checkHeaderValidity(preamble, serVe, familyID, flag)
+	if err != nil {
+		return nil, err
+	}
+
+	unused32 := make([]byte, 4)
+	_, err = r.Read(unused32)
+	if err != nil {
+		return nil, err
+	}
+
+	var numBuckets int32
+	err = binary.Read(r, binary.LittleEndian, &numBuckets)
+	if err != nil {
+		return nil, err
+	}
+
+	var numHashes int8
+	err = binary.Read(r, binary.LittleEndian, &numHashes)
+	if err != nil {
+		return nil, err
+	}
+
+	var seedHash int16
+	err = binary.Read(r, binary.LittleEndian, &seedHash)
+	if err != nil {
+		return nil, err
+	}
+
+	var unused8 int8
+	err = binary.Read(r, binary.LittleEndian, &unused8)
+	if err != nil {
+		return nil, err
+	}
+	var totatlWeights int64
+	err = binary.Read(r, binary.LittleEndian, &totatlWeights)
+	if err != nil {
+		return nil, err
+	}
+
+	cms, err := NewCountMinSketch(numHashes, numBuckets, seed)
+	if err != nil {
+		return nil, err
+	}
+
+	cms.totatlWeights = totatlWeights
+
+	var w int64
+	var i int
+	for r.Len() > 0 {
+		err = binary.Read(r, binary.LittleEndian, &w)
+		if err != nil {
+			return nil, err
+		}
+		cms.sketchSlice[i] = w
+		i++
+	}
+
+	return cms, nil
 }

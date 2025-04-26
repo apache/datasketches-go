@@ -12,12 +12,12 @@ import (
 )
 
 type countMinSketch struct {
-	numBuckets    int32 // counter array size for each of the hashing function
-	numHashes     int8  // number of hashing functions
-	sketchSlice   []int64
-	seed          int64
-	totatlWeights int64
-	hashSeeds     []int64
+	numBuckets  int32 // counter array size for each of the hashing function
+	numHashes   int8  // number of hashing functions
+	sketchSlice []int64
+	seed        int64
+	totalWeight int64
+	hashSeeds   []int64
 }
 
 func NewCountMinSketch(numHashes int8, numBuckets int32, seed int64) (*countMinSketch, error) {
@@ -55,8 +55,8 @@ func (c *countMinSketch) getNumHashes() int8 {
 	return c.numHashes
 }
 
-func (c *countMinSketch) getTotalWeights() int64 {
-	return c.totatlWeights
+func (c *countMinSketch) getTotalWeight() int64 {
+	return c.totalWeight
 }
 
 func (c *countMinSketch) getSeed() int64 {
@@ -68,7 +68,7 @@ func (c *countMinSketch) getRelativeError() float64 {
 }
 
 func (c *countMinSketch) isEmpty() bool {
-	return c.totatlWeights == 0
+	return c.totalWeight == 0
 }
 
 func (c *countMinSketch) getHashes(item []byte) []int64 {
@@ -91,9 +91,9 @@ func (c *countMinSketch) Update(item []byte, weight int64) error {
 	}
 
 	if weight < 0 {
-		c.totatlWeights += -weight
+		c.totalWeight += -weight
 	} else {
-		c.totatlWeights += weight
+		c.totalWeight += weight
 	}
 
 	hashLocations := c.getHashes(item)
@@ -144,7 +144,7 @@ func (c *countMinSketch) GetEstimateString(item string) int64 {
 }
 
 func (c *countMinSketch) GetUpperBound(item []byte) int64 {
-	return c.GetEstimate(item) + int64(c.getRelativeError()*float64(c.getTotalWeights()))
+	return c.GetEstimate(item) + int64(c.getRelativeError()*float64(c.getTotalWeight()))
 }
 
 func (c *countMinSketch) GetUpperBoundUint64(item uint64) int64 {
@@ -179,7 +179,7 @@ func (c *countMinSketch) Merge(otherSketch *countMinSketch) error {
 	for i := range c.sketchSlice {
 		c.sketchSlice[i] += otherSketch.sketchSlice[i]
 	}
-	c.totatlWeights += otherSketch.totatlWeights
+	c.totalWeight += otherSketch.totalWeight
 
 	return nil
 }
@@ -235,7 +235,7 @@ func (c *countMinSketch) Serialize(w io.Writer) error {
 		return nil
 	}
 
-	if err := binary.Write(w, binary.LittleEndian, c.totatlWeights); err != nil {
+	if err := binary.Write(w, binary.LittleEndian, c.totalWeight); err != nil {
 		return err
 	}
 
@@ -305,8 +305,8 @@ func (c *countMinSketch) deserialize(b []byte, seed int64) (*countMinSketch, err
 	if err != nil {
 		return nil, err
 	}
-	var totatlWeights int64
-	err = binary.Read(r, binary.LittleEndian, &totatlWeights)
+	var totalWeight int64
+	err = binary.Read(r, binary.LittleEndian, &totalWeight)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +316,7 @@ func (c *countMinSketch) deserialize(b []byte, seed int64) (*countMinSketch, err
 		return nil, err
 	}
 
-	cms.totatlWeights = totatlWeights
+	cms.totalWeight = totalWeight
 
 	var w int64
 	var i int

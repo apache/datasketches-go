@@ -137,7 +137,7 @@ func Test_CountMinSketch(t *testing.T) {
 		assert.NoError(t, err)
 		cms.UpdateString("x", 1)
 		cms.UpdateString("y", -1)
-		assert.Equal(t, int64(2), cms.getTotalWeights())
+		assert.Equal(t, int64(2), cms.getTotalWeight())
 		assert.Equal(t, int64(1), cms.GetEstimateString("x"))
 		assert.Equal(t, int64(-1), cms.GetEstimateString("y"))
 	})
@@ -226,7 +226,7 @@ func Test_CountMinSketch(t *testing.T) {
 
 		err = cms.Merge(otherCms)
 		assert.NoError(t, err)
-		assert.Equal(t, int64(0), cms.getTotalWeights())
+		assert.Equal(t, int64(0), cms.getTotalWeight())
 
 		data := []uint64{2, 3, 5, 7}
 		for _, d := range data {
@@ -237,7 +237,7 @@ func Test_CountMinSketch(t *testing.T) {
 		}
 		err = cms.Merge(otherCms)
 		assert.NoError(t, err)
-		assert.Equal(t, cms.getTotalWeights(), 2*otherCms.getTotalWeights())
+		assert.Equal(t, cms.getTotalWeight(), 2*otherCms.getTotalWeight())
 
 		for _, d := range data {
 			assert.LessOrEqual(t, cms.GetEstimateUint64(d), cms.GetUpperBoundUint64(d))

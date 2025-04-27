@@ -305,17 +305,22 @@ func (c *countMinSketch) deserialize(b []byte, seed int64) (*countMinSketch, err
 	if err != nil {
 		return nil, err
 	}
-	var totalWeight int64
-	err = binary.Read(r, binary.LittleEndian, &totalWeight)
-	if err != nil {
-		return nil, err
-	}
 
 	cms, err := NewCountMinSketch(numHashes, numBuckets, seed)
 	if err != nil {
 		return nil, err
 	}
 
+	isEmpty := (flag & (1 << IS_EMPTY)) > 0
+	if isEmpty {
+		return cms, nil
+	}
+
+	var totalWeight int64
+	err = binary.Read(r, binary.LittleEndian, &totalWeight)
+	if err != nil {
+		return nil, err
+	}
 	cms.totalWeight = totalWeight
 
 	var w int64

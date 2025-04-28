@@ -185,15 +185,15 @@ func (c *CountMinSketch) Merge(otherSketch *CountMinSketch) error {
 }
 
 func (c *CountMinSketch) Serialize(w io.Writer) error {
-	preambleLongs := byte(PREAMBLE_LONGS_SHORT)
-	serVer := byte(SERIAL_VERSION_1)
-	familyID := byte(FAMILY_ID)
+	preambleLongs := byte(PreambleLongsShort)
+	serVer := byte(SerialVersion1)
+	familyID := byte(FamilyId)
 
 	var flagsByte byte
 	if c.isEmpty() {
-		flagsByte |= 1 << IS_EMPTY
+		flagsByte |= 1 << IsEmpty
 	}
-	unused32 := uint32(NULL_32)
+	unused32 := uint32(Null32)
 
 	if err := binary.Write(w, binary.LittleEndian, preambleLongs); err != nil {
 		return err
@@ -225,7 +225,7 @@ func (c *CountMinSketch) Serialize(w io.Writer) error {
 	if err := binary.Write(w, binary.LittleEndian, seedHash); err != nil {
 		return err
 	}
-	unused8 := byte(NULL_8)
+	unused8 := byte(Null8)
 	if err := binary.Write(w, binary.LittleEndian, unused8); err != nil {
 		return err
 	}
@@ -317,7 +317,7 @@ func (c *CountMinSketch) Deserialize(b []byte, seed int64) (*CountMinSketch, err
 		return nil, err
 	}
 
-	isEmpty := (flag & (1 << IS_EMPTY)) > 0
+	isEmpty := (flag & (1 << IsEmpty)) > 0
 	if isEmpty {
 		return cms, nil
 	}

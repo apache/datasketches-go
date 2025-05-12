@@ -116,7 +116,8 @@ func IsNil[T any](t T) bool {
 
 func ComputeSeedHash(seed int64) (int16, error) {
 	seedArr := []int64{seed}
-	seedHash, _ := HashInt64SliceMurmur3(seedArr, 0, 1, uint64(seed))
+	//seedHash, _ := HashInt64SliceMurmur3(seedArr, 0, 1, uint64(seed))
+	seedHash, _ := HashInt64SliceMurmur3(seedArr, 0, len(seedArr), 0)
 	seedHash = seedHash & 0xFFFF
 
 	if seedHash == 0 {

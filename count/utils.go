@@ -52,9 +52,7 @@ func checkHeaderValidity(preamble, serVer, familyID, flagsByte byte) error {
 const (
 	PreambleLongsShort = 2
 	SerialVersion1     = 1
-	FamilyId           = 18
 	Null8              = 0
 	Null32             = 0
-
-	IsEmpty = 0
+	IsEmpty            = 0
 )

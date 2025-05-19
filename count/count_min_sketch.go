@@ -204,7 +204,7 @@ func (c *CountMinSketch) Merge(otherSketch *CountMinSketch) error {
 func (c *CountMinSketch) Serialize(w io.Writer) error {
 	preambleLongs := byte(PreambleLongsShort)
 	serVer := byte(SerialVersion1)
-	familyID := byte(FamilyId)
+	familyID := byte(internal.FamilyEnum.CountMinSketch.Id)
 
 	var flagsByte byte
 	if c.isEmpty() {

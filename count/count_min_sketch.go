@@ -28,6 +28,8 @@ import (
 	"github.com/apache/datasketches-go/internal"
 )
 
+// Implementation of the CountMin sketch data structure of Cormode and Muthukrishnan.
+// [1] - http://dimacs.rutgers.edu/~graham/pubs/papers/cm-full.pdf
 type CountMinSketch struct {
 	numBuckets  int32 // counter array size for each of the hashing function
 	numHashes   int8  // number of hashing functions
@@ -37,6 +39,9 @@ type CountMinSketch struct {
 	hashSeeds   []int64
 }
 
+// NewCountMinSketch creates an instance of the CounrMin sketch given parameters numHashes, numBuckets and hash seed.
+// The items inserted into the sketch can be arbitrary type, so long as they are hashable via murmurhash.
+// Only update and estimate methods are added for uint64 and string types.
 func NewCountMinSketch(numHashes int8, numBuckets int32, seed int64) (*CountMinSketch, error) {
 	if numBuckets < 3 {
 		return nil, errors.New("using fewer than 3 buckets incurs relative error greater than 1.0")

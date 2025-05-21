@@ -94,14 +94,12 @@ func (c *CountMinSketch) isEmpty() bool {
 }
 
 func (c *CountMinSketch) getHashes(item []byte) []int64 {
-	var bucketIndex, hashSeedIndex uint64
 	sketchUpdateLocations := make([]int64, c.numHashes)
 
 	for i, s := range c.hashSeeds {
 		h1, _ := internal.HashByteArrMurmur3(item, 0, len(item), uint64(s))
-		bucketIndex = h1 % uint64(c.numBuckets)
-		sketchUpdateLocations[i] = int64(hashSeedIndex)*int64(c.numBuckets) + int64(bucketIndex)
-		hashSeedIndex++
+		bucketIndex := h1 % uint64(c.numBuckets)
+		sketchUpdateLocations[i] = int64(i)*int64(c.numBuckets) + int64(bucketIndex)
 	}
 
 	return sketchUpdateLocations

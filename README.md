@@ -39,9 +39,9 @@ If you are interested in making contributions to this site please see our [Commu
 | Type         | Implementation          | Status |
 |--------------|-------------------------|--|
 | Cardinality	 |                         |  |
-| 	            | CpcSketch               | 🚧 |
+| 	            | CpcSketch               | ⚠️ |
 | 	            | HllSketch               | ⚠️ |
-| 	            | ThetaSketch             | ❌ |
+| 	            | ThetaSketch             | 🚧 |
 | 	            | TupleSketch<S>          | ❌ |
 | Quantiles	   |                         |  |
 | 	            | CormodeDoublesSketch    | ❌ |
@@ -53,6 +53,7 @@ If you are interested in making contributions to this site please see our [Commu
 | Frequencies  |              | ️ |
 |              | LongsSketch             | ⚠️ |
 |              | ItemsSketch<T>          | ⚠️ |
+|              | CountMinSketch          | ⚠️ |
 | Sampling |    |  |
 |  | ReservoirLongsSketch    | ❌ |
 |  | ReserviorItemsSketch<T> | ❌ |

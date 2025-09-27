@@ -19,10 +19,14 @@ package frequencies
 
 import (
 	"encoding/binary"
-	"github.com/apache/datasketches-go/common"
-	"github.com/stretchr/testify/assert"
+	"math/rand"
+	"slices"
+	"sort"
 	"strconv"
 	"testing"
+
+	"github.com/apache/datasketches-go/common"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestEmpty(t *testing.T) {
@@ -437,5 +441,67 @@ func BenchmarkItemSketch(b *testing.B) {
 	assert.NoError(b, err)
 	for i := 0; i < b.N; i++ {
 		sketch.Update(int64(i))
+	}
+}
+
+func generateTestRowItems(n int) []*RowItem[string] {
+	items := make([]*RowItem[string], n)
+	for i := 0; i < n; i++ {
+		est := rand.Int63n(10000)
+		items[i] = newRowItem(
+			"item"+string(rune('a'+i%26)),
+			est,
+			est+100,
+			est-100,
+		)
+	}
+	return items
+}
+
+func BenchmarkSortSliceRow(b *testing.B) {
+	sizes := []int{10, 100, 1000, 10000}
+
+	for _, size := range sizes {
+		b.Run("size="+strconv.Itoa(size), func(b *testing.B) {
+			original := generateTestRowItems(size)
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				rowList := make([]*RowItem[string], len(original))
+				copy(rowList, original)
+
+				sort.Slice(rowList, func(i, j int) bool {
+					return rowList[i].est > rowList[j].est
+				})
+			}
+		})
+	}
+}
+
+func BenchmarkSlicesSortFuncRow(b *testing.B) {
+	sizes := []int{10, 100, 1000, 10000}
+
+	for _, size := range sizes {
+		b.Run("size="+strconv.Itoa(size), func(b *testing.B) {
+			original := generateTestRowItems(size)
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				rowList := make([]*RowItem[string], len(original))
+				copy(rowList, original)
+
+				slices.SortFunc(rowList, func(a, b *RowItem[string]) int {
+					if a.est > b.est {
+						return -1
+					}
+					if a.est < b.est {
+						return 1
+					}
+					return 0
+				})
+			}
+		})
 	}
 }

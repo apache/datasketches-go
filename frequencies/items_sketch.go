@@ -29,11 +29,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/apache/datasketches-go/common"
-	"github.com/apache/datasketches-go/internal"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal"
 )
 
 type ItemsSketch[C comparable] struct {
@@ -515,8 +516,14 @@ func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*Row
 		}
 	}
 
-	sort.Slice(rowList, func(i, j int) bool {
-		return rowList[i].est > rowList[j].est
+	slices.SortFunc(rowList, func(a, b *RowItem[C]) int {
+		if a.est > b.est {
+			return -1
+		}
+		if a.est < b.est {
+			return 1
+		}
+		return 0
 	})
 
 	return rowList, nil

@@ -495,7 +495,7 @@ func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*Row
 	iter := i.hashMap.iterator()
 	if errorType == ErrorTypeEnum.NoFalseNegatives {
 		for iter.next() {
-			est, ub, lb, err := i.frequencies(iter.getKey())
+			est, lb, ub, err := i.frequencies(iter.getKey())
 			if err != nil {
 				return nil, err
 			}
@@ -506,7 +506,7 @@ func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*Row
 		}
 	} else { //NO_FALSE_POSITIVES
 		for iter.next() {
-			est, ub, lb, err := i.frequencies(iter.getKey())
+			est, lb, ub, err := i.frequencies(iter.getKey())
 			if err != nil {
 				return nil, err
 			}

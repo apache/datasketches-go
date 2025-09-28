@@ -29,7 +29,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -517,8 +517,14 @@ func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*Row
 		}
 	}
 
-	sort.Slice(rowList, func(i, j int) bool {
-		return rowList[i].est > rowList[j].est
+	slices.SortFunc(rowList, func(a, b *RowItem[C]) int {
+		if a.est > b.est {
+			return -1
+		}
+		if a.est < b.est {
+			return 1
+		}
+		return 0
 	})
 
 	return rowList, nil

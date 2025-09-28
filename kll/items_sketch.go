@@ -29,10 +29,11 @@ package kll
 import (
 	"encoding/binary"
 	"fmt"
+	"math/rand"
+	"slices"
+
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
-	"math/rand"
-	"sort"
 )
 
 type ItemsSketch[C comparable] struct {
@@ -862,8 +863,11 @@ func (s *ItemsSketch[C]) compressWhileUpdatingSketch() {
 	myItemsArr := s.GetTotalItemsArray()
 	if level == 0 { // level zero might not be sorted, so we must sort it if we wish to compact it
 		tmpSlice := myItemsArr[adjBeg : adjBeg+adjPop]
-		sort.Slice(tmpSlice, func(a, b int) bool {
-			return s.compareFn(tmpSlice[a], tmpSlice[b])
+		slices.SortFunc(tmpSlice, func(a, b C) int {
+			if s.compareFn(a, b) {
+				return -1
+			}
+			return 1
 		})
 	}
 	if popAbove == 0 {
@@ -1154,8 +1158,11 @@ func generalItemsCompress[C comparable](
 			// level zero might not be sorted, so we must sort it if we wish to compact it
 			if (curLevel == 0) && !isLevelZeroSorted {
 				tmpSlice := inBuf[adjBeg : adjBeg+adjPop]
-				sort.Slice(tmpSlice, func(a, b int) bool {
-					return compareFn(tmpSlice[a], tmpSlice[b])
+				slices.SortFunc(tmpSlice, func(a, b C) int {
+					if compareFn(a, b) {
+						return -1
+					}
+					return 1
 				})
 			}
 

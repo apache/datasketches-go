@@ -22,7 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"math/bits"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -598,8 +598,14 @@ func (s *LongsSketch) sortItems(threshold int64, errorType errorType) ([]*Row, e
 		}
 	}
 
-	sort.Slice(rowList, func(i, j int) bool {
-		return rowList[i].est > rowList[j].est
+	slices.SortFunc(rowList, func(a, b *Row) int {
+		if a.est > b.est {
+			return -1
+		}
+		if a.est < b.est {
+			return 1
+		}
+		return 0
 	})
 
 	return rowList, nil

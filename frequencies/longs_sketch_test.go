@@ -588,6 +588,55 @@ func TestGetAprioriError(t *testing.T) {
 	assert.Equal(t, apr, eps*10_000)
 }
 
+func TestLongsSketch_frequencies(t *testing.T) {
+	sketch, err := NewLongsSketchWithMaxMapSize(1 << _LG_MIN_MAP_SIZE)
+	assert.NoError(t, err)
+
+	// Add some items with different frequencies
+	err = sketch.UpdateMany(100, 5)
+	assert.NoError(t, err)
+	err = sketch.UpdateMany(200, 3)
+	assert.NoError(t, err)
+	err = sketch.Update(300)
+	assert.NoError(t, err)
+	err = sketch.UpdateMany(400, 2)
+	assert.NoError(t, err)
+
+	// Test existing items
+	testItems := []int64{100, 200, 300, 400}
+	for _, item := range testItems {
+		expectedEst, err := sketch.GetEstimate(item)
+		assert.NoError(t, err)
+		expectedLower, err := sketch.GetLowerBound(item)
+		assert.NoError(t, err)
+		expectedUpper, err := sketch.GetUpperBound(item)
+		assert.NoError(t, err)
+
+		est, lower, upper, err := sketch.frequencies(item)
+		assert.NoError(t, err)
+
+		assert.Equal(t, expectedEst, est, "Estimate mismatch for item %d", item)
+		assert.Equal(t, expectedLower, lower, "Lower bound mismatch for item %d", item)
+		assert.Equal(t, expectedUpper, upper, "Upper bound mismatch for item %d", item)
+	}
+
+	// Test non-existing item
+	nonExistingItem := int64(999)
+	expectedEst, err := sketch.GetEstimate(nonExistingItem)
+	assert.NoError(t, err)
+	expectedLower, err := sketch.GetLowerBound(nonExistingItem)
+	assert.NoError(t, err)
+	expectedUpper, err := sketch.GetUpperBound(nonExistingItem)
+	assert.NoError(t, err)
+
+	est, lower, upper, err := sketch.frequencies(nonExistingItem)
+	assert.NoError(t, err)
+
+	assert.Equal(t, expectedEst, est, "Estimate mismatch for non-existing item")
+	assert.Equal(t, expectedLower, lower, "Lower bound mismatch for non-existing item")
+	assert.Equal(t, expectedUpper, upper, "Upper bound mismatch for non-existing item")
+}
+
 func BenchmarkLongSketch(b *testing.B) {
 	sketch, err := NewLongsSketch(128, 8)
 	assert.NoError(b, err)

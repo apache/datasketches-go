@@ -560,15 +560,7 @@ func (s *LongsSketch) sortItems(threshold int64, errorType errorType) ([]*Row, e
 	iter := s.hashMap.iterator()
 	if errorType == ErrorTypeEnum.NoFalseNegatives {
 		for iter.next() {
-			est, err := s.GetEstimate(iter.getKey())
-			if err != nil {
-				return nil, err
-			}
-			ub, err := s.GetUpperBound(iter.getKey())
-			if err != nil {
-				return nil, err
-			}
-			lb, err := s.GetLowerBound(iter.getKey())
+			est, lb, ub, err := s.frequencies(iter.getKey())
 			if err != nil {
 				return nil, err
 			}
@@ -579,15 +571,7 @@ func (s *LongsSketch) sortItems(threshold int64, errorType errorType) ([]*Row, e
 		}
 	} else { //NO_FALSE_POSITIVES
 		for iter.next() {
-			est, err := s.GetEstimate(iter.getKey())
-			if err != nil {
-				return nil, err
-			}
-			ub, err := s.GetUpperBound(iter.getKey())
-			if err != nil {
-				return nil, err
-			}
-			lb, err := s.GetLowerBound(iter.getKey())
+			est, lb, ub, err := s.frequencies(iter.getKey())
 			if err != nil {
 				return nil, err
 			}
@@ -609,4 +593,19 @@ func (s *LongsSketch) sortItems(threshold int64, errorType errorType) ([]*Row, e
 	})
 
 	return rowList, nil
+}
+
+// frequencies return estimated frequency, lower bound frequency,
+// upper bound frequency at once.
+func (s *LongsSketch) frequencies(item int64) (est, lower, upper int64, err error) {
+	var cnt int64
+	cnt, err = s.hashMap.get(item)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	est = cnt + s.offset
+	lower = cnt
+	upper = cnt + s.offset
+	return
 }

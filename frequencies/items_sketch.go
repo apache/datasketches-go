@@ -244,6 +244,23 @@ func (i *ItemsSketch[C]) GetUpperBound(item C) (int64, error) {
 	return v + i.offset, err
 }
 
+// frequencies return estimated frequency, lower bound frequency,
+// upper bound frequency at once.
+func (i *ItemsSketch[C]) frequencies(item C) (est, lower, upper int64, err error) {
+	var v int64
+	v, err = i.hashMap.get(item)
+
+	lower = v
+	upper = v + i.offset
+	if v > 0 {
+		est = v + i.offset
+	} else {
+		est = 0
+	}
+
+	return
+}
+
 // GetFrequentItemsWithThreshold returns an array of RowItem that include frequent items, estimates, upper and
 // lower bounds given a threshold and an ErrorCondition. If the threshold is lower than
 // getMaximumError(), then getMaximumError() will be used instead.
@@ -478,15 +495,7 @@ func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*Row
 	iter := i.hashMap.iterator()
 	if errorType == ErrorTypeEnum.NoFalseNegatives {
 		for iter.next() {
-			est, err := i.GetEstimate(iter.getKey())
-			if err != nil {
-				return nil, err
-			}
-			ub, err := i.GetUpperBound(iter.getKey())
-			if err != nil {
-				return nil, err
-			}
-			lb, err := i.GetLowerBound(iter.getKey())
+			est, lb, ub, err := i.frequencies(iter.getKey())
 			if err != nil {
 				return nil, err
 			}
@@ -497,15 +506,7 @@ func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*Row
 		}
 	} else { //NO_FALSE_POSITIVES
 		for iter.next() {
-			est, err := i.GetEstimate(iter.getKey())
-			if err != nil {
-				return nil, err
-			}
-			ub, err := i.GetUpperBound(iter.getKey())
-			if err != nil {
-				return nil, err
-			}
-			lb, err := i.GetLowerBound(iter.getKey())
+			est, lb, ub, err := i.frequencies(iter.getKey())
 			if err != nil {
 				return nil, err
 			}

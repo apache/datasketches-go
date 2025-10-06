@@ -33,6 +33,14 @@ func TestQuickSelect(t *testing.T) {
 		expected int
 	}{
 		{
+			name:     "regression test PR48: two elements first smaller",
+			arr:      []int{50, 100},
+			lo:       0,
+			hi:       1,
+			pivot:    1,
+			expected: 100,
+		},
+		{
 			name:     "find median in odd length array",
 			arr:      []int{3, 1, 4, 1, 5, 9, 2, 6},
 			lo:       0,

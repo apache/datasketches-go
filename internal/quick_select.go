@@ -17,8 +17,10 @@
 
 package internal
 
-func QuickSelect(arr []int64, lo int, hi int, pivot int) int64 {
-	for hi > 0 {
+import "cmp"
+
+func QuickSelect[T cmp.Ordered](arr []T, lo int, hi int, pivot int) T {
+	for hi > lo {
 		j := partition(arr, lo, hi)
 		if j == pivot {
 			return arr[pivot]
@@ -32,7 +34,7 @@ func QuickSelect(arr []int64, lo int, hi int, pivot int) int64 {
 	return arr[pivot]
 }
 
-func partition(arr []int64, lo int, hi int) int {
+func partition[T cmp.Ordered](arr []T, lo int, hi int) int {
 	i := lo
 	j := hi + 1
 	v := arr[lo]
@@ -54,12 +56,8 @@ func partition(arr []int64, lo int, hi int) int {
 		if i >= j {
 			break
 		}
-		x := arr[i]
-		arr[i] = arr[j]
-		arr[j] = x
+		arr[i], arr[j] = arr[j], arr[i]
 	}
-	x := arr[lo]
-	arr[lo] = arr[j]
-	arr[j] = x
+	arr[lo], arr[j] = arr[j], arr[lo]
 	return j
 }

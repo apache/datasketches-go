@@ -8,22 +8,31 @@ import (
 	"github.com/apache/datasketches-go/internal"
 )
 
+const (
+	resizeThreshold  = 0.5
+	rebuildThreshold = 15.0 / 16.0
+)
+
+const (
+	strideHashBits = 7
+	strideMask     = (1 << strideHashBits) - 1
+)
+
 var (
 	ErrKeyNotFound                = errors.New("key not found")
 	ErrKeyNotFoundAndNoEmptySlots = errors.New("key not found and no empty slots")
-	ErrDuplicateKey               = errors.New("duplicate key")
 )
 
 type Hashtable struct {
-	isEmpty    bool
+	entries    []uint64
+	theta      uint64
+	seed       uint64
+	numEntries uint32
+	p          float32
 	lgCurSize  uint8
 	lgNomSize  uint8
 	rf         ResizeFactor
-	p          float32
-	numEntries uint32
-	theta      uint64
-	seed       uint64
-	entries    []uint64
+	isEmpty    bool
 }
 
 // NewHashtable creates a new hash table
@@ -151,7 +160,7 @@ func find(entries []uint64, lgSize uint8, key uint64) (int, error) {
 // computeStride computes the stride for probing
 func computeStride(key uint64, lgSize uint8) uint32 {
 	// odd and independent of the index assuming lg_size lowest bits of the key were used for the index
-	return (2 * uint32((key>>lgSize)&StrideMask)) + 1
+	return (2 * uint32((key>>lgSize)&strideMask)) + 1
 }
 
 // Insert inserts an entry at the given index
@@ -171,9 +180,9 @@ func (t *Hashtable) Insert(index int, entry uint64) {
 func computeCapacity(lgCurSize, lgNomSize uint8) uint32 {
 	var fraction float64
 	if lgCurSize <= lgNomSize {
-		fraction = ResizeThreshold
+		fraction = resizeThreshold
 	} else {
-		fraction = RebuildThreshold
+		fraction = rebuildThreshold
 	}
 	return uint32(math.Floor(fraction * float64(uint32(1)<<lgCurSize)))
 }

@@ -63,6 +63,6 @@ type Sketch interface {
 	// If shouldPrintItems is true, include the list of items retained by the sketch
 	String(shouldPrintItems bool) string
 
-	// Iter returns an iterator over hash values in the sketch.
-	Iter() iter.Seq[uint64]
+	// All returns hash values in the sketch.
+	All() iter.Seq[uint64]
 }

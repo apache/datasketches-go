@@ -14,16 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:alpine
+FROM golang:1.24.9-alpine
 ENV CGO_ENABLED=0
 
 WORKDIR /github.com/apache/datasketches-go/
 COPY go.mod .
 COPY go.sum .
 COPY serialization_test_data ./serialization_test_data
-COPY internal ./internal
-COPY hll ./hll
+COPY common ./common
+COPY count ./count
+COPY cpc ./cpc
+COPY examples ./examples
 COPY frequencies ./frequencies
+COPY hll ./hll
+COPY internal ./internal
+COPY kll ./kll
+COPY theta ./theta
 
 RUN go mod download
 RUN go build -v ./...

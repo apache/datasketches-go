@@ -22,7 +22,6 @@ import (
 	"math"
 	"math/bits"
 	"reflect"
-	"strconv"
 )
 
 const (
@@ -57,7 +56,7 @@ func PutShortLE(array []byte, offset int, value int) {
 // InvPow2 returns 2^(-e).
 func InvPow2(e int) (float64, error) {
 	if (e | 1024 - e - 1) < 0 {
-		return 0, fmt.Errorf("e cannot be negative or greater than 1023: " + strconv.Itoa(e))
+		return 0, fmt.Errorf("e cannot be negative or greater than 1023: %d", e)
 	}
 	return math.Float64frombits((1023 - uint64(e)) << 52), nil
 }

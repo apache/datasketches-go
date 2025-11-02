@@ -114,6 +114,7 @@ func newCompactSketchFromEntries(isEmpty, isOrdered bool, seedHash uint16, theta
 }
 
 // IsEmpty returns true if this sketch represents an empty set
+// (the same as no retained entries!)
 func (s *CompactSketch) IsEmpty() bool {
 	return s.isEmpty
 }
@@ -123,27 +124,30 @@ func (s *CompactSketch) IsOrdered() bool {
 	return s.isOrdered
 }
 
-// Theta64 returns theta as a positive integer
+// Theta64 returns theta as a positive integer between 0 and math.MaxInt64
 func (s *CompactSketch) Theta64() uint64 {
 	return s.theta
 }
 
-// NumRetained returns the number of retained entries
+// NumRetained returns the number of retained entries in the sketch
 func (s *CompactSketch) NumRetained() uint32 {
 	return uint32(len(s.entries))
 }
 
-// SeedHash returns hash of the seed
+// SeedHash returns hash of the seed that was used to hash the input
 func (s *CompactSketch) SeedHash() (uint16, error) {
 	return s.seedHash, nil
 }
 
-// Estimate returns the estimate of distinct count
+// Estimate returns estimate of the distinct count of the input stream
 func (s *CompactSketch) Estimate() float64 {
 	return float64(s.NumRetained()) / s.Theta()
 }
 
-// LowerBound returns the approximate lower error bound
+// LowerBound returns the approximate lower error bound given a number of standard deviations.
+// This parameter is similar to the number of standard deviations of the normal distribution
+// and corresponds to approximately 67%, 95% and 99% confidence intervals.
+// numStdDevs number of Standard Deviations (1, 2 or 3)
 func (s *CompactSketch) LowerBound(numStdDevs uint8) (float64, error) {
 	if !s.IsEstimationMode() {
 		return float64(len(s.entries)), nil
@@ -155,7 +159,10 @@ func (s *CompactSketch) LowerBound(numStdDevs uint8) (float64, error) {
 	)
 }
 
-// UpperBound returns the approximate upper error bound
+// UpperBound returns the approximate upper error bound given a number of standard deviations.
+// This parameter is similar to the number of standard deviations of the normal distribution
+// and corresponds to approximately 67%, 95% and 99% confidence intervals.
+// numStdDevs number of Standard Deviations (1, 2 or 3)
 func (s *CompactSketch) UpperBound(numStdDevs uint8) (float64, error) {
 	if !s.IsEstimationMode() {
 		return float64(len(s.entries)), nil
@@ -168,16 +175,18 @@ func (s *CompactSketch) UpperBound(numStdDevs uint8) (float64, error) {
 }
 
 // IsEstimationMode returns true if the sketch is in estimation mode
+// (as opposed to exact mode)
 func (s *CompactSketch) IsEstimationMode() bool {
 	return s.Theta64() < MaxTheta && !s.isEmpty
 }
 
-// Theta returns theta as a fraction from 0 to 1
+// Theta returns theta as a fraction from 0 to 1 (effective sampling rate)
 func (s *CompactSketch) Theta() float64 {
 	return float64(s.Theta64()) / float64(MaxTheta)
 }
 
-// String provides a human-readable summary
+// String returns a human-readable summary of this sketch as a string
+// If shouldPrintItems is true, include the list of items retained by the sketch
 func (s *CompactSketch) String(shouldPrintItems bool) string {
 	seedHash, _ := s.SeedHash()
 	lb, _ := s.LowerBound(2)
@@ -225,7 +234,7 @@ func (s *CompactSketch) String(shouldPrintItems bool) string {
 	return result.String()
 }
 
-// All returns hash values in this sketch
+// All returns hash values in the sketch.
 func (s *CompactSketch) All() iter.Seq[uint64] {
 	return func(yield func(uint64) bool) {
 		for _, entry := range s.entries {

@@ -163,7 +163,6 @@ func TestCompactSketch_All(t *testing.T) {
 	}
 }
 
-// TestCompactSketch_MarshalBinary tests the MarshalBinary method
 func TestCompactSketch_MarshalBinary(t *testing.T) {
 	t.Run("Empty sketch", func(t *testing.T) {
 		sketch, _ := NewQuickSelectUpdateSketch()

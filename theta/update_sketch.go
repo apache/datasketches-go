@@ -413,3 +413,11 @@ func (s *QuickSelectUpdateSketch) All() iter.Seq[uint64] {
 		}
 	}
 }
+
+func (s *QuickSelectUpdateSketch) Compact(ordered bool) *CompactSketch {
+	return NewCompactSketch(s, ordered)
+}
+
+func (s *QuickSelectUpdateSketch) CompactOrdered() *CompactSketch {
+	return s.Compact(true)
+}

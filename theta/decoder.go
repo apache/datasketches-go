@@ -291,7 +291,8 @@ func decodeVersion2(bytes []byte, seed uint64) (compactSketchData, error) {
 		return compactSketchData{}, err
 	}
 
-	if preambleSize == 1 {
+	switch preambleSize {
+	case 1:
 		return compactSketchData{
 			isEmpty:    true,
 			isOrdered:  true,
@@ -301,7 +302,7 @@ func decodeVersion2(bytes []byte, seed uint64) (compactSketchData, error) {
 			entryBits:  64,
 			bytes:      bytes,
 		}, nil
-	} else if preambleSize == 2 {
+	case 2:
 		numEntries := binary.LittleEndian.Uint32(bytes[compactSketchNumEntriesU32*4:])
 		if numEntries == 0 {
 			return compactSketchData{
@@ -330,7 +331,7 @@ func decodeVersion2(bytes []byte, seed uint64) (compactSketchData, error) {
 			entryBits:       64,
 			bytes:           bytes,
 		}, nil
-	} else if preambleSize == 3 {
+	case 3:
 		numEntries := binary.LittleEndian.Uint32(bytes[compactSketchNumEntriesU32*4:])
 		theta := binary.LittleEndian.Uint64(bytes[compactSketchThetaU64*8:])
 
@@ -362,9 +363,9 @@ func decodeVersion2(bytes []byte, seed uint64) (compactSketchData, error) {
 			entryBits:       64,
 			bytes:           bytes,
 		}, nil
+	default:
+		return compactSketchData{}, fmt.Errorf("invalid preamble size: %d (expected 1, 2, or 3)", preambleSize)
 	}
-
-	return compactSketchData{}, fmt.Errorf("invalid preamble size: %d (expected 1, 2, or 3)", preambleSize)
 }
 
 func decodeVersion1(bytes []byte, seed uint64) (compactSketchData, error) {

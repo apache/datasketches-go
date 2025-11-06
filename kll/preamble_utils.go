@@ -73,7 +73,7 @@ func getEmptyFlag(mem []byte) bool {
 }
 
 func getK(mem []byte) uint16 {
-	return uint16(mem[_K_SHORT_ADR]) & 0xFFFF
+	return binary.LittleEndian.Uint16(mem[_K_SHORT_ADR : _K_SHORT_ADR+2])
 }
 
 func getM(mem []byte) uint8 {

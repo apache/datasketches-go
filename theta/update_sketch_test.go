@@ -576,3 +576,89 @@ func TestQuickSelectUpdateSketch_Estimation(t *testing.T) {
 	updateSketch.Trim()
 	assert.Equal(t, k, updateSketch.NumRetained())
 }
+
+func TestUpdateSketch_Compact(t *testing.T) {
+	t.Run("Empty", func(t *testing.T) {
+		updateSketch, err := NewQuickSelectUpdateSketch()
+		assert.NoError(t, err)
+
+		compactSketch := updateSketch.Compact(true)
+		assert.True(t, compactSketch.IsEmpty())
+		assert.False(t, compactSketch.IsEstimationMode())
+		assert.Equal(t, 1.0, compactSketch.Theta())
+		assert.Equal(t, 0.0, compactSketch.Estimate())
+		lb, err := compactSketch.LowerBound(1)
+		assert.NoError(t, err)
+		assert.Equal(t, 0.0, lb)
+		ub, err := compactSketch.UpperBound(1)
+		assert.NoError(t, err)
+		assert.Equal(t, 0.0, ub)
+		assert.True(t, compactSketch.IsOrdered())
+
+		assert.True(t, updateSketch.Compact(false).IsOrdered())
+	})
+
+	t.Run("Non Empty No Retained Keys", func(t *testing.T) {
+		updateSketch, err := NewQuickSelectUpdateSketch(WithUpdateSketchP(0.001))
+		assert.NoError(t, err)
+		updateSketch.UpdateInt64(1)
+
+		compactSketch := updateSketch.Compact(true)
+		assert.Zero(t, compactSketch.NumRetained())
+		assert.False(t, compactSketch.IsEmpty())
+		assert.True(t, compactSketch.IsEstimationMode())
+		assert.Equal(t, 0.0, compactSketch.Estimate())
+		lb, err := compactSketch.LowerBound(1)
+		assert.NoError(t, err)
+		assert.Equal(t, 0.0, lb)
+		ub, err := compactSketch.UpperBound(1)
+		assert.NoError(t, err)
+		assert.Greater(t, ub, 0.0)
+	})
+
+	t.Run("Single Item", func(t *testing.T) {
+		updateSketch, err := NewQuickSelectUpdateSketch()
+		assert.NoError(t, err)
+		updateSketch.UpdateInt64(1)
+
+		compactSketch := updateSketch.Compact(true)
+		assert.False(t, compactSketch.IsEmpty())
+		assert.False(t, compactSketch.IsEstimationMode())
+		assert.Equal(t, 1.0, compactSketch.Theta())
+		assert.Equal(t, 1.0, compactSketch.Estimate())
+		lb, err := compactSketch.LowerBound(1)
+		assert.NoError(t, err)
+		assert.Equal(t, 1.0, lb)
+		ub, err := compactSketch.UpperBound(1)
+		assert.NoError(t, err)
+		assert.Equal(t, 1.0, ub)
+		assert.True(t, compactSketch.IsOrdered())
+
+		assert.True(t, updateSketch.Compact(false).IsOrdered())
+	})
+
+	t.Run("Estimation", func(t *testing.T) {
+		updateSketch, err := NewQuickSelectUpdateSketch(WithUpdateSketchResizeFactor(ResizeX1))
+		assert.NoError(t, err)
+
+		n := 8000
+		for i := 0; i < n; i++ {
+			updateSketch.UpdateInt64(int64(i))
+		}
+		updateSketch.Trim()
+
+		compactSketch := updateSketch.Compact(true)
+		assert.False(t, compactSketch.IsEmpty())
+		assert.True(t, compactSketch.IsOrdered())
+		assert.True(t, compactSketch.IsEstimationMode())
+		assert.Less(t, compactSketch.Theta(), 1.0)
+		assert.InEpsilon(t, n, compactSketch.Estimate(), 0.01)
+
+		lb, err := compactSketch.LowerBound(1)
+		assert.NoError(t, err)
+		assert.Less(t, lb, float64(n))
+		ub, err := compactSketch.UpperBound(1)
+		assert.NoError(t, err)
+		assert.GreaterOrEqual(t, ub, float64(n))
+	})
+}

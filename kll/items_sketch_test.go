@@ -19,13 +19,15 @@ package kll
 
 import (
 	"fmt"
-	"github.com/apache/datasketches-go/common"
-	"github.com/stretchr/testify/assert"
 	"math"
 	"math/rand"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/common"
 )
 
 const (
@@ -978,6 +980,61 @@ func TestSerializeStringDeserializeNoSerde(t *testing.T) {
 
 	_, err = NewKllItemsSketchFromSlice[string](nil, comparator, nil)
 	assert.Error(t, err)
+}
+
+func TestSerializeDeserializeLargeK(t *testing.T) {
+	sketch, err := NewKllItemsSketch[float64](710, 8, common.ItemSketchDoubleComparator(false), common.ItemSketchDoubleSerDe{})
+	assert.NoError(t, err)
+	for _, val := range []float64{0.1, 1.0, 5.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 99.9} {
+		sketch.Update(val)
+	}
+	numericalQuantileSketchBytes, err := sketch.ToSlice()
+	assert.NoError(t, err)
+
+	deserialized, err := NewKllItemsSketchFromSlice[float64](
+		numericalQuantileSketchBytes, common.ItemSketchDoubleComparator(false), common.ItemSketchDoubleSerDe{},
+	)
+	assert.NoError(t, err)
+
+	assert.Equal(t, sketch.GetK(), deserialized.GetK())
+	assert.Equal(t, sketch.GetN(), deserialized.GetN())
+	assert.Equal(t, sketch.GetNumRetained(), deserialized.GetNumRetained())
+	assert.Equal(t, sketch.IsEmpty(), deserialized.IsEmpty())
+	assert.Equal(t, sketch.IsEstimationMode(), deserialized.IsEstimationMode())
+
+	minV1, err := sketch.GetMinItem()
+	assert.NoError(t, err)
+	minV2, err := deserialized.GetMinItem()
+	assert.NoError(t, err)
+	assert.Equal(t, minV1, minV2)
+
+	maxV1, err := sketch.GetMaxItem()
+	assert.NoError(t, err)
+	maxV2, err := deserialized.GetMaxItem()
+	assert.NoError(t, err)
+	assert.Equal(t, maxV1, maxV2)
+
+	assert.Equal(t, sketch.GetNormalizedRankError(false), deserialized.GetNormalizedRankError(false))
+	assert.Equal(t, sketch.GetNormalizedRankError(true), deserialized.GetNormalizedRankError(true))
+
+	size1, err := sketch.GetSerializedSizeBytes()
+	assert.NoError(t, err)
+	size2, err := deserialized.GetSerializedSizeBytes()
+	assert.NoError(t, err)
+	assert.Equal(t, size1, size2)
+
+	bytes2, err := deserialized.ToSlice()
+	assert.NoError(t, err)
+	assert.Equal(t, numericalQuantileSketchBytes, bytes2)
+
+	ranks := []float64{0.0, 0.25, 0.5, 0.75, 1.0}
+	for _, rank := range ranks {
+		q1, err := sketch.GetQuantile(rank, true)
+		assert.NoError(t, err)
+		q2, err := deserialized.GetQuantile(rank, true)
+		assert.NoError(t, err)
+		assert.Equal(t, q1, q2)
+	}
 }
 
 func TestNoCompare(t *testing.T) {

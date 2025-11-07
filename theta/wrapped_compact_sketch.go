@@ -26,13 +26,11 @@ import (
 )
 
 // WrappedCompactSketch wraps a serialized compact sketch buffer for read-only access
-// This avoids the cost of full deserialization when only iteration is needed
 type WrappedCompactSketch struct {
 	data *compactSketchData
 }
 
 // WrapCompactSketch wraps a serialized compact sketch as an array of bytes
-// The sketch does not take ownership of the bytes - caller must ensure they remain valid
 func WrapCompactSketch(bytes []byte, seed uint64) (*WrappedCompactSketch, error) {
 	data, err := decodeCompactSketch(bytes, seed)
 	if err != nil {

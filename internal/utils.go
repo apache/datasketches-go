@@ -124,3 +124,23 @@ func ComputeSeedHash(seed int64) (int16, error) {
 	}
 	return int16(seedHash), nil
 }
+
+// Log2Floor returns the floor of log base 2 of n.
+func Log2Floor(n uint32) uint8 {
+	if n == 0 {
+		return 0
+	}
+	return uint8(bits.Len32(n) - 1)
+}
+
+func LgSizeFromCount(n uint32, loadFactor float64) uint8 {
+	lgN := Log2Floor(n)
+	// Check if n > (2^(lgN+1)) * loadFactor
+	// If so, we need lgN + 2, otherwise lgN + 1
+	powerOfTwo := uint32(1) << (lgN + 1)
+	threshold := uint32(float64(powerOfTwo) * loadFactor)
+	if n > threshold {
+		return lgN + 2
+	}
+	return lgN + 1
+}

@@ -125,7 +125,6 @@ func ComputeSeedHash(seed int64) (int16, error) {
 	return int16(seedHash), nil
 }
 
-// Log2Floor returns the floor of log base 2 of n.
 func Log2Floor(n uint32) uint8 {
 	if n == 0 {
 		return 0

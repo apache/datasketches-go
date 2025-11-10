@@ -159,10 +159,10 @@ func (i *Intersection) Update(sketch Sketch) error {
 	}
 
 	if count > int(sketch.NumRetained()) {
-		return errors.New(" more keys than expected, possibly corrupted input sketch")
+		return errors.New("more keys than expected, possibly corrupted input sketch")
 	}
 	if !sketch.IsOrdered() && count < int(sketch.NumRetained()) {
-		return errors.New(" fewer keys than expected, possibly corrupted input sketch")
+		return errors.New("fewer keys than expected, possibly corrupted input sketch")
 	}
 
 	if matchCount == 0 {

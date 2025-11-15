@@ -22,7 +22,7 @@ import "iter"
 // Sketch is a generalization of the Kth Minimum Value (KMV) sketch.
 type Sketch interface {
 	// IsEmpty returns true if this sketch represents an empty set
-	// (the same as no retained entries!)
+	// (not the same as no retained entries!)
 	IsEmpty() bool
 
 	// Estimate returns estimate of the distinct count of the input stream

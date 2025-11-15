@@ -115,6 +115,7 @@ func NewQuickSelectUpdateSketch(opts ...UpdateSketchOptionFunc) (*QuickSelectUpd
 }
 
 // IsEmpty returns true if this sketch represents an empty set
+// (not the same as no retained entries!)
 func (s *QuickSelectUpdateSketch) IsEmpty() bool {
 	return s.table.isEmpty
 }

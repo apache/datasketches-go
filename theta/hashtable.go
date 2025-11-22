@@ -287,6 +287,12 @@ func (t *Hashtable) LgTableSize() uint8 {
 	return t.lgCurSize
 }
 
+// IsEmpty returns true if this sketch represents an empty set
+// (not the same as no retained entries!)
+func (t *Hashtable) IsEmpty() bool {
+	return t.isEmpty
+}
+
 func consolidateNonEmpty(entries []uint64, size, num int) {
 	// find the first empty slot
 	i := 0

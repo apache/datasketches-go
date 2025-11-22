@@ -282,6 +282,7 @@ func (t *Hashtable) Reset() {
 	t.isEmpty = true
 }
 
+// LgTableSize returns the current size of the hashtable in log2 format as an uint8 value.
 func (t *Hashtable) LgTableSize() uint8 {
 	return t.lgCurSize
 }

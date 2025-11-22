@@ -114,7 +114,7 @@ func newCompactSketchFromEntries(isEmpty, isOrdered bool, seedHash uint16, theta
 }
 
 // IsEmpty returns true if this sketch represents an empty set
-// (the same as no retained entries!)
+// (not the same as no retained entries!)
 func (s *CompactSketch) IsEmpty() bool {
 	return s.isEmpty
 }

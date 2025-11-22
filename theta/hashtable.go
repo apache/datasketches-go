@@ -282,6 +282,10 @@ func (t *Hashtable) Reset() {
 	t.isEmpty = true
 }
 
+func (t *Hashtable) LgTableSize() uint8 {
+	return t.lgCurSize
+}
+
 func consolidateNonEmpty(entries []uint64, size, num int) {
 	// find the first empty slot
 	i := 0

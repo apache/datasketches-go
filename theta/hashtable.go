@@ -293,6 +293,35 @@ func (t *Hashtable) IsEmpty() bool {
 	return t.isEmpty
 }
 
+// LgK returns a configured nominal number of entries in the sketch
+func (t *Hashtable) LgK() uint8 {
+	return t.lgNomSize
+}
+
+// ResizeFactor returns a configured resize factor of the sketch
+func (t *Hashtable) ResizeFactor() ResizeFactor {
+	return t.rf
+}
+
+// NumRetained returns the number of retained entries in the sketch
+func (t *Hashtable) NumRetained() uint32 {
+	return t.numEntries
+}
+
+// SeedHash returns hash of the seed that was used to hash the input
+func (t *Hashtable) SeedHash() (uint16, error) {
+	seedHash, err := internal.ComputeSeedHash(int64(t.seed))
+	if err != nil {
+		return 0, err
+	}
+	return uint16(seedHash), nil
+}
+
+// Theta64 returns theta as a positive integer between 0 and math.MaxInt64
+func (t *Hashtable) Theta64() uint64 {
+	return t.theta
+}
+
 func consolidateNonEmpty(entries []uint64, size, num int) {
 	// find the first empty slot
 	i := 0

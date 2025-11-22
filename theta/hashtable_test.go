@@ -610,3 +610,25 @@ func TestHashtable_Reset(t *testing.T) {
 	expectedTheta := startingThetaFromP(sketch.p)
 	assert.Equal(t, expectedTheta, sketch.theta, "theta should be %d after reset", expectedTheta)
 }
+
+func TestHashtable_SeedHash(t *testing.T) {
+	t.Run("default seed", func(t *testing.T) {
+		ht := NewHashtable(4, 4, ResizeX1, 1.0, MaxTheta, DefaultSeed, true)
+		seedHash, err := ht.SeedHash()
+
+		assert.NoError(t, err)
+		assert.NotZero(t, seedHash)
+	})
+
+	t.Run("various seeds produce valid hashes", func(t *testing.T) {
+		seeds := []uint64{1, 12345, 99999, 9876543210}
+
+		for _, seed := range seeds {
+			ht := NewHashtable(4, 4, ResizeX1, 1.0, MaxTheta, seed, true)
+			seedHash, err := ht.SeedHash()
+
+			assert.NoError(t, err)
+			assert.NotZero(t, seedHash, "Expected non-zero seed hash for seed: %d", seed)
+		}
+	})
+}

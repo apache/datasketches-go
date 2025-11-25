@@ -632,3 +632,59 @@ func TestHashtable_SeedHash(t *testing.T) {
 		}
 	})
 }
+
+func TestHashtable_All(t *testing.T) {
+	t.Run("empty table", func(t *testing.T) {
+		ht := NewHashtable(4, 4, ResizeX1, 1.0, MaxTheta, DefaultSeed, true)
+
+		var entries []uint64
+		for entry := range ht.All() {
+			entries = append(entries, entry)
+		}
+
+		for _, entry := range entries {
+			assert.Zero(t, entry)
+		}
+	})
+
+	t.Run("table with entries", func(t *testing.T) {
+		ht := NewHashtable(4, 4, ResizeX1, 1.0, MaxTheta, DefaultSeed, true)
+
+		keys := []uint64{12345, 67890, 11111}
+		for _, key := range keys {
+			index, _ := ht.Find(key)
+			ht.entries[index] = key
+			ht.numEntries++
+		}
+
+		var entries []uint64
+		for entry := range ht.All() {
+			entries = append(entries, entry)
+		}
+
+		for _, key := range keys {
+			assert.Contains(t, entries, key)
+		}
+	})
+
+	t.Run("early termination", func(t *testing.T) {
+		ht := NewHashtable(4, 4, ResizeX1, 1.0, MaxTheta, DefaultSeed, true)
+
+		for i := uint64(1); i <= 5; i++ {
+			index, _ := ht.Find(i * 1000)
+			ht.entries[index] = i * 1000
+			ht.numEntries++
+		}
+
+		count := 0
+		for range ht.All() {
+			count++
+			if count == 2 {
+				break
+			}
+		}
+
+		assert.Equal(t, 2, count)
+	})
+
+}

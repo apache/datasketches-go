@@ -20,6 +20,7 @@ package theta
 import (
 	"errors"
 	"fmt"
+	"iter"
 	"math"
 
 	"github.com/apache/datasketches-go/internal"
@@ -320,6 +321,17 @@ func (t *Hashtable) SeedHash() (uint16, error) {
 // Theta64 returns theta as a positive integer between 0 and math.MaxInt64
 func (t *Hashtable) Theta64() uint64 {
 	return t.theta
+}
+
+// All returns a sequence of all non-zero entries in the hashtable, allowing iteration with a yield function.
+func (t *Hashtable) All() iter.Seq[uint64] {
+	return func(yield func(uint64) bool) {
+		for _, entry := range t.entries {
+			if !yield(entry) {
+				return
+			}
+		}
+	}
 }
 
 func consolidateNonEmpty(entries []uint64, size, num int) {

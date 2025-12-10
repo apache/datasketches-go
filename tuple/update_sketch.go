@@ -314,7 +314,7 @@ func (s *UpdateSketch[S, V]) UpdateInt64(key int64, value V) error {
 
 	index, err := s.table.Find(hash)
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
+		if err == ErrKeyNotFound {
 			summary := s.newSummary()
 			summary.Update(value)
 
@@ -342,7 +342,7 @@ func (s *UpdateSketch[S, V]) UpdateInt32(key int32, value V) error {
 
 	index, err := s.table.Find(hash)
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
+		if err == ErrKeyNotFound {
 			summary := s.newSummary()
 			summary.Update(value)
 
@@ -409,7 +409,7 @@ func (s *UpdateSketch[S, V]) UpdateString(key string, value V) error {
 
 	index, err := s.table.Find(hash)
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
+		if err == ErrKeyNotFound {
 			summary := s.newSummary()
 			summary.Update(value)
 
@@ -432,7 +432,7 @@ func (s *UpdateSketch[S, V]) UpdateBytes(data []byte, value V) error {
 
 	index, err := s.table.Find(hash)
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
+		if err == ErrKeyNotFound {
 			summary := s.newSummary()
 			summary.Update(value)
 

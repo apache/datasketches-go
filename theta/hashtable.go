@@ -19,7 +19,6 @@ package theta
 
 import (
 	"errors"
-	"fmt"
 	"math"
 
 	"github.com/apache/datasketches-go/internal"
@@ -40,7 +39,8 @@ var (
 	ErrKeyNotFoundAndNoEmptySlots = errors.New("key not found and no empty slots")
 	// ErrZeroHashValue is used to indicate that the hash value is zero.
 	// Zero is a reserved value for empty slots in the hash table.
-	ErrZeroHashValue = errors.New("zero hash value")
+	ErrZeroHashValue    = errors.New("zero hash value")
+	ErrHashExceedsTheta = errors.New("hash exceeds theta")
 )
 
 type Hashtable struct {
@@ -107,7 +107,7 @@ func (t *Hashtable) HashStringAndScreen(data string) (uint64, error) {
 	h1, _ := internal.HashCharSliceMurmur3([]byte(data), 0, len(data), t.seed)
 	hash := h1 >> 1
 	if hash >= t.theta {
-		return 0, fmt.Errorf("hash %d is greater than or equal to theta %d", hash, t.theta)
+		return 0, ErrHashExceedsTheta
 	}
 	if hash == 0 {
 		return 0, ErrZeroHashValue
@@ -121,7 +121,7 @@ func (t *Hashtable) HashInt32AndScreen(data int32) (uint64, error) {
 	h1, _ := internal.HashInt32SliceMurmur3([]int32{data}, 0, 1, t.seed)
 	hash := h1 >> 1
 	if hash >= t.theta {
-		return 0, fmt.Errorf("hash %d is greater than or equal to theta %d", hash, t.theta)
+		return 0, ErrHashExceedsTheta
 	}
 	if hash == 0 {
 		return 0, ErrZeroHashValue
@@ -135,7 +135,7 @@ func (t *Hashtable) HashInt64AndScreen(data int64) (uint64, error) {
 	h1, _ := internal.HashInt64SliceMurmur3([]int64{data}, 0, 1, t.seed)
 	hash := h1 >> 1
 	if hash >= t.theta {
-		return 0, fmt.Errorf("hash %d is greater than or equal to theta %d", hash, t.theta)
+		return 0, ErrHashExceedsTheta
 	}
 	if hash == 0 {
 		return 0, ErrZeroHashValue
@@ -149,7 +149,7 @@ func (t *Hashtable) HashBytesAndScreen(data []byte) (uint64, error) {
 	h1, _ := internal.HashByteArrMurmur3(data, 0, len(data), t.seed)
 	hash := h1 >> 1
 	if hash >= t.theta {
-		return 0, fmt.Errorf("hash %d is greater than or equal to theta %d", hash, t.theta)
+		return 0, ErrHashExceedsTheta
 	}
 	if hash == 0 {
 		return 0, ErrZeroHashValue

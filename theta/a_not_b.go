@@ -18,7 +18,6 @@
 package theta
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 
@@ -118,7 +117,7 @@ func computeHashBased(a, b Sketch, theta uint64) ([]uint64, error) {
 	for entry := range b.All() {
 		if entry < theta {
 			idx, err := table.Find(entry)
-			if err != nil && errors.Is(err, ErrKeyNotFoundAndNoEmptySlots) {
+			if err != nil && err == ErrKeyNotFoundAndNoEmptySlots {
 				return nil, err
 			}
 
@@ -133,7 +132,7 @@ func computeHashBased(a, b Sketch, theta uint64) ([]uint64, error) {
 	for entry := range a.All() {
 		if entry < theta {
 			_, err := table.Find(entry)
-			if err != nil && errors.Is(err, ErrKeyNotFound) {
+			if err != nil && err == ErrKeyNotFound {
 				entries = append(entries, entry)
 			}
 		} else if a.IsOrdered() {

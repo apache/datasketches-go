@@ -177,7 +177,7 @@ func (i *Intersection) Update(sketch Sketch) error {
 		i.hashtable = NewHashtable(lgSize, lgSize-1, ResizeX1, 1.0, i.hashtable.theta, i.hashtable.seed, i.hashtable.isEmpty)
 		for j := 0; j < matchCount; j++ {
 			key, err := i.hashtable.Find(matchesEntries[j])
-			if err != nil && errors.Is(err, ErrKeyNotFoundAndNoEmptySlots) {
+			if err != nil && err == ErrKeyNotFoundAndNoEmptySlots {
 				return err
 			}
 

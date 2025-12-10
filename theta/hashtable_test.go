@@ -105,7 +105,7 @@ func TestHashtable_HashStringAndScreen(t *testing.T) {
 			data:       "test",
 			theta:      1,
 			seed:       DefaultSeed,
-			wantErrMsg: "is greater than or equal to theta 1",
+			wantErrMsg: "hash exceeds theta",
 		},
 		{
 			name:       "different seed",
@@ -189,7 +189,7 @@ func TestHashtable_HashInt32AndScreen(t *testing.T) {
 			data:       12345,
 			theta:      1,
 			seed:       DefaultSeed,
-			wantErrMsg: "is greater than or equal to theta 1",
+			wantErrMsg: "hash exceeds theta",
 		},
 		{
 			name:       "different seed",
@@ -279,7 +279,7 @@ func TestHashtable_HashInt64AndScreen(t *testing.T) {
 			data:       1234567890,
 			theta:      1,
 			seed:       DefaultSeed,
-			wantErrMsg: "is greater than or equal to theta 1",
+			wantErrMsg: "hash exceeds theta",
 		},
 		{
 			name:       "different seed",
@@ -376,7 +376,7 @@ func TestHashtable_HashBytesAndScreen(t *testing.T) {
 			data:       []byte{1, 2, 3, 4, 5},
 			theta:      100,
 			seed:       DefaultSeed,
-			wantErrMsg: "is greater than or equal to theta 1",
+			wantErrMsg: "hash exceeds theta",
 		},
 		{
 			name:       "different seed",

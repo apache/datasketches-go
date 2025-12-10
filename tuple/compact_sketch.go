@@ -27,7 +27,6 @@ import (
 	"github.com/apache/datasketches-go/theta"
 )
 
-// Serialization constants matching C++ implementation
 const (
 	SerialVersionLegacy = uint8(1)
 	SerialVersion       = uint8(3)
@@ -36,7 +35,6 @@ const (
 	SketchTypeLegacy    = uint8(5)
 )
 
-// Flag bit positions for serialization
 const (
 	flagIsBigEndian = iota
 	flagIsReadOnly

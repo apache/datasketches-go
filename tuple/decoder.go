@@ -105,7 +105,7 @@ func (dec *Decoder[S]) Decode(r io.Reader) (*CompactSketch[S], error) {
 		}
 	}
 
-	theta := theta.MaxTheta
+	thetaVal := theta.MaxTheta
 	numEntries := uint32(0)
 	if !isEmpty {
 		if preambleLongs == 1 {
@@ -121,7 +121,7 @@ func (dec *Decoder[S]) Decode(r io.Reader) (*CompactSketch[S], error) {
 			}
 
 			if preambleLongs > 2 {
-				if err := binary.Read(r, binary.LittleEndian, &theta); err != nil {
+				if err := binary.Read(r, binary.LittleEndian, &thetaVal); err != nil {
 					return nil, err
 				}
 			}
@@ -145,7 +145,7 @@ func (dec *Decoder[S]) Decode(r io.Reader) (*CompactSketch[S], error) {
 
 	isOrdered := (flags & (1 << flagIsOrdered)) != 0
 	return newCompactSketch[S](
-		isEmpty, isOrdered, seedHash, theta, entries,
+		isEmpty, isOrdered, seedHash, thetaVal, entries,
 	), nil
 }
 

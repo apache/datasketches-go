@@ -689,3 +689,72 @@ func TestUpdateSketch_FloatSummaryWithDifferentKeyTypes(t *testing.T) {
 	}
 	assert.Equal(t, 28.0, total) // 1+2+3+4+5+6+7 = 28
 }
+
+func TestUpdateSketch_Filter(t *testing.T) {
+	t.Run("Empty Sketch", func(t *testing.T) {
+		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
+		assert.NoError(t, err)
+
+		got, err := sketch.Filter(func(summary *int32Summary) bool {
+			return true
+		})
+		assert.NoError(t, err)
+
+		assert.True(t, got.IsEmpty())
+		assert.True(t, got.IsOrdered())
+		assert.Empty(t, sketch.NumRetained())
+	})
+
+	t.Run("Exact Mode", func(t *testing.T) {
+		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
+		assert.NoError(t, err)
+		err = sketch.UpdateInt64(1, 1)
+		assert.NoError(t, err)
+		err = sketch.UpdateInt64(1, 1)
+		assert.NoError(t, err)
+		err = sketch.UpdateInt64(2, 1)
+		assert.NoError(t, err)
+		err = sketch.UpdateInt64(2, 1)
+		assert.NoError(t, err)
+		err = sketch.UpdateInt64(3, 1)
+		assert.NoError(t, err)
+
+		got, err := sketch.Filter(func(summary *int32Summary) bool {
+			return summary.value > 1
+		})
+		assert.NoError(t, err)
+
+		assert.False(t, got.IsEmpty())
+		assert.False(t, got.IsOrdered())
+		assert.False(t, got.IsEstimationMode())
+		assert.Equal(t, uint32(2), got.NumRetained())
+	})
+
+	t.Run("Estimation Mode", func(t *testing.T) {
+		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
+		assert.NoError(t, err)
+		err = sketch.UpdateInt64(1, 1)
+		assert.NoError(t, err)
+		err = sketch.UpdateInt64(1, 1)
+		assert.NoError(t, err)
+		err = sketch.UpdateInt64(2, 1)
+		assert.NoError(t, err)
+		err = sketch.UpdateInt64(2, 1)
+		assert.NoError(t, err)
+		err = sketch.UpdateInt64(3, 1)
+		assert.NoError(t, err)
+		for i := 0; i < 10000; i++ {
+			_ = sketch.UpdateInt64(int64(i), 1)
+		}
+
+		got, err := sketch.Filter(func(summary *int32Summary) bool {
+			return summary.value > 2
+		})
+		assert.NoError(t, err)
+
+		assert.False(t, got.IsEmpty())
+		assert.False(t, got.IsOrdered())
+		assert.True(t, got.IsEstimationMode())
+		assert.Equal(t, uint32(2), got.NumRetained())
+	})
+}

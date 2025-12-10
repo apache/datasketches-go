@@ -455,3 +455,14 @@ func (s *UpdateSketch[S, V]) Trim() {
 func (s *UpdateSketch[S, V]) Reset() {
 	s.table.Reset()
 }
+
+// Compact compacts this sketch to a compact sketch.
+func (s *UpdateSketch[S, V]) Compact(ordered bool) (*CompactSketch[S], error) {
+	return NewCompactSketch[S](s, ordered)
+}
+
+// Filter produces a CompactSketch from this sketch by applying a given predicate to each entry.
+// The predicate should return true for entries to keep.
+func (s *UpdateSketch[S, V]) Filter(predicate func(S) bool) (*CompactSketch[S], error) {
+	return newFilteredCompactSketch(s, predicate)
+}

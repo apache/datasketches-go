@@ -266,7 +266,7 @@ func (s *QuickSelectUpdateSketch) UpdateInt64(value int64) error {
 
 	index, err := s.table.Find(hash)
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
+		if err == ErrKeyNotFound {
 			s.table.Insert(index, hash)
 			return nil
 		}
@@ -292,7 +292,7 @@ func (s *QuickSelectUpdateSketch) UpdateInt32(value int32) error {
 
 	index, err := s.table.Find(hash)
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
+		if err == ErrKeyNotFound {
 			s.table.Insert(index, hash)
 			return nil
 		}
@@ -362,7 +362,7 @@ func (s *QuickSelectUpdateSketch) UpdateString(value string) error {
 
 	index, err := s.table.Find(hash)
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
+		if err == ErrKeyNotFound {
 			s.table.Insert(index, hash)
 			return nil
 		}
@@ -382,7 +382,7 @@ func (s *QuickSelectUpdateSketch) UpdateBytes(data []byte) error {
 
 	index, err := s.table.Find(hash)
 	if err != nil {
-		if errors.Is(err, ErrKeyNotFound) {
+		if err == ErrKeyNotFound {
 			s.table.Insert(index, hash)
 			return nil
 		}

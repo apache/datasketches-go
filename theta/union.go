@@ -136,7 +136,7 @@ func (u *Union) Update(sketch Sketch) error {
 		if entry < u.theta && entry < u.hashtable.theta {
 			index, err := u.hashtable.Find(entry)
 			if err != nil {
-				if errors.Is(err, ErrKeyNotFound) {
+				if err == ErrKeyNotFound {
 					u.hashtable.Insert(index, entry)
 					continue
 				}

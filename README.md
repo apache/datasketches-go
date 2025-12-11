@@ -41,8 +41,8 @@ If you are interested in making contributions to this site please see our [Commu
 | Cardinality	 |                         |  |
 | 	            | CpcSketch               | ⚠️ |
 | 	            | HllSketch               | ⚠️ |
-| 	            | ThetaSketch             | 🚧 |
-| 	            | TupleSketch<S>          | ❌ |
+| 	            | ThetaSketch             | ⚠️ |
+| 	            | TupleSketch<S>          | 🚧 |
 | Quantiles	   |                         |  |
 | 	            | CormodeDoublesSketch    | ❌ |
 | 	            | CormodeItemsSketch<T>   | ❌ |
@@ -51,8 +51,8 @@ If you are interested in making contributions to this site please see our [Commu
 | 	            | KllSketch<T>            | ⚠️ |
 | 	            | ReqFloatsSketch         | ❌ |
 | Frequencies  |              | ️ |
-|              | LongsSketch             | ⚠️ |
-|              | ItemsSketch<T>          | ⚠️ |
+|              | FreqLongsSketch             | ⚠️ |
+|              | FreqItemsSketch<T>          | ⚠️ |
 |              | CountMinSketch          | ⚠️ |
 | Sampling |    |  |
 |  | ReservoirLongsSketch    | ❌ |
@@ -80,4 +80,4 @@ If you are interested in making contributions to this site please see our [Commu
 
 =================
 
-This code requires Go 1.23
+This code requires Go 1.24

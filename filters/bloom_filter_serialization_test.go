@@ -29,10 +29,6 @@ import (
 )
 
 func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
-
-}
-
-func TestGoCompat(t *testing.T) {
 	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
 		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
 	}

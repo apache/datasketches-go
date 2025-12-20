@@ -72,10 +72,10 @@ type BloomFilter interface {
 
 	// State queries
 	IsEmpty() bool
-	GetBitsUsed() uint64
-	GetCapacity() uint64
-	GetNumHashes() uint16
-	GetSeed() uint64
+	BitsUsed() uint64
+	Capacity() uint64
+	NumHashes() uint16
+	Seed() uint64
 
 	// Serialization
 	ToCompactSlice() ([]byte, error)
@@ -94,12 +94,12 @@ type bloomFilterImpl struct {
 
 // IsEmpty returns true if no bits are set in the filter.
 func (bf *bloomFilterImpl) IsEmpty() bool {
-	return bf.GetBitsUsed() == 0
+	return bf.BitsUsed() == 0
 }
 
-// GetBitsUsed returns the number of bits currently set to 1.
+// BitsUsed returns the number of bits currently set to 1.
 // If the count is dirty, it will be recomputed.
-func (bf *bloomFilterImpl) GetBitsUsed() uint64 {
+func (bf *bloomFilterImpl) BitsUsed() uint64 {
 	if bf.isDirty {
 		bf.numBitsSet = countBitsSet(bf.bitArray)
 		bf.isDirty = false
@@ -107,18 +107,18 @@ func (bf *bloomFilterImpl) GetBitsUsed() uint64 {
 	return bf.numBitsSet
 }
 
-// GetCapacity returns the total number of bits in the filter.
-func (bf *bloomFilterImpl) GetCapacity() uint64 {
+// Capacity returns the total number of bits in the filter.
+func (bf *bloomFilterImpl) Capacity() uint64 {
 	return bf.capacityBits
 }
 
-// GetNumHashes returns the number of hash functions used.
-func (bf *bloomFilterImpl) GetNumHashes() uint16 {
+// NumHashes returns the number of hash functions used.
+func (bf *bloomFilterImpl) NumHashes() uint16 {
 	return bf.numHashes
 }
 
-// GetSeed returns the hash seed used by the filter.
-func (bf *bloomFilterImpl) GetSeed() uint64 {
+// Seed returns the hash seed used by the filter.
+func (bf *bloomFilterImpl) Seed() uint64 {
 	return bf.seed
 }
 
@@ -135,9 +135,9 @@ func (bf *bloomFilterImpl) Reset() error {
 // IsCompatible checks if two filters can be combined (union/intersection).
 // Filters are compatible if they have the same seed, hash count, and capacity.
 func (bf *bloomFilterImpl) IsCompatible(other BloomFilter) bool {
-	return bf.seed == other.GetSeed() &&
-		bf.numHashes == other.GetNumHashes() &&
-		bf.capacityBits == other.GetCapacity()
+	return bf.seed == other.Seed() &&
+		bf.numHashes == other.NumHashes() &&
+		bf.capacityBits == other.Capacity()
 }
 
 // computeHashes computes two hash values using XXHash64 and Kirsch-Mitzenmacher approach.
@@ -587,7 +587,7 @@ func (bf *bloomFilterImpl) ToCompactSlice() ([]byte, error) {
 	insertBitArrayLength(bytes, uint32(len(bf.bitArray)))
 
 	if !isEmpty {
-		bitsUsed := bf.GetBitsUsed()
+		bitsUsed := bf.BitsUsed()
 		insertNumBitsSet(bytes, bitsUsed)
 
 		// Write bit array

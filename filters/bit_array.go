@@ -49,7 +49,7 @@ func assignBit(array []uint64, index uint64, value bool) {
 	}
 }
 
-// getAndSetBit atomically gets the current bit value and sets it to 1.
+// getAndSetBit gets the current bit value and sets it to 1 in a single operation.
 // Returns true if the bit was already set, false if it was newly set.
 func getAndSetBit(array []uint64, index uint64) bool {
 	longIdx := index >> 6

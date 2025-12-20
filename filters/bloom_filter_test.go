@@ -60,7 +60,7 @@ func TestStandardConstructors(t *testing.T) {
 	assert.NotNil(t, bf1)
 
 	// Verify capacity is rounded to multiple of 64
-	capacity1 := bf1.GetCapacity()
+	capacity1 := bf1.Capacity()
 	assert.Equal(t, uint64(0), capacity1%64)
 
 	// Create by size with same parameters
@@ -70,14 +70,14 @@ func TestStandardConstructors(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Both should have same capacity and hash count
-	assert.Equal(t, bf1.GetCapacity(), bf2.GetCapacity())
-	assert.Equal(t, bf1.GetNumHashes(), bf2.GetNumHashes())
+	assert.Equal(t, bf1.Capacity(), bf2.Capacity())
+	assert.Equal(t, bf1.NumHashes(), bf2.NumHashes())
 
 	// Both should be empty
 	assert.True(t, bf1.IsEmpty())
 	assert.True(t, bf2.IsEmpty())
-	assert.Equal(t, uint64(0), bf1.GetBitsUsed())
-	assert.Equal(t, uint64(0), bf2.GetBitsUsed())
+	assert.Equal(t, uint64(0), bf1.BitsUsed())
+	assert.Equal(t, uint64(0), bf2.BitsUsed())
 }
 
 func TestBasicOperations(t *testing.T) {
@@ -87,7 +87,7 @@ func TestBasicOperations(t *testing.T) {
 
 	bf, err := NewBloomFilterByAccuracy(numItems, targetFpp, WithSeed(seed))
 	assert.NoError(t, err)
-	assert.Equal(t, seed, bf.GetSeed())
+	assert.Equal(t, seed, bf.Seed())
 
 	// Initially empty
 	assert.True(t, bf.IsEmpty())
@@ -102,8 +102,8 @@ func TestBasicOperations(t *testing.T) {
 	assert.False(t, bf.IsEmpty())
 
 	// Check bits used is reasonable (should be around 50% for optimal parameters)
-	bitsUsed := bf.GetBitsUsed()
-	capacity := bf.GetCapacity()
+	bitsUsed := bf.BitsUsed()
+	capacity := bf.Capacity()
 	utilizationPercent := float64(bitsUsed) * 100.0 / float64(capacity)
 	assert.Greater(t, utilizationPercent, 30.0)
 	assert.Less(t, utilizationPercent, 70.0)
@@ -131,7 +131,7 @@ func TestBasicOperations(t *testing.T) {
 	err = bf.Reset()
 	assert.NoError(t, err)
 	assert.True(t, bf.IsEmpty())
-	assert.Equal(t, uint64(0), bf.GetBitsUsed())
+	assert.Equal(t, uint64(0), bf.BitsUsed())
 }
 
 func TestInversion(t *testing.T) {
@@ -143,8 +143,8 @@ func TestInversion(t *testing.T) {
 		bf.UpdateUInt64(i)
 	}
 
-	bitsUsedBefore := bf.GetBitsUsed()
-	capacity := bf.GetCapacity()
+	bitsUsedBefore := bf.BitsUsed()
+	capacity := bf.Capacity()
 
 	// Count items that appear present before inversion
 	presentBefore := 0
@@ -160,7 +160,7 @@ func TestInversion(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Bits used should be inverted
-	bitsUsedAfter := bf.GetBitsUsed()
+	bitsUsedAfter := bf.BitsUsed()
 	assert.Equal(t, capacity-bitsUsedBefore, bitsUsedAfter)
 
 	// Most original items should now not be present
@@ -332,10 +332,10 @@ func TestSerializationRoundtrip(t *testing.T) {
 	// Verify we can deserialize and properties match
 	bf2, err := NewBloomFilterFromSlice(bytes)
 	assert.NoError(t, err)
-	assert.Equal(t, bf.GetSeed(), bf2.GetSeed())
-	assert.Equal(t, bf.GetNumHashes(), bf2.GetNumHashes())
-	assert.Equal(t, bf.GetCapacity(), bf2.GetCapacity())
-	assert.Equal(t, bf.GetBitsUsed(), bf2.GetBitsUsed())
+	assert.Equal(t, bf.Seed(), bf2.Seed())
+	assert.Equal(t, bf.NumHashes(), bf2.NumHashes())
+	assert.Equal(t, bf.Capacity(), bf2.Capacity())
+	assert.Equal(t, bf.BitsUsed(), bf2.BitsUsed())
 }
 
 func TestEmptySerializationFormat(t *testing.T) {
@@ -352,8 +352,8 @@ func TestEmptySerializationFormat(t *testing.T) {
 	bf2, err := NewBloomFilterFromSlice(bytes)
 	assert.NoError(t, err)
 	assert.True(t, bf2.IsEmpty())
-	assert.Equal(t, bf.GetSeed(), bf2.GetSeed())
-	assert.Equal(t, bf.GetNumHashes(), bf2.GetNumHashes())
+	assert.Equal(t, bf.Seed(), bf2.Seed())
+	assert.Equal(t, bf.NumHashes(), bf2.NumHashes())
 }
 
 func TestSuggestFunctions(t *testing.T) {
@@ -418,10 +418,10 @@ func TestDeserializationRoundtrip(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify properties match
-	assert.Equal(t, bf1.GetSeed(), bf2.GetSeed())
-	assert.Equal(t, bf1.GetNumHashes(), bf2.GetNumHashes())
-	assert.Equal(t, bf1.GetCapacity(), bf2.GetCapacity())
-	assert.Equal(t, bf1.GetBitsUsed(), bf2.GetBitsUsed())
+	assert.Equal(t, bf1.Seed(), bf2.Seed())
+	assert.Equal(t, bf1.NumHashes(), bf2.NumHashes())
+	assert.Equal(t, bf1.Capacity(), bf2.Capacity())
+	assert.Equal(t, bf1.BitsUsed(), bf2.BitsUsed())
 	assert.Equal(t, bf1.IsEmpty(), bf2.IsEmpty())
 
 	// Verify all inserted items are found
@@ -451,10 +451,10 @@ func TestDeserializeEmptyFilter(t *testing.T) {
 
 	// Verify properties
 	assert.True(t, bf2.IsEmpty())
-	assert.Equal(t, uint64(0), bf2.GetBitsUsed())
-	assert.Equal(t, bf1.GetSeed(), bf2.GetSeed())
-	assert.Equal(t, bf1.GetNumHashes(), bf2.GetNumHashes())
-	assert.Equal(t, bf1.GetCapacity(), bf2.GetCapacity())
+	assert.Equal(t, uint64(0), bf2.BitsUsed())
+	assert.Equal(t, bf1.Seed(), bf2.Seed())
+	assert.Equal(t, bf1.NumHashes(), bf2.NumHashes())
+	assert.Equal(t, bf1.Capacity(), bf2.Capacity())
 }
 
 func TestDeserializeInvalidData(t *testing.T) {
@@ -517,8 +517,8 @@ func TestDeserializeWithDirtyBits(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Should have correct bit count (recalculated)
-	assert.Equal(t, bf1.GetBitsUsed(), bf2.GetBitsUsed())
-	assert.Greater(t, bf2.GetBitsUsed(), uint64(0))
+	assert.Equal(t, bf1.BitsUsed(), bf2.BitsUsed())
+	assert.Greater(t, bf2.BitsUsed(), uint64(0))
 }
 
 func TestSerializeDeserializeConsistency(t *testing.T) {
@@ -656,7 +656,7 @@ func TestBasicUpdateMethods(t *testing.T) {
 	wasPresent, err := bf.QueryAndUpdateString("")
 	assert.NoError(t, err)
 	assert.False(t, wasPresent)
-	assert.Equal(t, uint64(0), bf.GetBitsUsed())
+	assert.Equal(t, uint64(0), bf.BitsUsed())
 
 	// Update with non-empty string
 	err = bf.UpdateString("abc")
@@ -686,7 +686,7 @@ func TestBasicUpdateMethods(t *testing.T) {
 	assert.False(t, wasPresent)
 
 	// Bits used should be reasonable (at most numHashes * 6 for 6 distinct updates)
-	assert.LessOrEqual(t, bf.GetBitsUsed(), uint64(bf.GetNumHashes())*6)
+	assert.LessOrEqual(t, bf.BitsUsed(), uint64(bf.NumHashes())*6)
 	assert.False(t, bf.IsEmpty())
 }
 
@@ -712,8 +712,8 @@ func TestArrayUpdateMethods(t *testing.T) {
 	found := bfDoubles.QueryFloat64Array(rawData)
 	assert.True(t, found, "Query should return true")
 
-	numBitsSet := bfDoubles.GetBitsUsed()
-	seed := bfDoubles.GetSeed()
+	numBitsSet := bfDoubles.BitsUsed()
+	seed := bfDoubles.Seed()
 
 	// Test with byte slice (matches Java's update(byte[]))
 	bytes := make([]byte, len(rawData)*8)
@@ -736,7 +736,7 @@ func TestArrayUpdateMethods(t *testing.T) {
 	assert.True(t, found)
 
 	// Both should have same number of bits set (same data, same seed)
-	assert.Equal(t, numBitsSet, bfBytes.GetBitsUsed())
+	assert.Equal(t, numBitsSet, bfBytes.BitsUsed())
 
 	// Test with int64 array (matches Java's update(long[]))
 	intData := []int64{12345, 67890, -11111}
@@ -756,11 +756,11 @@ func TestArrayUpdateMethods(t *testing.T) {
 	// Intersect all filters (each with different data but same seed)
 	bf := &bloomFilterImpl{
 		seed:         seed,
-		numHashes:    bfDoubles.GetNumHashes(),
+		numHashes:    bfDoubles.NumHashes(),
 		isDirty:      false,
-		capacityBits: bfDoubles.GetCapacity(),
+		capacityBits: bfDoubles.Capacity(),
 		numBitsSet:   0,
-		bitArray:     make([]uint64, bfDoubles.GetCapacity()/64),
+		bitArray:     make([]uint64, bfDoubles.Capacity()/64),
 	}
 
 	// Manually create a filter by intersecting
@@ -768,7 +768,7 @@ func TestArrayUpdateMethods(t *testing.T) {
 	bf.Intersect(bfBytes)
 
 	// After intersecting with itself (same data), should have same bit count
-	assert.Equal(t, numBitsSet, bf.GetBitsUsed(),
+	assert.Equal(t, numBitsSet, bf.BitsUsed(),
 		"Intersection of identical data should preserve bit count")
 }
 

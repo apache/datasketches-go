@@ -84,7 +84,7 @@ func TestGoCompat(t *testing.T) {
 			// Verify state
 			assert.Equal(t, tc.n == 0, bf.IsEmpty())
 			if !bf.IsEmpty() {
-				assert.Greater(t, bf.GetBitsUsed(), uint64(numInserts))
+				assert.Greater(t, bf.BitsUsed(), uint64(numInserts))
 			}
 
 			// Serialize
@@ -208,12 +208,12 @@ func TestJavaCompat(t *testing.T) {
 
 			// Verify basic properties
 			assert.Equal(t, tc.n == 0, bf.IsEmpty())
-			assert.Equal(t, tc.numHashes, bf.GetNumHashes())
+			assert.Equal(t, tc.numHashes, bf.NumHashes())
 
 			if tc.n > 0 {
 				// Verify bits used is reasonable
-				assert.Greater(t, bf.GetBitsUsed(), uint64(0))
-				assert.Less(t, bf.GetBitsUsed(), bf.GetCapacity())
+				assert.Greater(t, bf.BitsUsed(), uint64(0))
+				assert.Less(t, bf.BitsUsed(), bf.Capacity())
 
 				// Java inserts n/10 items (0 to n/10-1)
 				numInserted := tc.n / 10
@@ -358,7 +358,7 @@ func TestJavaCompat(t *testing.T) {
 				bf, err := NewBloomFilterFromSlice(data)
 				assert.NoError(t, err)
 				assert.False(t, bf.IsEmpty())
-				assert.Equal(t, numHashes, bf.GetNumHashes())
+				assert.Equal(t, numHashes, bf.NumHashes())
 
 				// Test all items of this type
 				tc.testItems(bf)
@@ -402,12 +402,12 @@ func TestCPPCompat(t *testing.T) {
 
 			// Verify basic properties
 			assert.Equal(t, tc.n == 0, bf.IsEmpty())
-			assert.Equal(t, tc.numHashes, bf.GetNumHashes())
+			assert.Equal(t, tc.numHashes, bf.NumHashes())
 
 			if tc.n > 0 {
 				// Verify bits used is reasonable
-				assert.Greater(t, bf.GetBitsUsed(), uint64(0))
-				assert.Less(t, bf.GetBitsUsed(), bf.GetCapacity())
+				assert.Greater(t, bf.BitsUsed(), uint64(0))
+				assert.Less(t, bf.BitsUsed(), bf.Capacity())
 
 				// C++ inserts n/10 items (0 to n/10-1)
 				numInserted := tc.n / 10
@@ -521,7 +521,7 @@ func TestCPPCompat(t *testing.T) {
 				bf, err := NewBloomFilterFromSlice(data)
 				assert.NoError(t, err)
 				assert.False(t, bf.IsEmpty())
-				assert.Equal(t, numHashes, bf.GetNumHashes())
+				assert.Equal(t, numHashes, bf.NumHashes())
 
 				// Test all items
 				tc.testItems(bf)

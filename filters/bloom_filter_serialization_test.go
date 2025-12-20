@@ -255,6 +255,7 @@ func TestJavaCompat(t *testing.T) {
 		}
 	})
 	t.Run("Specific Java", func(t *testing.T) {
+		t.Skipf("Skipping Java specific coverage until we have specific type generated")
 		n := 10000
 		numInserts := n / 10 // 1000 items
 		numHashes := uint16(3)
@@ -450,6 +451,7 @@ func TestCPPCompat(t *testing.T) {
 	})
 
 	t.Run("Specific Cpp", func(t *testing.T) {
+		t.Skipf("Skipping C++ specific coverage until we have specific type generated")
 		n := 10000
 		numInserts := n / 10 // 1000 items
 		numHashes := uint16(3)

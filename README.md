@@ -59,7 +59,7 @@ If you are interested in making contributions to this site please see our [Commu
 |  | ReserviorItemsSketch<T> | ❌ |
 | 	  | VarOptItemsSketch<T>    | ❌ |
 | Membership | | |
-| | BloomFilterSketch | ❌ |
+| | BloomFilter | 🚧 |
 
 
 ## Specialty Sketches

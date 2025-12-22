@@ -56,13 +56,13 @@ type BloomFilter interface {
 	QueryFloat64Array(data []float64) bool
 
 	// QueryAndUpdate atomically queries and updates (test-and-set)
-	QueryAndUpdateUInt64(datum uint64) (bool, error)
-	QueryAndUpdateInt64(datum int64) (bool, error)
-	QueryAndUpdateString(datum string) (bool, error)
-	QueryAndUpdateSlice(datum []byte) (bool, error)
-	QueryAndUpdateFloat64(datum float64) (bool, error)
-	QueryAndUpdateInt64Array(data []int64) (bool, error)
-	QueryAndUpdateFloat64Array(data []float64) (bool, error)
+	QueryAndUpdateUInt64(datum uint64) bool
+	QueryAndUpdateInt64(datum int64) bool
+	QueryAndUpdateString(datum string) bool
+	QueryAndUpdateSlice(datum []byte) bool
+	QueryAndUpdateFloat64(datum float64) bool
+	QueryAndUpdateInt64Array(data []int64) bool
+	QueryAndUpdateFloat64Array(data []float64) bool
 
 	// Set operations
 	Union(other BloomFilter) error
@@ -357,34 +357,34 @@ func (bf *bloomFilterImpl) QueryFloat64(datum float64) bool {
 
 // QueryAndUpdateUInt64 atomically queries and updates for a uint64 value.
 // Returns true if the value was already present before the update.
-func (bf *bloomFilterImpl) QueryAndUpdateUInt64(datum uint64) (bool, error) {
+func (bf *bloomFilterImpl) QueryAndUpdateUInt64(datum uint64) bool {
 	h0, h1 := bf.computeHashesForLong(datum)
-	return bf.internalQueryAndUpdate(h0, h1), nil
+	return bf.internalQueryAndUpdate(h0, h1)
 }
 
 // QueryAndUpdateInt64 atomically queries and updates for an int64 value.
-func (bf *bloomFilterImpl) QueryAndUpdateInt64(datum int64) (bool, error) {
+func (bf *bloomFilterImpl) QueryAndUpdateInt64(datum int64) bool {
 	h0, h1 := bf.computeHashesForLong(uint64(datum))
-	return bf.internalQueryAndUpdate(h0, h1), nil
+	return bf.internalQueryAndUpdate(h0, h1)
 }
 
 // QueryAndUpdateString atomically queries and updates for a string.
 // Empty strings are ignored and return false.
-func (bf *bloomFilterImpl) QueryAndUpdateString(datum string) (bool, error) {
+func (bf *bloomFilterImpl) QueryAndUpdateString(datum string) bool {
 	if datum == "" {
-		return false, nil // Empty string - do nothing, matching Java behavior
+		return false // Empty string - do nothing, matching Java behavior
 	}
 	return bf.QueryAndUpdateSlice([]byte(datum))
 }
 
 // QueryAndUpdateSlice atomically queries and updates for a byte slice.
-func (bf *bloomFilterImpl) QueryAndUpdateSlice(datum []byte) (bool, error) {
+func (bf *bloomFilterImpl) QueryAndUpdateSlice(datum []byte) bool {
 	h0, h1 := bf.computeHashes(datum)
-	return bf.internalQueryAndUpdate(h0, h1), nil
+	return bf.internalQueryAndUpdate(h0, h1)
 }
 
 // QueryAndUpdateFloat64 atomically queries and updates for a float64 value.
-func (bf *bloomFilterImpl) QueryAndUpdateFloat64(datum float64) (bool, error) {
+func (bf *bloomFilterImpl) QueryAndUpdateFloat64(datum float64) bool {
 	var bits uint64
 	if datum == 0.0 {
 		// Canonicalize -0.0 to 0.0
@@ -406,7 +406,7 @@ func (bf *bloomFilterImpl) QueryAndUpdateFloat64(datum float64) (bool, error) {
 	buf := make([]byte, 8)
 	binary.LittleEndian.PutUint64(buf, bits)
 	h0, h1 := bf.computeHashes(buf)
-	return bf.internalQueryAndUpdate(h0, h1), nil
+	return bf.internalQueryAndUpdate(h0, h1)
 }
 
 // UpdateInt64Array adds an array of int64 values to the filter.
@@ -485,9 +485,9 @@ func (bf *bloomFilterImpl) QueryFloat64Array(data []float64) bool {
 
 // QueryAndUpdateInt64Array atomically queries and updates for an int64 array.
 // Returns true if the array was already present before the update.
-func (bf *bloomFilterImpl) QueryAndUpdateInt64Array(data []int64) (bool, error) {
+func (bf *bloomFilterImpl) QueryAndUpdateInt64Array(data []int64) bool {
 	if len(data) == 0 {
-		return false, nil
+		return false
 	}
 
 	// Convert array to bytes (little-endian)
@@ -497,14 +497,14 @@ func (bf *bloomFilterImpl) QueryAndUpdateInt64Array(data []int64) (bool, error) 
 	}
 
 	h0, h1 := bf.computeHashes(bytes)
-	return bf.internalQueryAndUpdate(h0, h1), nil
+	return bf.internalQueryAndUpdate(h0, h1)
 }
 
 // QueryAndUpdateFloat64Array atomically queries and updates for a float64 array.
 // Returns true if the array was already present before the update.
-func (bf *bloomFilterImpl) QueryAndUpdateFloat64Array(data []float64) (bool, error) {
+func (bf *bloomFilterImpl) QueryAndUpdateFloat64Array(data []float64) bool {
 	if len(data) == 0 {
-		return false, nil
+		return false
 	}
 
 	// Convert array to bytes (little-endian)
@@ -515,7 +515,7 @@ func (bf *bloomFilterImpl) QueryAndUpdateFloat64Array(data []float64) (bool, err
 	}
 
 	h0, h1 := bf.computeHashes(bytes)
-	return bf.internalQueryAndUpdate(h0, h1), nil
+	return bf.internalQueryAndUpdate(h0, h1)
 }
 
 // Union performs a bitwise OR operation with another filter.

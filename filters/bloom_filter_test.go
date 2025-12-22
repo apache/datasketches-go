@@ -269,13 +269,11 @@ func TestQueryAndUpdate(t *testing.T) {
 	bf, _ := NewBloomFilterBySize(256, 5, WithSeed(789))
 
 	// First call should return false (not present)
-	wasPresent, err := bf.QueryAndUpdateUInt64(42)
-	assert.NoError(t, err)
+	wasPresent := bf.QueryAndUpdateUInt64(42)
 	assert.False(t, wasPresent)
 
 	// Second call should return true (now present)
-	wasPresent, err = bf.QueryAndUpdateUInt64(42)
-	assert.NoError(t, err)
+	wasPresent = bf.QueryAndUpdateUInt64(42)
 	assert.True(t, wasPresent)
 
 	// Regular query should also return true
@@ -605,8 +603,7 @@ func TestArrayMethods(t *testing.T) {
 	assert.True(t, bf1.QueryInt64Array(intArray), "Should find array after update")
 
 	// QueryAndUpdate should return true (already present)
-	wasPresent, err := bf1.QueryAndUpdateInt64Array(intArray)
-	assert.NoError(t, err)
+	wasPresent := bf1.QueryAndUpdateInt64Array(intArray)
 	assert.True(t, wasPresent, "Array should be present")
 
 	// Different array should not be found
@@ -622,8 +619,7 @@ func TestArrayMethods(t *testing.T) {
 
 	assert.True(t, bf2.QueryFloat64Array(floatArray), "Should find float array after update")
 
-	wasPresent, err = bf2.QueryAndUpdateFloat64Array(floatArray)
-	assert.NoError(t, err)
+	wasPresent = bf2.QueryAndUpdateFloat64Array(floatArray)
 	assert.True(t, wasPresent)
 
 	// Empty arrays should be no-op
@@ -653,8 +649,7 @@ func TestBasicUpdateMethods(t *testing.T) {
 	err = bf.UpdateString("")
 	assert.NoError(t, err)
 	// Querying empty string should return false (not inserted)
-	wasPresent, err := bf.QueryAndUpdateString("")
-	assert.NoError(t, err)
+	wasPresent := bf.QueryAndUpdateString("")
 	assert.False(t, wasPresent)
 	assert.Equal(t, uint64(0), bf.BitsUsed())
 
@@ -663,8 +658,7 @@ func TestBasicUpdateMethods(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Query different string (should not be present)
-	wasPresent, err = bf.QueryAndUpdateString("def")
-	assert.NoError(t, err)
+	wasPresent = bf.QueryAndUpdateString("def")
 	assert.False(t, wasPresent)
 
 	// Update with int
@@ -672,8 +666,7 @@ func TestBasicUpdateMethods(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Query different int (should not be present)
-	wasPresent, err = bf.QueryAndUpdateInt64(543)
-	assert.NoError(t, err)
+	wasPresent = bf.QueryAndUpdateInt64(543)
 	assert.False(t, wasPresent)
 
 	// Update with NaN
@@ -681,8 +674,7 @@ func TestBasicUpdateMethods(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Query positive infinity (should not be present)
-	wasPresent, err = bf.QueryAndUpdateFloat64(math.Inf(1))
-	assert.NoError(t, err)
+	wasPresent = bf.QueryAndUpdateFloat64(math.Inf(1))
 	assert.False(t, wasPresent)
 
 	// Bits used should be reasonable (at most numHashes * 6 for 6 distinct updates)
@@ -705,8 +697,7 @@ func TestArrayUpdateMethods(t *testing.T) {
 	err = bfDoubles.UpdateFloat64Array(rawData)
 	assert.NoError(t, err)
 
-	wasPresent, err := bfDoubles.QueryAndUpdateFloat64Array(rawData)
-	assert.NoError(t, err)
+	wasPresent := bfDoubles.QueryAndUpdateFloat64Array(rawData)
 	assert.True(t, wasPresent, "Should find array after update")
 
 	found := bfDoubles.QueryFloat64Array(rawData)
@@ -728,8 +719,7 @@ func TestArrayUpdateMethods(t *testing.T) {
 	err = bfBytes.UpdateSlice(bytes)
 	assert.NoError(t, err)
 
-	wasPresent, err = bfBytes.QueryAndUpdateSlice(bytes)
-	assert.NoError(t, err)
+	wasPresent = bfBytes.QueryAndUpdateSlice(bytes)
 	assert.True(t, wasPresent)
 
 	found = bfBytes.QuerySlice(bytes)
@@ -746,8 +736,7 @@ func TestArrayUpdateMethods(t *testing.T) {
 	err = bfInts.UpdateInt64Array(intData)
 	assert.NoError(t, err)
 
-	wasPresent, err = bfInts.QueryAndUpdateInt64Array(intData)
-	assert.NoError(t, err)
+	wasPresent = bfInts.QueryAndUpdateInt64Array(intData)
 	assert.True(t, wasPresent)
 
 	found = bfInts.QueryInt64Array(intData)

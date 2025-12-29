@@ -83,7 +83,12 @@ func ANotB[S Summary](a, b Sketch[S], seed uint64, ordered bool) (*CompactSketch
 
 	if ordered && !a.IsOrdered() {
 		slices.SortFunc(entries, func(a, b entry[S]) int {
-			return int(a.Hash - b.Hash)
+			if a.Hash < b.Hash {
+				return -1
+			} else if a.Hash > b.Hash {
+				return 1
+			}
+			return 0
 		})
 	}
 
@@ -213,7 +218,12 @@ func TupleANotThetaB[S Summary](a Sketch[S], b theta.Sketch, seed uint64, ordere
 
 	if ordered && !a.IsOrdered() {
 		slices.SortFunc(entries, func(a, b entry[S]) int {
-			return int(a.Hash - b.Hash)
+			if a.Hash < b.Hash {
+				return -1
+			} else if a.Hash > b.Hash {
+				return 1
+			}
+			return 0
 		})
 	}
 

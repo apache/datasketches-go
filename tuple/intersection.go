@@ -60,7 +60,12 @@ func NewIntersection[S Summary](policy Policy[S], opts ...IntersectionOptionFunc
 			0, 0, theta.ResizeX1, 1.0, theta.MaxTheta, options.seed, false,
 		),
 		entryLessFunc: func(a, b entry[S]) int {
-			return int(a.Hash) - int(b.Hash)
+			if a.Hash < b.Hash {
+				return -1
+			} else if a.Hash > b.Hash {
+				return 1
+			}
+			return 0
 		},
 		policy:  policy,
 		isValid: false,

@@ -25,9 +25,10 @@ type family struct {
 type families struct {
 	HLL            family
 	Frequency      family
-	Kll            family ``
+	Kll            family
 	CPC            family
 	CountMinSketch family
+	BloomFilter    family
 }
 
 var FamilyEnum = &families{
@@ -50,5 +51,9 @@ var FamilyEnum = &families{
 	CountMinSketch: family{
 		Id:          18,
 		MaxPreLongs: 3,
+	},
+	BloomFilter: family{
+		Id:          21,
+		MaxPreLongs: 4,
 	},
 }

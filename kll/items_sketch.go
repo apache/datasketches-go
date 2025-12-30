@@ -48,8 +48,9 @@ type ItemsSketch[C comparable] struct {
 	n                 uint64
 	levels            []uint32
 	items             []C
-	minItem           *C
-	maxItem           *C
+	minItem           C
+	maxItem           C
+	hasMinMax         bool
 	sortedView        *ItemsSketchSortedView[C]
 	serde             common.ItemSketchSerde[C]
 	compareFn         common.CompareFn[C]
@@ -128,15 +129,15 @@ func NewKllItemsSketchFromSlice[C comparable](sl []byte, compareFn common.Compar
 		n                 = memVal.n
 		minK              = memVal.minK
 		isLevelZeroSorted = memVal.level0SortedFlag
-		minItem           *C
-		maxItem           *C
+		minItem           C
+		maxItem           C
+		hasMinMax         bool
 		items             = make([]C, levelsArr[memVal.numLevels])
 	)
 
 	switch memVal.sketchStructure {
 	case _COMPACT_EMPTY:
-		minItem = nil
-		maxItem = nil
+		hasMinMax = false
 		items = make([]C, k)
 	case _COMPACT_SINGLE:
 		offset := _N_LONG_ADR
@@ -144,24 +145,26 @@ func NewKllItemsSketchFromSlice[C comparable](sl []byte, compareFn common.Compar
 		if err != nil {
 			return nil, err
 		}
-		minItem = &deserItems[0]
-		maxItem = &deserItems[0]
+		minItem = deserItems[0]
+		maxItem = deserItems[0]
+		hasMinMax = true
 		items = make([]C, k)
 		items[k-1] = deserItems[0]
 	case _COMPACT_FULL:
 		offset := int(_DATA_START_ADR + memVal.numLevels*4)
 		deserMinItems, err := serde.DeserializeManyFromSlice(sl, offset, 1)
-		minItem = &deserMinItems[0]
 		if err != nil {
 			return nil, err
 		}
-		offset += serde.SizeOf(*minItem)
+		minItem = deserMinItems[0]
+		offset += serde.SizeOf(minItem)
 		deserMaxItems, err := serde.DeserializeManyFromSlice(sl, offset, 1)
-		maxItem = &deserMaxItems[0]
 		if err != nil {
 			return nil, err
 		}
-		offset += serde.SizeOf(*maxItem)
+		maxItem = deserMaxItems[0]
+		hasMinMax = true
+		offset += serde.SizeOf(maxItem)
 		numRetained := levelsArr[memVal.numLevels] - levelsArr[0]
 		deseRetItems, err := serde.DeserializeManyFromSlice(sl, offset, int(numRetained))
 		if err != nil {
@@ -183,6 +186,7 @@ func NewKllItemsSketchFromSlice[C comparable](sl []byte, compareFn common.Compar
 		items:             items,
 		minItem:           minItem,
 		maxItem:           maxItem,
+		hasMinMax:         hasMinMax,
 		serde:             serde,
 		compareFn:         compareFn,
 	}, nil
@@ -213,7 +217,7 @@ func (s *ItemsSketch[C]) GetMinItem() (C, error) {
 	if s.IsEmpty() {
 		return *new(C), fmt.Errorf("operation is undefined for an empty sketch")
 	}
-	return *s.minItem, nil
+	return s.minItem, nil
 }
 
 // GetMaxItem returns the maximum item of the stream. This may be distinct from the largest item retained by the sketch algorithm.
@@ -221,7 +225,7 @@ func (s *ItemsSketch[C]) GetMaxItem() (C, error) {
 	if s.IsEmpty() {
 		return *new(C), fmt.Errorf("operation is undefined for an empty sketch")
 	}
-	return *s.maxItem, nil
+	return s.maxItem, nil
 }
 
 // IsEstimationMode returns true if the sketch is in estimation mode, otherwise false.
@@ -463,8 +467,10 @@ func (s *ItemsSketch[C]) Reset() {
 	s.isLevelZeroSorted = false
 	s.numLevels = 1
 	s.levels = []uint32{uint32(s.k), uint32(s.k)}
-	s.minItem = nil
-	s.maxItem = nil
+	s.hasMinMax = false
+	var zero C
+	s.minItem = zero
+	s.maxItem = zero
 	s.items = make([]C, s.k)
 	s.sortedView = nil
 }
@@ -616,12 +622,12 @@ func (s *ItemsSketch[C]) getLevelsArrSizeBytes(structure sketchStructure) int {
 }
 
 func (s *ItemsSketch[C]) getMinMaxSizeBytes() int {
-	return s.serde.SizeOf(*s.minItem) + s.serde.SizeOf(*s.maxItem)
+	return s.serde.SizeOf(s.minItem) + s.serde.SizeOf(s.maxItem)
 }
 
 func (s *ItemsSketch[C]) getMinMaxByteArr() []byte {
-	minBytes := s.serde.SerializeOneToSlice(*s.minItem)
-	maxBytes := s.serde.SerializeOneToSlice(*s.maxItem)
+	minBytes := s.serde.SerializeOneToSlice(s.minItem)
+	maxBytes := s.serde.SerializeOneToSlice(s.maxItem)
 	minMaxBytes := make([]byte, len(minBytes)+len(maxBytes))
 	copy(minMaxBytes, minBytes)
 	copy(minMaxBytes[len(minBytes):], maxBytes)
@@ -682,15 +688,16 @@ func (s *ItemsSketch[C]) updateItem(item C, compareFn common.CompareFn[C]) {
 	if internal.IsNil(item) {
 		return
 	}
-	if s.IsEmpty() {
-		s.minItem = &item
-		s.maxItem = &item
+	if !s.hasMinMax {
+		s.minItem = item
+		s.maxItem = item
+		s.hasMinMax = true
 	} else {
-		if compareFn(item, *s.minItem) {
-			s.minItem = &item
+		if compareFn(item, s.minItem) {
+			s.minItem = item
 		}
-		if compareFn(*s.maxItem, item) {
-			s.maxItem = &item
+		if compareFn(s.maxItem, item) {
+			s.maxItem = item
 		}
 	}
 	level0space := s.levels[0]
@@ -818,18 +825,20 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 	if myEmpty {
 		s.minItem = other.minItem
 		s.maxItem = other.maxItem
+		s.hasMinMax = other.hasMinMax
 	} else {
-		if s.compareFn(myMin, *other.minItem) {
-			s.minItem = &myMin
+		if s.compareFn(myMin, other.minItem) {
+			s.minItem = myMin
 		} else {
 			s.minItem = other.minItem
 		}
 
-		if s.compareFn(*other.maxItem, myMax) {
-			s.maxItem = &myMax
+		if s.compareFn(other.maxItem, myMax) {
+			s.maxItem = myMax
 		} else {
 			s.maxItem = other.maxItem
 		}
+		s.hasMinMax = true
 	}
 }
 
@@ -859,8 +868,8 @@ func (s *ItemsSketch[C]) compressWhileUpdatingSketch() {
 	}
 	halfAdjPop := adjPop / 2
 
-	//the following is specific to generic Items
-	myItemsArr := s.GetTotalItemsArray()
+	// Work directly on s.items to avoid allocation from GetTotalItemsArray.
+	myItemsArr := s.items
 	if level == 0 { // level zero might not be sorted, so we must sort it if we wish to compact it
 		tmpSlice := myItemsArr[adjBeg : adjBeg+adjPop]
 		slices.SortFunc(tmpSlice, func(a, b C) int {
@@ -904,17 +913,16 @@ func (s *ItemsSketch[C]) compressWhileUpdatingSketch() {
 		newIndex = myLevelsArr[lvl] + halfAdjPop //adjust boundary
 		s.levels[lvl] = newIndex
 	}
-	s.items = myItemsArr
 }
 
 func (s *ItemsSketch[C]) addEmptyTopLevelToCompletelyFullSketch() {
-	myCurLevelsArr := s.getLevelsArray()
+	// Use s.levels directly to avoid copy from getLevelsArray.
+	myCurLevelsArr := s.levels
 	myCurNumLevels := s.numLevels
 	myCurTotalItemsCapacity := myCurLevelsArr[myCurNumLevels]
 
-	myCurItemsArr := s.GetTotalItemsArray()
-	minItem := s.minItem
-	maxItem := s.maxItem
+	// Use s.items directly to avoid copy from GetTotalItemsArray.
+	myCurItemsArr := s.items
 
 	deltaItemsCap := levelCapacity(s.k, myCurNumLevels+1, 0, s.m)
 	myNewTotalItemsCapacity := myCurTotalItemsCapacity + deltaItemsCap
@@ -928,7 +936,6 @@ func (s *ItemsSketch[C]) addEmptyTopLevelToCompletelyFullSketch() {
 		myNewNumLevels uint8
 	)
 
-	//myNewLevelsArr := make([]uint32, myCurNumLevels+2)
 	// GROW LEVELS ARRAY
 	if growLevelsArr {
 		//grow levels arr by one and copy the old data to the new array, extra space at the top.
@@ -956,9 +963,6 @@ func (s *ItemsSketch[C]) addEmptyTopLevelToCompletelyFullSketch() {
 	// update our sketch with new expanded spaces
 	s.numLevels = myNewNumLevels
 	s.levels = myNewLevelsArr
-
-	s.minItem = minItem
-	s.maxItem = maxItem
 	s.items = myNewItemsArr
 }
 

@@ -196,7 +196,13 @@ func TestJavaCompat(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			b, err := os.ReadFile(fmt.Sprintf("%s/bf_n%d_h%d_java.sk", internal.JavaPath, tc.n, tc.numHashes))
+			filename := fmt.Sprintf("%s/bf_n%d_h%d_java.sk", internal.JavaPath, tc.n, tc.numHashes)
+			// Skip if file doesn't exist
+			if _, err := os.Stat(filename); os.IsNotExist(err) {
+				t.Skipf("Java file not found: %s", filename)
+				return
+			}
+			b, err := os.ReadFile(filename)
 			assert.NoError(t, err)
 
 			bf, err := NewBloomFilterFromSlice(b)

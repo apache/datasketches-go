@@ -112,7 +112,13 @@ func TestJavaCompat(t *testing.T) {
 	t.Run("theta sketch", func(t *testing.T) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
-			b, err := os.ReadFile(fmt.Sprintf("%s/theta_n%d_java.sk", internal.JavaPath, n))
+			filename := fmt.Sprintf("%s/theta_n%d_java.sk", internal.JavaPath, n)
+			// Skip if file doesn't exist
+			if _, err := os.Stat(filename); os.IsNotExist(err) {
+				t.Skipf("Java file not found: %s", filename)
+				return
+			}
+			b, err := os.ReadFile(filename)
 			assert.NoError(t, err)
 
 			sketch, err := Decode(b, DefaultSeed)
@@ -136,7 +142,13 @@ func TestJavaCompat(t *testing.T) {
 	t.Run("theta sketch compressed", func(t *testing.T) {
 		ns := []int{10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
-			b, err := os.ReadFile(fmt.Sprintf("%s/theta_compressed_n%d_java.sk", internal.JavaPath, n))
+			filename := fmt.Sprintf("%s/theta_compressed_n%d_java.sk", internal.JavaPath, n)
+			// Skip if file doesn't exist
+			if _, err := os.Stat(filename); os.IsNotExist(err) {
+				t.Skipf("Java file not found: %s", filename)
+				return
+			}
+			b, err := os.ReadFile(filename)
 			assert.NoError(t, err)
 
 			sketch, err := Decode(b, DefaultSeed)
@@ -157,7 +169,13 @@ func TestJavaCompat(t *testing.T) {
 	})
 
 	t.Run("theta sketch non-empty no entries", func(t *testing.T) {
-		b, err := os.ReadFile(fmt.Sprintf("%s/theta_non_empty_no_entries_java.sk", internal.JavaPath))
+		filename := fmt.Sprintf("%s/theta_non_empty_no_entries_java.sk", internal.JavaPath)
+		// Skip if file doesn't exist
+		if _, err := os.Stat(filename); os.IsNotExist(err) {
+			t.Skipf("Java file not found: %s", filename)
+			return
+		}
+		b, err := os.ReadFile(filename)
 		assert.NoError(t, err)
 
 		sketch, err := Decode(b, DefaultSeed)
@@ -378,7 +396,13 @@ func TestCPPCompat(t *testing.T) {
 	t.Run("theta sketch", func(t *testing.T) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
-			b, err := os.ReadFile(fmt.Sprintf("%s/theta_n%d_cpp.sk", internal.CppPath, n))
+			filename := fmt.Sprintf("%s/theta_n%d_cpp.sk", internal.CppPath, n)
+			// Skip if file doesn't exist
+			if _, err := os.Stat(filename); os.IsNotExist(err) {
+				t.Skipf("C++ file not found: %s", filename)
+				return
+			}
+			b, err := os.ReadFile(filename)
 			assert.NoError(t, err)
 
 			sketch, err := Decode(b, DefaultSeed)
@@ -402,7 +426,13 @@ func TestCPPCompat(t *testing.T) {
 	t.Run("theta sketch compressed", func(t *testing.T) {
 		ns := []int{10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
-			b, err := os.ReadFile(fmt.Sprintf("%s/theta_compressed_n%d_cpp.sk", internal.CppPath, n))
+			filename := fmt.Sprintf("%s/theta_compressed_n%d_cpp.sk", internal.CppPath, n)
+			// Skip if file doesn't exist
+			if _, err := os.Stat(filename); os.IsNotExist(err) {
+				t.Skipf("C++ file not found: %s", filename)
+				return
+			}
+			b, err := os.ReadFile(filename)
 			assert.NoError(t, err)
 
 			sketch, err := Decode(b, DefaultSeed)
@@ -423,7 +453,13 @@ func TestCPPCompat(t *testing.T) {
 	})
 
 	t.Run("theta sketch non-empty no entries", func(t *testing.T) {
-		b, err := os.ReadFile(fmt.Sprintf("%s/theta_non_empty_no_entries_cpp.sk", internal.CppPath))
+		filename := fmt.Sprintf("%s/theta_non_empty_no_entries_cpp.sk", internal.CppPath)
+		// Skip if file doesn't exist
+		if _, err := os.Stat(filename); os.IsNotExist(err) {
+			t.Skipf("C++ file not found: %s", filename)
+			return
+		}
+		b, err := os.ReadFile(filename)
 		assert.NoError(t, err)
 
 		sketch, err := Decode(b, DefaultSeed)

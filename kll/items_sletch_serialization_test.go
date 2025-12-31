@@ -71,7 +71,13 @@ func TestJavaCompat(t *testing.T) {
 		comparatorString := common.ItemSketchStringComparator(false)
 		for _, n := range nArr {
 			digits := numDigits(n)
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/kll_string_n%d_java.sk", internal.JavaPath, n))
+			filename := fmt.Sprintf("%s/kll_string_n%d_java.sk", internal.JavaPath, n)
+			// Skip if file doesn't exist
+			if _, err := os.Stat(filename); os.IsNotExist(err) {
+				t.Skipf("Java file not found: %s", filename)
+				return
+			}
+			bytes, err := os.ReadFile(filename)
 			assert.NoError(t, err)
 			sketch, err := NewKllItemsSketchFromSlice[string](bytes, comparatorString, serde)
 			if err != nil {
@@ -119,7 +125,13 @@ func TestJavaCompat(t *testing.T) {
 		serde := common.ItemSketchDoubleSerDe{}
 		comparatorDouble := common.ItemSketchDoubleComparator(false)
 		for _, n := range nArr {
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/kll_double_n%d_java.sk", internal.JavaPath, n))
+			filename := fmt.Sprintf("%s/kll_double_n%d_java.sk", internal.JavaPath, n)
+			// Skip if file doesn't exist
+			if _, err := os.Stat(filename); os.IsNotExist(err) {
+				t.Skipf("Java file not found: %s", filename)
+				return
+			}
+			bytes, err := os.ReadFile(filename)
 			assert.NoError(t, err)
 			sketch, err := NewKllItemsSketchFromSlice[float64](bytes, comparatorDouble, serde)
 			if err != nil {

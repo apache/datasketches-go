@@ -81,6 +81,20 @@ If you are interested in making contributions to this site please see our [Commu
 
 🚧 = In progress
 
-=================
+# Build & Runtime Dependencies
 
 This code requires Go 1.24
+
+# Compilation and Test 
+
+Test can be run using go test command 
+```
+go test ./...
+```
+
+A Dockerfile is also provided with the necessary env to build and test the project.
+
+```
+./build/Dockerfile
+./build/run-docker-test.sh
+```

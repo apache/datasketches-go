@@ -51,7 +51,13 @@ func TestJavaCompat(t *testing.T) {
 		nArr := []int{0, 100, 200, 2000, 20000}
 		flavorArr := []CpcFlavor{CpcFlavorEmpty, CpcFlavorSparse, CpcFlavorHybrid, CpcFlavorPinned, CpcFlavorSliding}
 		for flavorIdx, n := range nArr {
-			bytes, err := os.ReadFile(fmt.Sprintf("%s/cpc_n%d_java.sk", internal.JavaPath, n))
+			filename := fmt.Sprintf("%s/cpc_n%d_java.sk", internal.JavaPath, n)
+			// Skip if file doesn't exist
+			if _, err := os.Stat(filename); os.IsNotExist(err) {
+				t.Skipf("Java file not found: %s", filename)
+				return
+			}
+			bytes, err := os.ReadFile(filename)
 			assert.NoError(t, err)
 			sketch, err := NewCpcSketchFromSliceWithDefault(bytes)
 			assert.NoError(t, err)

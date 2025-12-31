@@ -78,7 +78,13 @@ func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
 func TestJavaCompat(t *testing.T) {
 	ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	for _, n := range ns {
-		b, err := os.ReadFile(fmt.Sprintf("%s/tuple_int_n%d_java.sk", internal.JavaPath, n))
+		filename := fmt.Sprintf("%s/tuple_int_n%d_java.sk", internal.JavaPath, n)
+		// Skip if file doesn't exist
+		if _, err := os.Stat(filename); os.IsNotExist(err) {
+			t.Skipf("Java file not found: %s", filename)
+			return
+		}
+		b, err := os.ReadFile(filename)
 		assert.NoError(t, err)
 
 		buf := bytes.NewBuffer(b)
@@ -98,7 +104,13 @@ func TestJavaCompat(t *testing.T) {
 func TestCPPCompat(t *testing.T) {
 	ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	for _, n := range ns {
-		b, err := os.ReadFile(fmt.Sprintf("%s/tuple_int_n%d_cpp.sk", internal.CppPath, n))
+		filename := fmt.Sprintf("%s/tuple_int_n%d_cpp.sk", internal.CppPath, n)
+		// Skip if file doesn't exist
+		if _, err := os.Stat(filename); os.IsNotExist(err) {
+			t.Skipf("C++ file not found: %s", filename)
+			return
+		}
+		b, err := os.ReadFile(filename)
 		assert.NoError(t, err)
 
 		buf := bytes.NewBuffer(b)

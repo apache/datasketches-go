@@ -42,7 +42,7 @@ If you are interested in making contributions to this site please see our [Commu
 | 	            | CpcSketch               | ⚠️ |
 | 	            | HllSketch               | ⚠️ |
 | 	            | ThetaSketch             | ⚠️ |
-| 	            | TupleSketch<S>          | 🚧 |
+| 	            | TupleSketch<S>          | ⚠️ |
 | Quantiles	   |                         |  |
 | 	            | CormodeDoublesSketch    | ❌ |
 | 	            | CormodeItemsSketch<T>   | ❌ |
@@ -66,7 +66,7 @@ If you are interested in making contributions to this site please see our [Commu
 | Type | Interface Name | Status |
 | --- | --- |---|
 | Cardinality/FM85 | UniqueCountMap  | ❌ |
-| Cardinality/Tuple	| FdtSketch | ❌ |
+| Cardinality/Tuple	| | |
 | 	| FdtSketch | ❌ |
 | 	| ArrayOfDoublesSketch  | ❌ |
 | 	| DoubleSketch  | ❌ |

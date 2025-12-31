@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.24.9-alpine
+FROM golang:1.24.11-alpine
 ENV CGO_ENABLED=0
 
 WORKDIR /github.com/apache/datasketches-go/
@@ -25,11 +25,13 @@ COPY common ./common
 COPY count ./count
 COPY cpc ./cpc
 COPY examples ./examples
+COPY filters ./filters
 COPY frequencies ./frequencies
 COPY hll ./hll
 COPY internal ./internal
 COPY kll ./kll
 COPY theta ./theta
+COPY tuple ./tuple
 
 RUN go mod download
 RUN go build -v ./...

@@ -24,7 +24,7 @@ require (
 	github.com/twmb/murmur3 v1.1.8
 )
 
-require github.com/cespare/xxhash/v2 v2.3.0 // indirect
+require github.com/cespare/xxhash/v2 v2.3.0
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect

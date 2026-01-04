@@ -38,7 +38,7 @@ func NewDecoder(seed uint64) Decoder {
 }
 
 // Decode decodes a compact sketch from the given reader.
-func (dec Decoder) Decode(r io.Reader) (*CompactSketch, error) {
+func (dec *Decoder) Decode(r io.Reader) (*CompactSketch, error) {
 	bytes, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err

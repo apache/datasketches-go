@@ -34,14 +34,14 @@ func NewEncoder(w io.Writer, compressed bool) Encoder {
 }
 
 // Encode encodes a compact theta sketch to bytes.
-func (enc Encoder) Encode(sketch *CompactSketch) error {
+func (enc *Encoder) Encode(sketch *CompactSketch) error {
 	if enc.compressed {
 		return enc.encodeWithCompression(sketch)
 	}
 	return enc.encodeWithoutCompression(sketch)
 }
 
-func (enc Encoder) encodeWithCompression(sketch *CompactSketch) error {
+func (enc *Encoder) encodeWithCompression(sketch *CompactSketch) error {
 	if sketch.isSuitableForCompression() {
 		entryBits := sketch.computeEntryBits()
 		numEntriesBytes := sketch.numEntriesBytes()
@@ -67,7 +67,7 @@ func (enc Encoder) encodeWithCompression(sketch *CompactSketch) error {
 	return enc.encodeWithoutCompression(sketch)
 }
 
-func (enc Encoder) encodeVersion4(sketch *CompactSketch, bytes []byte, offset int, entryBits, numEntriesBytes, preambleLongs uint8) error {
+func (enc *Encoder) encodeVersion4(sketch *CompactSketch, bytes []byte, offset int, entryBits, numEntriesBytes, preambleLongs uint8) error {
 	// Preamble
 	bytes[offset] = preambleLongs
 	offset++
@@ -89,15 +89,12 @@ func (enc Encoder) encodeVersion4(sketch *CompactSketch, bytes []byte, offset in
 	offset++
 
 	// Seed hash
-	bytes[offset] = byte(sketch.seedHash)
-	bytes[offset+1] = byte(sketch.seedHash >> 8)
+	binary.LittleEndian.PutUint16(bytes[offset:], sketch.seedHash)
 	offset += 2
 
 	// Theta (if estimation mode)
 	if sketch.IsEstimationMode() {
-		for i := 0; i < 8; i++ {
-			bytes[offset+i] = byte(sketch.theta >> (i * 8))
-		}
+		binary.LittleEndian.PutUint64(bytes[offset:], sketch.theta)
 		offset += 8
 	}
 
@@ -139,7 +136,7 @@ func (enc Encoder) encodeVersion4(sketch *CompactSketch, bytes []byte, offset in
 	return nil
 }
 
-func (enc Encoder) encodeWithoutCompression(sketch *CompactSketch) error {
+func (enc *Encoder) encodeWithoutCompression(sketch *CompactSketch) error {
 	preambleLongs := sketch.preambleLongs(false)
 
 	bytesSize := sketch.SerializedSizeBytes(false)
@@ -157,7 +154,7 @@ func (enc Encoder) encodeWithoutCompression(sketch *CompactSketch) error {
 	return nil
 }
 
-func (enc Encoder) encodeSketch(sketch *CompactSketch, bytes []byte, offset int64, preambleLongs uint8) {
+func (enc *Encoder) encodeSketch(sketch *CompactSketch, bytes []byte, offset int64, preambleLongs uint8) {
 	// Preamble
 	bytes[offset] = preambleLongs
 	offset++

@@ -1,0 +1,211 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package sampling
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestNewReservoirItemsSketch(t *testing.T) {
+	sketch, err := NewReservoirItemsSketch[int64](10)
+	assert.NoError(t, err)
+	assert.NotNil(t, sketch)
+	assert.Equal(t, 10, sketch.GetK())
+	assert.Equal(t, int64(0), sketch.GetN())
+	assert.True(t, sketch.IsEmpty())
+}
+
+func TestReservoirItemsSketchWithStrings(t *testing.T) {
+	sketch, err := NewReservoirItemsSketch[string](5)
+	assert.NoError(t, err)
+
+	sketch.Update("apple")
+	sketch.Update("banana")
+	sketch.Update("cherry")
+
+	assert.Equal(t, int64(3), sketch.GetN())
+	assert.Equal(t, 3, sketch.GetNumSamples())
+
+	samples := sketch.GetSamples()
+	assert.Contains(t, samples, "apple")
+	assert.Contains(t, samples, "banana")
+	assert.Contains(t, samples, "cherry")
+}
+
+func TestReservoirItemsSketchWithStruct(t *testing.T) {
+	type Event struct {
+		ID   int
+		Name string
+	}
+
+	sketch, err := NewReservoirItemsSketch[Event](5)
+	assert.NoError(t, err)
+
+	sketch.Update(Event{1, "login"})
+	sketch.Update(Event{2, "logout"})
+	sketch.Update(Event{3, "click"})
+
+	assert.Equal(t, int64(3), sketch.GetN())
+	samples := sketch.GetSamples()
+	assert.Len(t, samples, 3)
+}
+
+func TestReservoirItemsSketchInvalidK(t *testing.T) {
+	_, err := NewReservoirItemsSketch[int64](0)
+	assert.Error(t, err)
+
+	_, err = NewReservoirItemsSketch[int64](-1)
+	assert.Error(t, err)
+}
+
+func TestReservoirItemsSketchUpdateBelowK(t *testing.T) {
+	sketch, _ := NewReservoirItemsSketch[int64](10)
+
+	for i := int64(1); i <= 5; i++ {
+		sketch.Update(i)
+	}
+
+	assert.Equal(t, int64(5), sketch.GetN())
+	assert.Equal(t, 5, sketch.GetNumSamples())
+
+	samples := sketch.GetSamples()
+	for i := int64(1); i <= 5; i++ {
+		assert.Contains(t, samples, i)
+	}
+}
+
+func TestReservoirItemsSketchUpdateAboveK(t *testing.T) {
+	sketch, _ := NewReservoirItemsSketch[int64](10)
+
+	for i := int64(1); i <= 1000; i++ {
+		sketch.Update(i)
+	}
+
+	assert.Equal(t, int64(1000), sketch.GetN())
+	assert.Equal(t, 10, sketch.GetNumSamples())
+}
+
+func TestReservoirItemsSketchReset(t *testing.T) {
+	sketch, _ := NewReservoirItemsSketch[int64](10)
+
+	for i := int64(1); i <= 5; i++ {
+		sketch.Update(i)
+	}
+
+	sketch.Reset()
+	assert.True(t, sketch.IsEmpty())
+	assert.Equal(t, int64(0), sketch.GetN())
+	assert.Equal(t, 10, sketch.GetK())
+}
+
+func TestReservoirItemsUnion(t *testing.T) {
+	sketch1, _ := NewReservoirItemsSketch[int64](10)
+	sketch2, _ := NewReservoirItemsSketch[int64](10)
+
+	for i := int64(1); i <= 500; i++ {
+		sketch1.Update(i)
+	}
+	for i := int64(501); i <= 1000; i++ {
+		sketch2.Update(i)
+	}
+
+	union, err := NewReservoirItemsUnion[int64](10)
+	assert.NoError(t, err)
+
+	union.UpdateSketch(sketch1)
+	union.UpdateSketch(sketch2)
+
+	result, err := union.GetResult()
+	assert.NoError(t, err)
+	assert.Equal(t, 10, result.GetNumSamples())
+}
+
+func TestReservoirItemsUnionWithStrings(t *testing.T) {
+	sketch1, _ := NewReservoirItemsSketch[string](5)
+	sketch2, _ := NewReservoirItemsSketch[string](5)
+
+	sketch1.Update("a")
+	sketch1.Update("b")
+	sketch1.Update("c")
+
+	sketch2.Update("x")
+	sketch2.Update("y")
+	sketch2.Update("z")
+
+	union, _ := NewReservoirItemsUnion[string](5)
+	union.UpdateSketch(sketch1)
+	union.UpdateSketch(sketch2)
+
+	result, _ := union.GetResult()
+	assert.LessOrEqual(t, result.GetNumSamples(), 5)
+}
+
+func TestReservoirItemsSketchKEqualsOne(t *testing.T) {
+	// Edge case: k=1 should keep exactly one sample
+	sketch, err := NewReservoirItemsSketch[int64](1)
+	assert.NoError(t, err)
+
+	for i := int64(1); i <= 100; i++ {
+		sketch.Update(i)
+	}
+
+	assert.Equal(t, 1, sketch.GetNumSamples())
+	assert.Equal(t, int64(100), sketch.GetN())
+}
+
+func TestReservoirItemsSketchGetSamplesIsCopy(t *testing.T) {
+	sketch, _ := NewReservoirItemsSketch[int64](10)
+	sketch.Update(42)
+
+	samples1 := sketch.GetSamples()
+	samples2 := sketch.GetSamples()
+
+	// Modify samples1
+	samples1[0] = 999
+
+	// samples2 and internal data should be unchanged
+	assert.NotEqual(t, samples1[0], samples2[0])
+	assert.Equal(t, int64(42), samples2[0])
+}
+
+func TestReservoirItemsUnionWithEmptySketch(t *testing.T) {
+	sketch1, _ := NewReservoirItemsSketch[int64](10)
+	emptySketch, _ := NewReservoirItemsSketch[int64](10)
+
+	for i := int64(1); i <= 5; i++ {
+		sketch1.Update(i)
+	}
+
+	union, _ := NewReservoirItemsUnion[int64](10)
+	union.UpdateSketch(sketch1)
+	union.UpdateSketch(emptySketch) // Should not affect result
+
+	result, _ := union.GetResult()
+	assert.Equal(t, 5, result.GetNumSamples())
+}
+
+func TestReservoirItemsUnionWithNilSketch(t *testing.T) {
+	union, _ := NewReservoirItemsUnion[int64](10)
+	union.Update(42)
+	union.UpdateSketch(nil) // Should not panic
+
+	result, _ := union.GetResult()
+	assert.Equal(t, 1, result.GetNumSamples())
+}

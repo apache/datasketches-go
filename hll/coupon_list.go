@@ -191,8 +191,10 @@ func deserializeCouponList(byteArray []byte) (hllCoupon, error) {
 	}
 	couponCount := extractListCount(byteArray)
 	// TODO there must be a more efficient to reinterpret the byte array as an int array
+	base := listIntArrStart
 	for it := 0; it < couponCount; it++ {
-		list.couponIntArr[it] = int(binary.LittleEndian.Uint32(byteArray[listIntArrStart+it*4 : listIntArrStart+it*4+4]))
+		list.couponIntArr[it] = int(binary.LittleEndian.Uint32(byteArray[base:]))
+		base += 4
 	}
 	list.couponCount = couponCount
 	return &list, nil

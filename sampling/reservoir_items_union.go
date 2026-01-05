@@ -58,8 +58,8 @@ func (u *ReservoirItemsUnion[T]) UpdateSketch(sketch *ReservoirItemsSketch[T]) {
 		return
 	}
 
-	samples := sketch.GetSamples()
-	srcN := sketch.GetN()
+	samples := sketch.Samples()
+	srcN := sketch.N()
 
 	if u.gadget.IsEmpty() {
 		// If gadget is empty, copy the source directly
@@ -71,13 +71,13 @@ func (u *ReservoirItemsUnion[T]) UpdateSketch(sketch *ReservoirItemsSketch[T]) {
 	}
 
 	// Merge using weighted sampling
-	gadgetN := u.gadget.GetN()
+	gadgetN := u.gadget.N()
 	totalN := gadgetN + srcN
-	gadgetK := u.gadget.GetNumSamples()
+	gadgetK := u.gadget.NumSamples()
 	targetK := u.maxK
 
 	for _, item := range samples {
-		if u.gadget.GetNumSamples() < targetK {
+		if u.gadget.NumSamples() < targetK {
 			u.gadget.data = append(u.gadget.data, item)
 		} else {
 			j := rand.Int63n(totalN)
@@ -90,8 +90,8 @@ func (u *ReservoirItemsUnion[T]) UpdateSketch(sketch *ReservoirItemsSketch[T]) {
 	u.gadget.n = totalN
 }
 
-// GetResult returns a copy of the internal sketch.
-func (u *ReservoirItemsUnion[T]) GetResult() (*ReservoirItemsSketch[T], error) {
+// Result returns a copy of the internal sketch.
+func (u *ReservoirItemsUnion[T]) Result() (*ReservoirItemsSketch[T], error) {
 	result, err := NewReservoirItemsSketch[T](u.maxK)
 	if err != nil {
 		return nil, err
@@ -105,8 +105,8 @@ func (u *ReservoirItemsUnion[T]) GetResult() (*ReservoirItemsSketch[T], error) {
 	return result, nil
 }
 
-// GetMaxK returns the maximum k for this union.
-func (u *ReservoirItemsUnion[T]) GetMaxK() int {
+// MaxK returns the maximum k for this union.
+func (u *ReservoirItemsUnion[T]) MaxK() int {
 	return u.maxK
 }
 

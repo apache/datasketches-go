@@ -79,23 +79,23 @@ func (s *ReservoirItemsSketch[T]) Update(item T) {
 	s.n++
 }
 
-// GetK returns the maximum reservoir capacity.
-func (s *ReservoirItemsSketch[T]) GetK() int {
+// K returns the maximum reservoir capacity.
+func (s *ReservoirItemsSketch[T]) K() int {
 	return s.k
 }
 
-// GetN returns the total number of items seen by the sketch.
-func (s *ReservoirItemsSketch[T]) GetN() int64 {
+// N returns the total number of items seen by the sketch.
+func (s *ReservoirItemsSketch[T]) N() int64 {
 	return s.n
 }
 
-// GetNumSamples returns the number of items currently in the reservoir.
-func (s *ReservoirItemsSketch[T]) GetNumSamples() int {
+// NumSamples returns the number of items currently in the reservoir.
+func (s *ReservoirItemsSketch[T]) NumSamples() int {
 	return len(s.data)
 }
 
-// GetSamples returns a copy of the items in the reservoir.
-func (s *ReservoirItemsSketch[T]) GetSamples() []T {
+// Samples returns a copy of the items in the reservoir.
+func (s *ReservoirItemsSketch[T]) Samples() []T {
 	result := make([]T, len(s.data))
 	copy(result, s.data)
 	return result

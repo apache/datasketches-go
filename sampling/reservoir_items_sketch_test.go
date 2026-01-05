@@ -27,8 +27,8 @@ func TestNewReservoirItemsSketch(t *testing.T) {
 	sketch, err := NewReservoirItemsSketch[int64](10)
 	assert.NoError(t, err)
 	assert.NotNil(t, sketch)
-	assert.Equal(t, 10, sketch.GetK())
-	assert.Equal(t, int64(0), sketch.GetN())
+	assert.Equal(t, 10, sketch.K())
+	assert.Equal(t, int64(0), sketch.N())
 	assert.True(t, sketch.IsEmpty())
 }
 
@@ -40,10 +40,10 @@ func TestReservoirItemsSketchWithStrings(t *testing.T) {
 	sketch.Update("banana")
 	sketch.Update("cherry")
 
-	assert.Equal(t, int64(3), sketch.GetN())
-	assert.Equal(t, 3, sketch.GetNumSamples())
+	assert.Equal(t, int64(3), sketch.N())
+	assert.Equal(t, 3, sketch.NumSamples())
 
-	samples := sketch.GetSamples()
+	samples := sketch.Samples()
 	assert.Contains(t, samples, "apple")
 	assert.Contains(t, samples, "banana")
 	assert.Contains(t, samples, "cherry")
@@ -62,8 +62,8 @@ func TestReservoirItemsSketchWithStruct(t *testing.T) {
 	sketch.Update(Event{2, "logout"})
 	sketch.Update(Event{3, "click"})
 
-	assert.Equal(t, int64(3), sketch.GetN())
-	samples := sketch.GetSamples()
+	assert.Equal(t, int64(3), sketch.N())
+	samples := sketch.Samples()
 	assert.Len(t, samples, 3)
 }
 
@@ -82,10 +82,10 @@ func TestReservoirItemsSketchUpdateBelowK(t *testing.T) {
 		sketch.Update(i)
 	}
 
-	assert.Equal(t, int64(5), sketch.GetN())
-	assert.Equal(t, 5, sketch.GetNumSamples())
+	assert.Equal(t, int64(5), sketch.N())
+	assert.Equal(t, 5, sketch.NumSamples())
 
-	samples := sketch.GetSamples()
+	samples := sketch.Samples()
 	for i := int64(1); i <= 5; i++ {
 		assert.Contains(t, samples, i)
 	}
@@ -98,8 +98,8 @@ func TestReservoirItemsSketchUpdateAboveK(t *testing.T) {
 		sketch.Update(i)
 	}
 
-	assert.Equal(t, int64(1000), sketch.GetN())
-	assert.Equal(t, 10, sketch.GetNumSamples())
+	assert.Equal(t, int64(1000), sketch.N())
+	assert.Equal(t, 10, sketch.NumSamples())
 }
 
 func TestReservoirItemsSketchReset(t *testing.T) {
@@ -111,8 +111,8 @@ func TestReservoirItemsSketchReset(t *testing.T) {
 
 	sketch.Reset()
 	assert.True(t, sketch.IsEmpty())
-	assert.Equal(t, int64(0), sketch.GetN())
-	assert.Equal(t, 10, sketch.GetK())
+	assert.Equal(t, int64(0), sketch.N())
+	assert.Equal(t, 10, sketch.K())
 }
 
 func TestReservoirItemsUnion(t *testing.T) {
@@ -132,9 +132,9 @@ func TestReservoirItemsUnion(t *testing.T) {
 	union.UpdateSketch(sketch1)
 	union.UpdateSketch(sketch2)
 
-	result, err := union.GetResult()
+	result, err := union.Result()
 	assert.NoError(t, err)
-	assert.Equal(t, 10, result.GetNumSamples())
+	assert.Equal(t, 10, result.NumSamples())
 }
 
 func TestReservoirItemsUnionWithStrings(t *testing.T) {
@@ -153,8 +153,8 @@ func TestReservoirItemsUnionWithStrings(t *testing.T) {
 	union.UpdateSketch(sketch1)
 	union.UpdateSketch(sketch2)
 
-	result, _ := union.GetResult()
-	assert.LessOrEqual(t, result.GetNumSamples(), 5)
+	result, _ := union.Result()
+	assert.LessOrEqual(t, result.NumSamples(), 5)
 }
 
 func TestReservoirItemsSketchKEqualsOne(t *testing.T) {
@@ -166,16 +166,16 @@ func TestReservoirItemsSketchKEqualsOne(t *testing.T) {
 		sketch.Update(i)
 	}
 
-	assert.Equal(t, 1, sketch.GetNumSamples())
-	assert.Equal(t, int64(100), sketch.GetN())
+	assert.Equal(t, 1, sketch.NumSamples())
+	assert.Equal(t, int64(100), sketch.N())
 }
 
 func TestReservoirItemsSketchGetSamplesIsCopy(t *testing.T) {
 	sketch, _ := NewReservoirItemsSketch[int64](10)
 	sketch.Update(42)
 
-	samples1 := sketch.GetSamples()
-	samples2 := sketch.GetSamples()
+	samples1 := sketch.Samples()
+	samples2 := sketch.Samples()
 
 	// Modify samples1
 	samples1[0] = 999
@@ -197,8 +197,8 @@ func TestReservoirItemsUnionWithEmptySketch(t *testing.T) {
 	union.UpdateSketch(sketch1)
 	union.UpdateSketch(emptySketch) // Should not affect result
 
-	result, _ := union.GetResult()
-	assert.Equal(t, 5, result.GetNumSamples())
+	result, _ := union.Result()
+	assert.Equal(t, 5, result.NumSamples())
 }
 
 func TestReservoirItemsUnionWithNilSketch(t *testing.T) {
@@ -206,6 +206,6 @@ func TestReservoirItemsUnionWithNilSketch(t *testing.T) {
 	union.Update(42)
 	union.UpdateSketch(nil) // Should not panic
 
-	result, _ := union.GetResult()
-	assert.Equal(t, 1, result.GetNumSamples())
+	result, _ := union.Result()
+	assert.Equal(t, 1, result.NumSamples())
 }

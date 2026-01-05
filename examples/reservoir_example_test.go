@@ -36,11 +36,11 @@ func TestReservoirSamplingWithIntegers(t *testing.T) {
 	}
 
 	// The sketch maintains exactly k samples
-	assert.Equal(t, 10, sketch.GetNumSamples())
-	assert.Equal(t, int64(1000), sketch.GetN())
+	assert.Equal(t, 10, sketch.NumSamples())
+	assert.Equal(t, int64(1000), sketch.N())
 
-	samples := sketch.GetSamples()
-	fmt.Printf("Sampled %d integers from stream of %d\n", len(samples), sketch.GetN())
+	samples := sketch.Samples()
+	fmt.Printf("Sampled %d integers from stream of %d\n", len(samples), sketch.N())
 	fmt.Printf("Samples: %v\n", samples)
 }
 
@@ -54,8 +54,8 @@ func TestReservoirSamplingWithStrings(t *testing.T) {
 		sketch.Update(word)
 	}
 
-	assert.Equal(t, 5, sketch.GetNumSamples())
-	fmt.Printf("Sampled words: %v\n", sketch.GetSamples())
+	assert.Equal(t, 5, sketch.NumSamples())
+	fmt.Printf("Sampled words: %v\n", sketch.Samples())
 }
 
 func TestReservoirSamplingWithStructs(t *testing.T) {
@@ -75,8 +75,8 @@ func TestReservoirSamplingWithStructs(t *testing.T) {
 		})
 	}
 
-	assert.Equal(t, 3, sketch.GetNumSamples())
-	fmt.Printf("Sampled log entries: %+v\n", sketch.GetSamples())
+	assert.Equal(t, 3, sketch.NumSamples())
+	fmt.Printf("Sampled log entries: %+v\n", sketch.Samples())
 }
 
 func TestReservoirUnion(t *testing.T) {
@@ -98,9 +98,9 @@ func TestReservoirUnion(t *testing.T) {
 	union.UpdateSketch(node1)
 	union.UpdateSketch(node2)
 
-	result, err := union.GetResult()
+	result, err := union.Result()
 	assert.NoError(t, err)
 
-	assert.Equal(t, 10, result.GetNumSamples())
-	fmt.Printf("Union result: %d samples from combined stream\n", result.GetNumSamples())
+	assert.Equal(t, 10, result.NumSamples())
+	fmt.Printf("Union result: %d samples from combined stream\n", result.NumSamples())
 }

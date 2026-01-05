@@ -469,8 +469,8 @@ func computeApproxBinomialUpperBound(numSamples uint64, theta float64, numStdDev
 }
 
 func validateTheta(theta float64) error {
-	if theta < 0 || theta > 1 {
-		return fmt.Errorf("theta must be in [0, 1]")
+	if theta <= 0 || theta > 1 {
+		return fmt.Errorf("theta must be in (0, 1]")
 	}
 	return nil
 }

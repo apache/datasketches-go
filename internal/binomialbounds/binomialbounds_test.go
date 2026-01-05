@@ -187,14 +187,11 @@ func TestLowerBound(t *testing.T) {
 			},
 		},
 		{
-			name:       "theta=0",
-			numSamples: 10,
-			theta:      0.0,
-			numStdDevs: 1,
-			validate: func(t *testing.T, result float64, numSamples uint64, theta float64, numStdDevs uint) {
-				// When theta=0, result will be NaN due to division by zero
-				assert.True(t, math.IsNaN(result) || math.IsInf(result, 1))
-			},
+			name:         "theta=0",
+			numSamples:   10,
+			theta:        0.0,
+			numStdDevs:   1,
+			wantErrorMsg: "theta must be in (0, 1]",
 		},
 		{
 			name:       "theta very close to 0",
@@ -238,14 +235,14 @@ func TestLowerBound(t *testing.T) {
 			numSamples:   100,
 			theta:        -0.1,
 			numStdDevs:   1,
-			wantErrorMsg: "theta must be in [0, 1]",
+			wantErrorMsg: "theta must be in (0, 1]",
 		},
 		{
 			name:         "invalid theta > 1",
 			numSamples:   100,
 			theta:        1.1,
 			numStdDevs:   1,
-			wantErrorMsg: "theta must be in [0, 1]",
+			wantErrorMsg: "theta must be in (0, 1]",
 		},
 		{
 			name:         "invalid stddev = 0",
@@ -428,14 +425,11 @@ func TestUpperBound(t *testing.T) {
 			},
 		},
 		{
-			name:       "theta=0",
-			numSamples: 10,
-			theta:      0.0,
-			numStdDevs: 1,
-			validate: func(t *testing.T, result float64, numSamples uint64, theta float64, numStdDevs uint) {
-				// When theta=0, result will be NaN due to division by zero
-				assert.True(t, math.IsNaN(result) || math.IsInf(result, 1))
-			},
+			name:         "theta=0",
+			numSamples:   10,
+			theta:        0.0,
+			numStdDevs:   1,
+			wantErrorMsg: "theta must be in (0, 1]",
 		},
 		{
 			name:       "theta very close to 0",
@@ -479,14 +473,14 @@ func TestUpperBound(t *testing.T) {
 			numSamples:   100,
 			theta:        -0.1,
 			numStdDevs:   1,
-			wantErrorMsg: "theta must be in [0, 1]",
+			wantErrorMsg: "theta must be in (0, 1]",
 		},
 		{
 			name:         "invalid theta > 1",
 			numSamples:   100,
 			theta:        1.1,
 			numStdDevs:   1,
-			wantErrorMsg: "theta must be in [0, 1]",
+			wantErrorMsg: "theta must be in (0, 1]",
 		},
 		{
 			name:         "invalid stddev = 0",

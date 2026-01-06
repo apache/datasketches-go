@@ -29,8 +29,6 @@ import (
 
 const (
 	ArrayOfNumbersSketchSerialVersion = uint8(1)
-	ArrayOfNumbersSketchFamily        = uint8(9)
-	ArrayOfNumbersSketchType          = uint8(3)
 )
 
 const (

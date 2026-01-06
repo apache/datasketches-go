@@ -567,8 +567,8 @@ func TestArrayOfNumbersSketchDecoderErrors(t *testing.T) {
 		invalidData := make([]byte, 16)
 		invalidData[0] = 1  // preamble longs
 		invalidData[1] = 99 // Invalid version
-		invalidData[2] = ArrayOfNumbersSketchFamily
-		invalidData[3] = ArrayOfNumbersSketchType
+		invalidData[2] = uint8(internal.FamilyEnum.Tuple.Id)
+		invalidData[3] = uint8(SketchTypeArrayOfNumbers)
 
 		decoder := NewArrayOfNumbersSketchDecoderDecoder[float64](theta.DefaultSeed)
 		_, err := decoder.Decode(bytes.NewReader(invalidData))
@@ -582,7 +582,7 @@ func TestArrayOfNumbersSketchDecoderErrors(t *testing.T) {
 		invalidData[0] = 1                                 // preamble longs
 		invalidData[1] = ArrayOfNumbersSketchSerialVersion // valid version
 		invalidData[2] = 99                                // Invalid family
-		invalidData[3] = ArrayOfNumbersSketchType          // valid type
+		invalidData[3] = uint8(SketchTypeArrayOfNumbers)   // valid type
 
 		decoder := NewArrayOfNumbersSketchDecoderDecoder[float64](theta.DefaultSeed)
 		_, err := decoder.Decode(bytes.NewReader(invalidData))
@@ -592,10 +592,10 @@ func TestArrayOfNumbersSketchDecoderErrors(t *testing.T) {
 
 	t.Run("Invalid sketch type", func(t *testing.T) {
 		invalidData := make([]byte, 16)
-		invalidData[0] = 1                                 // preamble longs
-		invalidData[1] = ArrayOfNumbersSketchSerialVersion // valid version
-		invalidData[2] = ArrayOfNumbersSketchFamily        // valid family
-		invalidData[3] = 99                                // Invalid type
+		invalidData[0] = 1                                   // preamble longs
+		invalidData[1] = ArrayOfNumbersSketchSerialVersion   // valid version
+		invalidData[2] = uint8(internal.FamilyEnum.Tuple.Id) // valid family
+		invalidData[3] = 99                                  // Invalid type
 
 		decoder := NewArrayOfNumbersSketchDecoderDecoder[float64](theta.DefaultSeed)
 		_, err := decoder.Decode(bytes.NewReader(invalidData))

@@ -20,6 +20,8 @@ package tuple
 import (
 	"encoding/binary"
 	"io"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 // ArrayOfNumbersSketchEncoder encodes a compact ArrayOfNumberSketch to bytes.
@@ -54,11 +56,11 @@ func (enc *ArrayOfNumbersSketchEncoder[V]) Encode(sketch *ArrayOfNumbersCompactS
 		return err
 	}
 
-	if err := binary.Write(enc.w, binary.LittleEndian, ArrayOfNumbersSketchFamily); err != nil {
+	if err := binary.Write(enc.w, binary.LittleEndian, uint8(internal.FamilyEnum.Tuple.Id)); err != nil {
 		return err
 	}
 
-	if err := binary.Write(enc.w, binary.LittleEndian, ArrayOfNumbersSketchType); err != nil {
+	if err := binary.Write(enc.w, binary.LittleEndian, uint8(SketchTypeArrayOfNumbers)); err != nil {
 		return err
 	}
 

@@ -29,6 +29,7 @@ type families struct {
 	CPC            family
 	CountMinSketch family
 	BloomFilter    family
+	Tuple          family
 }
 
 var FamilyEnum = &families{
@@ -55,5 +56,9 @@ var FamilyEnum = &families{
 	BloomFilter: family{
 		Id:          21,
 		MaxPreLongs: 4,
+	},
+	Tuple: family{
+		Id:          9,
+		MaxPreLongs: 3,
 	},
 }

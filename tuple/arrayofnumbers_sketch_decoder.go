@@ -93,11 +93,11 @@ func (dec *ArrayOfNumbersSketchDecoder[V]) Decode(r io.Reader) (*ArrayOfNumbersC
 		return nil, err
 	}
 
-	if err := theta.CheckSketchFamilyEqual(family, ArrayOfNumbersSketchFamily); err != nil {
+	if err := theta.CheckSketchFamilyEqual(family, uint8(internal.FamilyEnum.Tuple.Id)); err != nil {
 		return nil, err
 	}
 
-	if err := theta.CheckSketchTypeEqual(sketchType, ArrayOfNumbersSketchType); err != nil {
+	if err := theta.CheckSketchTypeEqual(sketchType, uint8(SketchTypeArrayOfNumbers)); err != nil {
 		return nil, err
 	}
 

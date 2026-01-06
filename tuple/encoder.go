@@ -20,6 +20,8 @@ package tuple
 import (
 	"encoding/binary"
 	"io"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 // SummaryWriter writes a summary to the writer.
@@ -48,11 +50,11 @@ func (enc *Encoder[S]) Encode(sketch *CompactSketch[S]) error {
 		return err
 	}
 
-	if err := binary.Write(enc.w, binary.LittleEndian, SketchFamily); err != nil {
+	if err := binary.Write(enc.w, binary.LittleEndian, uint8(internal.FamilyEnum.Tuple.Id)); err != nil {
 		return err
 	}
 
-	if err := binary.Write(enc.w, binary.LittleEndian, SketchType); err != nil {
+	if err := binary.Write(enc.w, binary.LittleEndian, SketchTypeCompactTuple); err != nil {
 		return err
 	}
 

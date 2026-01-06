@@ -30,9 +30,6 @@ import (
 const (
 	SerialVersionLegacy = uint8(1)
 	SerialVersion       = uint8(3)
-	SketchFamily        = uint8(9)
-	SketchType          = uint8(1)
-	SketchTypeLegacy    = uint8(5)
 )
 
 const (

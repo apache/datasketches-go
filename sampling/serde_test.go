@@ -27,7 +27,8 @@ func TestInt64SerDe(t *testing.T) {
 	serde := Int64SerDe{}
 	items := []int64{1, 2, 3, 42, -100, 1000000}
 
-	bytes := serde.SerializeToBytes(items)
+	bytes, err := serde.SerializeToBytes(items)
+	assert.NoError(t, err)
 	assert.Equal(t, len(items)*8, len(bytes))
 
 	restored, err := serde.DeserializeFromBytes(bytes, len(items))
@@ -39,7 +40,8 @@ func TestInt32SerDe(t *testing.T) {
 	serde := Int32SerDe{}
 	items := []int32{1, 2, 3, 42, -100, 1000000}
 
-	bytes := serde.SerializeToBytes(items)
+	bytes, err := serde.SerializeToBytes(items)
+	assert.NoError(t, err)
 	assert.Equal(t, len(items)*4, len(bytes))
 
 	restored, err := serde.DeserializeFromBytes(bytes, len(items))
@@ -51,7 +53,8 @@ func TestFloat64SerDe(t *testing.T) {
 	serde := Float64SerDe{}
 	items := []float64{1.5, 2.5, 3.14159, -100.5}
 
-	bytes := serde.SerializeToBytes(items)
+	bytes, err := serde.SerializeToBytes(items)
+	assert.NoError(t, err)
 	assert.Equal(t, len(items)*8, len(bytes))
 
 	restored, err := serde.DeserializeFromBytes(bytes, len(items))
@@ -63,7 +66,8 @@ func TestStringSerDe(t *testing.T) {
 	serde := StringSerDe{}
 	items := []string{"hello", "world", "", "testing 123", "日本語"}
 
-	bytes := serde.SerializeToBytes(items)
+	bytes, err := serde.SerializeToBytes(items)
+	assert.NoError(t, err)
 
 	restored, err := serde.DeserializeFromBytes(bytes, len(items))
 	assert.NoError(t, err)

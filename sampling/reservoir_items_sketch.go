@@ -135,7 +135,10 @@ func (s *ReservoirItemsSketch[T]) ToByteArray(serde ItemsSerDe[T]) ([]byte, erro
 	}
 
 	// Serialize items
-	itemsBytes := serde.SerializeToBytes(s.data)
+	itemsBytes, err := serde.SerializeToBytes(s.data)
+	if err != nil {
+		return nil, err
+	}
 
 	// Non-empty sketch
 	preambleBytes := preambleIntsLong * 8

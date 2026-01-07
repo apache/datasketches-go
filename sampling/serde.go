@@ -28,7 +28,7 @@ import (
 // Built-in implementations are provided for common types (int64, int32, string, float64).
 type ItemsSerDe[T any] interface {
 	// SerializeToBytes converts items to a byte slice.
-	SerializeToBytes(items []T) []byte
+	SerializeToBytes(items []T) ([]byte, error)
 
 	// DeserializeFromBytes converts bytes back to items.
 	// numItems specifies how many items to read from the data.
@@ -42,12 +42,12 @@ type ItemsSerDe[T any] interface {
 // Int64SerDe provides serialization for int64 (8 bytes per item).
 type Int64SerDe struct{}
 
-func (s Int64SerDe) SerializeToBytes(items []int64) []byte {
+func (s Int64SerDe) SerializeToBytes(items []int64) ([]byte, error) {
 	buf := make([]byte, len(items)*8)
 	for i, v := range items {
 		binary.LittleEndian.PutUint64(buf[i*8:], uint64(v))
 	}
-	return buf
+	return buf, nil
 }
 
 func (s Int64SerDe) DeserializeFromBytes(data []byte, numItems int) ([]int64, error) {
@@ -68,12 +68,12 @@ func (s Int64SerDe) SizeOfItem() int {
 // Int32SerDe provides serialization for int32 (4 bytes per item).
 type Int32SerDe struct{}
 
-func (s Int32SerDe) SerializeToBytes(items []int32) []byte {
+func (s Int32SerDe) SerializeToBytes(items []int32) ([]byte, error) {
 	buf := make([]byte, len(items)*4)
 	for i, v := range items {
 		binary.LittleEndian.PutUint32(buf[i*4:], uint32(v))
 	}
-	return buf
+	return buf, nil
 }
 
 func (s Int32SerDe) DeserializeFromBytes(data []byte, numItems int) ([]int32, error) {
@@ -94,12 +94,12 @@ func (s Int32SerDe) SizeOfItem() int {
 // Float64SerDe provides serialization for float64 (8 bytes per item).
 type Float64SerDe struct{}
 
-func (s Float64SerDe) SerializeToBytes(items []float64) []byte {
+func (s Float64SerDe) SerializeToBytes(items []float64) ([]byte, error) {
 	buf := make([]byte, len(items)*8)
 	for i, v := range items {
 		binary.LittleEndian.PutUint64(buf[i*8:], math.Float64bits(v))
 	}
-	return buf
+	return buf, nil
 }
 
 func (s Float64SerDe) DeserializeFromBytes(data []byte, numItems int) ([]float64, error) {
@@ -121,7 +121,7 @@ func (s Float64SerDe) SizeOfItem() int {
 // StringSerDe provides serialization for string (variable length: 4-byte length prefix + content).
 type StringSerDe struct{}
 
-func (s StringSerDe) SerializeToBytes(items []string) []byte {
+func (s StringSerDe) SerializeToBytes(items []string) ([]byte, error) {
 	// Calculate total size
 	totalSize := 0
 	for _, str := range items {
@@ -138,7 +138,7 @@ func (s StringSerDe) SerializeToBytes(items []string) []byte {
 		copy(buf[offset:], str)
 		offset += len(str)
 	}
-	return buf
+	return buf, nil
 }
 
 func (s StringSerDe) DeserializeFromBytes(data []byte, numItems int) ([]string, error) {

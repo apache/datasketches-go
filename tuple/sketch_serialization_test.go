@@ -406,8 +406,8 @@ func TestDecoderErrors(t *testing.T) {
 		invalidData := make([]byte, 8)
 		invalidData[0] = 1  // preamble longs
 		invalidData[1] = 99 // Invalid version
-		invalidData[2] = SketchFamily
-		invalidData[3] = SketchType
+		invalidData[2] = uint8(internal.FamilyEnum.Tuple.Id)
+		invalidData[3] = uint8(SketchTypeCompactTuple)
 
 		decoder := NewDecoder[*int32Summary](theta.DefaultSeed, int32SummaryReader)
 		_, err := decoder.Decode(bytes.NewReader(invalidData))
@@ -421,7 +421,7 @@ func TestDecoderErrors(t *testing.T) {
 		invalidData[0] = 1             // preamble longs
 		invalidData[1] = SerialVersion // valid version
 		invalidData[2] = 99            // Invalid family
-		invalidData[3] = SketchType
+		invalidData[3] = uint8(SketchTypeCompactTuple)
 
 		decoder := NewDecoder[*int32Summary](theta.DefaultSeed, int32SummaryReader)
 		_, err := decoder.Decode(bytes.NewReader(invalidData))
@@ -431,10 +431,10 @@ func TestDecoderErrors(t *testing.T) {
 
 	t.Run("Invalid sketch type", func(t *testing.T) {
 		invalidData := make([]byte, 8)
-		invalidData[0] = 1             // preamble longs
-		invalidData[1] = SerialVersion // valid version
-		invalidData[2] = SketchFamily  // valid family
-		invalidData[3] = 99            // Invalid type
+		invalidData[0] = 1                                   // preamble longs
+		invalidData[1] = SerialVersion                       // valid version
+		invalidData[2] = uint8(internal.FamilyEnum.Tuple.Id) // valid family
+		invalidData[3] = 99                                  // Invalid type
 
 		decoder := NewDecoder[*int32Summary](theta.DefaultSeed, int32SummaryReader)
 		_, err := decoder.Decode(bytes.NewReader(invalidData))

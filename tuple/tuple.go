@@ -15,50 +15,13 @@
  * limitations under the License.
  */
 
-package internal
+package tuple
 
-type family struct {
-	Id          int
-	MaxPreLongs int
-}
+// SketchType defines tuple sketch type.
+type SketchType uint8
 
-type families struct {
-	HLL            family
-	Frequency      family
-	Kll            family
-	CPC            family
-	CountMinSketch family
-	BloomFilter    family
-	Tuple          family
-}
-
-var FamilyEnum = &families{
-	HLL: family{
-		Id:          7,
-		MaxPreLongs: 1,
-	},
-	Frequency: family{
-		Id:          10,
-		MaxPreLongs: 4,
-	},
-	Kll: family{
-		Id:          15,
-		MaxPreLongs: 2,
-	},
-	CPC: family{
-		Id:          16,
-		MaxPreLongs: 5,
-	},
-	CountMinSketch: family{
-		Id:          18,
-		MaxPreLongs: 3,
-	},
-	BloomFilter: family{
-		Id:          21,
-		MaxPreLongs: 4,
-	},
-	Tuple: family{
-		Id:          9,
-		MaxPreLongs: 3,
-	},
-}
+const (
+	SketchTypeArrayOfNumbers     SketchType = 3
+	SketchTypeCompactTuple       SketchType = 1
+	SketchTypeCompactTupleLegacy SketchType = 5
+)

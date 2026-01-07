@@ -28,43 +28,49 @@ import (
 )
 
 const (
-	SerialVersionLegacy = uint8(1)
-	SerialVersion       = uint8(3)
+	ArrayOfNumbersSketchSerialVersion = uint8(1)
 )
 
 const (
-	flagIsBigEndian = iota
-	flagIsReadOnly
-	flagIsEmpty
-	flagIsCompact
-	flagIsOrdered
+	arrayOfNumbersSketchFlagUnused1 = iota
+	arrayOfNumbersSketchFlagUnused2
+	arrayOfNumbersSketchFlagIsEmpty
+	arrayOfNumbersSketchFlagHasEntries
+	arrayOfNumbersSketchFlagIsOrdered
 )
 
-// CompactSketch is the immutable, serializable form of a tuple sketch.
-type CompactSketch[S Summary] struct {
-	theta     uint64
-	entries   []entry[S]
-	seedHash  uint16
-	isEmpty   bool
-	isOrdered bool
+// Compact compacts this sketch to a compact sketch (ordered or unordered).
+func (s *ArrayOfNumbersUpdateSketch[V]) Compact(ordered bool) (*ArrayOfNumbersCompactSketch[V], error) {
+	return NewArrayOfNumbersCompactSketch[V](s, ordered)
 }
 
-// NewCompactSketch creates a new CompactSketch from any sketch implementing
-// the Sketch interface.
-func NewCompactSketch[S Summary](other Sketch[S], ordered bool) (*CompactSketch[S], error) {
+// ArrayOfNumbersCompactSketch is the immutable, serializable form of an array of numbers tuple sketch.
+type ArrayOfNumbersCompactSketch[V Number] struct {
+	theta                   uint64
+	entries                 []entry[*ArrayOfNumbersSummary[V]]
+	seedHash                uint16
+	numberOfValuesInSummary uint8
+	isEmpty                 bool
+	isOrdered               bool
+}
+
+// NewArrayOfNumbersCompactSketch creates a new ArrayOfNumbersCompactSketch from any sketch implementing
+func NewArrayOfNumbersCompactSketch[V Number](
+	other ArrayOfNumbersSketch[V], ordered bool,
+) (*ArrayOfNumbersCompactSketch[V], error) {
 	seedHash, err := other.SeedHash()
 	if err != nil {
 		return nil, err
 	}
 
-	entries := make([]entry[S], 0, other.NumRetained())
+	entries := make([]entry[*ArrayOfNumbersSummary[V]], 0, other.NumRetained())
 	for hash, summary := range other.All() {
-		cloned, ok := summary.Clone().(S)
+		cloned, ok := summary.Clone().(*ArrayOfNumbersSummary[V])
 		if !ok {
-			return nil, fmt.Errorf("cloned summary is not S")
+			return nil, fmt.Errorf("cloned summary is not ArrayOfNumbersSummary[V]")
 		}
 
-		entries = append(entries, entry[S]{
+		entries = append(entries, entry[*ArrayOfNumbersSummary[V]]{
 			Hash:    hash,
 			Summary: cloned,
 		})
@@ -72,7 +78,7 @@ func NewCompactSketch[S Summary](other Sketch[S], ordered bool) (*CompactSketch[
 
 	isOrdered := other.IsOrdered() || ordered
 	if ordered && !other.IsOrdered() {
-		slices.SortFunc(entries, func(a, b entry[S]) int {
+		slices.SortFunc(entries, func(a, b entry[*ArrayOfNumbersSummary[V]]) int {
 			if a.Hash < b.Hash {
 				return -1
 			} else if a.Hash > b.Hash {
@@ -82,83 +88,51 @@ func NewCompactSketch[S Summary](other Sketch[S], ordered bool) (*CompactSketch[
 		})
 	}
 
-	return &CompactSketch[S]{
-		theta:     other.Theta64(),
-		entries:   entries,
-		seedHash:  seedHash,
-		isEmpty:   other.IsEmpty(),
-		isOrdered: isOrdered,
+	return &ArrayOfNumbersCompactSketch[V]{
+		theta:                   other.Theta64(),
+		entries:                 entries,
+		seedHash:                seedHash,
+		isEmpty:                 other.IsEmpty(),
+		isOrdered:               isOrdered,
+		numberOfValuesInSummary: other.NumValuesInSummary(),
 	}, nil
 }
 
-// NewCompactSketchFromThetaSketch creates a new CompactSketch from
-// a given theta.Sketch and a summary.
-func NewCompactSketchFromThetaSketch[S Summary](
-	sketch theta.Sketch, summary S, ordered bool,
-) (*CompactSketch[S], error) {
-	seedHash, err := sketch.SeedHash()
-	if err != nil {
-		return nil, err
-	}
-
-	entries := make([]entry[S], 0, sketch.NumRetained())
-	for hash := range sketch.All() {
-		entries = append(entries, entry[S]{
-			Hash:    hash,
-			Summary: summary,
-		})
-	}
-
-	isOrdered := sketch.IsOrdered() || ordered
-	if ordered && !sketch.IsOrdered() {
-		slices.SortFunc(entries, func(a, b entry[S]) int {
-			if a.Hash < b.Hash {
-				return -1
-			} else if a.Hash > b.Hash {
-				return 1
-			}
-			return 0
-		})
-	}
-
-	return &CompactSketch[S]{
-		theta:     sketch.Theta64(),
-		entries:   entries,
-		seedHash:  seedHash,
-		isEmpty:   sketch.IsEmpty(),
-		isOrdered: isOrdered,
-	}, nil
-}
-
-func newCompactSketch[S Summary](
-	isEmpty, isOrdered bool, seedHash uint16, thetaVal uint64, entries []entry[S],
-) *CompactSketch[S] {
+func newArrayOfNumbersCompactSketch[V Number](
+	isEmpty bool,
+	isOrdered bool,
+	seedHash uint16,
+	thetaVal uint64,
+	entries []entry[*ArrayOfNumbersSummary[V]],
+	numberOfValuesInSummary uint8,
+) *ArrayOfNumbersCompactSketch[V] {
 	if len(entries) <= 1 {
 		isOrdered = true
 	}
-	return &CompactSketch[S]{
-		theta:     thetaVal,
-		entries:   entries,
-		seedHash:  seedHash,
-		isEmpty:   isEmpty,
-		isOrdered: isOrdered,
+	return &ArrayOfNumbersCompactSketch[V]{
+		theta:                   thetaVal,
+		entries:                 entries,
+		seedHash:                seedHash,
+		numberOfValuesInSummary: numberOfValuesInSummary,
+		isEmpty:                 isEmpty,
+		isOrdered:               isOrdered,
 	}
 }
 
 // IsEstimationMode reports whether the sketch is in estimation mode,
 // as opposed to exact mode.
-func (s *CompactSketch[S]) IsEstimationMode() bool {
+func (s *ArrayOfNumbersCompactSketch[V]) IsEstimationMode() bool {
 	return s.Theta64() < theta.MaxTheta && !s.IsEmpty()
 }
 
 // Theta returns theta as a fraction from 0 to 1, representing the
 // effective sampling rate.
-func (s *CompactSketch[S]) Theta() float64 {
+func (s *ArrayOfNumbersCompactSketch[V]) Theta() float64 {
 	return float64(s.Theta64()) / float64(theta.MaxTheta)
 }
 
 // Estimate returns the estimated distinct count of the input stream.
-func (s *CompactSketch[S]) Estimate() float64 {
+func (s *ArrayOfNumbersCompactSketch[V]) Estimate() float64 {
 	return float64(s.NumRetained()) / s.Theta()
 }
 
@@ -168,7 +142,7 @@ func (s *CompactSketch[S]) Estimate() float64 {
 // approximately 67%, 95%, or 99% confidence intervals.
 // numSubsetEntries specifies number of items from {0, 1, ..., get_num_retained()}
 // over which to estimate the bound.
-func (s *CompactSketch[S]) LowerBoundFromSubset(numStdDevs uint8, numSubsetEntries uint32) (float64, error) {
+func (s *ArrayOfNumbersCompactSketch[V]) LowerBoundFromSubset(numStdDevs uint8, numSubsetEntries uint32) (float64, error) {
 	numSubsetEntries = min(numSubsetEntries, s.NumRetained())
 	if !s.IsEstimationMode() {
 		return float64(numSubsetEntries), nil
@@ -179,7 +153,7 @@ func (s *CompactSketch[S]) LowerBoundFromSubset(numStdDevs uint8, numSubsetEntri
 // LowerBound returns the approximate lower error bound for the given
 // number of standard deviations. numStdDevs should be 1, 2, or 3 for
 // approximately 67%, 95%, or 99% confidence intervals.
-func (s *CompactSketch[S]) LowerBound(numStdDevs uint8) (float64, error) {
+func (s *ArrayOfNumbersCompactSketch[V]) LowerBound(numStdDevs uint8) (float64, error) {
 	return s.LowerBoundFromSubset(numStdDevs, s.NumRetained())
 }
 
@@ -189,7 +163,7 @@ func (s *CompactSketch[S]) LowerBound(numStdDevs uint8) (float64, error) {
 // approximately 67%, 95%, or 99% confidence intervals.
 // numSubsetEntries specifies number of items from {0, 1, ..., get_num_retained()}
 // over which to estimate the bound.
-func (s *CompactSketch[S]) UpperBoundFromSubset(numStdDevs uint8, numSubsetEntries uint32) (float64, error) {
+func (s *ArrayOfNumbersCompactSketch[V]) UpperBoundFromSubset(numStdDevs uint8, numSubsetEntries uint32) (float64, error) {
 	numSubsetEntries = min(numSubsetEntries, s.NumRetained())
 	if !s.IsEstimationMode() {
 		return float64(numSubsetEntries), nil
@@ -200,13 +174,13 @@ func (s *CompactSketch[S]) UpperBoundFromSubset(numStdDevs uint8, numSubsetEntri
 // UpperBound returns the approximate upper error bound for the given
 // number of standard deviations. numStdDevs should be 1, 2, or 3 for
 // approximately 67%, 95%, or 99% confidence intervals.
-func (s *CompactSketch[S]) UpperBound(numStdDevs uint8) (float64, error) {
+func (s *ArrayOfNumbersCompactSketch[V]) UpperBound(numStdDevs uint8) (float64, error) {
 	return s.UpperBoundFromSubset(numStdDevs, s.NumRetained())
 }
 
 // String returns a human-readable summary of this sketch.
 // If printItems is true, the output includes all retained hashes.
-func (s *CompactSketch[S]) String(printItems bool) string {
+func (s *ArrayOfNumbersCompactSketch[V]) String(printItems bool) string {
 	seedHash, _ := s.SeedHash()
 	lb, _ := s.LowerBound(2)
 	ub, _ := s.UpperBound(2)
@@ -237,33 +211,33 @@ func (s *CompactSketch[S]) String(printItems bool) string {
 
 // IsEmpty reports whether this sketch represents an empty set.
 // Note: this is not the same as having no retained hashes.
-func (s *CompactSketch[S]) IsEmpty() bool {
+func (s *ArrayOfNumbersCompactSketch[V]) IsEmpty() bool {
 	return s.isEmpty
 }
 
 // IsOrdered reports whether retained hashes are sorted by hash value.
-func (s *CompactSketch[S]) IsOrdered() bool {
+func (s *ArrayOfNumbersCompactSketch[V]) IsOrdered() bool {
 	return s.isOrdered
 }
 
 // Theta64 returns theta as a positive integer between 0 and math.MaxUint64.
-func (s *CompactSketch[S]) Theta64() uint64 {
+func (s *ArrayOfNumbersCompactSketch[V]) Theta64() uint64 {
 	return s.theta
 }
 
 // NumRetained returns the number of hashes retained in the sketch.
-func (s *CompactSketch[S]) NumRetained() uint32 {
+func (s *ArrayOfNumbersCompactSketch[V]) NumRetained() uint32 {
 	return uint32(len(s.entries))
 }
 
 // SeedHash returns the hash of the seed used to hash the input.
-func (s *CompactSketch[S]) SeedHash() (uint16, error) {
+func (s *ArrayOfNumbersCompactSketch[V]) SeedHash() (uint16, error) {
 	return s.seedHash, nil
 }
 
 // All returns an iterator over all hash-summary pairs in the sketch.
-func (s *CompactSketch[S]) All() iter.Seq2[uint64, S] {
-	return func(yield func(uint64, S) bool) {
+func (s *ArrayOfNumbersCompactSketch[V]) All() iter.Seq2[uint64, *ArrayOfNumbersSummary[V]] {
+	return func(yield func(uint64, *ArrayOfNumbersSummary[V]) bool) {
 		for _, e := range s.entries {
 			if e.Hash != 0 {
 				if !yield(e.Hash, e.Summary) {
@@ -274,49 +248,7 @@ func (s *CompactSketch[S]) All() iter.Seq2[uint64, S] {
 	}
 }
 
-// Filter produces a new CompactSketch by applying a predicate to each entry.
-// The predicate should return true for entries to keep.
-func (s *CompactSketch[S]) Filter(predicate func(S) bool) (*CompactSketch[S], error) {
-	return newFilteredCompactSketch(s, predicate)
-}
-
-func newFilteredCompactSketch[S Summary](sketch Sketch[S], predicate func(S) bool) (*CompactSketch[S], error) {
-	seedHash, err := sketch.SeedHash()
-	if err != nil {
-		return nil, err
-	}
-
-	var entries []entry[S]
-	for hash, summary := range sketch.All() {
-		if predicate(summary) {
-			cloned, ok := summary.Clone().(S)
-			if !ok {
-				return nil, fmt.Errorf("cloned summary is not S")
-			}
-
-			entries = append(entries, entry[S]{
-				Hash:    hash,
-				Summary: cloned,
-			})
-		}
-	}
-
-	isEmpty := !sketch.IsEstimationMode() && len(entries) == 0
-	return newCompactSketch(
-		isEmpty,
-		sketch.IsOrdered(),
-		seedHash,
-		sketch.Theta64(),
-		entries,
-	), nil
-}
-
-func (s *CompactSketch[S]) preambleLongs() uint8 {
-	if s.IsEstimationMode() {
-		return 3
-	}
-	if s.isEmpty || len(s.entries) == 1 {
-		return 1
-	}
-	return 2
+// NumValuesInSummary returns the number of values in ArrayOfNumbersSummary.
+func (s *ArrayOfNumbersCompactSketch[V]) NumValuesInSummary() uint8 {
+	return s.numberOfValuesInSummary
 }

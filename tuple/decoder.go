@@ -86,12 +86,12 @@ func (dec *Decoder[S]) Decode(r io.Reader) (*CompactSketch[S], error) {
 		return nil, fmt.Errorf("serial version mismatch: expected %d, actual %d", SerialVersion, serialVersion)
 	}
 
-	if err := theta.CheckSketchFamilyEqual(family, SketchFamily); err != nil {
+	if err := theta.CheckSketchFamilyEqual(family, uint8(internal.FamilyEnum.Tuple.Id)); err != nil {
 		return nil, err
 	}
 
-	if sketchType != SketchType && sketchType != SketchTypeLegacy {
-		return nil, fmt.Errorf("sketch type mismatch: expected %d, actual %d", SketchType, sketchType)
+	if sketchType != uint8(SketchTypeCompactTuple) && sketchType != uint8(SketchTypeCompactTupleLegacy) {
+		return nil, fmt.Errorf("sketch type mismatch: expected %d, actual %d", SketchTypeCompactTuple, sketchType)
 	}
 
 	isEmpty := (flags & (1 << flagIsEmpty)) != 0

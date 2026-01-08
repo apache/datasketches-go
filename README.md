@@ -68,7 +68,7 @@ If you are interested in making contributions to this site please see our [Commu
 | Cardinality/FM85 | UniqueCountMap  | ❌ |
 | Cardinality/Tuple	| | |
 | 	| FdtSketch | ❌ |
-| 	| ArrayOfDoublesSketch  | 🚧 |
+| 	| ArrayOfDoublesSketch  | ⚠️ |
 | 	| DoubleSketch  | ❌ |
 | 	| IntegerSketch  | ❌ |
 |	| ArrayOfStringsSketch | ❌ |

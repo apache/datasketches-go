@@ -26,7 +26,9 @@ import (
 )
 
 // ArrayOfNumbersSketchANotB computes the set difference of two sketches.
-func ArrayOfNumbersSketchANotB[V Number](a, b ArrayOfNumbersSketch[V], seed uint64, ordered bool) (*ArrayOfNumbersCompactSketch[V], error) {
+func ArrayOfNumbersSketchANotB[V Number](
+	a, b ArrayOfNumbersSketch[V], seed uint64, ordered bool,
+) (*ArrayOfNumbersCompactSketch[V], error) {
 	seedHash, err := internal.ComputeSeedHash(int64(seed))
 	if err != nil {
 		return nil, err

@@ -21,6 +21,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"math/rand"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 // ResizeFactor controls how the internal array grows.
@@ -115,10 +117,9 @@ func (s *ReservoirItemsSketch[T]) Reset() {
 
 // Preamble constants for serialization
 const (
-	preambleIntsShort = 1  // empty sketch
-	preambleIntsLong  = 3  // non-empty sketch
-	serVer            = 2  // serialization version
-	familyID          = 13 // reservoir items family
+	preambleIntsShort = 1 // empty sketch
+	preambleIntsLong  = 3 // non-empty sketch
+	serVer            = 2 // serialization version
 )
 
 // ToByteArray serializes the sketch to a byte array using the provided SerDe.
@@ -128,7 +129,7 @@ func (s *ReservoirItemsSketch[T]) ToByteArray(serde ItemsSerDe[T]) ([]byte, erro
 		buf := make([]byte, 8)
 		buf[0] = preambleIntsShort
 		buf[1] = serVer
-		buf[2] = familyID
+		buf[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
 		// bytes 4-7: k as int32
 		binary.LittleEndian.PutUint32(buf[4:], uint32(s.k))
 		return buf, nil
@@ -147,7 +148,7 @@ func (s *ReservoirItemsSketch[T]) ToByteArray(serde ItemsSerDe[T]) ([]byte, erro
 	// Preamble
 	buf[0] = preambleIntsLong
 	buf[1] = serVer
-	buf[2] = familyID
+	buf[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
 	// byte 3: reserved
 	binary.LittleEndian.PutUint32(buf[4:], uint32(s.k))
 	binary.LittleEndian.PutUint64(buf[8:], uint64(s.n))
@@ -174,7 +175,7 @@ func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (
 	if ver != serVer {
 		return nil, errors.New("unsupported serialization version")
 	}
-	if family != familyID {
+	if family != byte(internal.FamilyEnum.ReservoirItems.Id) {
 		return nil, errors.New("wrong sketch family")
 	}
 

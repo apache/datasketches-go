@@ -18,18 +18,98 @@
 package sampling
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
 )
 
-const testDataPath = "../serialization_test_data/go_generated_files"
+// TestGenerateGoBinariesForCompatibilityTesting generates serialization test data.
+// This test is skipped unless DSKETCH_TEST_GENERATE_GO environment variable is set.
+// Run with: DSKETCH_TEST_GENERATE_GO=1 go test -v -run TestGenerateGoBinaries
+func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
+	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
+		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
+	}
+
+	err := os.MkdirAll(internal.GoPath, os.ModePerm)
+	assert.NoError(t, err)
+
+	t.Run("reservoir empty", func(t *testing.T) {
+		k := 10
+		sketch, err := NewReservoirItemsSketch[int64](k)
+		assert.NoError(t, err)
+
+		data, err := sketch.ToByteArray(Int64SerDe{})
+		assert.NoError(t, err)
+
+		filename := fmt.Sprintf("%s/reservoir_long_n0_k%d_go.sk", internal.GoPath, k)
+		err = os.WriteFile(filename, data, 0644)
+		assert.NoError(t, err)
+		t.Logf("Generated: %s (%d bytes)", filename, len(data))
+	})
+
+	t.Run("reservoir below k", func(t *testing.T) {
+		k, n := 100, 10
+		sketch, err := NewReservoirItemsSketch[int64](k)
+		assert.NoError(t, err)
+
+		for i := int64(1); i <= int64(n); i++ {
+			sketch.Update(i)
+		}
+
+		data, err := sketch.ToByteArray(Int64SerDe{})
+		assert.NoError(t, err)
+
+		filename := fmt.Sprintf("%s/reservoir_long_n%d_k%d_go.sk", internal.GoPath, n, k)
+		err = os.WriteFile(filename, data, 0644)
+		assert.NoError(t, err)
+		t.Logf("Generated: %s (%d bytes)", filename, len(data))
+	})
+
+	t.Run("reservoir at k", func(t *testing.T) {
+		k, n := 10, 10
+		sketch, err := NewReservoirItemsSketch[int64](k)
+		assert.NoError(t, err)
+
+		for i := int64(1); i <= int64(n); i++ {
+			sketch.Update(i)
+		}
+
+		data, err := sketch.ToByteArray(Int64SerDe{})
+		assert.NoError(t, err)
+
+		filename := fmt.Sprintf("%s/reservoir_long_n%d_k%d_go.sk", internal.GoPath, n, k)
+		err = os.WriteFile(filename, data, 0644)
+		assert.NoError(t, err)
+		t.Logf("Generated: %s (%d bytes)", filename, len(data))
+	})
+
+	t.Run("reservoir with sampling", func(t *testing.T) {
+		k, n := 10, 100
+		sketch, err := NewReservoirItemsSketch[int64](k)
+		assert.NoError(t, err)
+
+		for i := int64(1); i <= int64(n); i++ {
+			sketch.Update(i)
+		}
+
+		data, err := sketch.ToByteArray(Int64SerDe{})
+		assert.NoError(t, err)
+
+		filename := fmt.Sprintf("%s/reservoir_long_n%d_k%d_go.sk", internal.GoPath, n, k)
+		err = os.WriteFile(filename, data, 0644)
+		assert.NoError(t, err)
+		t.Logf("Generated: %s (%d bytes)", filename, len(data))
+	})
+}
 
 // TestSerializationCompatibilityEmpty tests deserialization of an empty sketch.
 func TestSerializationCompatibilityEmpty(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join(testDataPath, "reservoir_long_n0_k10_go.sk"))
+	data, err := os.ReadFile(filepath.Join(internal.GoPath, "reservoir_long_n0_k10_go.sk"))
 	assert.NoError(t, err)
 
 	sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
@@ -41,7 +121,7 @@ func TestSerializationCompatibilityEmpty(t *testing.T) {
 
 // TestSerializationCompatibilityBelowK tests deserialization of a sketch with items below k.
 func TestSerializationCompatibilityBelowK(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join(testDataPath, "reservoir_long_n10_k100_go.sk"))
+	data, err := os.ReadFile(filepath.Join(internal.GoPath, "reservoir_long_n10_k100_go.sk"))
 	assert.NoError(t, err)
 
 	sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
@@ -53,7 +133,7 @@ func TestSerializationCompatibilityBelowK(t *testing.T) {
 
 // TestSerializationCompatibilityAtK tests deserialization of a sketch at capacity.
 func TestSerializationCompatibilityAtK(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join(testDataPath, "reservoir_long_n10_k10_go.sk"))
+	data, err := os.ReadFile(filepath.Join(internal.GoPath, "reservoir_long_n10_k10_go.sk"))
 	assert.NoError(t, err)
 
 	sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
@@ -65,7 +145,7 @@ func TestSerializationCompatibilityAtK(t *testing.T) {
 
 // TestSerializationCompatibilityWithSampling tests deserialization of a sketch with sampling.
 func TestSerializationCompatibilityWithSampling(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join(testDataPath, "reservoir_long_n100_k10_go.sk"))
+	data, err := os.ReadFile(filepath.Join(internal.GoPath, "reservoir_long_n100_k10_go.sk"))
 	assert.NoError(t, err)
 
 	sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
@@ -88,9 +168,9 @@ func TestSerializationRoundTrip(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify preamble structure
-	assert.Equal(t, byte(3), data[0])  // preamble_longs = 3 for non-empty
-	assert.Equal(t, byte(2), data[1])  // serVer = 2
-	assert.Equal(t, byte(13), data[2]) // familyID = 13
+	assert.Equal(t, byte(3), data[0])                                     // preamble_longs = 3 for non-empty
+	assert.Equal(t, byte(2), data[1])                                     // serVer = 2
+	assert.Equal(t, byte(internal.FamilyEnum.ReservoirItems.Id), data[2]) // familyID
 
 	// Deserialize and verify
 	restored, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})

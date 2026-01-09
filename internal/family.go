@@ -31,6 +31,7 @@ type families struct {
 	BloomFilter    family
 	Tuple          family
 	Theta          family
+	ReservoirItems family
 }
 
 var FamilyEnum = &families{
@@ -65,5 +66,9 @@ var FamilyEnum = &families{
 	Theta: family{
 		Id:          3,
 		MaxPreLongs: 3,
+	},
+	ReservoirItems: family{
+		Id:          11,
+		MaxPreLongs: 2,
 	},
 }

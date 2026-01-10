@@ -63,7 +63,7 @@ var FamilyEnum = &families{
 		MaxPreLongs: 3,
 	},
 	ReservoirItems: family{
-		Id:          13,
-		MaxPreLongs: 3,
+		Id:          11,
+		MaxPreLongs: 2, // matches Java: min=1, max=2
 	},
 }

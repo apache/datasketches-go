@@ -18,8 +18,11 @@
 package sampling
 
 import (
+	"encoding/binary"
 	"errors"
 	"math/rand"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 // ResizeFactor controls how the internal array grows.
@@ -110,4 +113,95 @@ func (s *ReservoirItemsSketch[T]) IsEmpty() bool {
 func (s *ReservoirItemsSketch[T]) Reset() {
 	s.n = 0
 	s.data = s.data[:0]
+}
+
+// Preamble constants for serialization
+const (
+	preambleIntsShort = 1 // empty sketch
+	preambleIntsLong  = 3 // non-empty sketch
+	serVer            = 2 // serialization version
+)
+
+// ToByteArray serializes the sketch to a byte array using the provided SerDe.
+func (s *ReservoirItemsSketch[T]) ToByteArray(serde ItemsSerDe[T]) ([]byte, error) {
+	if s.IsEmpty() {
+		// Empty sketch: minimal preamble
+		buf := make([]byte, 8)
+		buf[0] = preambleIntsShort
+		buf[1] = serVer
+		buf[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
+		// bytes 4-7: k as int32
+		binary.LittleEndian.PutUint32(buf[4:], uint32(s.k))
+		return buf, nil
+	}
+
+	// Serialize items
+	itemsBytes, err := serde.SerializeToBytes(s.data)
+	if err != nil {
+		return nil, err
+	}
+
+	// Non-empty sketch
+	preambleBytes := preambleIntsLong * 8
+	buf := make([]byte, preambleBytes+len(itemsBytes))
+
+	// Preamble
+	buf[0] = preambleIntsLong
+	buf[1] = serVer
+	buf[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
+	// byte 3: reserved
+	binary.LittleEndian.PutUint32(buf[4:], uint32(s.k))
+	binary.LittleEndian.PutUint64(buf[8:], uint64(s.n))
+	binary.LittleEndian.PutUint32(buf[16:], uint32(len(s.data)))
+	// bytes 20-23 reserved
+
+	// Data
+	copy(buf[preambleBytes:], itemsBytes)
+
+	return buf, nil
+}
+
+// NewReservoirItemsSketchFromSlice deserializes a sketch from a byte array using the provided SerDe.
+func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (*ReservoirItemsSketch[T], error) {
+	if len(data) < 8 {
+		return nil, errors.New("data too short")
+	}
+
+	preambleInts := int(data[0])
+	ver := data[1]
+	family := data[2]
+	k := int(binary.LittleEndian.Uint32(data[4:]))
+
+	if ver != serVer {
+		return nil, errors.New("unsupported serialization version")
+	}
+	if family != byte(internal.FamilyEnum.ReservoirItems.Id) {
+		return nil, errors.New("wrong sketch family")
+	}
+
+	if preambleInts == preambleIntsShort {
+		// Empty sketch
+		return NewReservoirItemsSketch[T](k)
+	}
+
+	if len(data) < preambleIntsLong*8 {
+		return nil, errors.New("data too short for non-empty sketch")
+	}
+
+	n := int64(binary.LittleEndian.Uint64(data[8:]))
+	numSamples := int(binary.LittleEndian.Uint32(data[16:]))
+
+	preambleBytes := preambleIntsLong * 8
+	itemsData := data[preambleBytes:]
+
+	items, err := serde.DeserializeFromBytes(itemsData, numSamples)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ReservoirItemsSketch[T]{
+		k:    k,
+		n:    n,
+		data: items,
+	}, nil
 }

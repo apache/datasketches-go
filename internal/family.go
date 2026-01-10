@@ -30,6 +30,7 @@ type families struct {
 	CountMinSketch family
 	BloomFilter    family
 	Tuple          family
+	ReservoirItems family
 }
 
 var FamilyEnum = &families{
@@ -60,5 +61,9 @@ var FamilyEnum = &families{
 	Tuple: family{
 		Id:          9,
 		MaxPreLongs: 3,
+	},
+	ReservoirItems: family{
+		Id:          11,
+		MaxPreLongs: 2, // matches Java: min=1, max=2
 	},
 }

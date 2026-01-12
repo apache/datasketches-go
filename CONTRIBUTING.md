@@ -46,3 +46,8 @@ Proposed changes to the code or documentation are usually done through GitHub Pu
 
 ### Becoming a committer
 We welcome anyone who is eager to continue to contribute to the DataSketches mission of providing open source, production quality sketch algorithms and become part of our team.  Please send us a message on <dev@datasketches.apache.org> where we can give you some guidance.  After you have made some successful contributions, the current committers will discuss your candidacy for becoming a committer.  You can also review the [Apache policies on becoming a committer](https://community.apache.org/contributors/index.html) as well as our [New Committer Process](https://datasketches.apache.org/docs/Community/NewCommitterProcess.html) for selecting and inviting a committer to join our project.
+
+
+## Code of Conduct
+
+We expect all community members to follow our [Code of Conduct](https://www.apache.org/foundation/policies/conduct.html).

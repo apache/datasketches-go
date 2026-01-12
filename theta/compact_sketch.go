@@ -33,8 +33,6 @@ const UncompressedSerialVersion = 3
 
 const CompressedSerialVersion = 4
 
-const CompactSketchType = 3
-
 // Offsets in sizeof(type)
 const (
 	compactSketchPreLongsByte          = 0

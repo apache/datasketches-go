@@ -30,6 +30,7 @@ type families struct {
 	CountMinSketch family
 	BloomFilter    family
 	Tuple          family
+	Theta          family
 }
 
 var FamilyEnum = &families{
@@ -59,6 +60,10 @@ var FamilyEnum = &families{
 	},
 	Tuple: family{
 		Id:          9,
+		MaxPreLongs: 3,
+	},
+	Theta: family{
+		Id:          3,
 		MaxPreLongs: 3,
 	},
 }

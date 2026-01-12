@@ -125,8 +125,8 @@ func decodeCompactSketch(bytes []byte, seed uint64) (compactSketchData, error) {
 		return compactSketchData{}, err
 	}
 
-	if bytes[compactSketchTypeByte] != CompactSketchType {
-		return compactSketchData{}, fmt.Errorf("invalid sketch type: expected %d, got %d", CompactSketchType, bytes[compactSketchTypeByte])
+	if bytes[compactSketchTypeByte] != uint8(internal.FamilyEnum.Theta.Id) {
+		return compactSketchData{}, fmt.Errorf("invalid sketch type: expected %d, got %d", internal.FamilyEnum.Theta.Id, bytes[compactSketchTypeByte])
 	}
 
 	serialVersion := bytes[compactSketchSerialVersionByte]

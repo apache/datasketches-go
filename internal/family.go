@@ -30,6 +30,7 @@ type families struct {
 	CountMinSketch family
 	BloomFilter    family
 	Tuple          family
+	TDigest        family
 }
 
 var FamilyEnum = &families{
@@ -60,5 +61,9 @@ var FamilyEnum = &families{
 	Tuple: family{
 		Id:          9,
 		MaxPreLongs: 3,
+	},
+	TDigest: family{
+		Id:          20,
+		MaxPreLongs: 2,
 	},
 }

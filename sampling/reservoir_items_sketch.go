@@ -122,8 +122,8 @@ const (
 	serVer            = 2 // serialization version
 )
 
-// ToByteArray serializes the sketch to a byte array using the provided SerDe.
-func (s *ReservoirItemsSketch[T]) ToByteArray(serde ItemsSerDe[T]) ([]byte, error) {
+// ToSlice serializes the sketch to a byte slice using the provided SerDe.
+func (s *ReservoirItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 	if s.IsEmpty() {
 		// Empty sketch: minimal preamble
 		buf := make([]byte, 8)

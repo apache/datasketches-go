@@ -43,7 +43,7 @@ func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
 		sketch, err := NewReservoirItemsSketch[int64](k)
 		assert.NoError(t, err)
 
-		data, err := sketch.ToByteArray(Int64SerDe{})
+		data, err := sketch.ToSlice(Int64SerDe{})
 		assert.NoError(t, err)
 
 		filename := fmt.Sprintf("%s/reservoir_long_n0_k%d_go.sk", internal.GoPath, k)
@@ -61,7 +61,7 @@ func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
 			sketch.Update(i)
 		}
 
-		data, err := sketch.ToByteArray(Int64SerDe{})
+		data, err := sketch.ToSlice(Int64SerDe{})
 		assert.NoError(t, err)
 
 		filename := fmt.Sprintf("%s/reservoir_long_n%d_k%d_go.sk", internal.GoPath, n, k)
@@ -79,7 +79,7 @@ func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
 			sketch.Update(i)
 		}
 
-		data, err := sketch.ToByteArray(Int64SerDe{})
+		data, err := sketch.ToSlice(Int64SerDe{})
 		assert.NoError(t, err)
 
 		filename := fmt.Sprintf("%s/reservoir_long_n%d_k%d_go.sk", internal.GoPath, n, k)
@@ -97,7 +97,7 @@ func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
 			sketch.Update(i)
 		}
 
-		data, err := sketch.ToByteArray(Int64SerDe{})
+		data, err := sketch.ToSlice(Int64SerDe{})
 		assert.NoError(t, err)
 
 		filename := fmt.Sprintf("%s/reservoir_long_n%d_k%d_go.sk", internal.GoPath, n, k)
@@ -164,7 +164,7 @@ func TestSerializationRoundTrip(t *testing.T) {
 	}
 
 	// Serialize
-	data, err := sketch.ToByteArray(Int64SerDe{})
+	data, err := sketch.ToSlice(Int64SerDe{})
 	assert.NoError(t, err)
 
 	// Verify preamble structure

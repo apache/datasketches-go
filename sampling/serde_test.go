@@ -81,7 +81,7 @@ func TestSketchSerializationInt64(t *testing.T) {
 		sketch.Update(i)
 	}
 
-	bytes, err := sketch.ToByteArray(Int64SerDe{})
+	bytes, err := sketch.ToSlice(Int64SerDe{})
 	assert.NoError(t, err)
 	assert.NotNil(t, bytes)
 
@@ -99,7 +99,7 @@ func TestSketchSerializationString(t *testing.T) {
 	sketch.Update("banana")
 	sketch.Update("cherry")
 
-	bytes, err := sketch.ToByteArray(StringSerDe{})
+	bytes, err := sketch.ToSlice(StringSerDe{})
 	assert.NoError(t, err)
 
 	restored, err := NewReservoirItemsSketchFromSlice[string](bytes, StringSerDe{})
@@ -112,7 +112,7 @@ func TestSketchSerializationString(t *testing.T) {
 func TestSketchSerializationEmpty(t *testing.T) {
 	sketch, _ := NewReservoirItemsSketch[int64](10)
 
-	bytes, err := sketch.ToByteArray(Int64SerDe{})
+	bytes, err := sketch.ToSlice(Int64SerDe{})
 	assert.NoError(t, err)
 	assert.Equal(t, 8, len(bytes)) // Minimal preamble
 

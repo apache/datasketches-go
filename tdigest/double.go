@@ -31,6 +31,23 @@ const (
 	bufferMultiplier = 4
 )
 
+const (
+	preambleLongsEmptyOrSingle uint8 = 1
+	preambleLongsMultiple      uint8 = 2
+	serialVersion              uint8 = 1
+)
+
+const (
+	compatTypeDouble uint8 = 1
+	compatTypeFloat  uint8 = 2
+)
+
+const (
+	serializationFlagIsEmpty uint8 = iota
+	serializationFlagIsSingleValue
+	serializationFlagReverseMerge
+)
+
 var (
 	ErrEmpty              = errors.New("operation is undefined for an empty sketch")
 	ErrNaN                = errors.New("operation is undefined for NaN")

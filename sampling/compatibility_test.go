@@ -57,7 +57,7 @@ func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
 			n := n
 			t.Run(fmt.Sprintf("exact_n%d_k128", n), func(t *testing.T) {
 				sketch, _ := NewReservoirItemsSketch[int64](128)
-				for i := int64(1); i <= int64(n); i++ {
+				for i := int64(0); i < int64(n); i++ {
 					sketch.Update(i)
 				}
 				data, _ := sketch.ToSlice(Int64SerDe{})
@@ -69,7 +69,7 @@ func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
 			k := k
 			t.Run(fmt.Sprintf("sampling_n1000_k%d", k), func(t *testing.T) {
 				sketch, _ := NewReservoirItemsSketch[int64](k)
-				for i := int64(1); i <= 1000; i++ {
+				for i := int64(0); i < 1000; i++ {
 					sketch.Update(i)
 				}
 				data, _ := sketch.ToSlice(Int64SerDe{})
@@ -91,7 +91,7 @@ func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
 			n := n
 			t.Run(fmt.Sprintf("exact_n%d_k128", n), func(t *testing.T) {
 				sketch, _ := NewReservoirItemsSketch[float64](128)
-				for i := 1; i <= n; i++ {
+				for i := 0; i < n; i++ {
 					sketch.Update(float64(i))
 				}
 				data, _ := sketch.ToSlice(Float64SerDe{})
@@ -103,7 +103,7 @@ func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
 			k := k
 			t.Run(fmt.Sprintf("sampling_n1000_k%d", k), func(t *testing.T) {
 				sketch, _ := NewReservoirItemsSketch[float64](k)
-				for i := 1; i <= 1000; i++ {
+				for i := 0; i < 1000; i++ {
 					sketch.Update(float64(i))
 				}
 				data, _ := sketch.ToSlice(Float64SerDe{})
@@ -125,7 +125,7 @@ func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
 			n := n
 			t.Run(fmt.Sprintf("exact_n%d_k128", n), func(t *testing.T) {
 				sketch, _ := NewReservoirItemsSketch[string](128)
-				for i := 1; i <= n; i++ {
+				for i := 0; i < n; i++ {
 					sketch.Update(fmt.Sprintf("item%d", i))
 				}
 				data, _ := sketch.ToSlice(StringSerDe{})
@@ -137,7 +137,7 @@ func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
 			k := k
 			t.Run(fmt.Sprintf("sampling_n1000_k%d", k), func(t *testing.T) {
 				sketch, _ := NewReservoirItemsSketch[string](k)
-				for i := 1; i <= 1000; i++ {
+				for i := 0; i < 1000; i++ {
 					sketch.Update(fmt.Sprintf("item%d", i))
 				}
 				data, _ := sketch.ToSlice(StringSerDe{})
@@ -225,8 +225,9 @@ func TestSerializationRoundTrip(t *testing.T) {
 	data, err := sketch.ToSlice(Int64SerDe{})
 	assert.NoError(t, err)
 
-	// Verify preamble structure
-	assert.Equal(t, byte(3), data[0])                                     // preamble_longs = 3 for non-empty
+	// Verify preamble structure (Java-compatible format)
+	// Byte 0: 0xC0 (ResizeFactor X8) | 0x02 (preamble_longs) = 0xC2
+	assert.Equal(t, byte(0xC2), data[0])                                  // preamble_longs = 2 for non-empty + ResizeFactor bits
 	assert.Equal(t, byte(2), data[1])                                     // serVer = 2
 	assert.Equal(t, byte(internal.FamilyEnum.ReservoirItems.Id), data[2]) // familyID
 

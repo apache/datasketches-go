@@ -115,61 +115,57 @@ func (s *ReservoirItemsSketch[T]) Reset() {
 	s.data = s.data[:0]
 }
 
-// Preamble constants for serialization
+// Serialization constants
 const (
-	preambleIntsShort = 1 // empty sketch
-	preambleIntsLong  = 3 // non-empty sketch
-	serVer            = 2 // serialization version
+	preambleIntsEmpty    = 1
+	preambleIntsNonEmpty = 2
+	serVer               = 2
+	flagEmpty            = 0x04
+	resizeFactorBits     = 0xC0 // ResizeFactor X8
 )
 
-// ToSlice serializes the sketch to a byte slice using the provided SerDe.
+// ToSlice serializes the sketch to a byte slice.
 func (s *ReservoirItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 	if s.IsEmpty() {
-		// Empty sketch: minimal preamble
 		buf := make([]byte, 8)
-		buf[0] = preambleIntsShort
+		buf[0] = resizeFactorBits | preambleIntsEmpty
 		buf[1] = serVer
 		buf[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
-		// bytes 4-7: k as int32
+		buf[3] = flagEmpty
 		binary.LittleEndian.PutUint32(buf[4:], uint32(s.k))
 		return buf, nil
 	}
 
-	// Serialize items
 	itemsBytes, err := serde.SerializeToBytes(s.data)
 	if err != nil {
 		return nil, err
 	}
 
-	// Non-empty sketch
-	preambleBytes := preambleIntsLong * 8
+	preambleBytes := preambleIntsNonEmpty * 8
 	buf := make([]byte, preambleBytes+len(itemsBytes))
 
-	// Preamble
-	buf[0] = preambleIntsLong
+	buf[0] = resizeFactorBits | preambleIntsNonEmpty
 	buf[1] = serVer
 	buf[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
-	// byte 3: reserved
+	buf[3] = 0
 	binary.LittleEndian.PutUint32(buf[4:], uint32(s.k))
 	binary.LittleEndian.PutUint64(buf[8:], uint64(s.n))
-	binary.LittleEndian.PutUint32(buf[16:], uint32(len(s.data)))
-	// bytes 20-23 reserved
 
-	// Data
 	copy(buf[preambleBytes:], itemsBytes)
 
 	return buf, nil
 }
 
-// NewReservoirItemsSketchFromSlice deserializes a sketch from a byte array using the provided SerDe.
+// NewReservoirItemsSketchFromSlice deserializes a sketch from a byte slice.
 func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (*ReservoirItemsSketch[T], error) {
 	if len(data) < 8 {
 		return nil, errors.New("data too short")
 	}
 
-	preambleInts := int(data[0])
+	preambleInts := int(data[0] & 0x3F)
 	ver := data[1]
 	family := data[2]
+	flags := data[3]
 	k := int(binary.LittleEndian.Uint32(data[4:]))
 
 	if ver != serVer {
@@ -179,19 +175,18 @@ func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (
 		return nil, errors.New("wrong sketch family")
 	}
 
-	if preambleInts == preambleIntsShort {
-		// Empty sketch
+	if (flags&flagEmpty) != 0 || preambleInts == preambleIntsEmpty {
 		return NewReservoirItemsSketch[T](k)
 	}
 
-	if len(data) < preambleIntsLong*8 {
+	preambleBytes := preambleIntsNonEmpty * 8
+	if len(data) < preambleBytes {
 		return nil, errors.New("data too short for non-empty sketch")
 	}
 
 	n := int64(binary.LittleEndian.Uint64(data[8:]))
-	numSamples := int(binary.LittleEndian.Uint32(data[16:]))
+	numSamples := int(min(n, int64(k)))
 
-	preambleBytes := preambleIntsLong * 8
 	itemsData := data[preambleBytes:]
 
 	items, err := serde.DeserializeFromBytes(itemsData, numSamples)

@@ -898,7 +898,7 @@ func TestDecoderErrors(t *testing.T) {
 		invalidData := make([]byte, 8)
 		invalidData[0] = 1  // preamble longs
 		invalidData[1] = 99 // Invalid version
-		invalidData[2] = CompactSketchType
+		invalidData[2] = uint8(internal.FamilyEnum.Theta.Id)
 
 		decoder := NewDecoder(DefaultSeed)
 		_, err := decoder.Decode(bytes.NewReader(invalidData))

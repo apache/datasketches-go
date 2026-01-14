@@ -20,6 +20,8 @@ package theta
 import (
 	"encoding/binary"
 	"io"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 // Encoder encodes a compact theta sketch to bytes.
@@ -73,7 +75,7 @@ func (enc *Encoder) encodeVersion4(sketch *CompactSketch, bytes []byte, offset i
 	offset++
 	bytes[offset] = CompressedSerialVersion
 	offset++
-	bytes[offset] = CompactSketchType
+	bytes[offset] = uint8(internal.FamilyEnum.Theta.Id)
 	offset++
 	bytes[offset] = entryBits
 	offset++
@@ -160,7 +162,7 @@ func (enc *Encoder) encodeSketch(sketch *CompactSketch, bytes []byte, offset int
 	offset++
 	bytes[offset] = UncompressedSerialVersion
 	offset++
-	bytes[offset] = CompactSketchType
+	bytes[offset] = uint8(internal.FamilyEnum.Theta.Id)
 	offset++
 
 	// 2 bytes unused

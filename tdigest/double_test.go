@@ -97,24 +97,24 @@ func TestDouble_Update(t *testing.T) {
 		assert.Equal(t, uint64(0), sketch.TotalWeight())
 	})
 
-	t.Run("Positive Infinity", func(t *testing.T) {
+	t.Run("Positive Infinity Returns Error", func(t *testing.T) {
 		sketch, err := NewDouble(DefaultK)
 		assert.NoError(t, err)
 
 		err = sketch.Update(math.Inf(1))
-		assert.NoError(t, err)
-		assert.False(t, sketch.IsEmpty())
-		assert.Equal(t, uint64(1), sketch.TotalWeight())
+		assert.ErrorIs(t, err, ErrInfinity)
+		assert.True(t, sketch.IsEmpty())
+		assert.Equal(t, uint64(0), sketch.TotalWeight())
 	})
 
-	t.Run("Negative Infinity", func(t *testing.T) {
+	t.Run("Negative Infinity Returns Error", func(t *testing.T) {
 		sketch, err := NewDouble(DefaultK)
 		assert.NoError(t, err)
 
 		err = sketch.Update(math.Inf(-1))
-		assert.NoError(t, err)
-		assert.False(t, sketch.IsEmpty())
-		assert.Equal(t, uint64(1), sketch.TotalWeight())
+		assert.ErrorIs(t, err, ErrInfinity)
+		assert.True(t, sketch.IsEmpty())
+		assert.Equal(t, uint64(0), sketch.TotalWeight())
 	})
 
 	t.Run("Triggers Compression", func(t *testing.T) {

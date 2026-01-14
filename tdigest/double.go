@@ -51,6 +51,7 @@ const (
 var (
 	ErrEmpty              = errors.New("operation is undefined for an empty sketch")
 	ErrNaN                = errors.New("operation is undefined for NaN")
+	ErrInfinity           = errors.New("operation is undefined for Infinity")
 	ErrInvalidRank        = errors.New("normalized rank must be between 0 and 1 inclusive")
 	ErrInvalidK           = errors.New("k must be at least 10")
 	errNanInSplitPoints   = errors.New("NaN in split points")
@@ -180,10 +181,15 @@ func newDoubleFromInternalStates(
 	}, nil
 }
 
-// Update updates a value to the t-Digest
+// Update adds a value to the t-Digest.
+// Returns ErrNaN if the value is NaN.
+// Returns ErrInfinity if the value is positive or negative infinity.
 func (d *Double) Update(value float64) error {
 	if math.IsNaN(value) {
 		return ErrNaN
+	}
+	if math.IsInf(value, 1) || math.IsInf(value, -1) {
+		return ErrInfinity
 	}
 
 	if len(d.buffer) == d.centroidsCapacity*bufferMultiplier {

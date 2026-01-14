@@ -188,7 +188,7 @@ func (d *Double) Update(value float64) error {
 	if math.IsNaN(value) {
 		return ErrNaN
 	}
-	if math.IsInf(value, 1) || math.IsInf(value, -1) {
+	if math.IsInf(value, 0) {
 		return ErrInfinity
 	}
 

@@ -197,8 +197,8 @@ func TestVarOptItemsSketch_CumulativeWeight(t *testing.T) {
 
 	// Get output weights using Go 1.23 iterator
 	outputSum := 0.0
-	for _, weight := range sketch.Samples() {
-		outputSum += weight
+	for sample := range sketch.All() {
+		outputSum += sample.Weight
 	}
 
 	// The ratio should be exactly 1.0 (within floating point precision)

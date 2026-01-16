@@ -63,13 +63,19 @@ const (
 	varOptMaxK                = (1 << 31) - 2 // maximum k value
 )
 
-// NewVarOptItemsSketch creates a new VarOpt sketch with the specified maximum sample size k.
-func NewVarOptItemsSketch[T any](k int) (*VarOptItemsSketch[T], error) {
-	return NewVarOptItemsSketchWithResizeFactor[T](k, varOptDefaultResizeFactor)
+type VarOptOption func(*varOptConfig)
+
+type varOptConfig struct {
+	resizeFactor ResizeFactor
 }
 
-// NewVarOptItemsSketchWithResizeFactor creates a new VarOpt sketch with specified k and resize factor.
-func NewVarOptItemsSketchWithResizeFactor[T any](k int, rf ResizeFactor) (*VarOptItemsSketch[T], error) {
+func WithResizeFactor(rf ResizeFactor) VarOptOption {
+	return func(c *varOptConfig) {
+		c.resizeFactor = rf
+	}
+}
+
+func NewVarOptItemsSketch[T any](k int, opts ...VarOptOption) (*VarOptItemsSketch[T], error) {
 	if k < varOptMinK {
 		return nil, errors.New("k must be at least 8")
 	}
@@ -77,7 +83,15 @@ func NewVarOptItemsSketchWithResizeFactor[T any](k int, rf ResizeFactor) (*VarOp
 		return nil, errors.New("k is too large")
 	}
 
-	initialSize := int(rf)
+	cfg := &varOptConfig{
+		resizeFactor: varOptDefaultResizeFactor,
+	}
+
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	initialSize := int(cfg.resizeFactor)
 	if initialSize > k {
 		initialSize = k
 	}
@@ -91,7 +105,7 @@ func NewVarOptItemsSketchWithResizeFactor[T any](k int, rf ResizeFactor) (*VarOp
 		totalWeightR:  0.0,
 		data:          make([]T, 0, initialSize),
 		weights:       make([]float64, 0, initialSize),
-		rf:            rf,
+		rf:            cfg.resizeFactor,
 		allocatedSize: initialSize,
 	}, nil
 }
@@ -128,20 +142,26 @@ func (s *VarOptItemsSketch[T]) R() int { return s.r }
 // TotalWeightR returns the total weight of items in the R region.
 func (s *VarOptItemsSketch[T]) TotalWeightR() float64 { return s.totalWeightR }
 
-// Samples returns an iterator over the samples and their adjusted weights.
+// Sample represents a weighted sample item.
+type Sample[T any] struct {
+	Item   T
+	Weight float64
+}
+
+// All returns an iterator over all samples with their adjusted weights.
 // For items in H region, the weight is the original weight.
 // For items in R region, the weight is tau (totalWeightR / r).
 //
 // Usage:
 //
-//	for item, weight := range sketch.Samples() {
-//	    // process item and weight
+//	for sample := range sketch.All() {
+//	    fmt.Printf("Item: %v, Weight: %f\n", sample.Item, sample.Weight)
 //	}
-func (s *VarOptItemsSketch[T]) Samples() iter.Seq2[T, float64] {
-	return func(yield func(T, float64) bool) {
+func (s *VarOptItemsSketch[T]) All() iter.Seq[Sample[T]] {
+	return func(yield func(Sample[T]) bool) {
 		// H region: items with their actual weights
 		for i := 0; i < s.h; i++ {
-			if !yield(s.data[i], s.weights[i]) {
+			if !yield(Sample[T]{Item: s.data[i], Weight: s.weights[i]}) {
 				return
 			}
 		}
@@ -151,7 +171,7 @@ func (s *VarOptItemsSketch[T]) Samples() iter.Seq2[T, float64] {
 			tau := s.totalWeightR / float64(s.r)
 			rStart := s.h + s.m
 			for i := 0; i < s.r; i++ {
-				if !yield(s.data[rStart+i], tau) {
+				if !yield(Sample[T]{Item: s.data[rStart+i], Weight: tau}) {
 					return
 				}
 			}
@@ -196,30 +216,27 @@ func (s *VarOptItemsSketch[T]) Update(item T, weight float64) error {
 
 	if s.r == 0 {
 		// exact mode (warmup)
-		s.updateWarmupPhase(item, weight)
-	} else {
-		// estimation mode
-		// what tau would be if deletion candidates = R + new item
-		hypotheticalTau := (weight + s.totalWeightR) / float64(s.r) // r+1-1 = r
-
-		// is new item's turn to be considered for reservoir?
-		condition1 := s.h == 0 || weight <= s.peekMin()
-		// is new item light enough for reservoir?
-		condition2 := weight < hypotheticalTau
-
-		if condition1 && condition2 {
-			s.updateLight(item, weight)
-		} else if s.r == 1 {
-			s.updateHeavyREq1(item, weight)
-		} else {
-			s.updateHeavyGeneral(item, weight)
-		}
+		return s.updateWarmupPhase(item, weight)
 	}
-	return nil
+	// estimation mode
+	// what tau would be if deletion candidates = R + new item
+	hypotheticalTau := (weight + s.totalWeightR) / float64(s.r) // r+1-1 = r
+
+	// is new item's turn to be considered for reservoir?
+	condition1 := s.h == 0 || weight <= s.peekMin()
+	// is new item light enough for reservoir?
+	condition2 := weight < hypotheticalTau
+
+	if condition1 && condition2 {
+		return s.updateLight(item, weight)
+	} else if s.r == 1 {
+		return s.updateHeavyREq1(item, weight)
+	}
+	return s.updateHeavyGeneral(item, weight)
 }
 
 // updateWarmupPhase handles the warmup phase when r=0.
-func (s *VarOptItemsSketch[T]) updateWarmupPhase(item T, weight float64) {
+func (s *VarOptItemsSketch[T]) updateWarmupPhase(item T, weight float64) error {
 	if s.h >= len(s.data) {
 		s.growDataArrays()
 	}
@@ -236,12 +253,13 @@ func (s *VarOptItemsSketch[T]) updateWarmupPhase(item T, weight float64) {
 
 	// check if need to transition to estimation mode
 	if s.h > s.k {
-		s.transitionFromWarmup()
+		return s.transitionFromWarmup()
 	}
+	return nil
 }
 
 // transitionFromWarmup converts from warmup (exact) mode to estimation mode.
-func (s *VarOptItemsSketch[T]) transitionFromWarmup() {
+func (s *VarOptItemsSketch[T]) transitionFromWarmup() error {
 	// Convert to heap and move 2 lightest items to M region
 	s.heapify()
 	s.popMinToMRegion()
@@ -259,36 +277,36 @@ func (s *VarOptItemsSketch[T]) transitionFromWarmup() {
 
 	// The two lightest items are a valid initial candidate set
 	// weights[k-1] is in M, weights[k] (now -1) represents R
-	s.growCandidateSet(s.weights[s.k-1]+s.totalWeightR, 2)
+	return s.growCandidateSet(s.weights[s.k-1]+s.totalWeightR, 2)
 }
 
 // updateLight handles a light item (weight <= old_tau) in estimation mode.
-func (s *VarOptItemsSketch[T]) updateLight(item T, weight float64) {
+func (s *VarOptItemsSketch[T]) updateLight(item T, weight float64) error {
 	// The M slot is at index h (the gap)
 	mSlot := s.h
 	s.data[mSlot] = item
 	s.weights[mSlot] = weight
 	s.m++
 
-	s.growCandidateSet(s.totalWeightR+weight, s.r+1)
+	return s.growCandidateSet(s.totalWeightR+weight, s.r+1)
 }
 
 // updateHeavyGeneral handles a heavy item when r >= 2.
-func (s *VarOptItemsSketch[T]) updateHeavyGeneral(item T, weight float64) {
+func (s *VarOptItemsSketch[T]) updateHeavyGeneral(item T, weight float64) error {
 	// Put into H (may come back out momentarily)
 	s.push(item, weight)
 
-	s.growCandidateSet(s.totalWeightR, s.r)
+	return s.growCandidateSet(s.totalWeightR, s.r)
 }
 
 // updateHeavyREq1 handles a heavy item when r == 1.
-func (s *VarOptItemsSketch[T]) updateHeavyREq1(item T, weight float64) {
+func (s *VarOptItemsSketch[T]) updateHeavyREq1(item T, weight float64) error {
 	s.push(item, weight) // new item into H
 	s.popMinToMRegion()  // pop lightest back into M
 
 	// The M slot is at k-1 (array is k+1, 1 in R)
 	mSlot := s.k - 1
-	s.growCandidateSet(s.weights[mSlot]+s.totalWeightR, 2)
+	return s.growCandidateSet(s.weights[mSlot]+s.totalWeightR, 2)
 }
 
 // push adds an item to the H region heap.
@@ -320,7 +338,7 @@ func (s *VarOptItemsSketch[T]) popMinToMRegion() {
 }
 
 // growCandidateSet grows the candidate set by pulling light items from H to M.
-func (s *VarOptItemsSketch[T]) growCandidateSet(wtCands float64, numCands int) {
+func (s *VarOptItemsSketch[T]) growCandidateSet(wtCands float64, numCands int) error {
 	for s.h > 0 {
 		nextWt := s.peekMin()
 		nextTotWt := wtCands + nextWt
@@ -335,17 +353,20 @@ func (s *VarOptItemsSketch[T]) growCandidateSet(wtCands float64, numCands int) {
 		}
 	}
 
-	s.downsampleCandidateSet(wtCands, numCands)
+	return s.downsampleCandidateSet(wtCands, numCands)
 }
 
 // downsampleCandidateSet downsamples the candidate set to produce final R.
-func (s *VarOptItemsSketch[T]) downsampleCandidateSet(wtCands float64, numCands int) {
+func (s *VarOptItemsSketch[T]) downsampleCandidateSet(wtCands float64, numCands int) error {
 	if numCands < 2 {
-		return
+		return nil
 	}
 
 	// Choose which slot to delete
-	deleteSlot := s.chooseDeleteSlot(wtCands, numCands)
+	deleteSlot, err := s.chooseDeleteSlot(wtCands, numCands)
+	if err != nil {
+		return err
+	}
 
 	leftmostCandSlot := s.h
 
@@ -364,33 +385,34 @@ func (s *VarOptItemsSketch[T]) downsampleCandidateSet(wtCands float64, numCands 
 	s.m = 0
 	s.r = numCands - 1
 	s.totalWeightR = wtCands
+	return nil
 }
 
 // chooseDeleteSlot randomly selects which item to delete from candidates.
-func (s *VarOptItemsSketch[T]) chooseDeleteSlot(wtCands float64, numCands int) int {
+func (s *VarOptItemsSketch[T]) chooseDeleteSlot(wtCands float64, numCands int) (int, error) {
 	if s.r == 0 {
-		panic("choosing delete slot while in exact mode")
+		return 0, errors.New("chooseDeleteSlot called while in exact mode (r == 0)")
 	}
 
 	if s.m == 0 {
 		// All candidates are in R, pick random slot
-		return s.randomRIndex()
+		return s.randomRIndex(), nil
 	} else if s.m == 1 {
 		// Check if we keep the item in M or pick one from R
 		// p(keep) = (numCands - 1) * wtM / wtCands
 		wtMCand := s.weights[s.h] // slot of item in M is h
 		if wtCands*s.randFloat64NonZero() < float64(numCands-1)*wtMCand {
-			return s.randomRIndex() // keep item in M
+			return s.randomRIndex(), nil // keep item in M
 		}
-		return s.h // delete item in M
+		return s.h, nil // delete item in M
 	} else {
 		// General case with multiple M items
 		deleteSlot := s.chooseWeightedDeleteSlot(wtCands, numCands)
 		firstRSlot := s.h + s.m
 		if deleteSlot == firstRSlot {
-			return s.randomRIndex()
+			return s.randomRIndex(), nil
 		}
-		return deleteSlot
+		return deleteSlot, nil
 	}
 }
 

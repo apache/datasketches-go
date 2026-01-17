@@ -115,6 +115,73 @@ func (s *ReservoirItemsSketch[T]) Reset() {
 	s.data = s.data[:0]
 }
 
+// GetImplicitSampleWeight returns the implicit weight of each sample in the reservoir.
+// This is N/K when in sampling mode (N >= K), representing the "weight" each sample carries.
+func (s *ReservoirItemsSketch[T]) GetImplicitSampleWeight() float64 {
+	if s.n < int64(s.k) {
+		return 1.0
+	}
+	return float64(s.n) / float64(s.k)
+}
+
+// Copy returns a deep copy of the sketch.
+func (s *ReservoirItemsSketch[T]) Copy() *ReservoirItemsSketch[T] {
+	dataCopy := make([]T, len(s.data))
+	copy(dataCopy, s.data)
+	return &ReservoirItemsSketch[T]{
+		k:    s.k,
+		n:    s.n,
+		data: dataCopy,
+	}
+}
+
+// DownsampledCopy returns a copy of the sketch with a reduced reservoir size.
+// If newK >= current K, returns a regular copy.
+// This matches Java's downsampledCopy implementation: it creates a new sketch
+// with the target K and updates it with all current samples, then adjusts N
+// to preserve the correct implicit sample weights.
+func (s *ReservoirItemsSketch[T]) DownsampledCopy(newK int) *ReservoirItemsSketch[T] {
+	if newK >= s.k {
+		return s.Copy()
+	}
+
+	// Create new sketch with reduced K
+	result, _ := NewReservoirItemsSketch[T](newK)
+
+	// Update with each sample - this naturally performs reservoir sampling
+	// to select newK items from the current samples
+	samples := s.Samples()
+	for _, item := range samples {
+		result.Update(item)
+	}
+
+	// Adjust N to match original sketch's N for correct implicit weights
+	// This is critical for weighted merge operations
+	if result.n < s.n {
+		result.forceIncrementItemsSeen(s.n - result.n)
+	}
+
+	return result
+}
+
+// getValueAtPosition returns the item at the given position.
+// This is used internally by the union operation.
+func (s *ReservoirItemsSketch[T]) getValueAtPosition(pos int) T {
+	return s.data[pos]
+}
+
+// insertValueAtPosition replaces the item at the given position.
+// This is used internally by the union operation.
+func (s *ReservoirItemsSketch[T]) insertValueAtPosition(item T, pos int) {
+	s.data[pos] = item
+}
+
+// forceIncrementItemsSeen adds the given delta to the items seen count.
+// This is used internally by the union operation for weighted merging.
+func (s *ReservoirItemsSketch[T]) forceIncrementItemsSeen(delta int64) {
+	s.n += delta
+}
+
 // Serialization constants
 const (
 	preambleIntsEmpty    = 1

@@ -50,16 +50,17 @@ If you are interested in making contributions to this site please see our [Commu
 | 	            | KllFloatsSketch         | ❌ |
 | 	            | KllSketch<T>            | ⚠️ |
 | 	            | ReqFloatsSketch         | ❌ |
-| Frequencies  |              | ️ |
-|              | FreqLongsSketch             | ⚠️ |
-|              | FreqItemsSketch<T>          | ⚠️ |
+| 	            | TDigestDouble           | ⚠️ |
+| Frequencies  |                         | ️ |
+|              | FreqLongsSketch         | ⚠️ |
+|              | FreqItemsSketch<T>      | ⚠️ |
 |              | CountMinSketch          | ⚠️ |
-| Sampling |    |  |
+| Sampling |                         |  |
 |  | ReservoirLongsSketch    | ❌ |
 |  | ReserviorItemsSketch<T> | ❌ |
 | 	  | VarOptItemsSketch<T>    | ❌ |
-| Membership | | |
-| | BloomFilter | 🚧 |
+| Membership |                         | |
+| | BloomFilter             | 🚧 |
 
 
 ## Specialty Sketches

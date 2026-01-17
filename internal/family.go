@@ -33,6 +33,7 @@ type families struct {
 	Theta          family
 	TDigest        family
 	ReservoirItems family
+	VarOptItems    family
 }
 
 var FamilyEnum = &families{
@@ -75,5 +76,9 @@ var FamilyEnum = &families{
 	ReservoirItems: family{
 		Id:          11,
 		MaxPreLongs: 2,
+	},
+	VarOptItems: family{
+		Id:          13,
+		MaxPreLongs: 4,
 	},
 }

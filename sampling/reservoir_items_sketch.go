@@ -28,6 +28,7 @@ import (
 // ResizeFactor controls how the internal array grows.
 // Note: Go's slice append has automatic resizing, so this is kept for
 // API compatibility with the Java version. Can be removed if not needed.
+// TODO: In Java, this is abstracted into a common package. Consider if this should be moved to a common package in the future.
 type ResizeFactor int
 
 const (

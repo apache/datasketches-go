@@ -18,8 +18,13 @@
 package sampling
 
 import (
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"math/rand"
+	"strings"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 // ReservoirItemsUnion enables merging of multiple ReservoirItemsSketch instances.
@@ -77,19 +82,34 @@ func (u *ReservoirItemsUnion[T]) UpdateSketch(sketch *ReservoirItemsSketch[T]) {
 	u.twoWayMergeInternal(ris)
 }
 
+// UpdateFromRaw creates a sketch from raw components and merges it.
+// Useful in distributed environments. Items slice is used directly, not copied.
+func (u *ReservoirItemsUnion[T]) UpdateFromRaw(n int64, k int, items []T) {
+	if len(items) == 0 {
+		return
+	}
+
+	sketch := &ReservoirItemsSketch[T]{
+		k:    k,
+		n:    n,
+		data: items,
+	}
+
+	u.UpdateSketch(sketch)
+}
+
 // createNewGadget initializes the gadget based on the source sketch.
-// Matches Java's createNewGadget logic:
-// - If source K < maxK AND in exact mode (N <= K): create maxK gadget and merge items
-// - Otherwise: use source directly (preserving its K)
+// If source is in exact mode with K < maxK: upgrade to maxK.
+// Otherwise: preserve source's K.
 func (u *ReservoirItemsUnion[T]) createNewGadget(source *ReservoirItemsSketch[T]) {
 	if source.K() < u.maxK && source.N() <= int64(source.K()) {
-		// Exact mode with K < maxK: upgrade to maxK and merge all items
+
 		u.gadget, _ = NewReservoirItemsSketch[T](u.maxK)
 		for i := 0; i < source.NumSamples(); i++ {
 			u.gadget.Update(source.getValueAtPosition(i))
 		}
 	} else {
-		// K >= maxK OR sampling mode: preserve source's K
+
 		u.gadget = source.Copy()
 	}
 }
@@ -167,4 +187,106 @@ func (u *ReservoirItemsUnion[T]) MaxK() int {
 // Reset clears the union.
 func (u *ReservoirItemsUnion[T]) Reset() {
 	u.gadget = nil
+}
+
+// String returns a human-readable summary of the union.
+func (u *ReservoirItemsUnion[T]) String() string {
+	var sb strings.Builder
+	sb.WriteString("### ReservoirItemsUnion SUMMARY:\n")
+	sb.WriteString(fmt.Sprintf("   Max k: %d\n", u.maxK))
+	if u.gadget == nil {
+		sb.WriteString("   Gadget is nil\n")
+	} else {
+		sb.WriteString(fmt.Sprintf("   Gadget N: %d\n", u.gadget.N()))
+		sb.WriteString(fmt.Sprintf("   Gadget K: %d\n", u.gadget.K()))
+		sb.WriteString(fmt.Sprintf("   Gadget NumSamples: %d\n", u.gadget.NumSamples()))
+	}
+	sb.WriteString("### END UNION SUMMARY\n")
+	return sb.String()
+}
+
+// Serialization constants
+const (
+	unionPreambleLongs = 1
+	unionSerVer        = 2
+	unionFlagEmpty     = 0x04
+)
+
+// ToSlice serializes the union to a byte slice.
+func (u *ReservoirItemsUnion[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
+	empty := u.gadget == nil || u.gadget.IsEmpty()
+
+	if empty {
+
+		buf := make([]byte, 8)
+		buf[0] = unionPreambleLongs
+		buf[1] = unionSerVer
+		buf[2] = byte(internal.FamilyEnum.ReservoirUnion.Id)
+		buf[3] = unionFlagEmpty
+		binary.LittleEndian.PutUint32(buf[4:], uint32(u.maxK))
+		return buf, nil
+	}
+
+	gadgetBytes, err := u.gadget.ToSlice(serde)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := make([]byte, 8+len(gadgetBytes))
+
+	buf[0] = unionPreambleLongs
+	buf[1] = unionSerVer
+	buf[2] = byte(internal.FamilyEnum.ReservoirUnion.Id)
+	buf[3] = 0
+	binary.LittleEndian.PutUint32(buf[4:], uint32(u.maxK))
+
+	copy(buf[8:], gadgetBytes)
+
+	return buf, nil
+}
+
+// NewReservoirItemsUnionFromSlice deserializes a union from a byte slice.
+func NewReservoirItemsUnionFromSlice[T any](data []byte, serde ItemsSerDe[T]) (*ReservoirItemsUnion[T], error) {
+	if len(data) < 8 {
+		return nil, errors.New("data too short")
+	}
+
+	preambleLongs := int(data[0] & 0x3F)
+	ver := data[1]
+	family := data[2]
+	flags := data[3]
+	maxK := int(binary.LittleEndian.Uint32(data[4:])) // uint32, not uint16
+
+	if preambleLongs != unionPreambleLongs {
+		return nil, fmt.Errorf("invalid preamble longs: expected %d, got %d", unionPreambleLongs, preambleLongs)
+	}
+
+	if ver != unionSerVer {
+		return nil, errors.New("unsupported serialization version")
+	}
+	if family != byte(internal.FamilyEnum.ReservoirUnion.Id) {
+		return nil, errors.New("wrong sketch family")
+	}
+
+	isEmpty := (flags & unionFlagEmpty) != 0
+
+	union, err := NewReservoirItemsUnion[T](maxK)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isEmpty {
+		if len(data) <= 8 {
+			return nil, errors.New("data too short for non-empty union")
+		}
+
+		sketchData := data[8:]
+		sketch, err := NewReservoirItemsSketchFromSlice[T](sketchData, serde)
+		if err != nil {
+			return nil, err
+		}
+		union.UpdateSketch(sketch)
+	}
+
+	return union, nil
 }

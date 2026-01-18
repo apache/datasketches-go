@@ -24,7 +24,7 @@ import (
 )
 
 // Helper function to create a basic sketch with n items and capacity k
-func getBasicSketch(n int64, k int) *ReservoirItemsSketch[int64] {
+func newBasicSketch(n int64, k int) *ReservoirItemsSketch[int64] {
 	sketch, _ := NewReservoirItemsSketch[int64](k)
 	for i := int64(0); i < n; i++ {
 		sketch.Update(i)
@@ -111,8 +111,8 @@ func TestReservoirItemsUnionDownsampledUpdate(t *testing.T) {
 	const smallK = 256
 	const n = 2048
 
-	sketch1 := getBasicSketch(n, smallK)
-	sketch2 := getBasicSketch(2*n, bigK)
+	sketch1 := newBasicSketch(n, smallK)
+	sketch2 := newBasicSketch(2*n, bigK)
 
 	union, err := NewReservoirItemsUnion[int64](smallK)
 	assert.NoError(t, err)
@@ -139,8 +139,8 @@ func TestReservoirItemsUnionWeightedMerge(t *testing.T) {
 	const n1 = 16384
 	const n2 = 2048
 
-	sketch1 := getBasicSketch(n1, k)
-	sketch2 := getBasicSketch(n2, k)
+	sketch1 := newBasicSketch(n1, k)
+	sketch2 := newBasicSketch(n2, k)
 
 	// First merge order: sketch1 then sketch2
 	union, err := NewReservoirItemsUnion[int64](k)
@@ -182,7 +182,7 @@ func TestReservoirItemsUnionGadgetInitialization(t *testing.T) {
 	// Test case 1: Input K > maxK, in exact mode
 	// Result should use maxK
 	t.Run("InputK>MaxK_ExactMode", func(t *testing.T) {
-		bigKSketch := getBasicSketch(int64(maxK/2), bigK) // n=512, k=1536, exact mode
+		bigKSketch := newBasicSketch(int64(maxK/2), bigK) // n=512, k=1536, exact mode
 		union, err := NewReservoirItemsUnion[int64](maxK)
 		assert.NoError(t, err)
 
@@ -197,7 +197,7 @@ func TestReservoirItemsUnionGadgetInitialization(t *testing.T) {
 	// Test case 2: Input K < maxK and in sampling mode
 	// Result should preserve input's K (Java behavior)
 	t.Run("InputK<MaxK_SamplingMode", func(t *testing.T) {
-		smallKSketch := getBasicSketch(int64(maxK), smallK) // n=1024, k=128, sampling mode
+		smallKSketch := newBasicSketch(int64(maxK), smallK) // n=1024, k=128, sampling mode
 		union, err := NewReservoirItemsUnion[int64](maxK)
 		assert.NoError(t, err)
 
@@ -214,7 +214,7 @@ func TestReservoirItemsUnionGadgetInitialization(t *testing.T) {
 	// Test case 3: Input K < maxK and in exact mode
 	// Result should use maxK
 	t.Run("InputK<MaxK_ExactMode", func(t *testing.T) {
-		smallKExactSketch := getBasicSketch(int64(smallK), smallK) // n=128, k=128, exact mode
+		smallKExactSketch := newBasicSketch(int64(smallK), smallK) // n=128, k=128, exact mode
 		union, err := NewReservoirItemsUnion[int64](maxK)
 		assert.NoError(t, err)
 
@@ -235,8 +235,8 @@ func TestReservoirItemsUnionStandardMerge(t *testing.T) {
 	const n1 = 256
 	const n2 = 256
 
-	sketch1 := getBasicSketch(n1, k)
-	sketch2 := getBasicSketch(n2, k)
+	sketch1 := newBasicSketch(n1, k)
+	sketch2 := newBasicSketch(n2, k)
 
 	union, err := NewReservoirItemsUnion[int64](k)
 	assert.NoError(t, err)
@@ -254,7 +254,7 @@ func TestReservoirItemsUnionStandardMerge(t *testing.T) {
 
 	// Add a third sketch that will push into sampling mode
 	const n3 = 2048
-	sketch3 := getBasicSketch(n3, k)
+	sketch3 := newBasicSketch(n3, k)
 	union.UpdateSketch(sketch3)
 
 	result, err = union.Result()
@@ -314,7 +314,7 @@ func TestReservoirItemsUnionSerialization(t *testing.T) {
 		const n = 1000
 
 		// Create sketch and add to union
-		sketch := getBasicSketch(n, k)
+		sketch := newBasicSketch(n, k)
 		union, err := NewReservoirItemsUnion[int64](k)
 		assert.NoError(t, err)
 		union.UpdateSketch(sketch)
@@ -410,7 +410,7 @@ func TestReservoirItemsUnionResetWithSmallK(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Add sketch with small K in sampling mode
-	sketch := getBasicSketch(1000, smallK) // n=1000, k=25, sampling mode
+	sketch := newBasicSketch(1000, smallK) // n=1000, k=25, sampling mode
 	union.UpdateSketch(sketch)
 
 	result, err := union.Result()

@@ -48,8 +48,8 @@ func TestReservoirItemsUnion(t *testing.T) {
 	union, err := NewReservoirItemsUnion[int64](10)
 	assert.NoError(t, err)
 
-	union.UpdateSketch(sketch1)
-	union.UpdateSketch(sketch2)
+	assert.NoError(t, union.UpdateSketch(sketch1))
+	assert.NoError(t, union.UpdateSketch(sketch2))
 
 	result, err := union.Result()
 	assert.NoError(t, err)
@@ -69,8 +69,8 @@ func TestReservoirItemsUnionWithStrings(t *testing.T) {
 	sketch2.Update("z")
 
 	union, _ := NewReservoirItemsUnion[string](5)
-	union.UpdateSketch(sketch1)
-	union.UpdateSketch(sketch2)
+	assert.NoError(t, union.UpdateSketch(sketch1))
+	assert.NoError(t, union.UpdateSketch(sketch2))
 
 	result, _ := union.Result()
 	assert.LessOrEqual(t, result.NumSamples(), 5)
@@ -85,8 +85,8 @@ func TestReservoirItemsUnionWithEmptySketch(t *testing.T) {
 	}
 
 	union, _ := NewReservoirItemsUnion[int64](10)
-	union.UpdateSketch(sketch1)
-	union.UpdateSketch(emptySketch) // Should not affect result
+	assert.NoError(t, union.UpdateSketch(sketch1))
+	assert.NoError(t, union.UpdateSketch(emptySketch)) // Should not affect result
 
 	result, _ := union.Result()
 	assert.Equal(t, 5, result.NumSamples())
@@ -95,7 +95,7 @@ func TestReservoirItemsUnionWithEmptySketch(t *testing.T) {
 func TestReservoirItemsUnionWithNilSketch(t *testing.T) {
 	union, _ := NewReservoirItemsUnion[int64](10)
 	union.Update(42)
-	union.UpdateSketch(nil) // Should not panic
+	assert.NoError(t, union.UpdateSketch(nil)) // Should not panic
 
 	result, _ := union.Result()
 	assert.Equal(t, 1, result.NumSamples())
@@ -118,13 +118,13 @@ func TestReservoirItemsUnionDownsampledUpdate(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, smallK, union.MaxK())
 
-	union.UpdateSketch(sketch1)
+	assert.NoError(t, union.UpdateSketch(sketch1))
 	result, err := union.Result()
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, smallK, result.K())
 
-	union.UpdateSketch(sketch2)
+	assert.NoError(t, union.UpdateSketch(sketch2))
 	result, err = union.Result()
 	assert.NoError(t, err)
 	assert.Equal(t, smallK, result.K())
@@ -146,8 +146,8 @@ func TestReservoirItemsUnionWeightedMerge(t *testing.T) {
 	union, err := NewReservoirItemsUnion[int64](k)
 	assert.NoError(t, err)
 
-	union.UpdateSketch(sketch1)
-	union.UpdateSketch(sketch2)
+	assert.NoError(t, union.UpdateSketch(sketch1))
+	assert.NoError(t, union.UpdateSketch(sketch2))
 
 	result, err := union.Result()
 	assert.NoError(t, err)
@@ -160,8 +160,8 @@ func TestReservoirItemsUnionWeightedMerge(t *testing.T) {
 	union2, err := NewReservoirItemsUnion[int64](k)
 	assert.NoError(t, err)
 
-	union2.UpdateSketch(sketch2)
-	union2.UpdateSketch(sketch1)
+	assert.NoError(t, union2.UpdateSketch(sketch2))
+	assert.NoError(t, union2.UpdateSketch(sketch1))
 
 	result2, err := union2.Result()
 	assert.NoError(t, err)
@@ -186,7 +186,7 @@ func TestReservoirItemsUnionGadgetInitialization(t *testing.T) {
 		union, err := NewReservoirItemsUnion[int64](maxK)
 		assert.NoError(t, err)
 
-		union.UpdateSketch(bigKSketch)
+		assert.NoError(t, union.UpdateSketch(bigKSketch))
 		result, err := union.Result()
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -201,7 +201,7 @@ func TestReservoirItemsUnionGadgetInitialization(t *testing.T) {
 		union, err := NewReservoirItemsUnion[int64](maxK)
 		assert.NoError(t, err)
 
-		union.UpdateSketch(smallKSketch)
+		assert.NoError(t, union.UpdateSketch(smallKSketch))
 		result, err := union.Result()
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -218,7 +218,7 @@ func TestReservoirItemsUnionGadgetInitialization(t *testing.T) {
 		union, err := NewReservoirItemsUnion[int64](maxK)
 		assert.NoError(t, err)
 
-		union.UpdateSketch(smallKExactSketch)
+		assert.NoError(t, union.UpdateSketch(smallKExactSketch))
 		result, err := union.Result()
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -241,8 +241,8 @@ func TestReservoirItemsUnionStandardMerge(t *testing.T) {
 	union, err := NewReservoirItemsUnion[int64](k)
 	assert.NoError(t, err)
 
-	union.UpdateSketch(sketch1)
-	union.UpdateSketch(sketch2)
+	assert.NoError(t, union.UpdateSketch(sketch1))
+	assert.NoError(t, union.UpdateSketch(sketch2))
 
 	result, err := union.Result()
 	assert.NoError(t, err)
@@ -255,7 +255,7 @@ func TestReservoirItemsUnionStandardMerge(t *testing.T) {
 	// Add a third sketch that will push into sampling mode
 	const n3 = 2048
 	sketch3 := newBasicSketch(n3, k)
-	union.UpdateSketch(sketch3)
+	assert.NoError(t, union.UpdateSketch(sketch3))
 
 	result, err = union.Result()
 	assert.NoError(t, err)
@@ -317,7 +317,7 @@ func TestReservoirItemsUnionSerialization(t *testing.T) {
 		sketch := newBasicSketch(n, k)
 		union, err := NewReservoirItemsUnion[int64](k)
 		assert.NoError(t, err)
-		union.UpdateSketch(sketch)
+		assert.NoError(t, union.UpdateSketch(sketch))
 
 		// Serialize
 		bytes, err := union.ToSlice(Int64SerDe{})
@@ -352,7 +352,7 @@ func TestReservoirItemsUnionUpdateFromRaw(t *testing.T) {
 		data[i] = int64(i)
 	}
 
-	union.UpdateFromRaw(n, k, data)
+	assert.NoError(t, union.UpdateFromRaw(n, k, data))
 
 	result, err := union.Result()
 	assert.NoError(t, err)
@@ -365,7 +365,7 @@ func TestReservoirItemsUnionUpdateFromRaw(t *testing.T) {
 	for i := 0; i < 2*k; i++ {
 		data2[i] = int64(i)
 	}
-	union.UpdateFromRaw(10*n, 2*k, data2)
+	assert.NoError(t, union.UpdateFromRaw(10*n, 2*k, data2))
 
 	result, err = union.Result()
 	assert.NoError(t, err)
@@ -411,7 +411,7 @@ func TestReservoirItemsUnionResetWithSmallK(t *testing.T) {
 
 	// Add sketch with small K in sampling mode
 	sketch := newBasicSketch(1000, smallK) // n=1000, k=25, sampling mode
-	union.UpdateSketch(sketch)
+	assert.NoError(t, union.UpdateSketch(sketch))
 
 	result, err := union.Result()
 	assert.NoError(t, err)

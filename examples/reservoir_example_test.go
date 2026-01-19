@@ -95,8 +95,8 @@ func TestReservoirUnion(t *testing.T) {
 	union, err := sampling.NewReservoirItemsUnion[int64](10)
 	assert.NoError(t, err)
 
-	union.UpdateSketch(node1)
-	union.UpdateSketch(node2)
+	assert.NoError(t, union.UpdateSketch(node1))
+	assert.NoError(t, union.UpdateSketch(node2))
 
 	result, err := union.Result()
 	assert.NoError(t, err)

@@ -115,8 +115,8 @@ func (s *ReservoirItemsSketch[T]) Reset() {
 	s.data = s.data[:0]
 }
 
-// GetImplicitSampleWeight returns N/K when in sampling mode, or 1.0 in exact mode.
-func (s *ReservoirItemsSketch[T]) GetImplicitSampleWeight() float64 {
+// ImplicitSampleWeight returns N/K when in sampling mode, or 1.0 in exact mode.
+func (s *ReservoirItemsSketch[T]) ImplicitSampleWeight() float64 {
 	if s.n < int64(s.k) {
 		return 1.0
 	}
@@ -136,12 +136,15 @@ func (s *ReservoirItemsSketch[T]) Copy() *ReservoirItemsSketch[T] {
 
 // DownsampledCopy returns a copy with a reduced reservoir size.
 // If newK >= current K, returns a regular copy.
-func (s *ReservoirItemsSketch[T]) DownsampledCopy(newK int) *ReservoirItemsSketch[T] {
+func (s *ReservoirItemsSketch[T]) DownsampledCopy(newK int) (*ReservoirItemsSketch[T], error) {
 	if newK >= s.k {
-		return s.Copy()
+		return s.Copy(), nil
 	}
 
-	result, _ := NewReservoirItemsSketch[T](newK)
+	result, err := NewReservoirItemsSketch[T](newK)
+	if err != nil {
+		return nil, err
+	}
 
 	samples := s.Samples()
 	for _, item := range samples {
@@ -153,11 +156,11 @@ func (s *ReservoirItemsSketch[T]) DownsampledCopy(newK int) *ReservoirItemsSketc
 		result.forceIncrementItemsSeen(s.n - result.n)
 	}
 
-	return result
+	return result, nil
 }
 
-// getValueAtPosition returns the item at the given position.
-func (s *ReservoirItemsSketch[T]) getValueAtPosition(pos int) T {
+// valueAtPosition returns the item at the given position.
+func (s *ReservoirItemsSketch[T]) valueAtPosition(pos int) T {
 	return s.data[pos]
 }
 

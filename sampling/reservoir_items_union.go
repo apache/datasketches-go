@@ -62,31 +62,48 @@ func (u *ReservoirItemsUnion[T]) Update(item T) {
 
 // UpdateSketch merges another sketch into the union.
 // This implements Java's update(ReservoirItemsSketch) with twoWayMergeInternal logic.
-func (u *ReservoirItemsUnion[T]) UpdateSketch(sketch *ReservoirItemsSketch[T]) {
+func (u *ReservoirItemsUnion[T]) UpdateSketch(sketch *ReservoirItemsSketch[T]) error {
 	if sketch == nil || sketch.IsEmpty() {
-		return
+		return nil
 	}
 
 	// Downsample if input K > maxK
 	ris := sketch
 	if sketch.K() > u.maxK {
-		ris = sketch.DownsampledCopy(u.maxK)
+		var err error
+		ris, err = sketch.DownsampledCopy(u.maxK)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Initialize gadget if empty
 	if u.gadget == nil || u.gadget.IsEmpty() {
-		u.createNewGadget(ris)
-		return
+		if err := u.createNewGadget(ris); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	u.twoWayMergeInternal(ris)
+	return nil
 }
 
 // UpdateFromRaw creates a sketch from raw components and merges it.
 // Useful in distributed environments. Items slice is used directly, not copied.
-func (u *ReservoirItemsUnion[T]) UpdateFromRaw(n int64, k int, items []T) {
+func (u *ReservoirItemsUnion[T]) UpdateFromRaw(n int64, k int, items []T) error {
 	if len(items) == 0 {
-		return
+		return nil
+	}
+
+	if k < minK {
+		return errors.New("k must be at least 1")
+	}
+	if len(items) > k {
+		return fmt.Errorf("items length %d exceeds k=%d", len(items), k)
+	}
+	if n < int64(len(items)) {
+		return fmt.Errorf("items length %d cannot exceed n=%d", len(items), n)
 	}
 
 	sketch := &ReservoirItemsSketch[T]{
@@ -95,23 +112,26 @@ func (u *ReservoirItemsUnion[T]) UpdateFromRaw(n int64, k int, items []T) {
 		data: items,
 	}
 
-	u.UpdateSketch(sketch)
+	return u.UpdateSketch(sketch)
 }
 
 // createNewGadget initializes the gadget based on the source sketch.
 // If source is in exact mode with K < maxK: upgrade to maxK.
 // Otherwise: preserve source's K.
-func (u *ReservoirItemsUnion[T]) createNewGadget(source *ReservoirItemsSketch[T]) {
+func (u *ReservoirItemsUnion[T]) createNewGadget(source *ReservoirItemsSketch[T]) error {
 	if source.K() < u.maxK && source.N() <= int64(source.K()) {
 
-		u.gadget, _ = NewReservoirItemsSketch[T](u.maxK)
-		for i := 0; i < source.NumSamples(); i++ {
-			u.gadget.Update(source.getValueAtPosition(i))
+		var err error
+		u.gadget, err = NewReservoirItemsSketch[T](u.maxK)
+		if err != nil {
+			return err
 		}
+		u.twoWayMergeInternalStandard(source)
 	} else {
 
 		u.gadget = source.Copy()
 	}
+	return nil
 }
 
 // twoWayMergeInternal performs the merge based on the state of both sketches.
@@ -126,7 +146,7 @@ func (u *ReservoirItemsUnion[T]) twoWayMergeInternal(source *ReservoirItemsSketc
 		tmp := u.gadget
 		u.gadget = source.Copy()
 		u.twoWayMergeInternalStandard(tmp)
-	} else if source.GetImplicitSampleWeight() < float64(u.gadget.N())/float64(u.gadget.K()-1) {
+	} else if source.ImplicitSampleWeight() < float64(u.gadget.N())/float64(u.gadget.K()-1) {
 		// Case 3: both in sampling mode, source is "lighter"
 		// Merge source into gadget
 		u.twoWayMergeInternalWeighted(source)
@@ -143,7 +163,7 @@ func (u *ReservoirItemsUnion[T]) twoWayMergeInternal(source *ReservoirItemsSketc
 // Simply updates gadget with each item from source.
 func (u *ReservoirItemsUnion[T]) twoWayMergeInternalStandard(source *ReservoirItemsSketch[T]) {
 	for i := 0; i < source.NumSamples(); i++ {
-		u.gadget.Update(source.getValueAtPosition(i))
+		u.gadget.Update(source.valueAtPosition(i))
 	}
 }
 
@@ -163,7 +183,7 @@ func (u *ReservoirItemsUnion[T]) twoWayMergeInternalWeighted(source *ReservoirIt
 		rescaledFlip := targetTotal * rand.Float64()
 		if rescaledFlip < rescaledProb {
 			slotNo := rand.Intn(tgtK)
-			u.gadget.insertValueAtPosition(source.getValueAtPosition(i), slotNo)
+			u.gadget.insertValueAtPosition(source.valueAtPosition(i), slotNo)
 		}
 	}
 

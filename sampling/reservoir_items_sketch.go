@@ -115,6 +115,65 @@ func (s *ReservoirItemsSketch[T]) Reset() {
 	s.data = s.data[:0]
 }
 
+// ImplicitSampleWeight returns N/K when in sampling mode, or 1.0 in exact mode.
+func (s *ReservoirItemsSketch[T]) ImplicitSampleWeight() float64 {
+	if s.n < int64(s.k) {
+		return 1.0
+	}
+	return float64(s.n) / float64(s.k)
+}
+
+// Copy returns a deep copy of the sketch.
+func (s *ReservoirItemsSketch[T]) Copy() *ReservoirItemsSketch[T] {
+	dataCopy := make([]T, len(s.data))
+	copy(dataCopy, s.data)
+	return &ReservoirItemsSketch[T]{
+		k:    s.k,
+		n:    s.n,
+		data: dataCopy,
+	}
+}
+
+// DownsampledCopy returns a copy with a reduced reservoir size.
+// If newK >= current K, returns a regular copy.
+func (s *ReservoirItemsSketch[T]) DownsampledCopy(newK int) (*ReservoirItemsSketch[T], error) {
+	if newK >= s.k {
+		return s.Copy(), nil
+	}
+
+	result, err := NewReservoirItemsSketch[T](newK)
+	if err != nil {
+		return nil, err
+	}
+
+	samples := s.Samples()
+	for _, item := range samples {
+		result.Update(item)
+	}
+
+	// Adjust N to preserve correct implicit weights
+	if result.n < s.n {
+		result.forceIncrementItemsSeen(s.n - result.n)
+	}
+
+	return result, nil
+}
+
+// valueAtPosition returns the item at the given position.
+func (s *ReservoirItemsSketch[T]) valueAtPosition(pos int) T {
+	return s.data[pos]
+}
+
+// insertValueAtPosition replaces the item at the given position.
+func (s *ReservoirItemsSketch[T]) insertValueAtPosition(item T, pos int) {
+	s.data[pos] = item
+}
+
+// forceIncrementItemsSeen adds delta to the items seen count.
+func (s *ReservoirItemsSketch[T]) forceIncrementItemsSeen(delta int64) {
+	s.n += delta
+}
+
 // Serialization constants
 const (
 	preambleIntsEmpty    = 1

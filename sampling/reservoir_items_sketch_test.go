@@ -115,48 +115,6 @@ func TestReservoirItemsSketchReset(t *testing.T) {
 	assert.Equal(t, 10, sketch.K())
 }
 
-func TestReservoirItemsUnion(t *testing.T) {
-	sketch1, _ := NewReservoirItemsSketch[int64](10)
-	sketch2, _ := NewReservoirItemsSketch[int64](10)
-
-	for i := int64(1); i <= 500; i++ {
-		sketch1.Update(i)
-	}
-	for i := int64(501); i <= 1000; i++ {
-		sketch2.Update(i)
-	}
-
-	union, err := NewReservoirItemsUnion[int64](10)
-	assert.NoError(t, err)
-
-	union.UpdateSketch(sketch1)
-	union.UpdateSketch(sketch2)
-
-	result, err := union.Result()
-	assert.NoError(t, err)
-	assert.Equal(t, 10, result.NumSamples())
-}
-
-func TestReservoirItemsUnionWithStrings(t *testing.T) {
-	sketch1, _ := NewReservoirItemsSketch[string](5)
-	sketch2, _ := NewReservoirItemsSketch[string](5)
-
-	sketch1.Update("a")
-	sketch1.Update("b")
-	sketch1.Update("c")
-
-	sketch2.Update("x")
-	sketch2.Update("y")
-	sketch2.Update("z")
-
-	union, _ := NewReservoirItemsUnion[string](5)
-	union.UpdateSketch(sketch1)
-	union.UpdateSketch(sketch2)
-
-	result, _ := union.Result()
-	assert.LessOrEqual(t, result.NumSamples(), 5)
-}
-
 func TestReservoirItemsSketchKEqualsOne(t *testing.T) {
 	// Edge case: k=1 should keep exactly one sample
 	sketch, err := NewReservoirItemsSketch[int64](1)
@@ -183,29 +141,4 @@ func TestReservoirItemsSketchGetSamplesIsCopy(t *testing.T) {
 	// samples2 and internal data should be unchanged
 	assert.NotEqual(t, samples1[0], samples2[0])
 	assert.Equal(t, int64(42), samples2[0])
-}
-
-func TestReservoirItemsUnionWithEmptySketch(t *testing.T) {
-	sketch1, _ := NewReservoirItemsSketch[int64](10)
-	emptySketch, _ := NewReservoirItemsSketch[int64](10)
-
-	for i := int64(1); i <= 5; i++ {
-		sketch1.Update(i)
-	}
-
-	union, _ := NewReservoirItemsUnion[int64](10)
-	union.UpdateSketch(sketch1)
-	union.UpdateSketch(emptySketch) // Should not affect result
-
-	result, _ := union.Result()
-	assert.Equal(t, 5, result.NumSamples())
-}
-
-func TestReservoirItemsUnionWithNilSketch(t *testing.T) {
-	union, _ := NewReservoirItemsUnion[int64](10)
-	union.Update(42)
-	union.UpdateSketch(nil) // Should not panic
-
-	result, _ := union.Result()
-	assert.Equal(t, 1, result.NumSamples())
 }

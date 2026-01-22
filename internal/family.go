@@ -34,6 +34,7 @@ type families struct {
 	TDigest        family
 	ReservoirItems family
 	VarOptItems    family
+	ReservoirUnion family
 }
 
 var FamilyEnum = &families{
@@ -80,5 +81,8 @@ var FamilyEnum = &families{
 	VarOptItems: family{
 		Id:          13,
 		MaxPreLongs: 4,
+	ReservoirUnion: family{
+		Id:          12,
+		MaxPreLongs: 1,
 	},
 }

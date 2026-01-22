@@ -23,3 +23,6 @@ header:
     - .gitignore
     - .licenserc.yaml
     - .gitattributes
+    - go.sum
+    - RELEASE.md
+    - CONTRIBUTING.md

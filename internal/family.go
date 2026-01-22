@@ -81,6 +81,7 @@ var FamilyEnum = &families{
 	VarOptItems: family{
 		Id:          13,
 		MaxPreLongs: 4,
+	},
 	ReservoirUnion: family{
 		Id:          12,
 		MaxPreLongs: 1,

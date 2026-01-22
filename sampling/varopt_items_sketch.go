@@ -179,15 +179,6 @@ func (s *VarOptItemsSketch[T]) inWarmup() bool {
 	return s.r == 0
 }
 
-// tau returns the current threshold value tau.
-// Items with weight > tau are "heavy" and go into H region.
-func (s *VarOptItemsSketch[T]) tau() float64 {
-	if s.r == 0 {
-		return math.NaN()
-	}
-	return s.totalWeightR / float64(s.r)
-}
-
 // peekMin returns the minimum weight in the H region (heap root).
 func (s *VarOptItemsSketch[T]) peekMin() float64 {
 	if s.h == 0 {

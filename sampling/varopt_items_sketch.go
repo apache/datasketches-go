@@ -151,12 +151,6 @@ type Sample[T any] struct {
 // All returns an iterator over all samples with their adjusted weights.
 // For items in H region, the weight is the original weight.
 // For items in R region, the weight is tau (totalWeightR / r).
-//
-// Usage:
-//
-//	for sample := range sketch.All() {
-//	    fmt.Printf("Item: %v, Weight: %f\n", sample.Item, sample.Weight)
-//	}
 func (s *VarOptItemsSketch[T]) All() iter.Seq[Sample[T]] {
 	return func(yield func(Sample[T]) bool) {
 		// H region: items with their actual weights
@@ -237,7 +231,7 @@ func (s *VarOptItemsSketch[T]) Update(item T, weight float64) error {
 
 // updateWarmupPhase handles the warmup phase when r=0.
 func (s *VarOptItemsSketch[T]) updateWarmupPhase(item T, weight float64) error {
-	if s.h >= len(s.data) {
+	if s.h >= cap(s.data) {
 		s.growDataArrays()
 	}
 

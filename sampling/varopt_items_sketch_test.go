@@ -44,6 +44,12 @@ func TestVarOptItemsSketch_NewSketch(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for k < 8")
 	}
+
+	// Test k too large
+	_, err = NewVarOptItemsSketch[string](varOptMaxK + 1)
+	if err == nil {
+		t.Error("expected error for k > varOptMaxK")
+	}
 }
 
 func TestVarOptItemsSketch_WarmupPhase(t *testing.T) {

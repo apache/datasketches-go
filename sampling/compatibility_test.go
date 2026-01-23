@@ -18,7 +18,9 @@
 package sampling
 
 import (
+	"bytes"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -246,6 +248,49 @@ func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
 				os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_string_sampling_n1000_maxk%d_go.sk", internal.GoPath, k), data, 0644)
 			})
 		}
+	})
+
+	// ========== VarOptItemsSketch (10 files) ==========
+	t.Run("varopt_items", func(t *testing.T) {
+		nValues := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+		for _, n := range nValues {
+			n := n
+			t.Run(fmt.Sprintf("long_n%d", n), func(t *testing.T) {
+				sketch, _ := NewVarOptItemsSketch[int64](32)
+				for i := 1; i <= n; i++ {
+					_ = sketch.Update(int64(i), 1.0)
+				}
+				buf := &bytes.Buffer{}
+				enc := NewVarOptItemsSketchEncoder[int64](buf, Int64SerDe{})
+				_ = enc.Encode(sketch)
+				os.WriteFile(fmt.Sprintf("%s/varopt_sketch_long_n%d_go.sk", internal.GoPath, n), buf.Bytes(), 0644)
+			})
+		}
+
+		t.Run("string_exact", func(t *testing.T) {
+			sketch, _ := NewVarOptItemsSketch[string](1024)
+			for i := 1; i <= 200; i++ {
+				_ = sketch.Update(fmt.Sprintf("%d", i), 1000.0/float64(i))
+			}
+			buf := &bytes.Buffer{}
+			enc := NewVarOptItemsSketchEncoder[string](buf, StringSerDe{})
+			_ = enc.Encode(sketch)
+			os.WriteFile(fmt.Sprintf("%s/varopt_sketch_string_exact_go.sk", internal.GoPath), buf.Bytes(), 0644)
+		})
+
+		t.Run("long_sampling", func(t *testing.T) {
+			sketch, _ := NewVarOptItemsSketch[int64](1024)
+			for i := int64(0); i < 2000; i++ {
+				_ = sketch.Update(i, 1.0)
+			}
+			_ = sketch.Update(-1, 100000.0)
+			_ = sketch.Update(-2, 110000.0)
+			_ = sketch.Update(-3, 120000.0)
+			buf := &bytes.Buffer{}
+			enc := NewVarOptItemsSketchEncoder[int64](buf, Int64SerDe{})
+			_ = enc.Encode(sketch)
+			os.WriteFile(fmt.Sprintf("%s/varopt_sketch_long_sampling_go.sk", internal.GoPath), buf.Bytes(), 0644)
+		})
 	})
 }
 
@@ -618,4 +663,79 @@ func TestReservoirItemsUnion_JavaCompat(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestVarOptItemsSketch_JavaCompatLongs(t *testing.T) {
+	nValues := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+	for _, n := range nValues {
+		n := n
+		t.Run(fmt.Sprintf("long_n%d", n), func(t *testing.T) {
+			path := filepath.Join(internal.JavaPath, fmt.Sprintf("varopt_sketch_long_n%d_java.sk", n))
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				t.Skipf("Java file not found: %s", path)
+				return
+			}
+			data, err := os.ReadFile(path)
+			assert.NoError(t, err)
+
+			dec := NewVarOptItemsSketchDecoder[int64](bytes.NewReader(data), Int64SerDe{})
+			sketch, err := dec.Decode()
+			assert.NoError(t, err)
+			assert.Equal(t, 32, sketch.K())
+			assert.Equal(t, int64(n), sketch.N())
+			assert.Equal(t, min(n, sketch.K()), sketch.NumSamples())
+		})
+	}
+}
+
+func TestVarOptItemsSketch_JavaCompatStringExact(t *testing.T) {
+	path := filepath.Join(internal.JavaPath, "varopt_sketch_string_exact_java.sk")
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Skipf("Java file not found: %s", path)
+		return
+	}
+	data, err := os.ReadFile(path)
+	assert.NoError(t, err)
+
+	dec := NewVarOptItemsSketchDecoder[string](bytes.NewReader(data), StringSerDe{})
+	sketch, err := dec.Decode()
+	assert.NoError(t, err)
+	assert.Equal(t, 1024, sketch.K())
+	assert.Equal(t, int64(200), sketch.N())
+	assert.Equal(t, 200, sketch.NumSamples())
+
+	expected := 0.0
+	for i := 1; i <= 200; i++ {
+		expected += 1000.0 / float64(i)
+	}
+	sum := 0.0
+	for sample := range sketch.All() {
+		sum += sample.Weight
+	}
+	assert.InDelta(t, expected, sum, 1e-13)
+}
+
+func TestVarOptItemsSketch_JavaCompatLongSampling(t *testing.T) {
+	path := filepath.Join(internal.JavaPath, "varopt_sketch_long_sampling_java.sk")
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Skipf("Java file not found: %s", path)
+		return
+	}
+	data, err := os.ReadFile(path)
+	assert.NoError(t, err)
+
+	dec := NewVarOptItemsSketchDecoder[int64](bytes.NewReader(data), Int64SerDe{})
+	sketch, err := dec.Decode()
+	assert.NoError(t, err)
+	assert.Equal(t, 1024, sketch.K())
+	assert.Equal(t, int64(2003), sketch.N())
+	assert.Equal(t, 1024, sketch.NumSamples())
+
+	sumH := 0.0
+	for i := 0; i < sketch.h; i++ {
+		sumH += sketch.weights[i]
+	}
+	total := sumH + sketch.totalWeightR
+	assert.InDelta(t, 332000.0, total, 1e-13)
+	assert.False(t, math.IsNaN(total))
 }

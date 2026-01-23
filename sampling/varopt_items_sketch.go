@@ -18,10 +18,15 @@
 package sampling
 
 import (
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"iter"
 	"math"
 	"math/rand"
+	"io"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 // VarOptItemsSketch implements variance-optimal weighted sampling.
@@ -523,4 +528,257 @@ func (s *VarOptItemsSketch[T]) adjustedSize(maxSize, resizeTarget int) int {
 		return resizeTarget
 	}
 	return maxSize
+}
+
+// VarOptItemsSketchEncoder writes a Java-compatible VarOpt sketch to an io.Writer.
+type VarOptItemsSketchEncoder[T any] struct {
+	w     io.Writer
+	serde ItemsSerDe[T]
+}
+
+// NewVarOptItemsSketchEncoder creates an encoder with the provided writer and serde.
+func NewVarOptItemsSketchEncoder[T any](w io.Writer, serde ItemsSerDe[T]) *VarOptItemsSketchEncoder[T] {
+	return &VarOptItemsSketchEncoder[T]{w: w, serde: serde}
+}
+
+// Encode writes the serialized sketch to the encoder's writer.
+func (e *VarOptItemsSketchEncoder[T]) Encode(sketch *VarOptItemsSketch[T]) error {
+	if e == nil || e.w == nil {
+		return errors.New("nil writer")
+	}
+	data, err := encodeVarOptItemsSketch(sketch, e.serde)
+	if err != nil {
+		return err
+	}
+	_, err = e.w.Write(data)
+	return err
+}
+
+// VarOptItemsSketchDecoder reads a Java-compatible VarOpt sketch from an io.Reader.
+type VarOptItemsSketchDecoder[T any] struct {
+	r     io.Reader
+	serde ItemsSerDe[T]
+}
+
+// NewVarOptItemsSketchDecoder creates a decoder with the provided reader and serde.
+func NewVarOptItemsSketchDecoder[T any](r io.Reader, serde ItemsSerDe[T]) *VarOptItemsSketchDecoder[T] {
+	return &VarOptItemsSketchDecoder[T]{r: r, serde: serde}
+}
+
+// Decode reads all bytes from the decoder's reader and deserializes the sketch.
+func (d *VarOptItemsSketchDecoder[T]) Decode() (*VarOptItemsSketch[T], error) {
+	if d == nil || d.r == nil {
+		return nil, errors.New("nil reader")
+	}
+	data, err := io.ReadAll(d.r)
+	if err != nil {
+		return nil, err
+	}
+	return decodeVarOptItemsSketch[T](data, d.serde)
+}
+
+func encodeVarOptItemsSketch[T any](s *VarOptItemsSketch[T], serde ItemsSerDe[T]) ([]byte, error) {
+	if s.m != 0 {
+		return nil, errors.New("sketch has pending middle region items")
+	}
+
+	empty := s.h == 0 && s.r == 0
+	preLongs := varOptPreambleLongsEmpty
+	flags := 0
+	if empty {
+		flags |= varOptFlagEmpty
+	} else if s.r == 0 {
+		preLongs = varOptPreambleLongsWarmup
+	} else {
+		preLongs = varOptPreambleLongsFull
+	}
+
+	resizeBits, err := encodeVarOptResizeFactor(s.rf)
+	if err != nil {
+		return nil, err
+	}
+
+	if empty {
+		buf := make([]byte, preLongs*8)
+		buf[0] = resizeBits | byte(preLongs)
+		buf[1] = varOptSerVer
+		buf[2] = byte(internal.FamilyEnum.VarOptItems.Id)
+		buf[3] = byte(flags)
+		binary.LittleEndian.PutUint32(buf[4:], uint32(s.k))
+		return buf, nil
+	}
+
+	samples, err := s.sampleItems()
+	if err != nil {
+		return nil, err
+	}
+	itemBytes, err := serde.SerializeToBytes(samples)
+	if err != nil {
+		return nil, err
+	}
+
+	outBytes := (preLongs * 8) + (s.h * 8) + len(itemBytes)
+	buf := make([]byte, outBytes)
+	buf[0] = resizeBits | byte(preLongs)
+	buf[1] = varOptSerVer
+	buf[2] = byte(internal.FamilyEnum.VarOptItems.Id)
+	buf[3] = byte(flags)
+	binary.LittleEndian.PutUint32(buf[4:], uint32(s.k))
+	binary.LittleEndian.PutUint64(buf[8:], uint64(s.n))
+	binary.LittleEndian.PutUint32(buf[16:], uint32(s.h))
+	binary.LittleEndian.PutUint32(buf[20:], uint32(s.r))
+	if s.r > 0 {
+		binary.LittleEndian.PutUint64(buf[24:], math.Float64bits(s.totalWeightR))
+	}
+
+	offset := preLongs * 8
+	for i := 0; i < s.h; i++ {
+		binary.LittleEndian.PutUint64(buf[offset:], math.Float64bits(s.weights[i]))
+		offset += 8
+	}
+	copy(buf[offset:], itemBytes)
+
+	return buf, nil
+}
+
+func decodeVarOptItemsSketch[T any](data []byte, serde ItemsSerDe[T]) (*VarOptItemsSketch[T], error) {
+	if len(data) < 8 {
+		return nil, errors.New("data too short")
+	}
+
+	preLongs := int(data[0] & 0x3F)
+	rfBits := (data[0] >> 6) & 0x03
+	serVer := data[1]
+	family := data[2]
+	flags := data[3]
+	k := int(binary.LittleEndian.Uint32(data[4:]))
+
+	if serVer != varOptSerVer {
+		return nil, fmt.Errorf("unsupported serialization version: %d", serVer)
+	}
+	if family != byte(internal.FamilyEnum.VarOptItems.Id) {
+		return nil, errors.New("wrong sketch family")
+	}
+
+	rf, err := decodeVarOptResizeFactor(rfBits)
+	if err != nil {
+		return nil, err
+	}
+
+	isEmpty := (flags & varOptFlagEmpty) != 0
+	if isEmpty || preLongs == varOptPreambleLongsEmpty {
+		return NewVarOptItemsSketch[T](k, WithResizeFactor(rf))
+	}
+
+	if preLongs != varOptPreambleLongsWarmup && preLongs != varOptPreambleLongsFull {
+		return nil, fmt.Errorf("invalid preamble longs: %d", preLongs)
+	}
+
+	if len(data) < preLongs*8 {
+		return nil, errors.New("data too short for preamble")
+	}
+
+	n := int64(binary.LittleEndian.Uint64(data[8:]))
+	h := int(binary.LittleEndian.Uint32(data[16:]))
+	r := int(binary.LittleEndian.Uint32(data[20:]))
+	if h < 0 || r < 0 {
+		return nil, errors.New("negative region counts")
+	}
+	if n < 0 {
+		return nil, errors.New("negative n")
+	}
+	if int64(h+r) > n {
+		return nil, errors.New("sample count exceeds n")
+	}
+
+	totalWeightR := 0.0
+	if preLongs == varOptPreambleLongsFull {
+		if r == 0 {
+			return nil, errors.New("full preamble with empty R region")
+		}
+		totalWeightR = math.Float64frombits(binary.LittleEndian.Uint64(data[24:]))
+	} else if r != 0 {
+		return nil, errors.New("warmup preamble with non-empty R region")
+	}
+
+	weightsOffset := preLongs * 8
+	weightsBytes := h * 8
+	if len(data) < weightsOffset+weightsBytes {
+		return nil, errors.New("data too short for weights")
+	}
+
+	weights := make([]float64, h)
+	for i := 0; i < h; i++ {
+		weights[i] = math.Float64frombits(binary.LittleEndian.Uint64(data[weightsOffset+i*8:]))
+		if weights[i] <= 0.0 {
+			return nil, errors.New("non-positive weight in heap")
+		}
+	}
+
+	itemsOffset := weightsOffset + weightsBytes
+	items, err := serde.DeserializeFromBytes(data[itemsOffset:], h+r)
+	if err != nil {
+		return nil, err
+	}
+
+	sketch := &VarOptItemsSketch[T]{
+		k:            k,
+		n:            n,
+		h:            h,
+		m:            0,
+		r:            r,
+		totalWeightR: totalWeightR,
+		rf:           rf,
+	}
+
+	if r > 0 {
+		allocatedSize := k + 1
+		sketch.allocatedSize = allocatedSize
+		sketch.data = make([]T, allocatedSize)
+		sketch.weights = make([]float64, allocatedSize)
+		copy(sketch.data[:h], items[:h])
+		copy(sketch.weights[:h], weights)
+		copy(sketch.data[h:h+r], items[h:])
+		for i := 0; i < r; i++ {
+			sketch.weights[h+i] = -1.0
+		}
+	} else {
+		initialSize := int(rf)
+		if initialSize > k {
+			initialSize = k
+		}
+		allocatedSize := initialSize
+		if h > allocatedSize {
+			allocatedSize = h
+		}
+		sketch.allocatedSize = allocatedSize
+		sketch.data = make([]T, h, allocatedSize)
+		sketch.weights = make([]float64, h, allocatedSize)
+		copy(sketch.data, items[:h])
+		copy(sketch.weights, weights)
+	}
+
+	return sketch, nil
+}
+
+func (s *VarOptItemsSketch[T]) sampleItems() ([]T, error) {
+	numSamples := s.h + s.r
+	if numSamples == 0 {
+		return nil, nil
+	}
+	if s.h < 0 || s.r < 0 {
+		return nil, errors.New("negative sample counts")
+	}
+	rStart := s.h + s.m
+	if rStart < 0 || rStart > len(s.data) {
+		return nil, errors.New("invalid R region offset")
+	}
+	if rStart+s.r > len(s.data) {
+		return nil, errors.New("R region exceeds data length")
+	}
+
+	out := make([]T, numSamples)
+	copy(out[:s.h], s.data[:s.h])
+	copy(out[s.h:], s.data[rStart:rStart+s.r])
+	return out, nil
 }

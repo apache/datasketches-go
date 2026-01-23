@@ -22,6 +22,7 @@
 [![Release](https://img.shields.io/github/release/apache/datasketches-go.svg)](https://github.com/apache/datasketches-go/releases)
 [![GoDoc](https://godoc.org/github.com/apache/datasketches-go?status.svg)](https://godoc.org/github.com/apache/datasketches-go)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/apache/datasketches-go/blob/master/LICENSE)
+[![Coverage Status](https://coveralls.io/repos/github/apache/datasketches-go/badge.svg?branch=main)](https://coveralls.io/github/apache/datasketches-go?branch=main)
 
 # Apache<sup>&reg;</sup> DataSketches&trade; Core Go Library Component
 This is the core Go component of the DataSketches library.  It contains some of the sketching algorithms and can be accessed directly from user applications.

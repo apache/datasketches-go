@@ -15,33 +15,35 @@
 # limitations under the License.
 #
 
-# This workflow will build a golang project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
-
-name: Go
+name: Coverage
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
-
-  build:
+  test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: [ '1.24.x' ]
+
     steps:
-    - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Set up Go ${{ matrix.go-version }}
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ matrix.go-version }}
-    - name: Build
-      run: go build -v ./...
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
 
-    - name: Run Test With coverage
-      run: make test
+      - name: Run tests with coverage
+        run: make test
+
+      - name: Upload coverage to Coveralls
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: coverallsapp/github-action@v2
+        with:
+          file: coverage.out
+          format: golang

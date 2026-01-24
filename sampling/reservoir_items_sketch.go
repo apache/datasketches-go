@@ -20,8 +20,11 @@ package sampling
 import (
 	"encoding/binary"
 	"errors"
+	"math"
 	"math/rand"
+	"slices"
 
+	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
 )
 
@@ -38,7 +41,10 @@ const (
 	ResizeX8 ResizeFactor = 8
 
 	defaultResizeFactor = ResizeX8
-	minK                = 1
+	minK                = 2
+
+	// smallest sampling array allocated: 16
+	minLgArrItems = 4
 )
 
 // ReservoirItemsSketch provides a uniform random sample of items
@@ -52,19 +58,48 @@ const (
 type ReservoirItemsSketch[T any] struct {
 	k    int   // maximum reservoir size
 	n    int64 // total items seen
-	data []T   // reservoir storage
+	rf   ResizeFactor
+	data []T // reservoir storage
+}
+
+type reservoirItemsSketchOptions struct {
+	resizeFactor ResizeFactor
+}
+
+// ReservoirItemsSketchOptionFunc defines a functional option for configuring reservoirItemsSketchOptions.
+type ReservoirItemsSketchOptionFunc func(*reservoirItemsSketchOptions)
+
+// WithReservoirItemsSketchResizeFactor sets the resize factor for the internal array.
+func WithReservoirItemsSketchResizeFactor(rf ResizeFactor) ReservoirItemsSketchOptionFunc {
+	return func(r *reservoirItemsSketchOptions) {
+		r.resizeFactor = rf
+	}
 }
 
 // NewReservoirItemsSketch creates a new reservoir sketch with the given capacity k.
-func NewReservoirItemsSketch[T any](k int) (*ReservoirItemsSketch[T], error) {
+func NewReservoirItemsSketch[T any](
+	k int, opts ...ReservoirItemsSketchOptionFunc,
+) (*ReservoirItemsSketch[T], error) {
 	if k < minK {
-		return nil, errors.New("k must be at least 1")
+		return nil, errors.New("k must be at least 2")
 	}
 
+	options := &reservoirItemsSketchOptions{
+		resizeFactor: defaultResizeFactor,
+	}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	ceilingLgK, _ := internal.ExactLog2(common.CeilingPowerOf2(k))
+	initialLgSize := startingSubMultiple(
+		ceilingLgK, int(math.Log2(float64(options.resizeFactor))), minLgArrItems,
+	)
 	return &ReservoirItemsSketch[T]{
 		k:    k,
 		n:    0,
-		data: make([]T, 0, min(k, int(defaultResizeFactor))),
+		rf:   options.resizeFactor,
+		data: make([]T, 0, adjustedSamplingAllocationSize(k, 1<<initialLgSize)),
 	}, nil
 }
 
@@ -72,6 +107,10 @@ func NewReservoirItemsSketch[T any](k int) (*ReservoirItemsSketch[T], error) {
 func (s *ReservoirItemsSketch[T]) Update(item T) {
 	if s.n < int64(s.k) {
 		// Initial phase: store all items until reservoir is full
+		if s.n >= int64(cap(s.data)) {
+			s.growReservoir()
+		}
+
 		s.data = append(s.data, item)
 	} else {
 		// Steady state: replace with probability k/n
@@ -81,6 +120,11 @@ func (s *ReservoirItemsSketch[T]) Update(item T) {
 		}
 	}
 	s.n++
+}
+
+func (s *ReservoirItemsSketch[T]) growReservoir() {
+	adjustedSize := adjustedSamplingAllocationSize(s.k, cap(s.data)<<int(s.rf))
+	s.data = slices.Grow(s.data, adjustedSize)
 }
 
 // K returns the maximum reservoir capacity.
@@ -112,8 +156,13 @@ func (s *ReservoirItemsSketch[T]) IsEmpty() bool {
 
 // Reset clears the sketch while preserving capacity k.
 func (s *ReservoirItemsSketch[T]) Reset() {
+	ceilingLgK, _ := internal.ExactLog2(common.CeilingPowerOf2(s.k))
+	initialLgSize := startingSubMultiple(
+		ceilingLgK, int(math.Log2(float64(s.rf))), minLgArrItems,
+	)
+
 	s.n = 0
-	s.data = s.data[:0]
+	s.data = make([]T, 0, adjustedSamplingAllocationSize(s.k, 1<<initialLgSize))
 }
 
 // ImplicitSampleWeight returns N/K when in sampling mode, or 1.0 in exact mode.

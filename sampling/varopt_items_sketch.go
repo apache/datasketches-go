@@ -21,10 +21,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"iter"
 	"math"
 	"math/rand"
-	"io"
 
 	"github.com/apache/datasketches-go/internal"
 )
@@ -537,13 +537,13 @@ type VarOptItemsSketchEncoder[T any] struct {
 }
 
 // NewVarOptItemsSketchEncoder creates an encoder with the provided writer and serde.
-func NewVarOptItemsSketchEncoder[T any](w io.Writer, serde ItemsSerDe[T]) *VarOptItemsSketchEncoder[T] {
-	return &VarOptItemsSketchEncoder[T]{w: w, serde: serde}
+func NewVarOptItemsSketchEncoder[T any](w io.Writer, serde ItemsSerDe[T]) VarOptItemsSketchEncoder[T] {
+	return VarOptItemsSketchEncoder[T]{w: w, serde: serde}
 }
 
 // Encode writes the serialized sketch to the encoder's writer.
-func (e *VarOptItemsSketchEncoder[T]) Encode(sketch *VarOptItemsSketch[T]) error {
-	if e == nil || e.w == nil {
+func (e VarOptItemsSketchEncoder[T]) Encode(sketch *VarOptItemsSketch[T]) error {
+	if e.w == nil {
 		return errors.New("nil writer")
 	}
 	data, err := encodeVarOptItemsSketch(sketch, e.serde)
@@ -561,13 +561,13 @@ type VarOptItemsSketchDecoder[T any] struct {
 }
 
 // NewVarOptItemsSketchDecoder creates a decoder with the provided reader and serde.
-func NewVarOptItemsSketchDecoder[T any](r io.Reader, serde ItemsSerDe[T]) *VarOptItemsSketchDecoder[T] {
-	return &VarOptItemsSketchDecoder[T]{r: r, serde: serde}
+func NewVarOptItemsSketchDecoder[T any](r io.Reader, serde ItemsSerDe[T]) VarOptItemsSketchDecoder[T] {
+	return VarOptItemsSketchDecoder[T]{r: r, serde: serde}
 }
 
 // Decode reads all bytes from the decoder's reader and deserializes the sketch.
-func (d *VarOptItemsSketchDecoder[T]) Decode() (*VarOptItemsSketch[T], error) {
-	if d == nil || d.r == nil {
+func (d VarOptItemsSketchDecoder[T]) Decode() (*VarOptItemsSketch[T], error) {
+	if d.r == nil {
 		return nil, errors.New("nil reader")
 	}
 	data, err := io.ReadAll(d.r)

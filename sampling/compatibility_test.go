@@ -739,3 +739,80 @@ func TestVarOptItemsSketch_JavaCompatLongSampling(t *testing.T) {
 	assert.InDelta(t, 332000.0, total, 1e-13)
 	assert.False(t, math.IsNaN(total))
 }
+
+func TestVarOptItemsSketch_CppCompat(t *testing.T) {
+	nValues := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+	for _, n := range nValues {
+		n := n
+		t.Run(fmt.Sprintf("long_n%d", n), func(t *testing.T) {
+			path := filepath.Join(internal.CppPath, fmt.Sprintf("varopt_sketch_long_n%d_cpp.sk", n))
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				t.Skipf("C++ file not found: %s", path)
+				return
+			}
+			data, err := os.ReadFile(path)
+			assert.NoError(t, err)
+
+			dec := NewVarOptItemsSketchDecoder[int64](bytes.NewReader(data), Int64SerDe{})
+			sketch, err := dec.Decode()
+			assert.NoError(t, err)
+			assert.Equal(t, 32, sketch.K())
+			assert.Equal(t, int64(n), sketch.N())
+			assert.Equal(t, min(n, sketch.K()), sketch.NumSamples())
+		})
+	}
+
+	t.Run("string_exact", func(t *testing.T) {
+		path := filepath.Join(internal.CppPath, "varopt_sketch_string_exact_cpp.sk")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			t.Skipf("C++ file not found: %s", path)
+			return
+		}
+		data, err := os.ReadFile(path)
+		assert.NoError(t, err)
+
+		dec := NewVarOptItemsSketchDecoder[string](bytes.NewReader(data), StringSerDe{})
+		sketch, err := dec.Decode()
+		assert.NoError(t, err)
+		assert.Equal(t, 1024, sketch.K())
+		assert.Equal(t, int64(200), sketch.N())
+		assert.Equal(t, 200, sketch.NumSamples())
+
+		// Verify weights sum, similar to Java test
+		expected := 0.0
+		for i := 1; i <= 200; i++ {
+			expected += 1000.0 / float64(i)
+		}
+		sum := 0.0
+		for sample := range sketch.All() {
+			sum += sample.Weight
+		}
+		assert.InDelta(t, expected, sum, 1e-13)
+	})
+
+	t.Run("long_sampling", func(t *testing.T) {
+		path := filepath.Join(internal.CppPath, "varopt_sketch_long_sampling_cpp.sk")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			t.Skipf("C++ file not found: %s", path)
+			return
+		}
+		data, err := os.ReadFile(path)
+		assert.NoError(t, err)
+
+		dec := NewVarOptItemsSketchDecoder[int64](bytes.NewReader(data), Int64SerDe{})
+		sketch, err := dec.Decode()
+		assert.NoError(t, err)
+		assert.Equal(t, 1024, sketch.K())
+		assert.Equal(t, int64(2003), sketch.N())
+		assert.Equal(t, 1024, sketch.NumSamples())
+
+		// Verify total weight
+		sumH := 0.0
+		for i := 0; i < sketch.h; i++ {
+			sumH += sketch.weights[i]
+		}
+		total := sumH + sketch.totalWeightR
+		assert.InDelta(t, 332000.0, total, 1e-13)
+		assert.False(t, math.IsNaN(total))
+	})
+}

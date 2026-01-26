@@ -18,8 +18,11 @@
 package sampling
 
 import (
+	"math"
 	"testing"
 
+	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -69,63 +72,100 @@ func TestReservoirItemsSketchWithStruct(t *testing.T) {
 
 func TestReservoirItemsSketchInvalidK(t *testing.T) {
 	_, err := NewReservoirItemsSketch[int64](0)
-	assert.Error(t, err)
+	assert.ErrorContains(t, err, "k must be at least 2")
 
-	_, err = NewReservoirItemsSketch[int64](-1)
-	assert.Error(t, err)
+	_, err = NewReservoirItemsSketch[int64](1)
+	assert.ErrorContains(t, err, "k must be at least 2")
 }
 
-func TestReservoirItemsSketchUpdateBelowK(t *testing.T) {
-	sketch, _ := NewReservoirItemsSketch[int64](10)
+func TestReservoirItemsSketch_Update(t *testing.T) {
+	t.Run("BelowKStoresAllItems", func(t *testing.T) {
+		sketch, err := NewReservoirItemsSketch[int64](10)
+		assert.NoError(t, err)
 
-	for i := int64(1); i <= 5; i++ {
-		sketch.Update(i)
-	}
+		for i := int64(1); i <= 5; i++ {
+			sketch.Update(i)
+		}
 
-	assert.Equal(t, int64(5), sketch.N())
-	assert.Equal(t, 5, sketch.NumSamples())
+		assert.Equal(t, int64(5), sketch.N())
+		assert.Equal(t, 5, sketch.NumSamples())
+		assert.Equal(t, 1.0, sketch.ImplicitSampleWeight())
 
-	samples := sketch.Samples()
-	for i := int64(1); i <= 5; i++ {
-		assert.Contains(t, samples, i)
-	}
-}
+		samples := sketch.Samples()
+		for i := int64(1); i <= 5; i++ {
+			assert.Contains(t, samples, i)
+		}
+	})
 
-func TestReservoirItemsSketchUpdateAboveK(t *testing.T) {
-	sketch, _ := NewReservoirItemsSketch[int64](10)
+	t.Run("AtKStoresKItems", func(t *testing.T) {
+		sketch, err := NewReservoirItemsSketch[int64](8)
+		assert.NoError(t, err)
 
-	for i := int64(1); i <= 1000; i++ {
-		sketch.Update(i)
-	}
+		for i := int64(1); i <= 8; i++ {
+			sketch.Update(i)
+		}
 
-	assert.Equal(t, int64(1000), sketch.N())
-	assert.Equal(t, 10, sketch.NumSamples())
+		assert.Equal(t, int64(8), sketch.N())
+		assert.Equal(t, 8, sketch.NumSamples())
+		assert.Equal(t, 1.0, sketch.ImplicitSampleWeight())
+
+		samples := sketch.Samples()
+		for i := int64(1); i <= 8; i++ {
+			assert.Contains(t, samples, i)
+		}
+	})
+
+	t.Run("AboveKMaintainsKAndIncrementsN", func(t *testing.T) {
+		k := 10
+		total := 1000
+
+		sketch, err := NewReservoirItemsSketch[int64](k)
+		assert.NoError(t, err)
+
+		for i := 1; i <= total; i++ {
+			sketch.Update(int64(i))
+		}
+
+		assert.Equal(t, int64(total), sketch.N())
+		assert.Equal(t, k, sketch.NumSamples())
+		assert.Equal(t, float64(total)/float64(k), sketch.ImplicitSampleWeight())
+
+		samples := sketch.Samples()
+		seen := make(map[int64]struct{}, len(samples))
+		for _, sample := range samples {
+			assert.True(t, sample >= 1 && sample <= int64(total))
+			_, exists := seen[sample]
+			assert.False(t, exists)
+			seen[sample] = struct{}{}
+		}
+	})
 }
 
 func TestReservoirItemsSketchReset(t *testing.T) {
-	sketch, _ := NewReservoirItemsSketch[int64](10)
+	k := 1024
 
-	for i := int64(1); i <= 5; i++ {
-		sketch.Update(i)
-	}
-
-	sketch.Reset()
-	assert.True(t, sketch.IsEmpty())
-	assert.Equal(t, int64(0), sketch.N())
-	assert.Equal(t, 10, sketch.K())
-}
-
-func TestReservoirItemsSketchKEqualsOne(t *testing.T) {
-	// Edge case: k=1 should keep exactly one sample
-	sketch, err := NewReservoirItemsSketch[int64](1)
+	sketch, err := NewReservoirItemsSketch[int64](k)
 	assert.NoError(t, err)
 
-	for i := int64(1); i <= 100; i++ {
+	ceilingLgK, _ := internal.ExactLog2(common.CeilingPowerOf2(k))
+	initialLgSize := startingSubMultiple(
+		ceilingLgK, int(math.Log2(float64(defaultResizeFactor))), minLgArrItems,
+	)
+	expectedInitialCap := adjustedSamplingAllocationSize(k, 1<<initialLgSize)
+
+	for i := int64(1); i <= int64(expectedInitialCap)+1; i++ {
 		sketch.Update(i)
 	}
 
-	assert.Equal(t, 1, sketch.NumSamples())
-	assert.Equal(t, int64(100), sketch.N())
+	assert.Greater(t, cap(sketch.data), expectedInitialCap)
+
+	sketch.Reset()
+
+	assert.True(t, sketch.IsEmpty())
+	assert.Equal(t, int64(0), sketch.N())
+	assert.Equal(t, k, sketch.K())
+	assert.Equal(t, 0, len(sketch.data))
+	assert.Equal(t, expectedInitialCap, cap(sketch.data))
 }
 
 func TestReservoirItemsSketchGetSamplesIsCopy(t *testing.T) {

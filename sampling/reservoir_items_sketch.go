@@ -20,9 +20,11 @@ package sampling
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math"
 	"math/rand"
 	"slices"
+	"strings"
 
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
@@ -299,6 +301,30 @@ func (s *ReservoirItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 	copy(buf[preambleBytes:], itemsBytes)
 
 	return buf, nil
+}
+
+// String returns human-readable summary of the sketch, without items.
+func (s *ReservoirItemsSketch[T]) String() string {
+	var sb strings.Builder
+	sb.WriteString("\n")
+	sb.WriteString("### ")
+	sb.WriteString("ReservoirItemsSketch")
+	sb.WriteString(" SUMMARY: \n")
+	sb.WriteString("   k            : ")
+	sb.WriteString(fmt.Sprintf("%d", s.k))
+	sb.WriteString("\n")
+	sb.WriteString("   n            : ")
+	sb.WriteString(fmt.Sprintf("%d", s.n))
+	sb.WriteString("\n")
+	sb.WriteString("   Current size : ")
+	sb.WriteString(fmt.Sprintf("%d", len(s.data)))
+	sb.WriteString("\n")
+	sb.WriteString("   Resize factor: ")
+	sb.WriteString(fmt.Sprintf("%d", s.rf))
+	sb.WriteString("\n")
+	sb.WriteString("### END SKETCH SUMMARY\n")
+
+	return sb.String()
 }
 
 // NewReservoirItemsSketchFromSlice deserializes a sketch from a byte slice.

@@ -58,10 +58,10 @@ If you are interested in making contributions to this site please see our [Commu
 |              | CountMinSketch          | ⚠️ |
 | Sampling |                         |  |
 |  | ReservoirLongsSketch    | ❌ |
-|  | ReserviorItemsSketch<T> | ❌ |
-| 	  | VarOptItemsSketch<T>    | ❌ |
+|  | ReserviorItemsSketch<T> | ⚠️ |
+| 	  | VarOptItemsSketch<T>    | 🚧 |
 | Membership |                         | |
-| | BloomFilter             | 🚧 |
+| | BloomFilter             | ⚠️ |
 
 
 ## Specialty Sketches
@@ -92,6 +92,15 @@ This code requires Go 1.24
 Test can be run using go test command 
 ```
 go test ./...
+```
+
+## Experimental build tags
+
+Some packages (e.g., `sampling.VarOptItemsSketch`) are guarded by the `experimental`
+build tag. VarOptItemsSketch is currently under development. To include them in builds or tests, pass the tag explicitly:
+```
+go build -tags=experimental ./...
+go test -tags=experimental ./...
 ```
 
 A Dockerfile is also provided with the necessary env to build and test the project.

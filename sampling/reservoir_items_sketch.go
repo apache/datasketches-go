@@ -180,6 +180,7 @@ func (s *ReservoirItemsSketch[T]) Copy() *ReservoirItemsSketch[T] {
 	return &ReservoirItemsSketch[T]{
 		k:    s.k,
 		n:    s.n,
+		rf:   s.rf,
 		data: dataCopy,
 	}
 }
@@ -191,7 +192,7 @@ func (s *ReservoirItemsSketch[T]) DownsampledCopy(newK int) (*ReservoirItemsSket
 		return s.Copy(), nil
 	}
 
-	result, err := NewReservoirItemsSketch[T](newK)
+	result, err := NewReservoirItemsSketch[T](newK, WithReservoirItemsSketchResizeFactor(s.rf))
 	if err != nil {
 		return nil, err
 	}
@@ -230,14 +231,49 @@ const (
 	preambleIntsNonEmpty = 2
 	serVer               = 2
 	flagEmpty            = 0x04
-	resizeFactorBits     = 0xC0 // ResizeFactor X8
+	resizeFactorMask     = 0xC0
 )
+
+func resizeFactorBitsFor(rf ResizeFactor) (byte, error) {
+	switch rf {
+	case ResizeX1:
+		return 0x00, nil
+	case ResizeX2:
+		return 0x40, nil
+	case ResizeX4:
+		return 0x80, nil
+	case ResizeX8:
+		return 0xC0, nil
+	default:
+		return 0, errors.New("unsupported resize factor")
+	}
+}
+
+func resizeFactorFromHeaderByte(b byte) (ResizeFactor, error) {
+	switch (b & resizeFactorMask) >> 6 {
+	case 0:
+		return ResizeX1, nil
+	case 1:
+		return ResizeX2, nil
+	case 2:
+		return ResizeX4, nil
+	case 3:
+		return ResizeX8, nil
+	default:
+		return 0, errors.New("unsupported resize factor bits")
+	}
+}
 
 // ToSlice serializes the sketch to a byte slice.
 func (s *ReservoirItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
+	rfBits, err := resizeFactorBitsFor(s.rf)
+	if err != nil {
+		return nil, err
+	}
+
 	if s.IsEmpty() {
 		buf := make([]byte, 8)
-		buf[0] = resizeFactorBits | preambleIntsEmpty
+		buf[0] = rfBits | preambleIntsEmpty
 		buf[1] = serVer
 		buf[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
 		buf[3] = flagEmpty
@@ -253,7 +289,7 @@ func (s *ReservoirItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 	preambleBytes := preambleIntsNonEmpty * 8
 	buf := make([]byte, preambleBytes+len(itemsBytes))
 
-	buf[0] = resizeFactorBits | preambleIntsNonEmpty
+	buf[0] = rfBits | preambleIntsNonEmpty
 	buf[1] = serVer
 	buf[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
 	buf[3] = 0
@@ -276,16 +312,29 @@ func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (
 	family := data[2]
 	flags := data[3]
 	k := int(binary.LittleEndian.Uint32(data[4:]))
+	rf, err := resizeFactorFromHeaderByte(data[0])
+	if err != nil {
+		return nil, err
+	}
 
 	if ver != serVer {
-		return nil, errors.New("unsupported serialization version")
+		if ver == 1 {
+			encK := binary.LittleEndian.Uint16(data[4:])
+			decodedK, err := decodeReservoirSize(encK)
+			if err != nil {
+				return nil, err
+			}
+			k = decodedK
+		} else {
+			return nil, errors.New("unsupported serialization version")
+		}
 	}
 	if family != byte(internal.FamilyEnum.ReservoirItems.Id) {
 		return nil, errors.New("wrong sketch family")
 	}
 
 	if (flags&flagEmpty) != 0 || preambleInts == preambleIntsEmpty {
-		return NewReservoirItemsSketch[T](k)
+		return NewReservoirItemsSketch[T](k, WithReservoirItemsSketchResizeFactor(rf))
 	}
 
 	preambleBytes := preambleIntsNonEmpty * 8
@@ -306,6 +355,7 @@ func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (
 	return &ReservoirItemsSketch[T]{
 		k:    k,
 		n:    n,
+		rf:   rf,
 		data: items,
 	}, nil
 }

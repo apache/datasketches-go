@@ -18,8 +18,10 @@
 package sampling
 
 import (
+	"encoding/binary"
 	"testing"
 
+	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -281,6 +283,23 @@ func TestReservoirItemsUnionSerialization(t *testing.T) {
 		assert.Equal(t, 100, restored.MaxK())
 
 		result, err := restored.Result()
+		assert.NoError(t, err)
+		assert.True(t, result.IsEmpty())
+	})
+
+	t.Run("LegacySerVerEmptyUnion", func(t *testing.T) {
+		data := make([]byte, 8)
+		data[0] = unionPreambleLongs
+		data[1] = 1 // legacy serVer
+		data[2] = byte(internal.FamilyEnum.ReservoirUnion.Id)
+		data[3] = unionFlagEmpty
+		binary.LittleEndian.PutUint16(data[4:], 0x5000) // p=10, i=0 => maxK=1024
+
+		union, err := NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
+		assert.NoError(t, err)
+		assert.Equal(t, 1024, union.MaxK())
+
+		result, err := union.Result()
 		assert.NoError(t, err)
 		assert.True(t, result.IsEmpty())
 	})

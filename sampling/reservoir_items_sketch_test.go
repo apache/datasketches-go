@@ -18,6 +18,7 @@
 package sampling
 
 import (
+	"encoding/binary"
 	"math"
 	"testing"
 
@@ -181,4 +182,33 @@ func TestReservoirItemsSketchGetSamplesIsCopy(t *testing.T) {
 	// samples2 and internal data should be unchanged
 	assert.NotEqual(t, samples1[0], samples2[0])
 	assert.Equal(t, int64(42), samples2[0])
+}
+
+func TestReservoirItemsSketchResizeFactorSerialization(t *testing.T) {
+	sketch, err := NewReservoirItemsSketch[int64](10, WithReservoirItemsSketchResizeFactor(ResizeX2))
+	assert.NoError(t, err)
+	sketch.Update(1)
+
+	data, err := sketch.ToSlice(Int64SerDe{})
+	assert.NoError(t, err)
+	assert.Equal(t, byte(0x42), data[0]) // ResizeX2 (0x40) + preambleIntsNonEmpty (0x02)
+
+	restored, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
+	assert.NoError(t, err)
+	assert.Equal(t, ResizeX2, restored.rf)
+}
+
+func TestReservoirItemsSketchLegacySerVerEmpty(t *testing.T) {
+	data := make([]byte, 8)
+	data[0] = 0xC0 | preambleIntsEmpty
+	data[1] = 1 // legacy serVer
+	data[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
+	data[3] = flagEmpty
+	binary.LittleEndian.PutUint16(data[4:], 0x5000) // p=10, i=0 => k=1024
+
+	sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
+	assert.NoError(t, err)
+	assert.True(t, sketch.IsEmpty())
+	assert.Equal(t, 1024, sketch.K())
+	assert.Equal(t, ResizeX8, sketch.rf)
 }

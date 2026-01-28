@@ -109,6 +109,7 @@ func (u *ReservoirItemsUnion[T]) UpdateFromRaw(n int64, k int, items []T) error 
 	sketch := &ReservoirItemsSketch[T]{
 		k:    k,
 		n:    n,
+		rf:   defaultResizeFactor,
 		data: items,
 	}
 
@@ -282,7 +283,16 @@ func NewReservoirItemsUnionFromSlice[T any](data []byte, serde ItemsSerDe[T]) (*
 	}
 
 	if ver != unionSerVer {
-		return nil, errors.New("unsupported serialization version")
+		if ver == 1 {
+			encMaxK := binary.LittleEndian.Uint16(data[4:])
+			decodedMaxK, err := decodeReservoirSize(encMaxK)
+			if err != nil {
+				return nil, err
+			}
+			maxK = decodedMaxK
+		} else {
+			return nil, errors.New("unsupported serialization version")
+		}
 	}
 	if family != byte(internal.FamilyEnum.ReservoirUnion.Id) {
 		return nil, errors.New("wrong sketch family")

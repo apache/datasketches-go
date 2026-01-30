@@ -25,6 +25,7 @@ const (
 	varOptPreambleLongsFull   = 4
 	varOptSerVer              = 2
 	varOptFlagEmpty           = 0x04
+	varOptFlagGadget          = 0x80
 )
 
 func encodeVarOptResizeFactor(rf ResizeFactor) (byte, error) {

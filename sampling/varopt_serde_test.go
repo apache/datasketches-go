@@ -112,3 +112,53 @@ func TestVarOptItemsSketch_RoundTripSampling(t *testing.T) {
 		t.Fatalf("round-trip bytes mismatch")
 	}
 }
+
+func TestVarOptItemsSketch_GadgetMarksRoundTrip(t *testing.T) {
+	sketch, _ := NewVarOptItemsSketch[int64](16)
+	for i := int64(0); i < 50; i++ {
+		if err := sketch.Update(i, 1.0); err != nil {
+			t.Fatalf("update failed: %v", err)
+		}
+	}
+
+	sketch.marks = make([]bool, sketch.allocatedSize)
+	for i := 0; i < sketch.h; i++ {
+		if (i & 0x1) == 0 {
+			sketch.marks[i] = true
+		}
+	}
+
+	buf := &bytes.Buffer{}
+	enc := NewVarOptItemsSketchEncoder[int64](buf, Int64SerDe{})
+	if err := enc.Encode(sketch); err != nil {
+		t.Fatalf("encode failed: %v", err)
+	}
+	data := buf.Bytes()
+	if (data[3] & varOptFlagGadget) == 0 {
+		t.Fatalf("expected gadget flag to be set")
+	}
+
+	dec := NewVarOptItemsSketchDecoder[int64](bytes.NewReader(data), Int64SerDe{})
+	restored, err := dec.Decode()
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if restored.marks == nil {
+		t.Fatalf("expected marks to be allocated")
+	}
+	for i := 0; i < restored.h; i++ {
+		expected := (i & 0x1) == 0
+		if restored.marks[i] != expected {
+			t.Fatalf("mark mismatch at %d: got %v want %v", i, restored.marks[i], expected)
+		}
+	}
+
+	buf2 := &bytes.Buffer{}
+	enc2 := NewVarOptItemsSketchEncoder[int64](buf2, Int64SerDe{})
+	if err := enc2.Encode(restored); err != nil {
+		t.Fatalf("encode after restore failed: %v", err)
+	}
+	if !bytes.Equal(data, buf2.Bytes()) {
+		t.Fatalf("round-trip bytes mismatch")
+	}
+}

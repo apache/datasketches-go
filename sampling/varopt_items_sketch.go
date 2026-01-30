@@ -52,6 +52,7 @@ type VarOptItemsSketch[T any] struct {
 	totalWeightR float64   // total weight of items in R region
 	data         []T       // stored items
 	weights      []float64 // corresponding weights for each item (-1.0 indicates R region)
+	marks        []bool    // gadget marks (only serialized when non-nil)
 
 	// resize factor for array growth
 	rf ResizeFactor
@@ -136,6 +137,11 @@ func (s *VarOptItemsSketch[T]) Reset() {
 	s.totalWeightR = 0.0
 	s.data = s.data[:0]
 	s.weights = s.weights[:0]
+	if s.marks != nil {
+		for i := range s.marks {
+			s.marks[i] = false
+		}
+	}
 }
 
 // H returns the number of items in the H (heavy) region.
@@ -239,6 +245,9 @@ func (s *VarOptItemsSketch[T]) updateWarmupPhase(item T, weight float64) error {
 		s.data = append(s.data, item)
 		s.weights = append(s.weights, weight)
 	}
+	if s.marks != nil {
+		s.marks[s.h] = false
+	}
 	s.h++
 
 	// check if need to transition to estimation mode
@@ -276,6 +285,9 @@ func (s *VarOptItemsSketch[T]) updateLight(item T, weight float64) error {
 	mSlot := s.h
 	s.data[mSlot] = item
 	s.weights[mSlot] = weight
+	if s.marks != nil {
+		s.marks[mSlot] = false
+	}
 	s.m++
 
 	return s.growCandidateSet(s.totalWeightR+weight, s.r+1)
@@ -304,6 +316,9 @@ func (s *VarOptItemsSketch[T]) push(item T, weight float64) {
 	// Insert at position h (the gap)
 	s.data[s.h] = item
 	s.weights[s.h] = weight
+	if s.marks != nil {
+		s.marks[s.h] = false
+	}
 	s.h++
 
 	s.siftUp(s.h - 1)
@@ -364,12 +379,18 @@ func (s *VarOptItemsSketch[T]) downsampleCandidateSet(wtCands float64, numCands 
 	stopIdx := leftmostCandSlot + s.m
 	for j := leftmostCandSlot; j < stopIdx; j++ {
 		s.weights[j] = -1.0
+		if s.marks != nil {
+			s.marks[j] = false
+		}
 	}
 
 	// Move the delete slot's content to leftmost candidate position
 	// This works even when deleteSlot == leftmostCandSlot
 	if deleteSlot != leftmostCandSlot {
 		s.data[deleteSlot] = s.data[leftmostCandSlot]
+		if s.marks != nil {
+			s.marks[deleteSlot] = s.marks[leftmostCandSlot]
+		}
 	}
 
 	s.m = 0
@@ -499,6 +520,9 @@ func (s *VarOptItemsSketch[T]) siftUp(slotIn int) {
 func (s *VarOptItemsSketch[T]) swap(i, j int) {
 	s.data[i], s.data[j] = s.data[j], s.data[i]
 	s.weights[i], s.weights[j] = s.weights[j], s.weights[i]
+	if s.marks != nil {
+		s.marks[i], s.marks[j] = s.marks[j], s.marks[i]
+	}
 }
 
 // growDataArrays increases the capacity of data and weights arrays.
@@ -517,6 +541,11 @@ func (s *VarOptItemsSketch[T]) growDataArrays() {
 		newWeights := make([]float64, len(s.weights), newSize)
 		copy(newWeights, s.weights)
 		s.weights = newWeights
+		if s.marks != nil {
+			newMarks := make([]bool, newSize)
+			copy(newMarks, s.marks)
+			s.marks = newMarks
+		}
 
 		s.allocatedSize = newSize
 	}
@@ -592,6 +621,12 @@ func encodeVarOptItemsSketch[T any](s *VarOptItemsSketch[T], serde ItemsSerDe[T]
 	} else {
 		preLongs = varOptPreambleLongsFull
 	}
+	if s.marks != nil {
+		flags |= varOptFlagGadget
+		if len(s.marks) < s.h {
+			return nil, errors.New("marks length less than h")
+		}
+	}
 
 	resizeBits, err := encodeVarOptResizeFactor(s.rf)
 	if err != nil {
@@ -617,7 +652,11 @@ func encodeVarOptItemsSketch[T any](s *VarOptItemsSketch[T], serde ItemsSerDe[T]
 		return nil, err
 	}
 
-	outBytes := (preLongs * 8) + (s.h * 8) + len(itemBytes)
+	markBytes := 0
+	if s.marks != nil {
+		markBytes = (s.h + 7) / 8
+	}
+	outBytes := (preLongs * 8) + (s.h * 8) + markBytes + len(itemBytes)
 	buf := make([]byte, outBytes)
 	buf[0] = resizeBits | byte(preLongs)
 	buf[1] = varOptSerVer
@@ -635,6 +674,23 @@ func encodeVarOptItemsSketch[T any](s *VarOptItemsSketch[T], serde ItemsSerDe[T]
 	for i := 0; i < s.h; i++ {
 		binary.LittleEndian.PutUint64(buf[offset:], math.Float64bits(s.weights[i]))
 		offset += 8
+	}
+	if s.marks != nil {
+		var val byte
+		for i := 0; i < s.h; i++ {
+			if s.marks[i] {
+				val |= 0x1 << (i & 0x7)
+			}
+			if (i & 0x7) == 0x7 {
+				buf[offset] = val
+				offset++
+				val = 0
+			}
+		}
+		if (s.h & 0x7) != 0 {
+			buf[offset] = val
+			offset++
+		}
 	}
 	copy(buf[offset:], itemBytes)
 
@@ -666,8 +722,16 @@ func decodeVarOptItemsSketch[T any](data []byte, serde ItemsSerDe[T]) (*VarOptIt
 	}
 
 	isEmpty := (flags & varOptFlagEmpty) != 0
+	isGadget := (flags & varOptFlagGadget) != 0
 	if isEmpty || preLongs == varOptPreambleLongsEmpty {
-		return NewVarOptItemsSketch[T](k, WithResizeFactor(rf))
+		sketch, err := NewVarOptItemsSketch[T](k, WithResizeFactor(rf))
+		if err != nil {
+			return nil, err
+		}
+		if isGadget {
+			sketch.marks = make([]bool, sketch.allocatedSize)
+		}
+		return sketch, nil
 	}
 
 	if preLongs != varOptPreambleLongsWarmup && preLongs != varOptPreambleLongsFull {
@@ -703,7 +767,11 @@ func decodeVarOptItemsSketch[T any](data []byte, serde ItemsSerDe[T]) (*VarOptIt
 
 	weightsOffset := preLongs * 8
 	weightsBytes := h * 8
-	if len(data) < weightsOffset+weightsBytes {
+	markBytes := 0
+	if isGadget {
+		markBytes = (h + 7) / 8
+	}
+	if len(data) < weightsOffset+weightsBytes+markBytes {
 		return nil, errors.New("data too short for weights")
 	}
 
@@ -715,7 +783,7 @@ func decodeVarOptItemsSketch[T any](data []byte, serde ItemsSerDe[T]) (*VarOptIt
 		}
 	}
 
-	itemsOffset := weightsOffset + weightsBytes
+	itemsOffset := weightsOffset + weightsBytes + markBytes
 	items, err := serde.DeserializeFromBytes(data[itemsOffset:], h+r)
 	if err != nil {
 		return nil, err
@@ -736,6 +804,9 @@ func decodeVarOptItemsSketch[T any](data []byte, serde ItemsSerDe[T]) (*VarOptIt
 		sketch.allocatedSize = allocatedSize
 		sketch.data = make([]T, allocatedSize)
 		sketch.weights = make([]float64, allocatedSize)
+		if isGadget {
+			sketch.marks = make([]bool, allocatedSize)
+		}
 		copy(sketch.data[:h], items[:h])
 		copy(sketch.weights[:h], weights)
 		copy(sketch.data[h:h+r], items[h:])
@@ -754,8 +825,18 @@ func decodeVarOptItemsSketch[T any](data []byte, serde ItemsSerDe[T]) (*VarOptIt
 		sketch.allocatedSize = allocatedSize
 		sketch.data = make([]T, h, allocatedSize)
 		sketch.weights = make([]float64, h, allocatedSize)
+		if isGadget {
+			sketch.marks = make([]bool, allocatedSize)
+		}
 		copy(sketch.data, items[:h])
 		copy(sketch.weights, weights)
+	}
+	if isGadget && h > 0 {
+		markOffset := weightsOffset + weightsBytes
+		for i := 0; i < h; i++ {
+			val := data[markOffset+(i>>3)]
+			sketch.marks[i] = ((val >> (i & 0x7)) & 0x1) == 1
+		}
 	}
 
 	return sketch, nil

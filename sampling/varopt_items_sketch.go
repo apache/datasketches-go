@@ -758,9 +758,12 @@ func decodeVarOptItemsSketch[T any](data []byte, serde ItemsSerDe[T]) (*VarOptIt
 	totalWeightR := 0.0
 	if preLongs == varOptPreambleLongsFull {
 		if r == 0 {
-			return nil, errors.New("full preamble with empty R region")
+			return nil, fmt.Errorf("possible corruption: deserializing in full mode but r = 0 or invalid R weight. found r = %d", r)
 		}
 		totalWeightR = math.Float64frombits(binary.LittleEndian.Uint64(data[24:]))
+		if math.IsNaN(totalWeightR) || totalWeightR <= 0.0 {
+			return nil, fmt.Errorf("possible corruption: deserializing in full mode but r = 0 or invalid R weight. found r = %d, R region weight = %f", r, totalWeightR)
+		}
 	} else if r != 0 {
 		return nil, errors.New("warmup preamble with non-empty R region")
 	}

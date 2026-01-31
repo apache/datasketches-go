@@ -20,7 +20,7 @@ package sampling
 import "errors"
 
 const (
-	reservoirSizeBinsPerOctave   = 2048
+	reservoirSizeBinsPerOctave    = 2048
 	reservoirSizeInvBinsPerOctave = 1.0 / reservoirSizeBinsPerOctave
 	reservoirSizeExponentMask     = 0x1F
 	reservoirSizeExponentShift    = 11

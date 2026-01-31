@@ -18,8 +18,9 @@
 package internal
 
 import (
-	"github.com/twmb/murmur3"
 	"testing"
+
+	"github.com/twmb/murmur3"
 )
 
 func TestByteArrRemainderGT8(t *testing.T) {

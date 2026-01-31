@@ -19,6 +19,7 @@ package cpc
 
 import (
 	"fmt"
+
 	"github.com/apache/datasketches-go/internal"
 )
 

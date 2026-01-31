@@ -18,9 +18,10 @@
 package cpc
 
 import (
+	"testing"
+
 	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCpcUnionError(t *testing.T) {

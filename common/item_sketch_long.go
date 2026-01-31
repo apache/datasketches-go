@@ -19,6 +19,7 @@ package common
 
 import (
 	"encoding/binary"
+
 	"github.com/twmb/murmur3"
 )
 

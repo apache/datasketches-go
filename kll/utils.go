@@ -19,11 +19,12 @@ package kll
 
 import (
 	"errors"
-	"github.com/apache/datasketches-go/common"
-	"github.com/apache/datasketches-go/internal"
 	"math"
 	"math/bits"
 	"strconv"
+
+	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal"
 )
 
 const (

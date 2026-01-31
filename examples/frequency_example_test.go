@@ -18,10 +18,11 @@
 package examples
 
 import (
+	"testing"
+
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/frequencies"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestFrequencyItemsSketch(t *testing.T) {

@@ -19,10 +19,11 @@ package frequencies
 
 import (
 	"fmt"
-	"github.com/apache/datasketches-go/common"
 	"os"
 	"strconv"
 	"testing"
+
+	"github.com/apache/datasketches-go/common"
 
 	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"

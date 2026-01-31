@@ -20,6 +20,7 @@ package kll
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
 )

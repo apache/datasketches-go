@@ -20,10 +20,11 @@ package cpc
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/apache/datasketches-go/internal"
 	"math"
 	"math/bits"
 	"strings"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 type CpcFormat int

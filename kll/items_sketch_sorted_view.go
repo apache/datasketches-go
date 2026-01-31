@@ -19,9 +19,10 @@ package kll
 
 import (
 	"errors"
+	"sort"
+
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
-	"sort"
 )
 
 type ItemsSketchSortedView[C comparable] struct {

@@ -19,11 +19,13 @@ package kll
 
 import (
 	"fmt"
-	"github.com/apache/datasketches-go/common"
-	"github.com/apache/datasketches-go/internal"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal"
 )
 
 func TestGenerateGoFiles(t *testing.T) {
@@ -60,6 +62,20 @@ func TestGenerateGoFiles(t *testing.T) {
 		slc, err := sk.ToSlice()
 		assert.NoError(t, err)
 		err = os.WriteFile(fmt.Sprintf("%s/kll_double_n%d_go.sk", internal.GoPath, n), slc, 0644)
+		assert.NoError(t, err)
+	}
+
+	comparatorLong := common.ItemSketchLongComparator(false)
+	for _, n := range nArr {
+		sk, err := NewKllItemsSketchWithDefault[int64](comparatorLong, common.ItemSketchLongSerDe{})
+		sk.deterministicOffsetForTest = true
+		assert.NoError(t, err)
+		for i := 1; i <= n; i++ {
+			sk.Update(int64(i))
+		}
+		slc, err := sk.ToSlice()
+		assert.NoError(t, err)
+		err = os.WriteFile(fmt.Sprintf("%s/kll_long_n%d_go.sk", internal.GoPath, n), slc, 0644)
 		assert.NoError(t, err)
 	}
 }
@@ -166,6 +182,59 @@ func TestJavaCompat(t *testing.T) {
 					qut := it.GetQuantile()
 					assert.True(t, comparatorDouble(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
 					assert.True(t, !comparatorDouble(maxV, qut) || maxV == qut, fmt.Sprintf("max: \"%v\" \"%v\"", maxV, qut))
+					weight += it.GetWeight()
+				}
+				assert.Equal(t, weight, int64(n))
+			}
+		}
+	})
+
+	t.Run("Java KLL Long", func(t *testing.T) {
+		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+		serde := common.ItemSketchLongSerDe{}
+		comparatorLong := common.ItemSketchLongComparator(false)
+		for _, n := range nArr {
+			filename := fmt.Sprintf("%s/kll_long_n%d_java.sk", internal.JavaPath, n)
+			// Skip if file doesn't exist
+			if _, err := os.Stat(filename); os.IsNotExist(err) {
+				t.Skipf("Java file not found: %s", filename)
+				return
+			}
+			bytes, err := os.ReadFile(filename)
+			assert.NoError(t, err)
+			sketch, err := NewKllItemsSketchFromSlice[int64](bytes, comparatorLong, serde)
+			if err != nil {
+				return
+			}
+
+			assert.Equal(t, sketch.GetK(), uint16(200))
+			if n == 0 {
+				assert.True(t, sketch.IsEmpty())
+			} else {
+				assert.False(t, sketch.IsEmpty())
+			}
+
+			if n > 100 {
+				assert.True(t, sketch.IsEstimationMode())
+			} else {
+				assert.False(t, sketch.IsEstimationMode())
+			}
+
+			if n > 0 {
+				minV, err := sketch.GetMinItem()
+				assert.NoError(t, err)
+				assert.Equal(t, minV, int64(1))
+
+				maxV, err := sketch.GetMaxItem()
+				assert.NoError(t, err)
+				assert.Equal(t, maxV, int64(n))
+
+				weight := int64(0)
+				it := sketch.GetIterator()
+				for it.Next() {
+					qut := it.GetQuantile()
+					assert.True(t, comparatorLong(minV, qut) || minV == qut, fmt.Sprintf("min: \"%v\" \"%v\"", minV, qut))
+					assert.True(t, !comparatorLong(maxV, qut) || maxV == qut, fmt.Sprintf("max: \"%v\" \"%v\"", maxV, qut))
 					weight += it.GetWeight()
 				}
 				assert.Equal(t, weight, int64(n))

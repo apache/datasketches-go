@@ -17,6 +17,17 @@
 
 package sampling
 
+import (
+	"math"
+
+	"github.com/apache/datasketches-go/internal/binomialproportionsbounds"
+)
+
+const (
+	// defaultKappa is Number of standard deviations to use for subset sum error bounds
+	defaultKappa = 2.0
+)
+
 func startingSubMultiple(lgTarget, lgRf, lgMin int) int {
 	if lgTarget <= lgMin {
 		return lgMin
@@ -37,4 +48,20 @@ func adjustedSamplingAllocationSize(
 		return maxSize
 	}
 	return resizeTarget
+}
+
+// SampleSubsetSummary is a simple object that captures the results of a subset sum query on a sampling sketch.
+type SampleSubsetSummary struct {
+	LowerBound        float64
+	Estimate          float64
+	UpperBound        float64
+	TotalSketchWeight float64
+}
+
+func pseudoHypergeometricUpperBoundOnP(n, k uint64, samplingRate float64) (float64, error) {
+	return binomialproportionsbounds.ApproximateUpperBoundOnP(n, k, defaultKappa*math.Sqrt(1-samplingRate))
+}
+
+func pseudoHypergeometricLowerBoundOnP(n, k uint64, samplingRate float64) (float64, error) {
+	return binomialproportionsbounds.ApproximateLowerBoundOnP(n, k, defaultKappa*math.Sqrt(1-samplingRate))
 }

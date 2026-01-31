@@ -187,6 +187,54 @@ func (s *ReservoirItemsSketch[T]) Copy() *ReservoirItemsSketch[T] {
 	}
 }
 
+// EstimateSubsetSum computes an estimated subset sum from the entire stream for objects matching a given
+// predicate. Provides a lower bound, estimate, and upper bound using a target of 2 standard deviations.
+//
+// NOTE: This is technically a heuristic method, and tries to err on the conservative side.
+//
+// predicate: A predicate to use when identifying items.
+// Returns a summary object containing the estimate, upper and lower bounds, and the total sketch weight.
+func (s *ReservoirItemsSketch[T]) EstimateSubsetSum(predicate func(T) bool) (SampleSubsetSummary, error) {
+	if s.n == 0 {
+		return SampleSubsetSummary{}, nil
+	}
+
+	numSamples := s.NumSamples()
+	samplingRate := float64(numSamples) / float64(s.n)
+
+	trueCount := 0
+	for _, sample := range s.data {
+		if predicate(sample) {
+			trueCount++
+		}
+	}
+
+	if s.n <= int64(s.k) { // exact mode.
+		return SampleSubsetSummary{
+			LowerBound:        float64(trueCount),
+			Estimate:          float64(trueCount),
+			UpperBound:        float64(trueCount),
+			TotalSketchWeight: float64(numSamples),
+		}, nil
+	}
+
+	lowerBoundTrueFraction, err := pseudoHypergeometricLowerBoundOnP(uint64(numSamples), uint64(trueCount), samplingRate)
+	if err != nil {
+		return SampleSubsetSummary{}, nil
+	}
+	upperBoundTrueFraction, err := pseudoHypergeometricUpperBoundOnP(uint64(numSamples), uint64(trueCount), samplingRate)
+	if err != nil {
+		return SampleSubsetSummary{}, nil
+	}
+	estimatedTrueFraction := (1.0 * float64(trueCount)) / float64(numSamples)
+	return SampleSubsetSummary{
+		LowerBound:        lowerBoundTrueFraction,
+		Estimate:          estimatedTrueFraction,
+		UpperBound:        upperBoundTrueFraction,
+		TotalSketchWeight: float64(numSamples),
+	}, nil
+}
+
 // DownsampledCopy returns a copy with a reduced reservoir size.
 // If newK >= current K, returns a regular copy.
 func (s *ReservoirItemsSketch[T]) DownsampledCopy(newK int) (*ReservoirItemsSketch[T], error) {

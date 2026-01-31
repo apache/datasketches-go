@@ -20,6 +20,7 @@ package sampling
 import (
 	"encoding/binary"
 	"math"
+	"math/rand"
 	"testing"
 
 	"github.com/apache/datasketches-go/common"
@@ -196,6 +197,94 @@ func TestReservoirItemsSketchResizeFactorSerialization(t *testing.T) {
 	restored, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
 	assert.NoError(t, err)
 	assert.Equal(t, ResizeX2, restored.rf)
+}
+
+func TestReservoirItemsSketchEstimateSubsetSum(t *testing.T) {
+	t.Run("EmptySketch", func(t *testing.T) {
+		sketch, err := NewReservoirItemsSketch[int64](10)
+		assert.NoError(t, err)
+
+		summary, err := sketch.EstimateSubsetSum(func(int64) bool { return true })
+		assert.NoError(t, err)
+		assert.Equal(t, 0.0, summary.LowerBound)
+		assert.Equal(t, 0.0, summary.Estimate)
+		assert.Equal(t, 0.0, summary.UpperBound)
+		assert.Equal(t, 0.0, summary.TotalSketchWeight)
+	})
+
+	t.Run("ExactMode", func(t *testing.T) {
+		sketch, err := NewReservoirItemsSketch[int64](10)
+		assert.NoError(t, err)
+		for i := int64(1); i <= 5; i++ {
+			sketch.Update(i)
+		}
+
+		summary, err := sketch.EstimateSubsetSum(func(v int64) bool { return v%2 == 0 })
+		assert.NoError(t, err)
+		assert.Equal(t, 2.0, summary.LowerBound)
+		assert.Equal(t, 2.0, summary.Estimate)
+		assert.Equal(t, 2.0, summary.UpperBound)
+		assert.Equal(t, 5.0, summary.TotalSketchWeight)
+	})
+
+	t.Run("EstimationModePredicateNeverMatches", func(t *testing.T) {
+		rand.Seed(7)
+		sketch, err := NewReservoirItemsSketch[int64](10)
+		assert.NoError(t, err)
+		for i := int64(1); i <= 100; i++ {
+			sketch.Update(i)
+		}
+
+		summary, err := sketch.EstimateSubsetSum(func(int64) bool { return false })
+		assert.NoError(t, err)
+		assert.Equal(t, 0.0, summary.Estimate)
+		assert.Equal(t, 0.0, summary.LowerBound)
+		assert.True(t, summary.UpperBound >= 0.0 && summary.UpperBound <= 1.0)
+		assert.Equal(t, float64(sketch.NumSamples()), summary.TotalSketchWeight)
+	})
+
+	t.Run("EstimationModePredicateAlwaysMatches", func(t *testing.T) {
+		rand.Seed(11)
+		sketch, err := NewReservoirItemsSketch[int64](10)
+		assert.NoError(t, err)
+		for i := int64(1); i <= 100; i++ {
+			sketch.Update(i)
+		}
+
+		summary, err := sketch.EstimateSubsetSum(func(int64) bool { return true })
+		assert.NoError(t, err)
+		assert.Equal(t, 1.0, summary.Estimate)
+		assert.Equal(t, 1.0, summary.UpperBound)
+		assert.True(t, summary.LowerBound >= 0.0 && summary.LowerBound <= 1.0)
+		assert.Equal(t, float64(sketch.NumSamples()), summary.TotalSketchWeight)
+	})
+
+	t.Run("EstimationModePredicatePartiallyMatches", func(t *testing.T) {
+		rand.Seed(23)
+		sketch, err := NewReservoirItemsSketch[int64](10)
+		assert.NoError(t, err)
+		for i := int64(1); i <= 100; i++ {
+			sketch.Update(i)
+		}
+
+		samples := sketch.Samples()
+		trueCount := 0
+		for _, v := range samples {
+			if v%2 == 0 {
+				trueCount++
+			}
+		}
+		expectedEstimate := float64(trueCount) / float64(len(samples))
+
+		summary, err := sketch.EstimateSubsetSum(func(v int64) bool { return v%2 == 0 })
+		assert.NoError(t, err)
+		assert.InDelta(t, expectedEstimate, summary.Estimate, 0.0)
+		assert.True(t, summary.LowerBound >= 0.0 && summary.LowerBound <= 1.0)
+		assert.True(t, summary.UpperBound >= 0.0 && summary.UpperBound <= 1.0)
+		assert.True(t, summary.LowerBound <= summary.Estimate)
+		assert.True(t, summary.Estimate <= summary.UpperBound)
+		assert.Equal(t, float64(sketch.NumSamples()), summary.TotalSketchWeight)
+	})
 }
 
 func TestReservoirItemsSketchLegacySerVerEmpty(t *testing.T) {

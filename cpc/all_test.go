@@ -18,9 +18,10 @@
 package cpc
 
 import (
-	"github.com/apache/datasketches-go/internal"
 	"math/bits"
 	"testing"
+
+	"github.com/apache/datasketches-go/internal"
 
 	"github.com/stretchr/testify/assert"
 )

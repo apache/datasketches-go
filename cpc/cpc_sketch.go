@@ -20,11 +20,12 @@ package cpc
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/apache/datasketches-go/internal"
-	"github.com/twmb/murmur3"
 	"math"
 	"math/bits"
 	"unsafe"
+
+	"github.com/apache/datasketches-go/internal"
+	"github.com/twmb/murmur3"
 )
 
 const (

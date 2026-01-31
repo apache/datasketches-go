@@ -19,8 +19,9 @@ package common
 
 import (
 	"encoding/binary"
-	"github.com/twmb/murmur3"
 	"math"
+
+	"github.com/twmb/murmur3"
 )
 
 type ItemSketchDoubleHasher struct {

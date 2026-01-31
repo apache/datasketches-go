@@ -18,9 +18,10 @@
 package frequencies
 
 import (
+	"testing"
+
 	"github.com/apache/datasketches-go/common"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestItemsToLongs(t *testing.T) {

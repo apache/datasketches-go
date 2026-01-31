@@ -18,9 +18,10 @@
 package cpc
 
 import (
-	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCpcCheckSort(t *testing.T) {

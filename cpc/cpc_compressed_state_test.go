@@ -18,11 +18,12 @@
 package cpc
 
 import (
-	"github.com/apache/datasketches-go/internal"
 	"math/rand"
 	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 // TestWriteReadUnary verifies that writeUnary and readUnary are inverses.

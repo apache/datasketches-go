@@ -19,10 +19,11 @@ package frequencies
 
 import (
 	"fmt"
-	"github.com/apache/datasketches-go/common"
-	"github.com/apache/datasketches-go/internal"
 	"math/bits"
 	"strings"
+
+	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal"
 )
 
 type reversePurgeItemHashMap[C comparable] struct {

@@ -19,10 +19,11 @@ package examples
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/kll"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestKllItemsSketch(t *testing.T) {

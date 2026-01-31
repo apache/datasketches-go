@@ -19,9 +19,10 @@ package examples
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/apache/datasketches-go/hll"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestHllItemsSketch(t *testing.T) {

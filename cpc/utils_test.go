@@ -18,9 +18,10 @@
 package cpc
 
 import (
+	"testing"
+
 	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 // checkFirst8 verifies that the first eight bytes of the preamble in mem match

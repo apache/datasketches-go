@@ -19,8 +19,9 @@ package cpc
 
 import (
 	"fmt"
-	"github.com/apache/datasketches-go/internal"
 	"math/bits"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 // Constants for ptrArr indices.

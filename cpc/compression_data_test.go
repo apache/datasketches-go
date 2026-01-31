@@ -20,8 +20,9 @@
 package cpc
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // TestCompressionData validates encoding and decoding tables.

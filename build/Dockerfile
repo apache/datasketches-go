@@ -30,6 +30,8 @@ COPY frequencies ./frequencies
 COPY hll ./hll
 COPY internal ./internal
 COPY kll ./kll
+COPY sampling ./sampling
+COPY tdigest ./tdigest
 COPY theta ./theta
 COPY tuple ./tuple
 

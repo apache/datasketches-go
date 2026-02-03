@@ -17,7 +17,7 @@
     under the License.
 -->
 
-[![Go](https://github.com/apache/datasketches-go/actions/workflows/go.yml/badge.svg)](https://github.com/apache/datasketches-go/actions/workflows/go.yml)
+[![Go](https://github.com/apache/datasketches-go/actions/workflows/test.yml/badge.svg)](https://github.com/apache/datasketches-go/actions/workflows/go.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/apache/datasketches-go)](https://goreportcard.com/report/github.com/apache/datasketches-go)
 [![Release](https://img.shields.io/github/release/apache/datasketches-go.svg)](https://github.com/apache/datasketches-go/releases)
 [![GoDoc](https://godoc.org/github.com/apache/datasketches-go?status.svg)](https://godoc.org/github.com/apache/datasketches-go)

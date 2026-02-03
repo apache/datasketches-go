@@ -251,7 +251,12 @@ func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
 
 // TestSerializationCompatibilityEmpty tests deserialization of an empty sketch.
 func TestSerializationCompatibilityEmpty(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join(internal.GoPath, "reservoir_items_long_empty_k128_go.sk"))
+	filename := filepath.Join(internal.GoPath, "reservoir_items_long_empty_k128_go.sk")
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		t.Skipf("Go file not found: %s", filename)
+		return
+	}
+	data, err := os.ReadFile(filename)
 	assert.NoError(t, err)
 
 	sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
@@ -277,7 +282,12 @@ func TestSerializationCompatibilityExact(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.filename, func(t *testing.T) {
-			data, err := os.ReadFile(filepath.Join(internal.GoPath, tc.filename))
+			filename := filepath.Join(internal.GoPath, tc.filename)
+			if _, err := os.Stat(filename); os.IsNotExist(err) {
+				t.Skipf("Go file not found: %s", filename)
+				return
+			}
+			data, err := os.ReadFile(filename)
 			assert.NoError(t, err)
 
 			sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
@@ -303,7 +313,12 @@ func TestSerializationCompatibilityWithSampling(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.filename, func(t *testing.T) {
-			data, err := os.ReadFile(filepath.Join(internal.GoPath, tc.filename))
+			filename := filepath.Join(internal.GoPath, tc.filename)
+			if _, err := os.Stat(filename); os.IsNotExist(err) {
+				t.Skipf("Go file not found: %s", filename)
+				return
+			}
+			data, err := os.ReadFile(filename)
 			assert.NoError(t, err)
 
 			sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})

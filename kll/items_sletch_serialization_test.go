@@ -33,7 +33,7 @@ func TestGenerateGoFiles(t *testing.T) {
 		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
 	}
 
-	os.Mkdir(internal.GoPath, 0755)
+	os.MkdirAll(internal.GoPath, 0755)
 
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	comparatorString := common.ItemSketchStringComparator(false)

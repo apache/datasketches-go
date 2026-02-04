@@ -27,6 +27,10 @@ import (
 )
 
 func TestGenerateGoFiles(t *testing.T) {
+	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
+		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
+	}
+
 	nArr := []int{0, 100, 200, 2000, 20000}
 	flavorArr := []CpcFlavor{CpcFlavorEmpty, CpcFlavorSparse, CpcFlavorHybrid, CpcFlavorPinned, CpcFlavorSliding}
 	for flavorIdx, n := range nArr {

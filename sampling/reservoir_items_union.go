@@ -53,11 +53,15 @@ func NewReservoirItemsUnion[T any](maxK int) (*ReservoirItemsUnion[T], error) {
 }
 
 // Update adds a single item to the union.
-func (u *ReservoirItemsUnion[T]) Update(item T) {
+func (u *ReservoirItemsUnion[T]) Update(item T) error {
 	if u.gadget == nil {
-		u.gadget, _ = NewReservoirItemsSketch[T](u.maxK)
+		var err error
+		u.gadget, err = NewReservoirItemsSketch[T](u.maxK)
+		if err != nil {
+			return err
+		}
 	}
-	u.gadget.Update(item)
+	return u.gadget.Update(item)
 }
 
 // UpdateSketch merges another sketch into the union.
@@ -85,8 +89,7 @@ func (u *ReservoirItemsUnion[T]) UpdateSketch(sketch *ReservoirItemsSketch[T]) e
 		return nil
 	}
 
-	u.twoWayMergeInternal(ris)
-	return nil
+	return u.twoWayMergeInternal(ris)
 }
 
 // UpdateFromRaw creates a sketch from raw components and merges it.
@@ -127,7 +130,9 @@ func (u *ReservoirItemsUnion[T]) createNewGadget(source *ReservoirItemsSketch[T]
 		if err != nil {
 			return err
 		}
-		u.twoWayMergeInternalStandard(source)
+		if err := u.twoWayMergeInternalStandard(source); err != nil {
+			return err
+		}
 	} else {
 
 		u.gadget = source.Copy()
@@ -137,40 +142,43 @@ func (u *ReservoirItemsUnion[T]) createNewGadget(source *ReservoirItemsSketch[T]
 
 // twoWayMergeInternal performs the merge based on the state of both sketches.
 // This implements Java's twoWayMergeInternal logic.
-func (u *ReservoirItemsUnion[T]) twoWayMergeInternal(source *ReservoirItemsSketch[T]) {
+func (u *ReservoirItemsUnion[T]) twoWayMergeInternal(source *ReservoirItemsSketch[T]) error {
 	if source.N() <= int64(source.K()) {
 		// Case 1: source is in exact mode - use standard merge
-		u.twoWayMergeInternalStandard(source)
+		return u.twoWayMergeInternalStandard(source)
 	} else if u.gadget.N() < int64(u.gadget.K()) {
 		// Case 2: gadget is in exact mode, source is in sampling mode
 		// Swap: merge gadget into source (source becomes new gadget)
 		tmp := u.gadget
 		u.gadget = source.Copy()
-		u.twoWayMergeInternalStandard(tmp)
+		return u.twoWayMergeInternalStandard(tmp)
 	} else if source.ImplicitSampleWeight() < float64(u.gadget.N())/float64(u.gadget.K()-1) {
 		// Case 3: both in sampling mode, source is "lighter"
 		// Merge source into gadget
-		u.twoWayMergeInternalWeighted(source)
+		return u.twoWayMergeInternalWeighted(source)
 	} else {
 		// Case 4: both in sampling mode, gadget is "lighter"
 		// Swap: merge gadget into source
 		tmp := u.gadget
 		u.gadget = source.Copy()
-		u.twoWayMergeInternalWeighted(tmp)
+		return u.twoWayMergeInternalWeighted(tmp)
 	}
 }
 
 // twoWayMergeInternalStandard merges a sketch in exact mode (N <= K) into gadget.
 // Simply updates gadget with each item from source.
-func (u *ReservoirItemsUnion[T]) twoWayMergeInternalStandard(source *ReservoirItemsSketch[T]) {
+func (u *ReservoirItemsUnion[T]) twoWayMergeInternalStandard(source *ReservoirItemsSketch[T]) error {
 	for i := 0; i < source.NumSamples(); i++ {
-		u.gadget.Update(source.valueAtPosition(i))
+		if err := u.gadget.Update(source.valueAtPosition(i)); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // twoWayMergeInternalWeighted merges a "lighter" sketch into gadget using weighted sampling.
 // Uses the correct probability formula: P = (K * w) / targetTotal
-func (u *ReservoirItemsUnion[T]) twoWayMergeInternalWeighted(source *ReservoirItemsSketch[T]) {
+func (u *ReservoirItemsUnion[T]) twoWayMergeInternalWeighted(source *ReservoirItemsSketch[T]) error {
 	numSourceSamples := source.K()
 	sourceItemWeight := float64(source.N()) / float64(numSourceSamples)
 	rescaledProb := float64(u.gadget.K()) * sourceItemWeight
@@ -188,7 +196,7 @@ func (u *ReservoirItemsUnion[T]) twoWayMergeInternalWeighted(source *ReservoirIt
 		}
 	}
 
-	u.gadget.forceIncrementItemsSeen(source.N())
+	return u.gadget.forceIncrementItemsSeen(source.N())
 }
 
 // Result returns a copy of the internal sketch.
@@ -315,7 +323,9 @@ func NewReservoirItemsUnionFromSlice[T any](data []byte, serde ItemsSerDe[T]) (*
 		if err != nil {
 			return nil, err
 		}
-		union.UpdateSketch(sketch)
+		if err := union.UpdateSketch(sketch); err != nil {
+			return nil, err
+		}
 	}
 
 	return union, nil

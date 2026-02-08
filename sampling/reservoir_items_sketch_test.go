@@ -41,8 +41,8 @@ func TestReservoirItemsSketchWithStrings(t *testing.T) {
 	assert.NoError(t, err)
 
 	sketch.Update("apple")
-	sketch.Update("banana")
-	sketch.Update("cherry")
+	_ = sketch.Update("banana")
+	_ = sketch.Update("cherry")
 
 	assert.Equal(t, int64(3), sketch.N())
 	assert.Equal(t, 3, sketch.NumSamples())
@@ -62,9 +62,9 @@ func TestReservoirItemsSketchWithStruct(t *testing.T) {
 	sketch, err := NewReservoirItemsSketch[Event](5)
 	assert.NoError(t, err)
 
-	sketch.Update(Event{1, "login"})
-	sketch.Update(Event{2, "logout"})
-	sketch.Update(Event{3, "click"})
+	_ = sketch.Update(Event{1, "login"})
+	_ = sketch.Update(Event{2, "logout"})
+	_ = sketch.Update(Event{3, "click"})
 
 	assert.Equal(t, int64(3), sketch.N())
 	samples := sketch.Samples()
@@ -344,24 +344,22 @@ func TestReservoirItemsSketchLegacySerVerEmpty(t *testing.T) {
 	assert.Equal(t, ResizeX8, sketch.rf)
 }
 
-func TestReservoirItemsSketchUpdatePanicsAtMaxItemsSeen(t *testing.T) {
+func TestReservoirItemsSketchUpdateReturnsErrorAtMaxItemsSeen(t *testing.T) {
 	sketch, err := NewReservoirItemsSketch[int64](8)
 	assert.NoError(t, err)
 	sketch.n = maxItemsSeen
 
-	assert.Panics(t, func() {
-		sketch.Update(1)
-	})
+	err = sketch.Update(1)
+	assert.ErrorContains(t, err, "sketch has exceeded capacity")
 }
 
-func TestReservoirItemsSketchForceIncrementItemsSeenPanicsOnOverflow(t *testing.T) {
+func TestReservoirItemsSketchForceIncrementItemsSeenReturnsErrorOnOverflow(t *testing.T) {
 	sketch, err := NewReservoirItemsSketch[int64](8)
 	assert.NoError(t, err)
 	sketch.n = maxItemsSeen - 1
 
-	assert.Panics(t, func() {
-		sketch.forceIncrementItemsSeen(2)
-	})
+	err = sketch.forceIncrementItemsSeen(2)
+	assert.ErrorContains(t, err, "sketch has exceeded capacity")
 }
 
 func TestReservoirItemsSketchFromSliceRejectsNTooLarge(t *testing.T) {

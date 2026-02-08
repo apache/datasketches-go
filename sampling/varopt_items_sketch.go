@@ -503,7 +503,7 @@ func (s *VarOptItemsSketch[T]) swap(i, j int) {
 
 // growDataArrays increases the capacity of data and weights arrays.
 func (s *VarOptItemsSketch[T]) growDataArrays() {
-	lgRf := mustResizeFactorLg(s.rf)
+	lgRf, _ := resizeFactorLg(s.rf)
 	prevSize := s.allocatedSize
 	newSize := s.adjustedSize(s.k, prevSize<<lgRf)
 	if newSize == s.k {

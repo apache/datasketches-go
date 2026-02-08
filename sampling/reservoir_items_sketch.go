@@ -63,14 +63,6 @@ func resizeFactorLg(rf ResizeFactor) (int, error) {
 	}
 }
 
-func mustResizeFactorLg(rf ResizeFactor) int {
-	lgRf, err := resizeFactorLg(rf)
-	if err != nil {
-		panic(err)
-	}
-	return lgRf
-}
-
 // ReservoirItemsSketch provides a uniform random sample of items
 // from a stream of unknown size using the reservoir sampling algorithm.
 //
@@ -133,15 +125,17 @@ func NewReservoirItemsSketch[T any](
 }
 
 // Update adds an item to the sketch using reservoir sampling algorithm.
-func (s *ReservoirItemsSketch[T]) Update(item T) {
+func (s *ReservoirItemsSketch[T]) Update(item T) error {
 	if s.n == maxItemsSeen {
-		panic(fmt.Sprintf("sketch has exceeded capacity for total items seen: %d", maxItemsSeen))
+		return fmt.Errorf("sketch has exceeded capacity for total items seen: %d", maxItemsSeen)
 	}
 
 	if s.n < int64(s.k) {
 		// Initial phase: store all items until reservoir is full
 		if s.n >= int64(cap(s.data)) {
-			s.growReservoir()
+			if err := s.growReservoir(); err != nil {
+				return err
+			}
 		}
 
 		s.data = append(s.data, item)
@@ -153,17 +147,22 @@ func (s *ReservoirItemsSketch[T]) Update(item T) {
 			s.data[rand.Intn(s.k)] = item
 		}
 	}
+	return nil
 }
 
-func (s *ReservoirItemsSketch[T]) growReservoir() {
-	lgRf := mustResizeFactorLg(s.rf)
+func (s *ReservoirItemsSketch[T]) growReservoir() error {
+	lgRf, err := resizeFactorLg(s.rf)
+	if err != nil {
+		return err
+	}
 	targetCap := adjustedSamplingAllocationSize(s.k, cap(s.data)<<lgRf)
 	if targetCap <= cap(s.data) {
-		return
+		return nil
 	}
 	newData := make([]T, len(s.data), targetCap)
 	copy(newData, s.data)
 	s.data = newData
+	return nil
 }
 
 // K returns the maximum reservoir capacity.
@@ -195,7 +194,7 @@ func (s *ReservoirItemsSketch[T]) IsEmpty() bool {
 
 // Reset clears the sketch while preserving capacity k.
 func (s *ReservoirItemsSketch[T]) Reset() {
-	lgRf := mustResizeFactorLg(s.rf)
+	lgRf, _ := resizeFactorLg(s.rf)
 	ceilingLgK, _ := internal.ExactLog2(common.CeilingPowerOf2(s.k))
 	initialLgSize := startingSubMultiple(
 		ceilingLgK, lgRf, minLgArrItems,
@@ -287,12 +286,16 @@ func (s *ReservoirItemsSketch[T]) DownsampledCopy(newK int) (*ReservoirItemsSket
 
 	samples := s.Samples()
 	for _, item := range samples {
-		result.Update(item)
+		if err := result.Update(item); err != nil {
+			return nil, err
+		}
 	}
 
 	// Adjust N to preserve correct implicit weights
 	if result.n < s.n {
-		result.forceIncrementItemsSeen(s.n - result.n)
+		if err := result.forceIncrementItemsSeen(s.n - result.n); err != nil {
+			return nil, err
+		}
 	}
 
 	return result, nil
@@ -309,14 +312,15 @@ func (s *ReservoirItemsSketch[T]) insertValueAtPosition(item T, pos int) {
 }
 
 // forceIncrementItemsSeen adds delta to the items seen count.
-func (s *ReservoirItemsSketch[T]) forceIncrementItemsSeen(delta int64) {
+func (s *ReservoirItemsSketch[T]) forceIncrementItemsSeen(delta int64) error {
 	s.n += delta
 	if s.n > maxItemsSeen {
-		panic(fmt.Sprintf(
+		return fmt.Errorf(
 			"sketch has exceeded capacity for total items seen. limit: %d, found: %d",
 			maxItemsSeen, s.n,
-		))
+		)
 	}
+	return nil
 }
 
 // Serialization constants

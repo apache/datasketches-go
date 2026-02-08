@@ -50,6 +50,11 @@ func TestVarOptItemsSketch_NewSketch(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for k > varOptMaxK")
 	}
+
+	_, err = NewVarOptItemsSketch[string](16, WithResizeFactor(ResizeFactor(3)))
+	if err == nil {
+		t.Error("expected error for unsupported resize factor")
+	}
 }
 
 func TestVarOptItemsSketch_WarmupPhase(t *testing.T) {

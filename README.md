@@ -47,21 +47,23 @@ If you are interested in making contributions to this site please see our [Commu
 | Quantiles	   |                         |  |
 | 	            | CormodeDoublesSketch    | ❌ |
 | 	            | CormodeItemsSketch<T>   | ❌ |
-| 	            | KllDoublesSketch        | ❌ |
-| 	            | KllFloatsSketch         | ❌ |
+| 	            | KllDoublesSketch        | ⚠️ |
+| 	            | KllFloatsSketch         | ⚠️ |
 | 	            | KllSketch<T>            | ⚠️ |
-| 	            | ReqFloatsSketch         | ❌ |
+| 	            | ReqFloatsSketch         | 🚧 |
 | 	            | TDigestDouble           | ⚠️ |
 | Frequencies  |                         | ️ |
 |              | FreqLongsSketch         | ⚠️ |
 |              | FreqItemsSketch<T>      | ⚠️ |
 |              | CountMinSketch          | ⚠️ |
-| Sampling |                         |  |
-|  | ReservoirLongsSketch    | ❌ |
-|  | ReserviorItemsSketch<T> | ❌ |
-| 	  | VarOptItemsSketch<T>    | ❌ |
-| Membership |                         | |
-| | BloomFilter             | 🚧 |
+| Sampling     |                         |  |
+|              | ReservoirLongsSketch    | ❌ |
+|              | ReserviorItemsSketch<T> | 🚧 |
+| 	            | VarOptItemsSketch<T>    | 🚧 |
+| Membership   |                         | |
+|              | BloomFilter             | ⚠️ |
+| Density      |                         | |
+|              | DensitySketch           | ❌ | 
 
 
 ## Specialty Sketches

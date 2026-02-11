@@ -38,6 +38,10 @@ func TestInvalidConstructorArguments(t *testing.T) {
 	_, err = NewBloomFilterBySize(1<<60, 3)
 	assert.Error(t, err)
 
+	// numBits exceeds maxBits by 1
+	_, err = NewBloomFilterBySize(maxBits+1, 3)
+	assert.ErrorContains(t, err, "numBits exceeds maximum allowed size")
+
 	// Invalid FPP
 	_, err = NewBloomFilterByAccuracy(1000, 0.0)
 	assert.Error(t, err)

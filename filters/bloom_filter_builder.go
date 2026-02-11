@@ -22,10 +22,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
-// Default seed value for hash functions
+// DefaultSeed is the default seed value for hash functions
 const DefaultSeed = uint64(9001)
+
+var maxBits = uint64((math.MaxInt32 - internal.FamilyEnum.BloomFilter.MaxPreLongs) * 64)
 
 // bloomFilterOptions holds optional parameters for filter construction.
 type bloomFilterOptions struct {
@@ -59,7 +63,6 @@ func NewBloomFilterBySize(numBits uint64, numHashes uint16, opts ...BloomFilterO
 	}
 
 	// Check for overflow
-	maxBits := uint64(math.MaxInt32-32) * 64
 	if numBits > maxBits {
 		return nil, fmt.Errorf("numBits exceeds maximum allowed size")
 	}

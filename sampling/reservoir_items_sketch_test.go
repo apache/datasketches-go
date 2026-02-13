@@ -19,7 +19,6 @@ package sampling
 
 import (
 	"encoding/binary"
-	"math"
 	"math/rand"
 	"testing"
 
@@ -42,8 +41,8 @@ func TestReservoirItemsSketchWithStrings(t *testing.T) {
 	assert.NoError(t, err)
 
 	sketch.Update("apple")
-	sketch.Update("banana")
-	sketch.Update("cherry")
+	_ = sketch.Update("banana")
+	_ = sketch.Update("cherry")
 
 	assert.Equal(t, int64(3), sketch.N())
 	assert.Equal(t, 3, sketch.NumSamples())
@@ -63,9 +62,9 @@ func TestReservoirItemsSketchWithStruct(t *testing.T) {
 	sketch, err := NewReservoirItemsSketch[Event](5)
 	assert.NoError(t, err)
 
-	sketch.Update(Event{1, "login"})
-	sketch.Update(Event{2, "logout"})
-	sketch.Update(Event{3, "click"})
+	_ = sketch.Update(Event{1, "login"})
+	_ = sketch.Update(Event{2, "logout"})
+	_ = sketch.Update(Event{3, "click"})
 
 	assert.Equal(t, int64(3), sketch.N())
 	samples := sketch.Samples()
@@ -78,6 +77,9 @@ func TestReservoirItemsSketchInvalidK(t *testing.T) {
 
 	_, err = NewReservoirItemsSketch[int64](1)
 	assert.ErrorContains(t, err, "k must be at least 2")
+
+	_, err = NewReservoirItemsSketch[int64](16, WithReservoirItemsSketchResizeFactor(ResizeFactor(3)))
+	assert.ErrorContains(t, err, "unsupported resize factor")
 }
 
 func TestReservoirItemsSketch_Update(t *testing.T) {
@@ -150,8 +152,9 @@ func TestReservoirItemsSketchReset(t *testing.T) {
 	assert.NoError(t, err)
 
 	ceilingLgK, _ := internal.ExactLog2(common.CeilingPowerOf2(k))
+	lgRf, _ := resizeFactorLg(defaultResizeFactor)
 	initialLgSize := startingSubMultiple(
-		ceilingLgK, int(math.Log2(float64(defaultResizeFactor))), minLgArrItems,
+		ceilingLgK, lgRf, minLgArrItems,
 	)
 	expectedInitialCap := adjustedSamplingAllocationSize(k, 1<<initialLgSize)
 
@@ -199,6 +202,45 @@ func TestReservoirItemsSketchResizeFactorSerialization(t *testing.T) {
 	assert.Equal(t, ResizeX2, restored.rf)
 }
 
+func TestReservoirItemsSketchResizeFactorGrowth(t *testing.T) {
+	tests := []struct {
+		name     string
+		rf       ResizeFactor
+		wantLgRf int
+	}{
+		{name: "X1", rf: ResizeX1, wantLgRf: 0},
+		{name: "X2", rf: ResizeX2, wantLgRf: 1},
+		{name: "X4", rf: ResizeX4, wantLgRf: 2},
+		{name: "X8", rf: ResizeX8, wantLgRf: 3},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			lgK := 8 // k=256 gives room for growth before clamping
+			k := 1 << lgK
+			minLg := minLgArrItems
+
+			sketch, err := NewReservoirItemsSketch[int64](k, WithReservoirItemsSketchResizeFactor(tc.rf))
+			assert.NoError(t, err)
+
+			initialLg := startingSubMultiple(lgK, tc.wantLgRf, minLg)
+			initialCap := adjustedSamplingAllocationSize(k, 1<<initialLg)
+
+			assert.Equal(t, initialCap, cap(sketch.data))
+
+			// Fill to initial capacity then trigger one growth.
+			for i := 0; i < initialCap; i++ {
+				sketch.Update(int64(i))
+			}
+			sketch.Update(int64(initialCap))
+
+			expectedTarget := adjustedSamplingAllocationSize(k, initialCap<<tc.wantLgRf)
+			assert.GreaterOrEqual(t, cap(sketch.data), expectedTarget)
+		})
+	}
+}
+
 func TestReservoirItemsSketchEstimateSubsetSum(t *testing.T) {
 	t.Run("EmptySketch", func(t *testing.T) {
 		sketch, err := NewReservoirItemsSketch[int64](10)
@@ -239,8 +281,8 @@ func TestReservoirItemsSketchEstimateSubsetSum(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 0.0, summary.Estimate)
 		assert.Equal(t, 0.0, summary.LowerBound)
-		assert.True(t, summary.UpperBound >= 0.0 && summary.UpperBound <= 1.0)
-		assert.Equal(t, float64(sketch.NumSamples()), summary.TotalSketchWeight)
+		assert.True(t, summary.UpperBound >= 0.0 && summary.UpperBound <= float64(sketch.N()))
+		assert.Equal(t, float64(sketch.N()), summary.TotalSketchWeight)
 	})
 
 	t.Run("EstimationModePredicateAlwaysMatches", func(t *testing.T) {
@@ -253,10 +295,10 @@ func TestReservoirItemsSketchEstimateSubsetSum(t *testing.T) {
 
 		summary, err := sketch.EstimateSubsetSum(func(int64) bool { return true })
 		assert.NoError(t, err)
-		assert.Equal(t, 1.0, summary.Estimate)
-		assert.Equal(t, 1.0, summary.UpperBound)
-		assert.True(t, summary.LowerBound >= 0.0 && summary.LowerBound <= 1.0)
-		assert.Equal(t, float64(sketch.NumSamples()), summary.TotalSketchWeight)
+		assert.Equal(t, float64(sketch.N()), summary.Estimate)
+		assert.Equal(t, float64(sketch.N()), summary.UpperBound)
+		assert.True(t, summary.LowerBound >= 0.0 && summary.LowerBound <= float64(sketch.N()))
+		assert.Equal(t, float64(sketch.N()), summary.TotalSketchWeight)
 	})
 
 	t.Run("EstimationModePredicatePartiallyMatches", func(t *testing.T) {
@@ -274,16 +316,16 @@ func TestReservoirItemsSketchEstimateSubsetSum(t *testing.T) {
 				trueCount++
 			}
 		}
-		expectedEstimate := float64(trueCount) / float64(len(samples))
+		expectedEstimate := float64(sketch.N()) * (float64(trueCount) / float64(len(samples)))
 
 		summary, err := sketch.EstimateSubsetSum(func(v int64) bool { return v%2 == 0 })
 		assert.NoError(t, err)
 		assert.InDelta(t, expectedEstimate, summary.Estimate, 0.0)
-		assert.True(t, summary.LowerBound >= 0.0 && summary.LowerBound <= 1.0)
-		assert.True(t, summary.UpperBound >= 0.0 && summary.UpperBound <= 1.0)
+		assert.True(t, summary.LowerBound >= 0.0 && summary.LowerBound <= float64(sketch.N()))
+		assert.True(t, summary.UpperBound >= 0.0 && summary.UpperBound <= float64(sketch.N()))
 		assert.True(t, summary.LowerBound <= summary.Estimate)
 		assert.True(t, summary.Estimate <= summary.UpperBound)
-		assert.Equal(t, float64(sketch.NumSamples()), summary.TotalSketchWeight)
+		assert.Equal(t, float64(sketch.N()), summary.TotalSketchWeight)
 	})
 }
 
@@ -300,4 +342,35 @@ func TestReservoirItemsSketchLegacySerVerEmpty(t *testing.T) {
 	assert.True(t, sketch.IsEmpty())
 	assert.Equal(t, 1024, sketch.K())
 	assert.Equal(t, ResizeX8, sketch.rf)
+}
+
+func TestReservoirItemsSketchUpdateReturnsErrorAtMaxItemsSeen(t *testing.T) {
+	sketch, err := NewReservoirItemsSketch[int64](8)
+	assert.NoError(t, err)
+	sketch.n = maxItemsSeen
+
+	err = sketch.Update(1)
+	assert.ErrorContains(t, err, "sketch has exceeded capacity")
+}
+
+func TestReservoirItemsSketchForceIncrementItemsSeenReturnsErrorOnOverflow(t *testing.T) {
+	sketch, err := NewReservoirItemsSketch[int64](8)
+	assert.NoError(t, err)
+	sketch.n = maxItemsSeen - 1
+
+	err = sketch.forceIncrementItemsSeen(2)
+	assert.ErrorContains(t, err, "sketch has exceeded capacity")
+}
+
+func TestReservoirItemsSketchFromSliceRejectsNTooLarge(t *testing.T) {
+	data := make([]byte, 16)
+	data[0] = 0xC0 | preambleIntsNonEmpty
+	data[1] = serVer
+	data[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
+	data[3] = 0
+	binary.LittleEndian.PutUint32(data[4:], uint32(8))
+	binary.LittleEndian.PutUint64(data[8:], uint64(maxItemsSeen+1))
+
+	_, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
+	assert.ErrorContains(t, err, "items seen exceeds limit")
 }

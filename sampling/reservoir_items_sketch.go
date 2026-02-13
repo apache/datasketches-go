@@ -21,9 +21,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 	"math/rand"
-	"slices"
 	"strings"
 
 	"github.com/apache/datasketches-go/common"
@@ -44,10 +42,26 @@ const (
 
 	defaultResizeFactor = ResizeX8
 	minK                = 2
+	maxItemsSeen        = int64(0xFFFFFFFFFFFF)
 
 	// smallest sampling array allocated: 16
 	minLgArrItems = 4
 )
+
+func resizeFactorLg(rf ResizeFactor) (int, error) {
+	switch rf {
+	case ResizeX1:
+		return 0, nil
+	case ResizeX2:
+		return 1, nil
+	case ResizeX4:
+		return 2, nil
+	case ResizeX8:
+		return 3, nil
+	default:
+		return 0, errors.New("unsupported resize factor")
+	}
+}
 
 // ReservoirItemsSketch provides a uniform random sample of items
 // from a stream of unknown size using the reservoir sampling algorithm.
@@ -93,9 +107,14 @@ func NewReservoirItemsSketch[T any](
 		opt(options)
 	}
 
+	lgRf, err := resizeFactorLg(options.resizeFactor)
+	if err != nil {
+		return nil, err
+	}
+
 	ceilingLgK, _ := internal.ExactLog2(common.CeilingPowerOf2(k))
 	initialLgSize := startingSubMultiple(
-		ceilingLgK, int(math.Log2(float64(options.resizeFactor))), minLgArrItems,
+		ceilingLgK, lgRf, minLgArrItems,
 	)
 	return &ReservoirItemsSketch[T]{
 		k:    k,
@@ -106,27 +125,44 @@ func NewReservoirItemsSketch[T any](
 }
 
 // Update adds an item to the sketch using reservoir sampling algorithm.
-func (s *ReservoirItemsSketch[T]) Update(item T) {
+func (s *ReservoirItemsSketch[T]) Update(item T) error {
+	if s.n == maxItemsSeen {
+		return fmt.Errorf("sketch has exceeded capacity for total items seen: %d", maxItemsSeen)
+	}
+
 	if s.n < int64(s.k) {
 		// Initial phase: store all items until reservoir is full
 		if s.n >= int64(cap(s.data)) {
-			s.growReservoir()
+			if err := s.growReservoir(); err != nil {
+				return err
+			}
 		}
 
 		s.data = append(s.data, item)
+		s.n++
 	} else {
 		// Steady state: replace with probability k/n
-		j := rand.Int63n(s.n + 1)
-		if j < int64(s.k) {
-			s.data[j] = item
+		s.n++
+		if rand.Float64()*float64(s.n) < float64(s.k) {
+			s.data[rand.Intn(s.k)] = item
 		}
 	}
-	s.n++
+	return nil
 }
 
-func (s *ReservoirItemsSketch[T]) growReservoir() {
-	adjustedSize := adjustedSamplingAllocationSize(s.k, cap(s.data)<<int(s.rf))
-	s.data = slices.Grow(s.data, adjustedSize)
+func (s *ReservoirItemsSketch[T]) growReservoir() error {
+	lgRf, err := resizeFactorLg(s.rf)
+	if err != nil {
+		return err
+	}
+	targetCap := adjustedSamplingAllocationSize(s.k, cap(s.data)<<lgRf)
+	if targetCap <= cap(s.data) {
+		return nil
+	}
+	newData := make([]T, len(s.data), targetCap)
+	copy(newData, s.data)
+	s.data = newData
+	return nil
 }
 
 // K returns the maximum reservoir capacity.
@@ -158,9 +194,10 @@ func (s *ReservoirItemsSketch[T]) IsEmpty() bool {
 
 // Reset clears the sketch while preserving capacity k.
 func (s *ReservoirItemsSketch[T]) Reset() {
+	lgRf, _ := resizeFactorLg(s.rf)
 	ceilingLgK, _ := internal.ExactLog2(common.CeilingPowerOf2(s.k))
 	initialLgSize := startingSubMultiple(
-		ceilingLgK, int(math.Log2(float64(s.rf))), minLgArrItems,
+		ceilingLgK, lgRf, minLgArrItems,
 	)
 
 	s.n = 0
@@ -220,18 +257,18 @@ func (s *ReservoirItemsSketch[T]) EstimateSubsetSum(predicate func(T) bool) (Sam
 
 	lowerBoundTrueFraction, err := pseudoHypergeometricLowerBoundOnP(uint64(numSamples), uint64(trueCount), samplingRate)
 	if err != nil {
-		return SampleSubsetSummary{}, nil
+		return SampleSubsetSummary{}, err
 	}
 	upperBoundTrueFraction, err := pseudoHypergeometricUpperBoundOnP(uint64(numSamples), uint64(trueCount), samplingRate)
 	if err != nil {
-		return SampleSubsetSummary{}, nil
+		return SampleSubsetSummary{}, err
 	}
 	estimatedTrueFraction := (1.0 * float64(trueCount)) / float64(numSamples)
 	return SampleSubsetSummary{
-		LowerBound:        lowerBoundTrueFraction,
-		Estimate:          estimatedTrueFraction,
-		UpperBound:        upperBoundTrueFraction,
-		TotalSketchWeight: float64(numSamples),
+		LowerBound:        float64(s.n) * lowerBoundTrueFraction,
+		Estimate:          float64(s.n) * estimatedTrueFraction,
+		UpperBound:        float64(s.n) * upperBoundTrueFraction,
+		TotalSketchWeight: float64(s.n),
 	}, nil
 }
 
@@ -249,12 +286,16 @@ func (s *ReservoirItemsSketch[T]) DownsampledCopy(newK int) (*ReservoirItemsSket
 
 	samples := s.Samples()
 	for _, item := range samples {
-		result.Update(item)
+		if err := result.Update(item); err != nil {
+			return nil, err
+		}
 	}
 
 	// Adjust N to preserve correct implicit weights
 	if result.n < s.n {
-		result.forceIncrementItemsSeen(s.n - result.n)
+		if err := result.forceIncrementItemsSeen(s.n - result.n); err != nil {
+			return nil, err
+		}
 	}
 
 	return result, nil
@@ -271,8 +312,15 @@ func (s *ReservoirItemsSketch[T]) insertValueAtPosition(item T, pos int) {
 }
 
 // forceIncrementItemsSeen adds delta to the items seen count.
-func (s *ReservoirItemsSketch[T]) forceIncrementItemsSeen(delta int64) {
+func (s *ReservoirItemsSketch[T]) forceIncrementItemsSeen(delta int64) error {
 	s.n += delta
+	if s.n > maxItemsSeen {
+		return fmt.Errorf(
+			"sketch has exceeded capacity for total items seen. limit: %d, found: %d",
+			maxItemsSeen, s.n,
+		)
+	}
+	return nil
 }
 
 // Serialization constants
@@ -417,6 +465,9 @@ func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (
 	}
 
 	n := int64(binary.LittleEndian.Uint64(data[8:]))
+	if n > maxItemsSeen {
+		return nil, fmt.Errorf("items seen exceeds limit: %d", maxItemsSeen)
+	}
 	numSamples := int(min(n, int64(k)))
 
 	itemsData := data[preambleBytes:]

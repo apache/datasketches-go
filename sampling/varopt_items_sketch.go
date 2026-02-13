@@ -91,7 +91,12 @@ func NewVarOptItemsSketch[T any](k int, opts ...VarOptOption) (*VarOptItemsSketc
 		opt(cfg)
 	}
 
-	initialSize := int(cfg.resizeFactor)
+	lgRf, err := resizeFactorLg(cfg.resizeFactor)
+	if err != nil {
+		return nil, err
+	}
+
+	initialSize := 1 << lgRf
 	if initialSize > k {
 		initialSize = k
 	}
@@ -498,8 +503,9 @@ func (s *VarOptItemsSketch[T]) swap(i, j int) {
 
 // growDataArrays increases the capacity of data and weights arrays.
 func (s *VarOptItemsSketch[T]) growDataArrays() {
+	lgRf, _ := resizeFactorLg(s.rf)
 	prevSize := s.allocatedSize
-	newSize := s.adjustedSize(s.k, prevSize<<int(s.rf))
+	newSize := s.adjustedSize(s.k, prevSize<<lgRf)
 	if newSize == s.k {
 		newSize++ // need space for the gap
 	}

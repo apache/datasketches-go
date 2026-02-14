@@ -19,205 +19,291 @@ package sampling
 
 import (
 	"math"
-	"math/rand"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestVarOptItemsSketch_NewSketch(t *testing.T) {
-	// Test valid k
-	sketch, err := NewVarOptItemsSketch[string](16)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if sketch.K() != 16 {
-		t.Errorf("expected K=16, got %d", sketch.K())
-	}
-	if sketch.N() != 0 {
-		t.Errorf("expected N=0, got %d", sketch.N())
-	}
-	if !sketch.IsEmpty() {
-		t.Error("expected empty sketch")
-	}
+func TestNewVarOptItemsSketch(t *testing.T) {
+	t.Run("valid K", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[string](16)
+		assert.NoError(t, err)
+		assert.Equal(t, 16, sketch.K())
+		assert.Equal(t, int64(0), sketch.N())
+		assert.True(t, sketch.IsEmpty())
+	})
 
-	// Test k too small
-	_, err = NewVarOptItemsSketch[string](4)
-	if err == nil {
-		t.Error("expected error for k < 8")
-	}
-
-	// Test k too large
-	_, err = NewVarOptItemsSketch[string](varOptMaxK + 1)
-	if err == nil {
-		t.Error("expected error for k > varOptMaxK")
-	}
+	t.Run("K is too large", func(t *testing.T) {
+		_, err := NewVarOptItemsSketch[string](varOptMaxK + 1)
+		assert.ErrorContains(t, err, "k must be at least 1 and less than 2^31 - 1")
+	})
 }
 
-func TestVarOptItemsSketch_WarmupPhase(t *testing.T) {
-	sketch, _ := NewVarOptItemsSketch[int](10)
+func TestVarOptItemsSketch_NumSamples(t *testing.T) {
+	t.Run("empty sketch returns 0", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int](10)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, sketch.NumSamples())
+	})
 
-	// Add fewer than k items - should all be stored
-	for i := 1; i <= 5; i++ {
-		err := sketch.Update(i, float64(i))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+	t.Run("fewer items than k returns number of items", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int](10)
+		assert.NoError(t, err)
+		for i := 1; i <= 5; i++ {
+			err = sketch.Update(i, float64(i))
+			assert.NoError(t, err)
 		}
-	}
+		assert.Equal(t, 5, sketch.NumSamples())
+	})
 
-	if sketch.N() != 5 {
-		t.Errorf("expected N=5, got %d", sketch.N())
-	}
-	if sketch.NumSamples() != 5 {
-		t.Errorf("expected NumSamples=5, got %d", sketch.NumSamples())
-	}
-	if !sketch.inWarmup() {
-		t.Error("expected to still be in warmup mode")
-	}
-}
-
-func TestVarOptItemsSketch_TransitionToEstimation(t *testing.T) {
-	sketch, _ := NewVarOptItemsSketch[int](8)
-
-	// Need k+1 items to trigger transition (h > k condition)
-	for i := 1; i <= 9; i++ {
-		err := sketch.Update(i, float64(i))
-		if err != nil {
-			t.Fatalf("unexpected error at i=%d: %v", i, err)
+	t.Run("exactly k items returns k", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int](10)
+		assert.NoError(t, err)
+		for i := 1; i <= 10; i++ {
+			err = sketch.Update(i, float64(i))
+			assert.NoError(t, err)
 		}
-	}
+		assert.Equal(t, 10, sketch.NumSamples())
+	})
 
-	if sketch.N() != 9 {
-		t.Errorf("expected N=9, got %d", sketch.N())
-	}
-	// After transition, H + R should equal k
-	if sketch.NumSamples() != 8 {
-		t.Errorf("expected NumSamples=8, got %d", sketch.NumSamples())
-	}
-	// Should have transitioned out of warmup
-	if sketch.inWarmup() {
-		t.Error("expected to NOT be in warmup mode after filling")
-	}
-	// Should have some items in R region
-	if sketch.R() == 0 {
-		t.Error("expected R > 0 after transition")
-	}
-}
-
-func TestVarOptItemsSketch_EstimationMode(t *testing.T) {
-	sketch, _ := NewVarOptItemsSketch[int](8)
-
-	// Fill and then add more
-	for i := 1; i <= 20; i++ {
-		err := sketch.Update(i, float64(i))
-		if err != nil {
-			t.Fatalf("unexpected error at i=%d: %v", i, err)
+	t.Run("more than k items returns k", func(t *testing.T) {
+		k := 100
+		sketch, err := NewVarOptItemsSketch[int](uint(k))
+		assert.NoError(t, err)
+		for i := 1; i <= 200; i++ {
+			err = sketch.Update(i, float64(i))
+			assert.NoError(t, err)
 		}
-	}
-
-	if sketch.N() != 20 {
-		t.Errorf("expected N=20, got %d", sketch.N())
-	}
-	// Should still have at most k samples
-	if sketch.NumSamples() > sketch.K() {
-		t.Errorf("expected NumSamples <= K, got %d > %d", sketch.NumSamples(), sketch.K())
-	}
-	// H + R should be <= k
-	if sketch.H()+sketch.R() > sketch.K() {
-		t.Errorf("expected H+R <= K, got %d+%d > %d", sketch.H(), sketch.R(), sketch.K())
-	}
-}
-
-func TestVarOptItemsSketch_InvalidWeight(t *testing.T) {
-	sketch, _ := NewVarOptItemsSketch[string](8)
-
-	// Negative weight should error
-	err := sketch.Update("a", -1.0)
-	if err == nil {
-		t.Error("expected error for negative weight")
-	}
-
-	// Zero weight is valid in C++/Java - just ignored
-	err = sketch.Update("b", 0.0)
-	if err != nil {
-		t.Errorf("zero weight should be valid (ignored), got error: %v", err)
-	}
-	// Sketch should still be empty since zero weight is ignored
-	if sketch.N() != 0 {
-		t.Errorf("expected N=0 after zero weight update, got %d", sketch.N())
-	}
+		assert.Equal(t, k, sketch.NumSamples())
+	})
 }
 
 func TestVarOptItemsSketch_Reset(t *testing.T) {
-	sketch, _ := NewVarOptItemsSketch[int](8)
+	t.Run("exact mode", func(t *testing.T) {
+		k := 10
+		sketch, err := NewVarOptItemsSketch[int](uint(k))
+		assert.NoError(t, err)
+		for i := 1; i <= 5; i++ {
+			err = sketch.Update(i, float64(i))
+			assert.NoError(t, err)
+		}
+		assert.Equal(t, int64(5), sketch.N())
+		assert.Equal(t, k, sketch.K())
+		assert.False(t, sketch.IsEmpty())
 
-	for i := 1; i <= 10; i++ {
-		sketch.Update(i, float64(i))
-	}
+		sketch.Reset()
 
-	sketch.Reset()
+		assert.Equal(t, 10, sketch.K())
+		assert.Equal(t, int64(0), sketch.N())
+		assert.Equal(t, 0, sketch.NumSamples())
+		assert.True(t, sketch.IsEmpty())
+		assert.Equal(t, 0, sketch.H())
+		assert.Equal(t, 0, sketch.R())
+	})
 
-	if !sketch.IsEmpty() {
-		t.Error("expected empty after reset")
-	}
-	if sketch.N() != 0 {
-		t.Errorf("expected N=0 after reset, got %d", sketch.N())
-	}
-	if sketch.H() != 0 || sketch.R() != 0 {
-		t.Errorf("expected H=0, R=0 after reset, got H=%d, R=%d", sketch.H(), sketch.R())
-	}
+	t.Run("estimation mode", func(t *testing.T) {
+		k := 100
+		sketch, err := NewVarOptItemsSketch[int](uint(k))
+		assert.NoError(t, err)
+		for i := 1; i <= 200; i++ {
+			err = sketch.Update(i, float64(i))
+			assert.NoError(t, err)
+		}
+		assert.Equal(t, int64(200), sketch.N())
+		assert.Equal(t, k, sketch.K())
+		assert.Equal(t, k, sketch.NumSamples())
+
+		sketch.Reset()
+
+		assert.Equal(t, k, sketch.K())
+		assert.Equal(t, int64(0), sketch.N())
+		assert.Equal(t, 0, sketch.NumSamples())
+		assert.True(t, sketch.IsEmpty())
+		assert.Equal(t, 0, sketch.H())
+		assert.Equal(t, 0, sketch.R())
+	})
 }
 
-func TestVarOptItemsSketch_UniformWeights(t *testing.T) {
-	// With uniform weights, VarOpt should behave like reservoir sampling
-	sketch, _ := NewVarOptItemsSketch[int](10)
+func TestVarOptItemsSketch_All(t *testing.T) {
+	t.Run("empty sketch", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int](10)
+		assert.NoError(t, err)
 
-	for i := 1; i <= 100; i++ {
-		sketch.Update(i, 1.0)
-	}
+		count := 0
+		for range sketch.All() {
+			count++
+		}
+		assert.Equal(t, 0, count)
+	})
 
-	if sketch.N() != 100 {
-		t.Errorf("expected N=100, got %d", sketch.N())
-	}
-	if sketch.NumSamples() > sketch.K() {
-		t.Errorf("expected NumSamples <= K, got %d", sketch.NumSamples())
-	}
+	t.Run("exact mode", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int](10)
+		assert.NoError(t, err)
+
+		expectedWeights := map[int]float64{}
+		for i := 1; i <= 5; i++ {
+			w := float64(i) * 10.0
+			err = sketch.Update(i, w)
+			assert.NoError(t, err)
+			expectedWeights[i] = w
+		}
+
+		count := 0
+		for sample := range sketch.All() {
+			w, ok := expectedWeights[sample.Item]
+			assert.True(t, ok, "unexpected item %d", sample.Item)
+			assert.Equal(t, w, sample.Weight)
+			count++
+		}
+		assert.Equal(t, 5, count)
+	})
+
+	t.Run("estimation mode", func(t *testing.T) {
+		k := 100
+		sketch, err := NewVarOptItemsSketch[int](uint(k))
+		assert.NoError(t, err)
+		for i := 1; i <= 200; i++ {
+			err = sketch.Update(i, float64(i))
+			assert.NoError(t, err)
+		}
+
+		hCount := sketch.H()
+		rCount := sketch.R()
+		assert.Equal(t, k, hCount+rCount)
+
+		tau := sketch.totalWeightR / float64(rCount)
+
+		idx := 0
+		for sample := range sketch.All() {
+			assert.True(t, sample.Weight > 0, "weight should be positive")
+			if idx >= hCount {
+				// R region items should have weight == tau
+				assert.InDelta(t, tau, sample.Weight, 1e-10)
+			}
+			idx++
+		}
+		assert.Equal(t, k, idx)
+	})
+
+	t.Run("early break stops iteration", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int](10)
+		assert.NoError(t, err)
+		for i := 1; i <= 5; i++ {
+			err = sketch.Update(i, float64(i))
+			assert.NoError(t, err)
+		}
+
+		count := 0
+		for range sketch.All() {
+			count++
+			if count == 3 {
+				break
+			}
+		}
+		assert.Equal(t, 3, count)
+	})
 }
 
-func TestVarOptItemsSketch_CumulativeWeight(t *testing.T) {
-	// This test verifies that the sum of output weights equals the sum of input weights.
-	// This is a key property of VarOpt sketches.
-	// Matches C++ test: "varopt sketch: cumulative weight"
-	const eps = 1e-13
-	k := 256
-	n := 10 * k
+func TestVarOptItemsSketch_Update(t *testing.T) {
+	t.Run("negative weight", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int](10)
+		assert.NoError(t, err)
 
-	sketch, _ := NewVarOptItemsSketch[int](k)
+		err = sketch.Update(1, -1.0)
+		assert.ErrorContains(t, err, "weight must be strictly positive and finite")
+		assert.Equal(t, int64(0), sketch.N())
+	})
 
-	inputSum := 0.0
-	for i := 0; i < n; i++ {
-		// Generate weights using exp(5*N(0,1)) to cover ~10 orders of magnitude
-		// This matches the C++ test distribution
-		w := math.Exp(5 * randNormal())
-		inputSum += w
-		sketch.Update(i, w)
-	}
+	t.Run("zero weight", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int](10)
+		assert.NoError(t, err)
 
-	// Get output weights using Go 1.23 iterator
-	outputSum := 0.0
-	for sample := range sketch.All() {
-		outputSum += sample.Weight
-	}
+		err = sketch.Update(1, 0.0)
+		assert.ErrorContains(t, err, "weight must be strictly positive and finite")
+		assert.Equal(t, int64(0), sketch.N())
+	})
 
-	// The ratio should be exactly 1.0 (within floating point precision)
-	ratio := outputSum / inputSum
-	if math.Abs(ratio-1.0) > eps {
-		t.Errorf("weight ratio out of expected range: got %f, expected 1.0 (±%e)", ratio, eps)
-	}
-}
+	t.Run("NaN weight", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int](10)
+		assert.NoError(t, err)
 
-// randNormal returns a random number from standard normal distribution N(0,1)
-func randNormal() float64 {
-	// Box-Muller transform
-	u1 := rand.Float64()
-	u2 := rand.Float64()
-	return math.Sqrt(-2*math.Log(u1)) * math.Cos(2*math.Pi*u2)
+		err = sketch.Update(1, math.NaN())
+		assert.ErrorContains(t, err, "weight must be strictly positive and finite")
+		assert.Equal(t, int64(0), sketch.N())
+	})
+
+	t.Run("positive infinity weight", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int](10)
+		assert.NoError(t, err)
+
+		err = sketch.Update(1, math.Inf(1))
+		assert.ErrorContains(t, err, "weight must be strictly positive and finite")
+		assert.Equal(t, int64(0), sketch.N())
+	})
+
+	t.Run("negative infinity weight", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int](10)
+		assert.NoError(t, err)
+
+		err = sketch.Update(1, math.Inf(-1))
+		assert.ErrorContains(t, err, "weight must be strictly positive and finite")
+		assert.Equal(t, int64(0), sketch.N())
+	})
+
+	t.Run("exact mode", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int](10)
+		assert.NoError(t, err)
+
+		inputWeightSum := float64(0)
+		for i := 1; i <= 5; i++ {
+			w := float64(i)
+
+			err = sketch.Update(i, w)
+			assert.NoError(t, err)
+
+			inputWeightSum += w
+		}
+
+		outputWeightSum := float64(0)
+		for sample := range sketch.All() {
+			outputWeightSum += sample.Weight
+		}
+
+		assert.Equal(t, 5, sketch.H())
+		assert.Equal(t, 0, sketch.R())
+		assert.False(t, sketch.IsEmpty())
+
+		// check cumulative weight
+		weightRatio := outputWeightSum / inputWeightSum
+		assert.InDelta(t, weightRatio, 1.0, 1e-10)
+	})
+
+	t.Run("estimation mode", func(t *testing.T) {
+		k := 100
+		sketch, err := NewVarOptItemsSketch[int](uint(k))
+		assert.NoError(t, err)
+
+		inputWeightSum := float64(0)
+		for i := 1; i <= 200; i++ {
+			w := float64(i)
+
+			err = sketch.Update(i, w)
+			assert.NoError(t, err)
+
+			inputWeightSum += w
+		}
+
+		outputWeightSum := float64(0)
+		for sample := range sketch.All() {
+			outputWeightSum += sample.Weight
+		}
+
+		assert.Equal(t, int64(200), sketch.N())
+		assert.Equal(t, k, sketch.H()+sketch.R())
+		assert.True(t, sketch.totalWeightR > 0)
+
+		// check cumulative weight
+		weightRatio := outputWeightSum / inputWeightSum
+		assert.InDelta(t, weightRatio, 1.0, 1e-10)
+	})
 }

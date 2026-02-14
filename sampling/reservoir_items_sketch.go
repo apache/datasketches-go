@@ -30,18 +30,7 @@ import (
 	"github.com/apache/datasketches-go/internal"
 )
 
-// ResizeFactor controls how the internal array grows.
-// Note: Go's slice append has automatic resizing, so this is kept for
-// API compatibility with the Java version. Can be removed if not needed.
-// TODO: In Java, this is abstracted into a common package. Consider if this should be moved to a common package in the future.
-type ResizeFactor int
-
 const (
-	ResizeX1 ResizeFactor = 1
-	ResizeX2 ResizeFactor = 2
-	ResizeX4 ResizeFactor = 4
-	ResizeX8 ResizeFactor = 8
-
 	defaultResizeFactor = ResizeX8
 	minK                = 2
 
@@ -95,7 +84,7 @@ func NewReservoirItemsSketch[T any](
 
 	ceilingLgK, _ := internal.ExactLog2(common.CeilingPowerOf2(k))
 	initialLgSize := startingSubMultiple(
-		ceilingLgK, int(math.Log2(float64(options.resizeFactor))), minLgArrItems,
+		ceilingLgK, int(float64(options.resizeFactor)), minLgArrItems,
 	)
 	return &ReservoirItemsSketch[T]{
 		k:    k,

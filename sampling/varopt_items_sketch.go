@@ -19,10 +19,12 @@ package sampling
 
 import (
 	"errors"
+	"fmt"
 	"iter"
 	"math"
 	"math/rand"
 	"slices"
+	"strings"
 
 	"github.com/apache/datasketches-go/internal"
 )
@@ -191,12 +193,6 @@ func (s *VarOptItemsSketch[T]) All() iter.Seq[Sample[T]] {
 	}
 }
 
-// inWarmup returns true if the sketch is still in warmup phase (exact mode).
-// During warmup, r=0 and we store all items directly in H.
-func (s *VarOptItemsSketch[T]) inWarmup() bool {
-	return s.r == 0
-}
-
 // peekMin returns the minimum weight in the H region (heap root).
 func (s *VarOptItemsSketch[T]) peekMin() (float64, error) {
 	if s.h == 0 {
@@ -223,13 +219,17 @@ func (s *VarOptItemsSketch[T]) update(item T, weight float64, mark bool) error {
 		return s.updateWarmupPhase(item, weight, mark)
 	}
 
-	minWeight, err := s.peekMin()
-	if err != nil {
-		return err
-	}
+	var minWeight float64
+	if s.h != 0 {
+		var err error
+		minWeight, err = s.peekMin()
+		if err != nil {
+			return err
+		}
 
-	if s.h != 0 && minWeight < s.tau() {
-		return errors.New("sketch not in valid estimation mode")
+		if minWeight < s.tau() {
+			return errors.New("sketch not in valid estimation mode")
+		}
 	}
 
 	// what tau would be if deletion candidates turn out to be R plus the new item
@@ -648,4 +648,91 @@ func (s *VarOptItemsSketch[T]) adjustedSize(maxSize, resizeTarget int) int {
 		return maxSize
 	}
 	return resizeTarget
+}
+
+// String returns a human-readable summary of this sketch.
+func (s *VarOptItemsSketch[T]) String() string {
+	var sb strings.Builder
+	sb.WriteString("\n")
+	sb.WriteString("### VarOptItemsSketch SUMMARY: \n")
+	sb.WriteString(fmt.Sprintf("   k            : %d\n", s.k))
+	sb.WriteString(fmt.Sprintf("   h            : %d\n", s.h))
+	sb.WriteString(fmt.Sprintf("   r            : %d\n", s.r))
+	sb.WriteString(fmt.Sprintf("   weight_r     : %g\n", s.totalWeightR))
+	sb.WriteString(fmt.Sprintf("   Current size : %d\n", cap(s.data)))
+	sb.WriteString(fmt.Sprintf("   Resize factor: %v\n", s.rf))
+	sb.WriteString("### END SKETCH SUMMARY\n")
+	return sb.String()
+}
+
+// EstimateSubsetSum computes an estimated subset sum from the entire stream for objects matching a given
+// predicate. Provides a lower bound, estimate, and upper bound using a target of 2 standard deviations.
+//
+// NOTE: This is technically a heuristic method, and tries to err on the conservative side.
+//
+// predicate: A predicate to use when identifying items.
+// Returns a summary object containing the estimate, upper and lower bounds, and the total sketch weight.
+func (s *VarOptItemsSketch[T]) EstimateSubsetSum(predicate func(T) bool) (SampleSubsetSummary, error) {
+	if s.n == 0 {
+		return SampleSubsetSummary{}, nil
+	}
+
+	var (
+		weightSumInH  = 0.0
+		trueWeightInH = 0.0
+		idx           = 0
+	)
+	for idx < s.h {
+		weight := s.weights[idx]
+
+		weightSumInH += weight
+
+		if predicate(s.data[idx]) {
+			trueWeightInH += weight
+		}
+
+		idx++
+	}
+
+	// if only heavy items, we have an exact answer
+	if s.r == 0 {
+		return SampleSubsetSummary{
+			LowerBound:        trueWeightInH,
+			Estimate:          trueWeightInH,
+			UpperBound:        trueWeightInH,
+			TotalSketchWeight: trueWeightInH,
+		}, nil
+	}
+
+	numSampled := s.n - int64(s.h)
+	effectiveSamplingRate := float64(s.r) / float64(numSampled)
+	if effectiveSamplingRate < 0 || effectiveSamplingRate > 1.0 {
+		return SampleSubsetSummary{}, errors.New("invalid sampling rate outside [0.0, 1.0]")
+	}
+
+	trueRCount := 0
+	idx++ // skip the gap
+	for idx < (s.k + 1) {
+		if predicate(s.data[idx]) {
+			trueRCount++
+		}
+
+		idx++
+	}
+
+	lowerBoundTrueFraction, err := pseudoHypergeometricLowerBoundOnP(uint64(s.r), uint64(trueRCount), effectiveSamplingRate)
+	if err != nil {
+		return SampleSubsetSummary{}, err
+	}
+	upperTrueFraction, err := pseudoHypergeometricUpperBoundOnP(uint64(s.r), uint64(trueRCount), effectiveSamplingRate)
+	if err != nil {
+		return SampleSubsetSummary{}, err
+	}
+	estimatedTrueFraction := float64(trueRCount) / float64(s.r)
+	return SampleSubsetSummary{
+		LowerBound:        trueWeightInH + s.totalWeightR*lowerBoundTrueFraction,
+		Estimate:          trueWeightInH + s.totalWeightR*estimatedTrueFraction,
+		UpperBound:        trueWeightInH + s.totalWeightR*upperTrueFraction,
+		TotalSketchWeight: weightSumInH + s.totalWeightR,
+	}, nil
 }

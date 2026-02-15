@@ -209,18 +209,18 @@ func (s *ReservoirItemsSketch[T]) EstimateSubsetSum(predicate func(T) bool) (Sam
 
 	lowerBoundTrueFraction, err := pseudoHypergeometricLowerBoundOnP(uint64(numSamples), uint64(trueCount), samplingRate)
 	if err != nil {
-		return SampleSubsetSummary{}, nil
+		return SampleSubsetSummary{}, err
 	}
 	upperBoundTrueFraction, err := pseudoHypergeometricUpperBoundOnP(uint64(numSamples), uint64(trueCount), samplingRate)
 	if err != nil {
-		return SampleSubsetSummary{}, nil
+		return SampleSubsetSummary{}, err
 	}
 	estimatedTrueFraction := (1.0 * float64(trueCount)) / float64(numSamples)
 	return SampleSubsetSummary{
-		LowerBound:        lowerBoundTrueFraction,
-		Estimate:          estimatedTrueFraction,
-		UpperBound:        upperBoundTrueFraction,
-		TotalSketchWeight: float64(numSamples),
+		LowerBound:        float64(s.n) * lowerBoundTrueFraction,
+		Estimate:          float64(s.n) * estimatedTrueFraction,
+		UpperBound:        float64(s.n) * upperBoundTrueFraction,
+		TotalSketchWeight: float64(s.n),
 	}, nil
 }
 

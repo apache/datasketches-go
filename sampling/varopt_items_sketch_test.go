@@ -307,3 +307,81 @@ func TestVarOptItemsSketch_Update(t *testing.T) {
 		assert.InDelta(t, weightRatio, 1.0, 1e-10)
 	})
 }
+
+func TestVarOptItemsSketch_EstimateSubsetSum(t *testing.T) {
+	k := 10
+	sketch, err := NewVarOptItemsSketch[int64](uint(k))
+	assert.NoError(t, err)
+
+	// empty sketch
+	summary, err := sketch.EstimateSubsetSum(func(i int64) bool {
+		return true
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 0.0, summary.Estimate)
+	assert.Equal(t, 0.0, summary.TotalSketchWeight)
+
+	// exact mode
+	weightSum := 0.0
+	for i := 1; i < k; i++ {
+		err := sketch.Update(int64(i), float64(i))
+		assert.NoError(t, err)
+
+		weightSum += float64(i)
+	}
+
+	summary, err = sketch.EstimateSubsetSum(func(i int64) bool {
+		return true
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, weightSum, summary.Estimate)
+	assert.Equal(t, weightSum, summary.LowerBound)
+	assert.Equal(t, weightSum, summary.UpperBound)
+	assert.Equal(t, weightSum, summary.TotalSketchWeight)
+
+	// estimation mode
+	for i := k; i < k+2; i++ {
+		err = sketch.Update(int64(i), float64(i))
+		assert.NoError(t, err)
+
+		weightSum += float64(i)
+	}
+
+	summary, err = sketch.EstimateSubsetSum(func(i int64) bool {
+		return true
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, weightSum, summary.Estimate)
+	assert.Equal(t, weightSum, summary.UpperBound)
+	assert.Less(t, summary.LowerBound, weightSum)
+	assert.Equal(t, weightSum, summary.TotalSketchWeight)
+
+	summary, err = sketch.EstimateSubsetSum(func(i int64) bool {
+		return false
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 0.0, summary.Estimate)
+	assert.Equal(t, 0.0, summary.LowerBound)
+	assert.Greater(t, summary.UpperBound, 0.0)
+	assert.Equal(t, weightSum, summary.TotalSketchWeight)
+
+	// finally, a non-degenerate predicate
+	// insert negative items with identical weights, filter for negative weights only
+	for i := 1; i < k+2; i++ {
+		err := sketch.Update(int64(-i), float64(i))
+		assert.NoError(t, err)
+
+		weightSum += float64(i)
+	}
+
+	summary, err = sketch.EstimateSubsetSum(func(i int64) bool {
+		return i < 0
+	})
+	assert.NoError(t, err)
+	assert.GreaterOrEqual(t, summary.Estimate, summary.LowerBound)
+	assert.LessOrEqual(t, summary.Estimate, summary.UpperBound)
+
+	assert.Less(t, summary.LowerBound, weightSum/1.4)
+	assert.Greater(t, summary.UpperBound, weightSum/2.6)
+	assert.Equal(t, weightSum, summary.TotalSketchWeight)
+}

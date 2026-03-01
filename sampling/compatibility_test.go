@@ -247,7 +247,303 @@ func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
 			})
 		}
 	})
+
+	// ========== VarOptItemsSketch<Long> (8 files) ==========
+	// Matches Java/C++ VarOptCrossLanguageTest / serialize_for_java scenarios.
+	t.Run("varopt_sketch_long", func(t *testing.T) {
+		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+		for _, n := range nArr {
+			n := n
+			t.Run(fmt.Sprintf("n%d", n), func(t *testing.T) {
+				sketch, err := NewVarOptItemsSketch[int64](32)
+				assert.NoError(t, err)
+				for i := 1; i <= n; i++ {
+					assert.NoError(t, sketch.Update(int64(i), 1.0))
+				}
+				data, err := sketch.ToSlice(Int64SerDe{})
+				assert.NoError(t, err)
+				assert.NoError(t, os.WriteFile(
+					fmt.Sprintf("%s/varopt_sketch_long_n%d_go.sk", internal.GoPath, n),
+					data,
+					0644,
+				))
+			})
+		}
+	})
+
+	// ========== VarOptItemsSketch<String> exact (1 file) ==========
+	t.Run("varopt_sketch_string_exact", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[string](1024)
+		assert.NoError(t, err)
+		for i := 1; i <= 200; i++ {
+			assert.NoError(t, sketch.Update(fmt.Sprintf("%d", i), 1000.0/float64(i)))
+		}
+		data, err := sketch.ToSlice(StringSerDe{})
+		assert.NoError(t, err)
+		assert.NoError(t, os.WriteFile(
+			fmt.Sprintf("%s/varopt_sketch_string_exact_go.sk", internal.GoPath),
+			data,
+			0644,
+		))
+	})
+
+	// ========== VarOptItemsSketch<Long> sampling (1 file) ==========
+	t.Run("varopt_sketch_long_sampling", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int64](1024)
+		assert.NoError(t, err)
+		for i := int64(0); i < 2000; i++ {
+			assert.NoError(t, sketch.Update(i, 1.0))
+		}
+		// Negative heavy items to allow predicate filtering, aligned with Java/C++.
+		assert.NoError(t, sketch.Update(-1, 100000.0))
+		assert.NoError(t, sketch.Update(-2, 110000.0))
+		assert.NoError(t, sketch.Update(-3, 120000.0))
+
+		data, err := sketch.ToSlice(Int64SerDe{})
+		assert.NoError(t, err)
+		assert.NoError(t, os.WriteFile(
+			fmt.Sprintf("%s/varopt_sketch_long_sampling_go.sk", internal.GoPath),
+			data,
+			0644,
+		))
+	})
+
+	// ========== VarOptItemsUnion<Double> sampling (1 file) ==========
+	t.Run("varopt_union_double_sampling", func(t *testing.T) {
+		const (
+			kSmall = 16
+			kMax   = 128
+			n1     = 32
+			n2     = 64
+		)
+
+		// Small-k sketch in sampling mode.
+		sketch1, err := NewVarOptItemsSketch[float64](kSmall)
+		assert.NoError(t, err)
+		for i := 0; i < n1; i++ {
+			assert.NoError(t, sketch1.Update(float64(i), 1.0))
+		}
+		assert.NoError(t, sketch1.Update(-1.0, float64(n1*n1))) // negative heavy item
+
+		// Another sketch with different n to yield a different implicit per-item weight.
+		sketch2, err := NewVarOptItemsSketch[float64](kSmall)
+		assert.NoError(t, err)
+		for i := 0; i < n2; i++ {
+			assert.NoError(t, sketch2.Update(float64(i), 1.0))
+		}
+
+		union, err := NewVarOptItemsUnion[float64](kMax)
+		assert.NoError(t, err)
+		assert.NoError(t, union.UpdateSketch(sketch1))
+		assert.NoError(t, union.UpdateSketch(sketch2))
+
+		data, err := union.ToSlice(Float64SerDe{})
+		assert.NoError(t, err)
+		assert.NoError(t, os.WriteFile(
+			fmt.Sprintf("%s/varopt_union_double_sampling_go.sk", internal.GoPath),
+			data,
+			0644,
+		))
+	})
 }
+
+func TestVarOptItemsSketch_JavaCompat(t *testing.T) {
+	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+	for _, n := range nArr {
+		t.Run(fmt.Sprintf("long_n%d", n), func(t *testing.T) {
+			path := filepath.Join(internal.JavaPath, fmt.Sprintf("varopt_sketch_long_n%d_java.sk", n))
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				t.Skipf("Java file not found: %s", path)
+				return
+			}
+
+			data, err := os.ReadFile(path)
+			assert.NoError(t, err)
+
+			sketch, err := NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+			assert.NoError(t, err)
+			assert.Equal(t, 32, sketch.K())
+			assert.Equal(t, int64(n), sketch.N())
+			assert.Equal(t, min(n, 32), sketch.NumSamples())
+		})
+	}
+
+	t.Run("string_exact", func(t *testing.T) {
+		path := filepath.Join(internal.JavaPath, "varopt_sketch_string_exact_java.sk")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			t.Skipf("Java file not found: %s", path)
+			return
+		}
+
+		data, err := os.ReadFile(path)
+		assert.NoError(t, err)
+
+		sketch, err := NewVarOptItemsSketchFromSlice[string](data, StringSerDe{})
+		assert.NoError(t, err)
+		assert.Equal(t, 1024, sketch.K())
+		assert.Equal(t, int64(200), sketch.N())
+		assert.Equal(t, 200, sketch.NumSamples())
+
+		ss, err := sketch.EstimateSubsetSum(func(_ string) bool { return true })
+		assert.NoError(t, err)
+		weight := 0.0
+		for i := 1; i <= 200; i++ {
+			weight += 1000.0 / float64(i)
+		}
+		assert.InDelta(t, weight, ss.TotalSketchWeight, 1e-9)
+	})
+
+	t.Run("long_sampling", func(t *testing.T) {
+		path := filepath.Join(internal.JavaPath, "varopt_sketch_long_sampling_java.sk")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			t.Skipf("Java file not found: %s", path)
+			return
+		}
+
+		data, err := os.ReadFile(path)
+		assert.NoError(t, err)
+
+		sketch, err := NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+		assert.NoError(t, err)
+		assert.Equal(t, 1024, sketch.K())
+		assert.Equal(t, int64(2003), sketch.N())
+		assert.Equal(t, 1024, sketch.NumSamples())
+
+		ssAll, err := sketch.EstimateSubsetSum(func(_ int64) bool { return true })
+		assert.NoError(t, err)
+		assert.InDelta(t, 332000.0, ssAll.TotalSketchWeight, 1e-9)
+
+		ssNeg, err := sketch.EstimateSubsetSum(func(v int64) bool { return v < 0 })
+		assert.NoError(t, err)
+		assert.InDelta(t, 330000.0, ssNeg.Estimate, 1e-9)
+
+		ssNonNeg, err := sketch.EstimateSubsetSum(func(v int64) bool { return v >= 0 })
+		assert.NoError(t, err)
+		assert.InDelta(t, 2000.0, ssNonNeg.Estimate, 1e-9)
+	})
+}
+
+func TestVarOptItemsSketch_CppCompat(t *testing.T) {
+	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+	for _, n := range nArr {
+		t.Run(fmt.Sprintf("long_n%d", n), func(t *testing.T) {
+			path := filepath.Join(internal.CppPath, fmt.Sprintf("varopt_sketch_long_n%d_cpp.sk", n))
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				t.Skipf("CPP file not found: %s", path)
+				return
+			}
+
+			data, err := os.ReadFile(path)
+			assert.NoError(t, err)
+
+			sketch, err := NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+			assert.NoError(t, err)
+			assert.Equal(t, 32, sketch.K())
+			assert.Equal(t, int64(n), sketch.N())
+			assert.Equal(t, min(n, 32), sketch.NumSamples())
+		})
+	}
+
+	t.Run("string_exact", func(t *testing.T) {
+		path := filepath.Join(internal.CppPath, "varopt_sketch_string_exact_cpp.sk")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			t.Skipf("CPP file not found: %s", path)
+			return
+		}
+
+		data, err := os.ReadFile(path)
+		assert.NoError(t, err)
+
+		sketch, err := NewVarOptItemsSketchFromSlice[string](data, StringSerDe{})
+		assert.NoError(t, err)
+		assert.Equal(t, 1024, sketch.K())
+		assert.Equal(t, int64(200), sketch.N())
+		assert.Equal(t, 200, sketch.NumSamples())
+
+		ss, err := sketch.EstimateSubsetSum(func(_ string) bool { return true })
+		assert.NoError(t, err)
+		weight := 0.0
+		for i := 1; i <= 200; i++ {
+			weight += 1000.0 / float64(i)
+		}
+		assert.InDelta(t, weight, ss.TotalSketchWeight, 1e-9)
+	})
+
+	t.Run("long_sampling", func(t *testing.T) {
+		path := filepath.Join(internal.CppPath, "varopt_sketch_long_sampling_cpp.sk")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			t.Skipf("CPP file not found: %s", path)
+			return
+		}
+
+		data, err := os.ReadFile(path)
+		assert.NoError(t, err)
+
+		sketch, err := NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+		assert.NoError(t, err)
+		assert.Equal(t, 1024, sketch.K())
+		assert.Equal(t, int64(2003), sketch.N())
+		assert.Equal(t, 1024, sketch.NumSamples())
+
+		ssAll, err := sketch.EstimateSubsetSum(func(_ int64) bool { return true })
+		assert.NoError(t, err)
+		assert.InDelta(t, 332000.0, ssAll.TotalSketchWeight, 1e-9)
+
+		ssNeg, err := sketch.EstimateSubsetSum(func(v int64) bool { return v < 0 })
+		assert.NoError(t, err)
+		assert.InDelta(t, 330000.0, ssNeg.Estimate, 1e-9)
+
+		ssNonNeg, err := sketch.EstimateSubsetSum(func(v int64) bool { return v >= 0 })
+		assert.NoError(t, err)
+		assert.InDelta(t, 2000.0, ssNonNeg.Estimate, 1e-9)
+	})
+}
+
+func TestVarOptItemsUnion_JavaCompat(t *testing.T) {
+	path := filepath.Join(internal.JavaPath, "varopt_union_double_sampling_java.sk")
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Skipf("Java file not found: %s", path)
+		return
+	}
+	data, err := os.ReadFile(path)
+	assert.NoError(t, err)
+
+	union, err := NewVarOptItemsUnionFromSlice[float64](data, Float64SerDe{})
+	assert.NoError(t, err)
+	result, err := union.Result()
+	assert.NoError(t, err)
+	assert.True(t, result.K() < 128)
+	assert.Equal(t, int64(97), result.N())
+
+	ss, err := result.EstimateSubsetSum(func(v float64) bool { return v >= 0 })
+	assert.NoError(t, err)
+	assert.InDelta(t, 96.0, ss.Estimate, 1e-9)
+	assert.InDelta(t, 96.0+1024.0, ss.TotalSketchWeight, 1e-9)
+}
+
+func TestVarOptItemsUnion_CppCompat(t *testing.T) {
+	path := filepath.Join(internal.CppPath, "varopt_union_double_sampling_cpp.sk")
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Skipf("CPP file not found: %s", path)
+		return
+	}
+	data, err := os.ReadFile(path)
+	assert.NoError(t, err)
+
+	union, err := NewVarOptItemsUnionFromSlice[float64](data, Float64SerDe{})
+	assert.NoError(t, err)
+	result, err := union.Result()
+	assert.NoError(t, err)
+	assert.True(t, result.K() < 128)
+	assert.True(t, result.K() >= 16)
+	assert.Equal(t, int64(97), result.N())
+
+	ss, err := result.EstimateSubsetSum(func(v float64) bool { return v >= 0 })
+	assert.NoError(t, err)
+	assert.InDelta(t, 96.0, ss.Estimate, 1e-9)
+	assert.InDelta(t, 96.0+1024.0, ss.TotalSketchWeight, 1e-9)
+}
+
 
 // TestSerializationCompatibilityEmpty tests deserialization of an empty sketch.
 func TestSerializationCompatibilityEmpty(t *testing.T) {

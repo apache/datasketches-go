@@ -499,6 +499,82 @@ func TestVarOptItemsSketch_CppCompat(t *testing.T) {
 	})
 }
 
+func TestVarOptItemsSketch_GoCompat(t *testing.T) {
+	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+	for _, n := range nArr {
+		t.Run(fmt.Sprintf("long_n%d", n), func(t *testing.T) {
+			path := filepath.Join(internal.GoPath, fmt.Sprintf("varopt_sketch_long_n%d_go.sk", n))
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				t.Skipf("Go file not found: %s", path)
+				return
+			}
+
+			data, err := os.ReadFile(path)
+			assert.NoError(t, err)
+
+			sketch, err := NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+			assert.NoError(t, err)
+			assert.Equal(t, 32, sketch.K())
+			assert.Equal(t, int64(n), sketch.N())
+			assert.Equal(t, min(n, 32), sketch.NumSamples())
+		})
+	}
+
+	t.Run("string_exact", func(t *testing.T) {
+		path := filepath.Join(internal.GoPath, "varopt_sketch_string_exact_go.sk")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			t.Skipf("Go file not found: %s", path)
+			return
+		}
+
+		data, err := os.ReadFile(path)
+		assert.NoError(t, err)
+
+		sketch, err := NewVarOptItemsSketchFromSlice[string](data, StringSerDe{})
+		assert.NoError(t, err)
+		assert.Equal(t, 1024, sketch.K())
+		assert.Equal(t, int64(200), sketch.N())
+		assert.Equal(t, 200, sketch.NumSamples())
+
+		ss, err := sketch.EstimateSubsetSum(func(_ string) bool { return true })
+		assert.NoError(t, err)
+		weight := 0.0
+		for i := 1; i <= 200; i++ {
+			weight += 1000.0 / float64(i)
+		}
+		assert.InDelta(t, weight, ss.TotalSketchWeight, 1e-9)
+	})
+
+	t.Run("long_sampling", func(t *testing.T) {
+		path := filepath.Join(internal.GoPath, "varopt_sketch_long_sampling_go.sk")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			t.Skipf("Go file not found: %s", path)
+			return
+		}
+
+		data, err := os.ReadFile(path)
+		assert.NoError(t, err)
+
+		sketch, err := NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+		assert.NoError(t, err)
+		assert.Equal(t, 1024, sketch.K())
+		assert.Equal(t, int64(2003), sketch.N())
+		assert.Equal(t, 1024, sketch.NumSamples())
+
+		ssAll, err := sketch.EstimateSubsetSum(func(_ int64) bool { return true })
+		assert.NoError(t, err)
+		assert.InDelta(t, 332000.0, ssAll.TotalSketchWeight, 1e-9)
+
+		ssNeg, err := sketch.EstimateSubsetSum(func(v int64) bool { return v < 0 })
+		assert.NoError(t, err)
+		assert.InDelta(t, 330000.0, ssNeg.Estimate, 1e-9)
+
+		ssNonNeg, err := sketch.EstimateSubsetSum(func(v int64) bool { return v >= 0 })
+		assert.NoError(t, err)
+		assert.InDelta(t, 2000.0, ssNonNeg.Estimate, 1e-9)
+	})
+}
+
 func TestVarOptItemsUnion_JavaCompat(t *testing.T) {
 	path := filepath.Join(internal.JavaPath, "varopt_union_double_sampling_java.sk")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -525,6 +601,29 @@ func TestVarOptItemsUnion_CppCompat(t *testing.T) {
 	path := filepath.Join(internal.CppPath, "varopt_union_double_sampling_cpp.sk")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		t.Skipf("CPP file not found: %s", path)
+		return
+	}
+	data, err := os.ReadFile(path)
+	assert.NoError(t, err)
+
+	union, err := NewVarOptItemsUnionFromSlice[float64](data, Float64SerDe{})
+	assert.NoError(t, err)
+	result, err := union.Result()
+	assert.NoError(t, err)
+	assert.True(t, result.K() < 128)
+	assert.True(t, result.K() >= 16)
+	assert.Equal(t, int64(97), result.N())
+
+	ss, err := result.EstimateSubsetSum(func(v float64) bool { return v >= 0 })
+	assert.NoError(t, err)
+	assert.InDelta(t, 96.0, ss.Estimate, 1e-9)
+	assert.InDelta(t, 96.0+1024.0, ss.TotalSketchWeight, 1e-9)
+}
+
+func TestVarOptItemsUnion_GoCompat(t *testing.T) {
+	path := filepath.Join(internal.GoPath, "varopt_union_double_sampling_go.sk")
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Skipf("Go file not found: %s", path)
 		return
 	}
 	data, err := os.ReadFile(path)

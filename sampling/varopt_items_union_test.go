@@ -63,6 +63,117 @@ func TestVarOptItemsUnion_UpdateSketchExactMode(t *testing.T) {
 	assert.Equal(t, 0, result.R())
 }
 
+func TestVarOptItemsUnion_UpdateSketchSamplingWithExtremeHeavyItem(t *testing.T) {
+	const k = 16
+
+	sketch1, err := NewVarOptItemsSketch[int](uint(k))
+	assert.NoError(t, err)
+	for i := 0; i < 500; i++ {
+		assert.NoError(t, sketch1.Update(i, 1.0))
+	}
+	assert.NoError(t, sketch1.Update(-1, 1e12))
+	assert.Greater(t, sketch1.R(), 0)
+
+	sketch2, err := NewVarOptItemsSketch[int](uint(k))
+	assert.NoError(t, err)
+	for i := 1000; i < 1500; i++ {
+		assert.NoError(t, sketch2.Update(i, 1.0))
+	}
+	assert.Greater(t, sketch2.R(), 0)
+
+	union, err := NewVarOptItemsUnion[int](k)
+	assert.NoError(t, err)
+	assert.NoError(t, union.UpdateSketch(sketch1))
+	assert.NoError(t, union.UpdateSketch(sketch2))
+
+	result, err := union.Result()
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1001), result.N())
+	assert.Equal(t, k, result.K())
+	assert.LessOrEqual(t, result.NumSamples(), k)
+
+	foundHeavy := false
+	for sample := range result.All() {
+		if sample.Item == -1 {
+			foundHeavy = true
+			break
+		}
+	}
+	assert.True(t, foundHeavy, "extreme heavy item should be retained in union result")
+}
+
+func TestVarOptItemsUnion_UpdateSketchIdenticalSamplingSketches(t *testing.T) {
+	const k = 16
+	const n = 1000
+
+	base, err := NewVarOptItemsSketch[int64](uint(k))
+	assert.NoError(t, err)
+	for i := 0; i < n; i++ {
+		assert.NoError(t, base.Update(int64(i), 1.0))
+	}
+	assert.Greater(t, base.R(), 0)
+
+	data, err := base.ToSlice(Int64SerDe{})
+	assert.NoError(t, err)
+	clone, err := NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+	assert.NoError(t, err)
+
+	union, err := NewVarOptItemsUnion[int64](k)
+	assert.NoError(t, err)
+	assert.NoError(t, union.UpdateSketch(base))
+	assert.NoError(t, union.UpdateSketch(clone))
+
+	result, err := union.Result()
+	assert.NoError(t, err)
+	assert.Equal(t, int64(2*n), result.N())
+	assert.Equal(t, k, result.K())
+	assert.LessOrEqual(t, result.NumSamples(), k)
+
+	ss, err := result.EstimateSubsetSum(func(_ int64) bool { return true })
+	assert.NoError(t, err)
+	assert.InDelta(t, float64(2*n), ss.TotalSketchWeight, 1e-9)
+}
+
+func TestVarOptItemsUnion_UpdateSketchDifferentKWeightedItems(t *testing.T) {
+	smallK := 8
+	largeK := 32
+
+	small, err := NewVarOptItemsSketch[int](uint(smallK))
+	assert.NoError(t, err)
+	totalWeight := 0.0
+	for i := 1; i <= 200; i++ {
+		w := float64(i)
+		totalWeight += w
+		assert.NoError(t, small.Update(i, w))
+	}
+	assert.Greater(t, small.R(), 0)
+
+	large, err := NewVarOptItemsSketch[int](uint(largeK))
+	assert.NoError(t, err)
+	for i := 1; i <= 400; i++ {
+		w := float64(i) * 0.5
+		totalWeight += w
+		assert.NoError(t, large.Update(10000+i, w))
+	}
+	assert.Greater(t, large.R(), 0)
+
+	union, err := NewVarOptItemsUnion[int](largeK)
+	assert.NoError(t, err)
+	assert.NoError(t, union.UpdateSketch(small))
+	assert.NoError(t, union.UpdateSketch(large))
+
+	result, err := union.Result()
+	assert.NoError(t, err)
+	assert.Equal(t, int64(600), result.N())
+	assert.GreaterOrEqual(t, result.K(), 1)
+	assert.LessOrEqual(t, result.K(), largeK)
+	assert.LessOrEqual(t, result.NumSamples(), largeK)
+
+	ss, err := result.EstimateSubsetSum(func(_ int) bool { return true })
+	assert.NoError(t, err)
+	assert.InDelta(t, totalWeight, ss.TotalSketchWeight, 1e-9)
+}
+
 func TestVarOptItemsUnion_UpdateSketchNilNoop(t *testing.T) {
 	union, err := NewVarOptItemsUnion[int](8)
 	assert.NoError(t, err)

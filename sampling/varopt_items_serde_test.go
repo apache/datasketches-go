@@ -87,6 +87,8 @@ func TestVarOptItemsSketchSerde_WarmupRoundTrip(t *testing.T) {
 	assert.Equal(t, sketch.N(), restored.N())
 	assert.Equal(t, sketch.H(), restored.H())
 	assert.Equal(t, sketch.R(), restored.R())
+	assert.Greater(t, cap(restored.data), restored.H())
+	assert.Equal(t, cap(restored.data), cap(restored.weights))
 }
 
 func TestVarOptItemsSketchSerde_SamplingRoundTrip(t *testing.T) {

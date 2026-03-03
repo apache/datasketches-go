@@ -245,9 +245,24 @@ func NewVarOptItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (*Va
 	}
 
 	if r == 0 {
+		ceilingLgK := math.Log2(float64(internal.CeilPowerOf2(k)))
+		initialLgSize := startingSubMultiple(int(ceilingLgK), int(rf), minLgArrItems)
+		warmupCap := adjustedSamplingAllocationSize(k, 1<<initialLgSize)
+		if warmupCap == k {
+			warmupCap++
+		}
+		if warmupCap < h+1 {
+			warmupCap = h + 1
+		}
+
+		dataOut := make([]T, h, warmupCap)
+		weightsOut := make([]float64, h, warmupCap)
+		copy(dataOut, items)
+		copy(weightsOut, hWeights)
+
 		out := &VarOptItemsSketch[T]{
-			data:         append([]T(nil), items...),
-			weights:      append([]float64(nil), hWeights...),
+			data:         dataOut,
+			weights:      weightsOut,
 			k:            k,
 			n:            n,
 			h:            h,
@@ -258,7 +273,8 @@ func NewVarOptItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (*Va
 			numMarksInH:  numMarksInH,
 		}
 		if isGadget {
-			out.marks = append([]bool(nil), hMarks...)
+			out.marks = make([]bool, h, warmupCap)
+			copy(out.marks, hMarks)
 		}
 		return out, nil
 	}

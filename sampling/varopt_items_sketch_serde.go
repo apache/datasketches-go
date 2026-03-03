@@ -76,9 +76,13 @@ func (s *VarOptItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 			items = append(items, s.data[i])
 		}
 	}
-	itemsBytes, err := serde.SerializeToBytes(items)
-	if err != nil {
-		return nil, err
+
+	itemsBytes := []byte(nil)
+	if totalItems > 0 {
+		itemsBytes, err = serde.SerializeToBytes(items)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	preambleBytes := preLongs * 8
@@ -115,7 +119,9 @@ func (s *VarOptItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 		packBoolsInto(out[markOffset:markOffset+markBytes], s.marks[:s.h])
 	}
 
-	copy(out[markOffset+markBytes:], itemsBytes)
+	if totalItems > 0 {
+		copy(out[markOffset+markBytes:], itemsBytes)
+	}
 	return out, nil
 }
 
@@ -179,6 +185,9 @@ func NewVarOptItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (*Va
 	if h < 0 || r < 0 {
 		return nil, errors.New("invalid h/r in serialized varopt sketch")
 	}
+	if preLongs == varOptPreambleLongsFull && r == 0 {
+		return nil, errors.New("invalid varopt sketch header: full preLongs with empty r region")
+	}
 	if r > 0 && h+r != k {
 		return nil, errors.New("invalid varopt sketch state: h + r must equal k in sampling mode")
 	}
@@ -189,6 +198,9 @@ func NewVarOptItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (*Va
 	totalWeightR := 0.0
 	if r > 0 {
 		totalWeightR = math.Float64frombits(binary.LittleEndian.Uint64(data[24:]))
+		if math.IsNaN(totalWeightR) {
+			return nil, errors.New("invalid totalWeightR in serialized varopt sketch: NaN")
+		}
 	}
 
 	weightOffset := 24

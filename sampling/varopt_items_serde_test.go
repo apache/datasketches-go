@@ -19,11 +19,29 @@ package sampling
 
 import (
 	"encoding/binary"
+	"math"
 	"testing"
 
 	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
 )
+
+type emptyCorruptingInt64SerDe struct{}
+
+func (emptyCorruptingInt64SerDe) SerializeToBytes(items []int64) ([]byte, error) {
+	if len(items) == 0 {
+		return []byte{0xCA, 0xFE, 0xBA, 0xBE}, nil
+	}
+	return Int64SerDe{}.SerializeToBytes(items)
+}
+
+func (emptyCorruptingInt64SerDe) DeserializeFromBytes(data []byte, numItems int) ([]int64, error) {
+	return Int64SerDe{}.DeserializeFromBytes(data, numItems)
+}
+
+func (emptyCorruptingInt64SerDe) SizeOfItem() int {
+	return Int64SerDe{}.SizeOfItem()
+}
 
 func TestVarOptItemsSketchSerde_EmptyRoundTrip(t *testing.T) {
 	sketch, err := NewVarOptItemsSketch[int64](16)
@@ -36,6 +54,21 @@ func TestVarOptItemsSketchSerde_EmptyRoundTrip(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, restored.IsEmpty())
 	assert.Equal(t, 16, restored.K())
+}
+
+func TestVarOptItemsSketchSerde_EmptySketchIgnoresCustomEmptyItemsBytes(t *testing.T) {
+	sketch, err := NewVarOptItemsSketch[int64](16)
+	assert.NoError(t, err)
+
+	data, err := sketch.ToSlice(emptyCorruptingInt64SerDe{})
+	assert.NoError(t, err)
+	assert.Equal(t, 8, len(data))
+
+	restored, err := NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+	assert.NoError(t, err)
+	assert.True(t, restored.IsEmpty())
+	assert.Equal(t, 16, restored.K())
+	assert.Equal(t, int64(0), restored.N())
 }
 
 func TestVarOptItemsSketchSerde_WarmupRoundTrip(t *testing.T) {
@@ -127,6 +160,40 @@ func TestVarOptItemsSketchSerde_HeaderConsistency(t *testing.T) {
 
 	_, err := NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
 	assert.ErrorContains(t, err, "empty preLongs without empty flag")
+}
+
+func TestVarOptItemsSketchSerde_FullPreLongsWithZeroRIsInvalid(t *testing.T) {
+	sketch, err := NewVarOptItemsSketch[int64](16)
+	assert.NoError(t, err)
+	for i := int64(1); i <= 10; i++ {
+		assert.NoError(t, sketch.Update(i, float64(i)))
+	}
+	assert.Equal(t, 0, sketch.R())
+
+	data, err := sketch.ToSlice(Int64SerDe{})
+	assert.NoError(t, err)
+
+	data[0] = (data[0] & 0xC0) | byte(varOptPreambleLongsFull)
+
+	_, err = NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+	assert.ErrorContains(t, err, "full preLongs with empty r region")
+}
+
+func TestVarOptItemsSketchSerde_NaNTotalWeightRIsInvalid(t *testing.T) {
+	sketch, err := NewVarOptItemsSketch[int64](16)
+	assert.NoError(t, err)
+	for i := int64(1); i <= 80; i++ {
+		assert.NoError(t, sketch.Update(i, float64(i)))
+	}
+	assert.Greater(t, sketch.R(), 0)
+
+	data, err := sketch.ToSlice(Int64SerDe{})
+	assert.NoError(t, err)
+
+	binary.LittleEndian.PutUint64(data[24:], math.Float64bits(math.NaN()))
+
+	_, err = NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+	assert.ErrorContains(t, err, "invalid totalWeightR")
 }
 
 func TestVarOptItemsUnionSerde_HeaderConsistency(t *testing.T) {

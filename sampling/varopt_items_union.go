@@ -231,6 +231,9 @@ func (u *VarOptItemsUnion[T]) markMovingGadgetCoercer() (*VarOptItemsSketch[T], 
 	if resultH+resultR != resultK {
 		return nil, errors.New("invalid state resolving pseudo-exact union gadget")
 	}
+	if math.Abs(transferredWeight-u.outerTauNumer) > 1e-10 {
+		return nil, errors.New("unexpected mismatch in transferred weight")
+	}
 
 	// Gap slot.
 	weights[resultH] = -1.0

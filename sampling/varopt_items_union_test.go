@@ -214,6 +214,7 @@ func TestVarOptItemsUnion_ResultPseudoExactMarkedResolution(t *testing.T) {
 	}
 	union.n = 4
 	union.outerTauDenom = int64(union.gadget.numMarksInH)
+	union.outerTauNumer = 10.0
 
 	out, err := union.Result()
 	assert.NoError(t, err)
@@ -224,6 +225,25 @@ func TestVarOptItemsUnion_ResultPseudoExactMarkedResolution(t *testing.T) {
 	assert.Equal(t, 4, out.R())
 	assert.Nil(t, out.marks)
 	assert.Equal(t, uint32(0), out.numMarksInH)
+}
+
+func TestVarOptItemsUnion_ResultPseudoExactTransferredWeightMismatch(t *testing.T) {
+	union, err := NewVarOptItemsUnion[int](8)
+	assert.NoError(t, err)
+
+	// Construct a pseudo-exact gadget where transferred marked-H weight is known.
+	assert.NoError(t, union.gadget.update(1, 1.0, true))
+	assert.NoError(t, union.gadget.update(2, 2.0, true))
+	assert.NoError(t, union.gadget.update(3, 3.0, true))
+	union.n = 3
+	union.outerTauDenom = int64(union.gadget.numMarksInH)
+
+	// Intentionally break bookkeeping to ensure we fail fast like Java/C++ checks.
+	union.outerTauNumer = 123.456
+
+	out, err := union.Result()
+	assert.Nil(t, out)
+	assert.ErrorContains(t, err, "unexpected mismatch in transferred weight")
 }
 
 func TestVarOptItemsUnion_ResultMigrateMarkedItemsByDecreasingK(t *testing.T) {

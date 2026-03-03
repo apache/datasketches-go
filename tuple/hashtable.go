@@ -49,16 +49,22 @@ type entry[S Summary] struct {
 	Summary S
 }
 
-func (e *entry[S]) reset() {
+func (e *entry[S]) reset(newSummary func() S) {
 	if e.Hash != 0 {
-		e.Summary.Reset()
+		if newSummary != nil {
+			e.Summary = newSummary()
+		} else {
+			e.Summary.Reset()
+		}
+
+		e.Hash = 0
 	}
-	e.Hash = 0
 }
 
 type hashtable[S Summary] struct {
 	entries       []entry[S]
 	entryLessFunc func(a, b entry[S]) int
+	newSummary    func() S
 	theta         uint64
 	seed          uint64
 	numEntries    uint32
@@ -270,7 +276,7 @@ func (t *hashtable[S]) Reset() {
 	} else {
 		// just clear existing entries
 		for i := range t.entries {
-			t.entries[i].reset()
+			t.entries[i].reset(t.newSummary)
 		}
 	}
 

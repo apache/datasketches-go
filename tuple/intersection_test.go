@@ -899,4 +899,101 @@ func TestIntersectionWithDifferentPolicies(t *testing.T) {
 		}
 		assert.Equal(t, int32(303), totalSum) // (100+1) + (200+2)
 	})
+
+	t.Run("Sum With SummaryMergeFunc", func(t *testing.T) {
+		sketch1, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary,
+			func(s int32ValueSummary, v int32) int32ValueSummary {
+				s.value += v
+				return s
+			},
+		)
+		assert.NoError(t, err)
+		sketch1.UpdateInt64(1, 100)
+		sketch1.UpdateInt64(2, 200)
+		sketch1.UpdateInt64(3, 300)
+
+		sketch2, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary,
+			func(s int32ValueSummary, v int32) int32ValueSummary {
+				s.value += v
+				return s
+			},
+		)
+		assert.NoError(t, err)
+		sketch2.UpdateInt64(2, 5)
+		sketch2.UpdateInt64(3, 15)
+		sketch2.UpdateInt64(4, 25)
+
+		intersection := NewIntersectionWithSummaryMergeFunc[int32ValueSummary](
+			func(internal, incoming int32ValueSummary) int32ValueSummary {
+				internal.value += incoming.value
+				return internal
+			},
+		)
+		err = intersection.Update(sketch1)
+		assert.NoError(t, err)
+		err = intersection.Update(sketch2)
+		assert.NoError(t, err)
+
+		result, err := intersection.Result(true)
+		assert.NoError(t, err)
+
+		assert.Equal(t, uint32(2), result.NumRetained())
+
+		totalSum := int32(0)
+		for _, summary := range result.All() {
+			totalSum += summary.value
+		}
+		// Key 2: 200 + 5 = 205, Key 3: 300 + 15 = 315, Total = 520
+		assert.Equal(t, int32(520), totalSum)
+	})
+
+	t.Run("Exact Mode Half Overlap With SummaryMergeFunc", func(t *testing.T) {
+		sketch1, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary,
+			func(s int32ValueSummary, v int32) int32ValueSummary {
+				s.value += v
+				return s
+			},
+		)
+		assert.NoError(t, err)
+		value := 0
+		for i := 0; i < 1000; i++ {
+			sketch1.UpdateInt64(int64(value), 1)
+			value++
+		}
+
+		sketch2, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary,
+			func(s int32ValueSummary, v int32) int32ValueSummary {
+				s.value += v
+				return s
+			},
+		)
+		assert.NoError(t, err)
+		value = 500
+		for i := 0; i < 1000; i++ {
+			sketch2.UpdateInt64(int64(value), 1)
+			value++
+		}
+
+		intersection := NewIntersectionWithSummaryMergeFunc[int32ValueSummary](
+			func(internal, incoming int32ValueSummary) int32ValueSummary {
+				internal.value += incoming.value
+				return internal
+			},
+		)
+		err = intersection.Update(sketch1)
+		assert.NoError(t, err)
+		err = intersection.Update(sketch2)
+		assert.NoError(t, err)
+
+		result, err := intersection.Result(true)
+		assert.NoError(t, err)
+
+		assert.False(t, result.IsEmpty())
+		assert.False(t, result.IsEstimationMode())
+		assert.Equal(t, 500.0, result.Estimate())
+	})
 }

@@ -148,150 +148,341 @@ func TestUpdateSketch_SeedHash(t *testing.T) {
 }
 
 func TestUpdateSketch_UpdateUint32(t *testing.T) {
-	sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
-	assert.NoError(t, err)
+	t.Run("Without SummaryUpdateFunc", func(t *testing.T) {
+		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
+		assert.NoError(t, err)
 
-	err = sketch.UpdateUint32(100, 10)
-	assert.NoError(t, err)
-	assert.False(t, sketch.IsEmpty())
-	assert.Equal(t, uint32(1), sketch.NumRetained())
-	for _, summary := range sketch.All() {
-		assert.Equal(t, int32(10), summary.value)
-	}
+		err = sketch.UpdateUint32(100, 10)
+		assert.NoError(t, err)
+		assert.False(t, sketch.IsEmpty())
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(10), summary.value)
+		}
 
-	// using the same key
-	err = sketch.UpdateUint32(100, 20)
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), sketch.NumRetained())
-	for _, summary := range sketch.All() {
-		assert.Equal(t, int32(30), summary.value)
-	}
+		// using the same key
+		err = sketch.UpdateUint32(100, 20)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(30), summary.value)
+		}
+	})
+
+	t.Run("With SummaryUpdateFunc", func(t *testing.T) {
+		updateFunc := func(s int32ValueSummary, v int32) int32ValueSummary {
+			s.value += v
+			return s
+		}
+		sketch, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary, updateFunc,
+		)
+		assert.NoError(t, err)
+
+		err = sketch.UpdateUint32(1, 10)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(10), summary.value)
+		}
+
+		// same key should update
+		err = sketch.UpdateInt64(1, 20)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(30), summary.value)
+		}
+	})
 }
 
 func TestUpdateSketch_UpdateInt64(t *testing.T) {
-	sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
-	assert.NoError(t, err)
+	t.Run("Without SummaryUpdateFunc", func(t *testing.T) {
+		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
+		assert.NoError(t, err)
 
-	err = sketch.UpdateInt64(-100, 10)
-	assert.NoError(t, err)
-	assert.False(t, sketch.IsEmpty())
-	assert.Equal(t, uint32(1), sketch.NumRetained())
-	for _, summary := range sketch.All() {
-		assert.Equal(t, int32(10), summary.value)
-	}
+		err = sketch.UpdateInt64(-100, 10)
+		assert.NoError(t, err)
+		assert.False(t, sketch.IsEmpty())
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(10), summary.value)
+		}
 
-	// using the same key.
-	err = sketch.UpdateInt64(-100, 20)
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), sketch.NumRetained())
-	for _, summary := range sketch.All() {
-		assert.Equal(t, int32(30), summary.value)
-	}
+		// using the same key.
+		err = sketch.UpdateInt64(-100, 20)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(30), summary.value)
+		}
+	})
+
+	t.Run("With SummaryUpdateFunc", func(t *testing.T) {
+		updateFunc := func(s int32ValueSummary, v int32) int32ValueSummary {
+			s.value += v
+			return s
+		}
+		sketch, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary, updateFunc,
+		)
+		assert.NoError(t, err)
+
+		err = sketch.UpdateInt64(1, 10)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(10), summary.value)
+		}
+
+		// same key should update
+		err = sketch.UpdateInt64(1, 20)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(30), summary.value)
+		}
+	})
 }
 
 func TestUpdateSketch_UpdateInt32(t *testing.T) {
-	sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
-	assert.NoError(t, err)
+	t.Run("Without SummaryUpdateFunc", func(t *testing.T) {
+		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
+		assert.NoError(t, err)
 
-	err = sketch.UpdateInt32(42, 10)
-	assert.NoError(t, err)
-	assert.False(t, sketch.IsEmpty())
-	assert.Equal(t, uint32(1), sketch.NumRetained())
-	for _, summary := range sketch.All() {
-		assert.Equal(t, int32(10), summary.value)
-	}
+		err = sketch.UpdateInt32(42, 10)
+		assert.NoError(t, err)
+		assert.False(t, sketch.IsEmpty())
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(10), summary.value)
+		}
 
-	// using the same key
-	err = sketch.UpdateInt32(42, 20)
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), sketch.NumRetained())
-	for _, summary := range sketch.All() {
-		assert.Equal(t, int32(30), summary.value)
-	}
+		// using the same key
+		err = sketch.UpdateInt32(42, 20)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(30), summary.value)
+		}
+	})
+
+	t.Run("With SummaryUpdateFunc", func(t *testing.T) {
+		updateFunc := func(s int32ValueSummary, v int32) int32ValueSummary {
+			s.value += v
+			return s
+		}
+		sketch, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary, updateFunc,
+		)
+		assert.NoError(t, err)
+
+		err = sketch.UpdateInt32(42, 10)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(10), summary.value)
+		}
+
+		err = sketch.UpdateInt32(42, 20)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(30), summary.value)
+		}
+	})
 }
 
 func TestUpdateSketch_UpdateString(t *testing.T) {
-	sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
-	assert.NoError(t, err)
+	t.Run("Without SummaryUpdateFunc", func(t *testing.T) {
+		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
+		assert.NoError(t, err)
 
-	err = sketch.UpdateString("", 10)
-	assert.ErrorIs(t, err, ErrUpdateEmptyString)
+		err = sketch.UpdateString("", 10)
+		assert.ErrorIs(t, err, ErrUpdateEmptyString)
 
-	err = sketch.UpdateString("hello", 10)
-	assert.NoError(t, err)
-	assert.False(t, sketch.IsEmpty())
-	assert.Equal(t, uint32(1), sketch.NumRetained())
-	for _, summary := range sketch.All() {
-		assert.Equal(t, int32(10), summary.value)
-	}
+		err = sketch.UpdateString("hello", 10)
+		assert.NoError(t, err)
+		assert.False(t, sketch.IsEmpty())
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(10), summary.value)
+		}
 
-	// using the same key
-	err = sketch.UpdateString("hello", 20)
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), sketch.NumRetained())
-	for _, summary := range sketch.All() {
-		assert.Equal(t, int32(30), summary.value)
-	}
+		// using the same key
+		err = sketch.UpdateString("hello", 20)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(30), summary.value)
+		}
+	})
+
+	t.Run("With SummaryUpdateFunc", func(t *testing.T) {
+		updateFunc := func(s int32ValueSummary, v int32) int32ValueSummary {
+			s.value += v
+			return s
+		}
+		sketch, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary, updateFunc,
+		)
+		assert.NoError(t, err)
+
+		err = sketch.UpdateString("hello", 10)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(10), summary.value)
+		}
+
+		err = sketch.UpdateString("hello", 20)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(30), summary.value)
+		}
+	})
 }
 
 func TestUpdateSketch_UpdateBytes(t *testing.T) {
-	sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
-	assert.NoError(t, err)
+	t.Run("Without SummaryUpdateFunc", func(t *testing.T) {
+		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
+		assert.NoError(t, err)
 
-	err = sketch.UpdateBytes([]byte{1, 2, 3}, 10)
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), sketch.NumRetained())
-	for _, summary := range sketch.All() {
-		assert.Equal(t, int32(10), summary.value)
-	}
+		err = sketch.UpdateBytes([]byte{1, 2, 3}, 10)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(10), summary.value)
+		}
 
-	// using the same key
-	err = sketch.UpdateBytes([]byte{1, 2, 3}, 20)
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), sketch.NumRetained())
-	for _, summary := range sketch.All() {
-		assert.Equal(t, int32(30), summary.value)
-	}
+		// using the same key
+		err = sketch.UpdateBytes([]byte{1, 2, 3}, 20)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(30), summary.value)
+		}
+	})
+
+	t.Run("With SummaryUpdateFunc", func(t *testing.T) {
+		updateFunc := func(s int32ValueSummary, v int32) int32ValueSummary {
+			s.value += v
+			return s
+		}
+		sketch, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary, updateFunc,
+		)
+		assert.NoError(t, err)
+
+		err = sketch.UpdateBytes([]byte{1, 2, 3}, 10)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(10), summary.value)
+		}
+
+		err = sketch.UpdateBytes([]byte{1, 2, 3}, 20)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(30), summary.value)
+		}
+	})
 }
 
 func TestUpdateSketch_UpdateFloat64(t *testing.T) {
-	sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
-	assert.NoError(t, err)
+	t.Run("Without SummaryUpdateFunc", func(t *testing.T) {
+		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
+		assert.NoError(t, err)
 
-	err = sketch.UpdateFloat64(3.14, 10)
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), sketch.NumRetained())
-	for _, summary := range sketch.All() {
-		assert.Equal(t, int32(10), summary.value)
-	}
+		err = sketch.UpdateFloat64(3.14, 10)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(10), summary.value)
+		}
 
-	// using the same key
-	err = sketch.UpdateFloat64(3.14, 20)
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), sketch.NumRetained())
-	for _, summary := range sketch.All() {
-		assert.Equal(t, int32(30), summary.value)
-	}
+		// using the same key
+		err = sketch.UpdateFloat64(3.14, 20)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(30), summary.value)
+		}
+	})
+
+	t.Run("With SummaryUpdateFunc", func(t *testing.T) {
+		updateFunc := func(s int32ValueSummary, v int32) int32ValueSummary {
+			s.value += v
+			return s
+		}
+		sketch, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary, updateFunc,
+		)
+		assert.NoError(t, err)
+
+		err = sketch.UpdateFloat64(3.14, 10)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(10), summary.value)
+		}
+
+		err = sketch.UpdateFloat64(3.14, 20)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(30), summary.value)
+		}
+	})
 }
 
 func TestUpdateSketch_UpdateFloat32(t *testing.T) {
-	sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
-	assert.NoError(t, err)
+	t.Run("Without SummaryUpdateFunc", func(t *testing.T) {
+		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
+		assert.NoError(t, err)
 
-	err = sketch.UpdateFloat32(3.14, 10)
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), sketch.NumRetained())
-	for _, summary := range sketch.All() {
-		assert.Equal(t, int32(10), summary.value)
-	}
+		err = sketch.UpdateFloat32(3.14, 10)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(10), summary.value)
+		}
 
-	// using the same key
-	err = sketch.UpdateFloat32(3.14, 20)
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), sketch.NumRetained())
-	for _, summary := range sketch.All() {
-		assert.Equal(t, int32(30), summary.value)
-	}
+		// using the same key
+		err = sketch.UpdateFloat32(3.14, 20)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(30), summary.value)
+		}
+	})
+
+	t.Run("With SummaryUpdateFunc", func(t *testing.T) {
+		updateFunc := func(s int32ValueSummary, v int32) int32ValueSummary {
+			s.value += v
+			return s
+		}
+		sketch, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary, updateFunc,
+		)
+		assert.NoError(t, err)
+
+		err = sketch.UpdateFloat32(3.14, 10)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(10), summary.value)
+		}
+
+		err = sketch.UpdateFloat32(3.14, 20)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), sketch.NumRetained())
+		for _, summary := range sketch.All() {
+			assert.Equal(t, int32(30), summary.value)
+		}
+	})
 }
 
 func TestUpdateSketch_Estimate(t *testing.T) {

@@ -44,6 +44,7 @@ type UpdatableSummary[V any] interface {
 // UpdateSketch builds Tuple sketch from input data via update methods.
 type UpdateSketch[S UpdatableSummary[V], V any] struct {
 	newSummary func() S
+	updateFunc func(S, V) S
 	table      *hashtable[S]
 }
 
@@ -129,6 +130,22 @@ func NewUpdateSketch[S UpdatableSummary[V], V any](
 			true,
 		),
 	}, nil
+}
+
+// NewUpdateSketchWithSummaryUpdateFunc initializes and returns a new instance of UpdateSketch
+// that uses the provided summaryUpdateFunc to update summaries by returning a new updated summary
+// instead of calling Update method of summary. This enables value-type summaries to be stored inline,
+// reducing GC pressure.
+func NewUpdateSketchWithSummaryUpdateFunc[S UpdatableSummary[V], V any](
+	newSummaryFunc func() S, updateFunc func(S, V) S, opts ...UpdateSketchOptionFunc,
+) (*UpdateSketch[S, V], error) {
+	sketch, err := NewUpdateSketch[S, V](newSummaryFunc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	sketch.updateFunc = updateFunc
+	sketch.table.newSummary = newSummaryFunc
+	return sketch, nil
 }
 
 // IsEstimationMode reports whether the sketch is in estimation mode,
@@ -315,16 +332,13 @@ func (s *UpdateSketch[S, V]) UpdateInt64(key int64, value V) error {
 	index, err := s.table.Find(hash)
 	if err != nil {
 		if err == ErrKeyNotFound {
-			summary := s.newSummary()
-			summary.Update(value)
-
-			s.table.Insert(index, entry[S]{Hash: hash, Summary: summary})
+			s.insertOrUpdate(index, hash, value, true)
 			return nil
 		}
 		return err
 	}
 
-	s.table.entries[index].Summary.Update(value)
+	s.insertOrUpdate(index, hash, value, false)
 	return nil
 }
 
@@ -343,16 +357,13 @@ func (s *UpdateSketch[S, V]) UpdateInt32(key int32, value V) error {
 	index, err := s.table.Find(hash)
 	if err != nil {
 		if err == ErrKeyNotFound {
-			summary := s.newSummary()
-			summary.Update(value)
-
-			s.table.Insert(index, entry[S]{Hash: hash, Summary: summary})
+			s.insertOrUpdate(index, hash, value, true)
 			return nil
 		}
 		return err
 	}
 
-	s.table.entries[index].Summary.Update(value)
+	s.insertOrUpdate(index, hash, value, false)
 	return nil
 }
 
@@ -410,16 +421,13 @@ func (s *UpdateSketch[S, V]) UpdateString(key string, value V) error {
 	index, err := s.table.Find(hash)
 	if err != nil {
 		if err == ErrKeyNotFound {
-			summary := s.newSummary()
-			summary.Update(value)
-
-			s.table.Insert(index, entry[S]{Hash: hash, Summary: summary})
+			s.insertOrUpdate(index, hash, value, true)
 			return nil
 		}
 		return err
 	}
 
-	s.table.entries[index].Summary.Update(value)
+	s.insertOrUpdate(index, hash, value, false)
 	return nil
 }
 
@@ -433,17 +441,32 @@ func (s *UpdateSketch[S, V]) UpdateBytes(data []byte, value V) error {
 	index, err := s.table.Find(hash)
 	if err != nil {
 		if err == ErrKeyNotFound {
-			summary := s.newSummary()
-			summary.Update(value)
-
-			s.table.Insert(index, entry[S]{Hash: hash, Summary: summary})
+			s.insertOrUpdate(index, hash, value, true)
 			return nil
 		}
 		return err
 	}
 
-	s.table.entries[index].Summary.Update(value)
+	s.insertOrUpdate(index, hash, value, false)
 	return nil
+}
+
+func (s *UpdateSketch[S, V]) insertOrUpdate(index int, hash uint64, value V, isNew bool) {
+	if isNew {
+		summary := s.newSummary()
+		if s.updateFunc != nil {
+			summary = s.updateFunc(summary, value)
+		} else {
+			summary.Update(value)
+		}
+		s.table.Insert(index, entry[S]{Hash: hash, Summary: summary})
+	} else {
+		if s.updateFunc != nil {
+			s.table.entries[index].Summary = s.updateFunc(s.table.entries[index].Summary, value)
+		} else {
+			s.table.entries[index].Summary.Update(value)
+		}
+	}
 }
 
 // Trim removes retained entries in excess of the nominal size k (if any)

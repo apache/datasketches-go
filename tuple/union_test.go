@@ -822,4 +822,105 @@ func TestUnionWithDifferentPolicies(t *testing.T) {
 		assert.Contains(t, values, int32(101)) // 100 + 1
 		assert.Contains(t, values, int32(202)) // 200 + 2
 	})
+
+	t.Run("Sum With SummaryMergeFunc", func(t *testing.T) {
+		sketch1, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary,
+			func(s int32ValueSummary, v int32) int32ValueSummary {
+				s.value += v
+				return s
+			},
+			WithUpdateSketchLgK(12),
+		)
+		assert.NoError(t, err)
+		sketch1.UpdateInt64(1, 100)
+		sketch1.UpdateInt64(2, 200)
+
+		sketch2, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary,
+			func(s int32ValueSummary, v int32) int32ValueSummary {
+				s.value += v
+				return s
+			},
+			WithUpdateSketchLgK(12),
+		)
+		assert.NoError(t, err)
+		sketch2.UpdateInt64(1, 1)
+		sketch2.UpdateInt64(2, 2)
+
+		union, err := NewUnionWithSummaryMergeFunc[int32ValueSummary](
+			func(internal, incoming int32ValueSummary) int32ValueSummary {
+				internal.value += incoming.value
+				return internal
+			},
+		)
+		assert.NoError(t, err)
+		err = union.Update(sketch1)
+		assert.NoError(t, err)
+		err = union.Update(sketch2)
+		assert.NoError(t, err)
+
+		result, err := union.Result(true)
+		assert.NoError(t, err)
+
+		assert.Equal(t, uint32(2), result.NumRetained())
+
+		values := make([]int32, 0)
+		for _, s := range result.All() {
+			values = append(values, s.value)
+		}
+		assert.Contains(t, values, int32(101)) // 100 + 1
+		assert.Contains(t, values, int32(202)) // 200 + 2
+	})
+
+	t.Run("Exact Mode Half Overlap With SummaryMergeFunc", func(t *testing.T) {
+		sketch1, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary,
+			func(s int32ValueSummary, v int32) int32ValueSummary {
+				s.value += v
+				return s
+			},
+			WithUpdateSketchLgK(12),
+		)
+		assert.NoError(t, err)
+		value := 0
+		for i := 0; i < 1000; i++ {
+			sketch1.UpdateInt64(int64(value), 1)
+			value++
+		}
+
+		sketch2, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
+			newInt32ValueSummary,
+			func(s int32ValueSummary, v int32) int32ValueSummary {
+				s.value += v
+				return s
+			},
+			WithUpdateSketchLgK(12),
+		)
+		assert.NoError(t, err)
+		value = 500
+		for i := 0; i < 1000; i++ {
+			sketch2.UpdateInt64(int64(value), 1)
+			value++
+		}
+
+		union, err := NewUnionWithSummaryMergeFunc[int32ValueSummary](
+			func(internal, incoming int32ValueSummary) int32ValueSummary {
+				internal.value += incoming.value
+				return internal
+			},
+		)
+		assert.NoError(t, err)
+		err = union.Update(sketch1)
+		assert.NoError(t, err)
+		err = union.Update(sketch2)
+		assert.NoError(t, err)
+
+		result, err := union.Result(true)
+		assert.NoError(t, err)
+
+		assert.False(t, result.IsEmpty())
+		assert.False(t, result.IsEstimationMode())
+		assert.Equal(t, 1500.0, result.Estimate())
+	})
 }

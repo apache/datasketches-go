@@ -42,6 +42,7 @@ func WithIntersectionSeed(seed uint64) IntersectionOptionFunc {
 type Intersection[S Summary] struct {
 	hashtable     *hashtable[S]
 	policy        Policy[S]
+	applyFunc     func(S, S) S
 	entryLessFunc func(a, b entry[S]) int
 	isValid       bool
 }
@@ -69,6 +70,35 @@ func NewIntersection[S Summary](policy Policy[S], opts ...IntersectionOptionFunc
 		},
 		policy:  policy,
 		isValid: false,
+	}
+}
+
+// NewIntersectionWithSummaryMergeFunc creates a new intersection that uses a function to merge summaries.
+// This is useful for value-type summaries where Policy.Apply cannot mutate the internal summary.
+func NewIntersectionWithSummaryMergeFunc[S Summary](
+	applyFunc func(S, S) S, opts ...IntersectionOptionFunc,
+) *Intersection[S] {
+	options := &intersectionOptions{
+		seed: theta.DefaultSeed,
+	}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	return &Intersection[S]{
+		hashtable: newHashtable[S](
+			0, 0, theta.ResizeX1, 1.0, theta.MaxTheta, options.seed, false,
+		),
+		entryLessFunc: func(a, b entry[S]) int {
+			if a.Hash < b.Hash {
+				return -1
+			} else if a.Hash > b.Hash {
+				return 1
+			}
+			return 0
+		},
+		applyFunc: applyFunc,
+		isValid:   false,
 	}
 }
 
@@ -149,7 +179,11 @@ func (i *Intersection[S]) Update(sketch Sketch[S]) error {
 					return errors.New("max matches exceeded, possibly corrupted input sketch")
 				}
 
-				i.policy.Apply(i.hashtable.entries[key].Summary, summary)
+				if i.applyFunc != nil {
+					i.hashtable.entries[key].Summary = i.applyFunc(i.hashtable.entries[key].Summary, summary)
+				} else {
+					i.policy.Apply(i.hashtable.entries[key].Summary, summary)
+				}
 
 				matchesEntries = append(matchesEntries, i.hashtable.entries[key])
 				matchCount++

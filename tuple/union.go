@@ -29,6 +29,7 @@ import (
 // Union computes the union of Tuple sketches.
 type Union[S Summary] struct {
 	policy        Policy[S]
+	applyFunc     func(S, S) S
 	hashtable     *hashtable[S]
 	entryLessFunc func(a, b entry[S]) int
 	theta         uint64
@@ -41,6 +42,20 @@ type unionOptions struct {
 	lgCurSize uint8
 	lgK       uint8
 	rf        theta.ResizeFactor
+}
+
+func (o *unionOptions) Validate() error {
+	if o.lgK < theta.MinLgK {
+		return fmt.Errorf("lgK must not be less than %d: %d", theta.MinLgK, o.lgK)
+	}
+	if o.lgK > theta.MaxLgK {
+		return fmt.Errorf("lgK must not be greater than %d: %d", theta.MaxLgK, o.lgK)
+	}
+	if o.p <= 0 || o.p > 1 {
+		return errors.New("sampling probability must be between 0 and 1")
+	}
+
+	return nil
 }
 
 type UnionOptionFunc func(*unionOptions)
@@ -89,14 +104,8 @@ func NewUnion[S Summary](policy Policy[S], opts ...UnionOptionFunc) (*Union[S], 
 		opt(options)
 	}
 
-	if options.lgK < theta.MinLgK {
-		return nil, fmt.Errorf("lgK must not be less than %d: %d", theta.MinLgK, options.lgK)
-	}
-	if options.lgK > theta.MaxLgK {
-		return nil, fmt.Errorf("lgK must not be greater than %d: %d", theta.MaxLgK, options.lgK)
-	}
-	if options.p <= 0 || options.p > 1 {
-		return nil, errors.New("sampling probability must be between 0 and 1")
+	if err := options.Validate(); err != nil {
+		return nil, err
 	}
 
 	options.lgCurSize = startingSubMultiple(options.lgK+1, theta.MinLgK, uint8(options.rf))
@@ -109,6 +118,47 @@ func NewUnion[S Summary](policy Policy[S], opts ...UnionOptionFunc) (*Union[S], 
 	return &Union[S]{
 		hashtable: table,
 		policy:    policy,
+		entryLessFunc: func(a, b entry[S]) int {
+			if a.Hash < b.Hash {
+				return -1
+			} else if a.Hash > b.Hash {
+				return 1
+			}
+			return 0
+		},
+		theta: table.theta,
+	}, nil
+}
+
+// NewUnionWithSummaryMergeFunc creates a new union that uses a function to merge summaries.
+// This is useful for value-type summaries where Policy.Apply cannot mutate the internal summary.
+func NewUnionWithSummaryMergeFunc[S Summary](
+	applyFunc func(S, S) S, opts ...UnionOptionFunc,
+) (*Union[S], error) {
+	options := &unionOptions{
+		lgK:  theta.DefaultLgK,
+		rf:   theta.DefaultResizeFactor,
+		p:    1.0,
+		seed: theta.DefaultSeed,
+	}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	if err := options.Validate(); err != nil {
+		return nil, err
+	}
+
+	options.lgCurSize = startingSubMultiple(options.lgK+1, theta.MinLgK, uint8(options.rf))
+	options.theta = startingThetaFromP(options.p)
+
+	table := newHashtable[S](
+		options.lgCurSize, options.lgK, options.rf, options.p, options.theta, options.seed, true,
+	)
+
+	return &Union[S]{
+		hashtable: table,
+		applyFunc: applyFunc,
 		entryLessFunc: func(a, b entry[S]) int {
 			if a.Hash < b.Hash {
 				return -1
@@ -156,7 +206,11 @@ func (u *Union[S]) Update(sketch Sketch[S]) error {
 				return err
 			}
 
-			u.policy.Apply(u.hashtable.entries[index].Summary, summary)
+			if u.applyFunc != nil {
+				u.hashtable.entries[index].Summary = u.applyFunc(u.hashtable.entries[index].Summary, summary)
+			} else {
+				u.policy.Apply(u.hashtable.entries[index].Summary, summary)
+			}
 		} else {
 			// For ordered sketches, we can break early
 			if sketch.IsOrdered() {

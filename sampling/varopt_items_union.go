@@ -58,11 +58,16 @@ func (u *VarOptItemsUnion[T]) MaxK() int {
 }
 
 func (u *VarOptItemsUnion[T]) Reset() error {
-	gadget, err := newVarOptItemsSketchAsGadget[T](u.maxK)
-	if err != nil {
-		return err
+	if u.gadget == nil {
+		gadget, err := newVarOptItemsSketchAsGadget[T](u.maxK)
+		if err != nil {
+			return err
+		}
+		u.gadget = gadget
+	} else {
+		u.gadget.Reset()
 	}
-	u.gadget = gadget
+
 	u.n = 0
 	u.outerTauNumer = 0
 	u.outerTauDenom = 0

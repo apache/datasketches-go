@@ -120,7 +120,7 @@ func TestVarOptItemsUnionSerde_EmptyRoundTrip(t *testing.T) {
 
 	restored, err := NewVarOptItemsUnionFromSlice[int64](data, Int64SerDe{})
 	assert.NoError(t, err)
-	assert.Equal(t, union.MaxK(), restored.MaxK())
+	assert.Equal(t, union.maxK, restored.maxK)
 
 	result, err := restored.Result()
 	assert.NoError(t, err)
@@ -143,7 +143,7 @@ func TestVarOptItemsUnionSerde_NonEmptyRoundTrip(t *testing.T) {
 
 	restored, err := NewVarOptItemsUnionFromSlice[int64](data, Int64SerDe{})
 	assert.NoError(t, err)
-	assert.Equal(t, union.MaxK(), restored.MaxK())
+	assert.Equal(t, union.maxK, restored.maxK)
 
 	result, err := restored.Result()
 	assert.NoError(t, err)

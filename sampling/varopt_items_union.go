@@ -53,10 +53,6 @@ func NewVarOptItemsUnion[T any](maxK int) (*VarOptItemsUnion[T], error) {
 	}, nil
 }
 
-func (u *VarOptItemsUnion[T]) MaxK() int {
-	return u.maxK
-}
-
 func (u *VarOptItemsUnion[T]) Reset() error {
 	if u.gadget == nil {
 		gadget, err := newVarOptItemsSketchAsGadget[T](u.maxK)

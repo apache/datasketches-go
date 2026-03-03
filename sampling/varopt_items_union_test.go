@@ -29,7 +29,7 @@ func TestNewVarOptItemsUnion(t *testing.T) {
 
 	union, err := NewVarOptItemsUnion[int](16)
 	assert.NoError(t, err)
-	assert.Equal(t, 16, union.MaxK())
+	assert.Equal(t, 16, union.maxK)
 }
 
 func TestVarOptItemsUnion_ResultEmpty(t *testing.T) {

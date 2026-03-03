@@ -164,7 +164,7 @@ func TestVarOptItemsSketchSerde_HeaderConsistency(t *testing.T) {
 	assert.ErrorContains(t, err, "empty preLongs without empty flag")
 }
 
-func TestVarOptItemsSketchSerde_FullPreLongsWithZeroRIsInvalid(t *testing.T) {
+func TestVarOptItemsSketchSerde_WarmupDataWithFullPreLongsIsInvalid(t *testing.T) {
 	sketch, err := NewVarOptItemsSketch[int64](16)
 	assert.NoError(t, err)
 	for i := int64(1); i <= 10; i++ {
@@ -178,7 +178,92 @@ func TestVarOptItemsSketchSerde_FullPreLongsWithZeroRIsInvalid(t *testing.T) {
 	data[0] = (data[0] & 0xC0) | byte(varOptPreambleLongsFull)
 
 	_, err = NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
-	assert.ErrorContains(t, err, "full preLongs with empty r region")
+	assert.ErrorContains(t, err, "n <= k but not in warmup mode")
+}
+
+func TestVarOptItemsSketchSerde_WarmupModeRequiresNEqualsH(t *testing.T) {
+	sketch, err := NewVarOptItemsSketch[int64](16)
+	assert.NoError(t, err)
+	for i := int64(1); i <= 10; i++ {
+		assert.NoError(t, sketch.Update(i, float64(i)))
+	}
+
+	data, err := sketch.ToSlice(Int64SerDe{})
+	assert.NoError(t, err)
+
+	binary.LittleEndian.PutUint64(data[8:], uint64(9))
+
+	_, err = NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+	assert.ErrorContains(t, err, "warmup mode but n != h")
+}
+
+func TestVarOptItemsSketchSerde_WarmupModeRequiresRZero(t *testing.T) {
+	sketch, err := NewVarOptItemsSketch[int64](16)
+	assert.NoError(t, err)
+	for i := int64(1); i <= 10; i++ {
+		assert.NoError(t, sketch.Update(i, float64(i)))
+	}
+
+	data, err := sketch.ToSlice(Int64SerDe{})
+	assert.NoError(t, err)
+
+	binary.LittleEndian.PutUint32(data[20:], uint32(1))
+
+	_, err = NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+	assert.ErrorContains(t, err, "warmup mode but r > 0")
+}
+
+func TestVarOptItemsSketchSerde_FullModeRequiresHSumREqualsK(t *testing.T) {
+	sketch, err := NewVarOptItemsSketch[int64](16)
+	assert.NoError(t, err)
+	for i := int64(1); i <= 80; i++ {
+		assert.NoError(t, sketch.Update(i, float64(i)))
+	}
+	assert.Greater(t, sketch.R(), 0)
+
+	data, err := sketch.ToSlice(Int64SerDe{})
+	assert.NoError(t, err)
+
+	h := binary.LittleEndian.Uint32(data[16:])
+	binary.LittleEndian.PutUint32(data[16:], h-1)
+
+	_, err = NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+	assert.ErrorContains(t, err, "full mode but h + r != k")
+}
+
+func TestVarOptItemsSketchSerde_NGreaterThanKRequiresFullMode(t *testing.T) {
+	sketch, err := NewVarOptItemsSketch[int64](16)
+	assert.NoError(t, err)
+	for i := int64(1); i <= 80; i++ {
+		assert.NoError(t, sketch.Update(i, float64(i)))
+	}
+	assert.Greater(t, sketch.N(), int64(sketch.K()))
+
+	data, err := sketch.ToSlice(Int64SerDe{})
+	assert.NoError(t, err)
+
+	data[0] = (data[0] & 0xC0) | byte(varOptPreambleLongsWarmup)
+
+	_, err = NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+	assert.ErrorContains(t, err, "n > k but not in full mode")
+}
+
+func TestVarOptItemsSketchSerde_FullModeRequiresRPositive(t *testing.T) {
+	sketch, err := NewVarOptItemsSketch[int64](16)
+	assert.NoError(t, err)
+	for i := int64(1); i <= 80; i++ {
+		assert.NoError(t, sketch.Update(i, float64(i)))
+	}
+	assert.Greater(t, sketch.R(), 0)
+
+	data, err := sketch.ToSlice(Int64SerDe{})
+	assert.NoError(t, err)
+
+	binary.LittleEndian.PutUint32(data[16:], uint32(sketch.K()))
+	binary.LittleEndian.PutUint32(data[20:], uint32(0))
+
+	_, err = NewVarOptItemsSketchFromSlice[int64](data, Int64SerDe{})
+	assert.ErrorContains(t, err, "full mode but r == 0")
 }
 
 func TestVarOptItemsSketchSerde_NaNTotalWeightRIsInvalid(t *testing.T) {

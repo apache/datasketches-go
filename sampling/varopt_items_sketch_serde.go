@@ -185,21 +185,37 @@ func NewVarOptItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (*Va
 	if h < 0 || r < 0 {
 		return nil, errors.New("invalid h/r in serialized varopt sketch")
 	}
-	if preLongs == varOptPreambleLongsFull && r == 0 {
-		return nil, errors.New("invalid varopt sketch header: full preLongs with empty r region")
+	if n < 0 {
+		return nil, errors.New("invalid n in serialized varopt sketch: negative")
 	}
-	if r > 0 && h+r != k {
-		return nil, errors.New("invalid varopt sketch state: h + r must equal k in sampling mode")
-	}
-	if r == 0 && h > k {
-		return nil, errors.New("invalid varopt sketch state: h exceeds k in warmup mode")
+
+	if n <= int64(k) {
+		if preLongs != varOptPreambleLongsWarmup {
+			return nil, errors.New("invalid varopt sketch state: n <= k but not in warmup mode")
+		}
+		if int64(h) != n {
+			return nil, errors.New("invalid varopt sketch state: warmup mode but n != h")
+		}
+		if r > 0 {
+			return nil, errors.New("invalid varopt sketch state: warmup mode but r > 0")
+		}
+	} else {
+		if preLongs != varOptPreambleLongsFull {
+			return nil, errors.New("invalid varopt sketch state: n > k but not in full mode")
+		}
+		if h+r != k {
+			return nil, errors.New("invalid varopt sketch state: full mode but h + r != k")
+		}
+		if r == 0 {
+			return nil, errors.New("invalid varopt sketch state: full mode but r == 0")
+		}
 	}
 
 	totalWeightR := 0.0
 	if r > 0 {
 		totalWeightR = math.Float64frombits(binary.LittleEndian.Uint64(data[24:]))
-		if math.IsNaN(totalWeightR) {
-			return nil, errors.New("invalid totalWeightR in serialized varopt sketch: NaN")
+		if math.IsNaN(totalWeightR) || math.IsInf(totalWeightR, 0) || totalWeightR <= 0 {
+			return nil, errors.New("invalid totalWeightR in serialized varopt sketch: non-positive or non-finite")
 		}
 	}
 

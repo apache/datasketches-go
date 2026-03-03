@@ -259,7 +259,7 @@ func TestReservoirItemsSketchEstimateSubsetSum(t *testing.T) {
 
 		// finally, a non-degenerate predicate
 		// insert negative items with identical weights, filter for negative weights only
-		for i := k; i < (k + 2); i++ {
+		for i := 1; i <= (k + 1); i++ {
 			sketch.Update(int64(-i))
 			itemCount += 1.0
 		}

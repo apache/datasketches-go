@@ -42,10 +42,6 @@ type VarOptItemsUnion[T any] struct {
 }
 
 func NewVarOptItemsUnion[T any](maxK int) (*VarOptItemsUnion[T], error) {
-	if maxK < 1 || maxK > varOptMaxK {
-		return nil, errors.New("maxK must be at least 1 and less than 2^31 - 1")
-	}
-
 	gadget, err := newVarOptItemsSketchAsGadget[T](maxK)
 	if err != nil {
 		return nil, err

@@ -25,7 +25,7 @@ import (
 
 func TestNewVarOptItemsUnion(t *testing.T) {
 	_, err := NewVarOptItemsUnion[int](0)
-	assert.ErrorContains(t, err, "maxK must be at least 1")
+	assert.ErrorContains(t, err, "k must be at least 1")
 
 	union, err := NewVarOptItemsUnion[int](16)
 	assert.NoError(t, err)

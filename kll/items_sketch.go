@@ -593,7 +593,6 @@ func (s *ItemsSketch[C]) currentSerializedSizeBytes() (int, error) {
 		}
 		totalBytes = _DATA_START_ADR_SINGLE_ITEM + v
 	} else if tgtStructure == _COMPACT_FULL {
-
 		totalBytes = _DATA_START_ADR + s.getLevelsArrSizeBytes(tgtStructure) + s.getMinMaxSizeBytes() + s.getRetainedItemsSizeBytes()
 	} else { //structure = UPDATABLE
 		return 0, fmt.Errorf("updatable serialization not implemented")
@@ -670,7 +669,11 @@ func (s *ItemsSketch[C]) getRetainedItemsByteArr() []byte {
 }
 
 func (s *ItemsSketch[C]) getRetainedItemsSizeBytes() int {
-	return len(s.getRetainedItemsByteArr())
+	retainedSize := 0
+	for i := s.levels[0]; i < s.levels[s.numLevels]; i++ {
+		retainedSize += s.serde.SizeOf(s.items[i])
+	}
+	return retainedSize
 }
 
 func (s *ItemsSketch[C]) setupSortedView() error {

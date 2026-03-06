@@ -30,3 +30,16 @@ type ItemSketchSerde[C comparable] interface {
 	SerializeOneToSlice(item C) []byte
 	DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]C, error)
 }
+
+// ItemSketchSerdeWithValidation extends ItemSketchSerde by adding validation for single and multiple items.
+type ItemSketchSerdeWithValidation[C comparable] interface {
+	ItemSketchSerde[C]
+
+	// ValidateOne checks the validity of a single item of type C and returns an error if it does not meet the criteria.
+	// ValidateOne executed before serialization or after deserialization.
+	ValidateOne(item C) error
+
+	// ValidateMany checks the validity of multiple items of type C and returns an error if any item does not meet the criteria.
+	// ValidateMany executed before serialization or after deserialization.
+	ValidateMany(items []C) error
+}

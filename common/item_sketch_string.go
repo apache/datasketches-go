@@ -20,13 +20,20 @@ package common
 import (
 	"encoding/binary"
 	"errors"
+	"unicode/utf8"
 	"unsafe"
 
 	"github.com/twmb/murmur3"
 )
 
+var (
+	ErrInvalidUTF8 = errors.New("invalid UTF-8 string")
+)
+
 type ItemSketchStringHasher struct{}
-type ItemSketchStringSerDe struct{}
+type ItemSketchStringSerDe struct {
+	ValidateUTF8 bool
+}
 
 var ItemSketchStringComparator = func(reverseOrder bool) CompareFn[string] {
 	return func(a, b string) bool {
@@ -121,4 +128,26 @@ func (f ItemSketchStringSerDe) DeserializeManyFromSlice(mem []byte, offsetBytes 
 		array[i] = string(utf8Bytes)
 	}
 	return array, nil
+}
+
+func (f ItemSketchStringSerDe) ValidateOne(item string) error {
+	if f.ValidateUTF8 {
+		if !utf8.ValidString(item) {
+			return ErrInvalidUTF8
+		}
+	}
+
+	return nil
+}
+
+func (f ItemSketchStringSerDe) ValidateMany(items []string) error {
+	if f.ValidateUTF8 {
+		for _, item := range items {
+			if err := f.ValidateOne(item); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

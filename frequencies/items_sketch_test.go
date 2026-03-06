@@ -484,6 +484,122 @@ func TestItemsSketch_frequencies(t *testing.T) {
 	assert.Equal(t, expectedUpper, upper, "Upper bound mismatch for non-existing item")
 }
 
+func TestToSliceValidateManyWithStringSerde(t *testing.T) {
+	tests := []struct {
+		name         string
+		validateUTF8 bool
+		items        []string
+		expectErr    bool
+	}{
+		{
+			name:         "valid utf8 strings with validation enabled",
+			validateUTF8: true,
+			items:        []string{"hello", "world", "안녕"},
+			expectErr:    false,
+		},
+		{
+			name:         "invalid utf8 string with validation enabled",
+			validateUTF8: true,
+			items:        []string{"hello", string([]byte{0xff, 0xfe})},
+			expectErr:    true,
+		},
+		{
+			name:         "invalid utf8 string with validation disabled",
+			validateUTF8: false,
+			items:        []string{"hello", string([]byte{0xff, 0xfe})},
+			expectErr:    false,
+		},
+		{
+			name:         "empty sketch with validation enabled",
+			validateUTF8: true,
+			items:        []string{},
+			expectErr:    false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			serde := common.ItemSketchStringSerDe{ValidateUTF8: tt.validateUTF8}
+			sketch, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, common.ItemSketchStringHasher{}, serde)
+			assert.NoError(t, err)
+
+			for _, item := range tt.items {
+				err = sketch.Update(item)
+				assert.NoError(t, err)
+			}
+
+			_, err = sketch.ToSlice()
+			if tt.expectErr {
+				assert.ErrorIs(t, err, common.ErrInvalidUTF8)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestFromSliceValidateManyWithStringSerde(t *testing.T) {
+	hasher := common.ItemSketchStringHasher{}
+	invalidStr := string([]byte{0xff, 0xfe})
+
+	tests := []struct {
+		name             string
+		items            []string
+		serdeSerialize   common.ItemSketchStringSerDe
+		serdeDeserialize common.ItemSketchStringSerDe
+		expectErr        bool
+	}{
+		{
+			name:             "valid utf8 deserialized with validation enabled",
+			items:            []string{"hello", "world", "안녕"},
+			serdeSerialize:   common.ItemSketchStringSerDe{ValidateUTF8: false},
+			serdeDeserialize: common.ItemSketchStringSerDe{ValidateUTF8: true},
+			expectErr:        false,
+		},
+		{
+			name:             "invalid utf8 deserialized with validation enabled",
+			items:            []string{"hello", invalidStr},
+			serdeSerialize:   common.ItemSketchStringSerDe{ValidateUTF8: false},
+			serdeDeserialize: common.ItemSketchStringSerDe{ValidateUTF8: true},
+			expectErr:        true,
+		},
+		{
+			name:             "invalid utf8 deserialized with validation disabled",
+			items:            []string{"hello", invalidStr},
+			serdeSerialize:   common.ItemSketchStringSerDe{ValidateUTF8: false},
+			serdeDeserialize: common.ItemSketchStringSerDe{ValidateUTF8: false},
+			expectErr:        false,
+		},
+		{
+			name:             "empty sketch deserialized with validation enabled",
+			items:            []string{},
+			serdeSerialize:   common.ItemSketchStringSerDe{ValidateUTF8: false},
+			serdeDeserialize: common.ItemSketchStringSerDe{ValidateUTF8: true},
+			expectErr:        false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sketch, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<_LG_MIN_MAP_SIZE, hasher, tt.serdeSerialize)
+			assert.NoError(t, err)
+
+			for _, item := range tt.items {
+				err = sketch.Update(item)
+				assert.NoError(t, err)
+			}
+
+			slc, err := sketch.ToSlice()
+			assert.NoError(t, err)
+
+			_, err = NewFrequencyItemsSketchFromSlice[string](slc, hasher, tt.serdeDeserialize)
+			if tt.expectErr {
+				assert.ErrorIs(t, err, common.ErrInvalidUTF8)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func BenchmarkItemSketch(b *testing.B) {
 	sketch, err := NewFrequencyItemsSketch[int64](128, 8, common.ItemSketchLongHasher{}, nil)
 	assert.NoError(b, err)

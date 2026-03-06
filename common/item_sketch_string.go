@@ -43,10 +43,7 @@ func (f ItemSketchStringHasher) Hash(item string) uint64 {
 }
 
 func (f ItemSketchStringSerDe) SizeOf(item string) int {
-	if len(item) == 0 {
-		return int(unsafe.Sizeof(uint32(0)))
-	}
-	return len(item) + int(unsafe.Sizeof(uint32(0)))
+	return len(item) + 4
 }
 
 func (f ItemSketchStringSerDe) SizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error) {
@@ -77,28 +74,25 @@ func (f ItemSketchStringSerDe) SerializeOneToSlice(item string) []byte {
 	utf8len := len(item)
 	bytesOut := make([]byte, utf8len+4)
 	binary.LittleEndian.PutUint32(bytesOut, uint32(utf8len))
-	copy(bytesOut[4:], []byte(item))
+	copy(bytesOut[4:], item)
 	return bytesOut
 }
 
-func (f ItemSketchStringSerDe) SerializeManyToSlice(item []string) []byte {
-	if len(item) == 0 {
+func (f ItemSketchStringSerDe) SerializeManyToSlice(items []string) []byte {
+	if len(items) == 0 {
 		return []byte{}
 	}
 	totalBytes := 0
-	numItems := len(item)
-	serialized2DArray := make([][]byte, numItems)
-	for i := 0; i < numItems; i++ {
-		serialized2DArray[i] = []byte(item[i])
-		totalBytes += len(serialized2DArray[i]) + 4
+	for _, item := range items {
+		totalBytes += len(item) + 4
 	}
 	bytesOut := make([]byte, totalBytes)
 	offset := 0
-	for i := 0; i < numItems; i++ {
-		utf8len := len(serialized2DArray[i])
+	for _, item := range items {
+		utf8len := len(item)
 		binary.LittleEndian.PutUint32(bytesOut[offset:], uint32(utf8len))
 		offset += 4
-		copy(bytesOut[offset:], serialized2DArray[i])
+		copy(bytesOut[offset:], item)
 		offset += utf8len
 	}
 	return bytesOut
@@ -110,7 +104,7 @@ func (f ItemSketchStringSerDe) DeserializeManyFromSlice(mem []byte, offsetBytes 
 	}
 	array := make([]string, numItems)
 	offset := offsetBytes
-	intSize := int(unsafe.Sizeof(uint32(0)))
+	intSize := 4
 	memCap := len(mem)
 	for i := 0; i < numItems; i++ {
 		if !checkBounds(offset, intSize, memCap) {

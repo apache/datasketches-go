@@ -1071,3 +1071,177 @@ func TestL0SortDuringMerge(t *testing.T) {
 		}
 	}
 }
+
+func TestToSliceValidateWithStringSerde(t *testing.T) {
+	comparator := common.ItemSketchStringComparator(false)
+
+	tests := []struct {
+		name         string
+		validateUTF8 bool
+		items        []string
+		expectErr    bool
+	}{
+		{
+			name:         "valid utf8 strings with validation enabled",
+			validateUTF8: true,
+			items:        []string{"hello", "world", "안녕"},
+			expectErr:    false,
+		},
+		{
+			name:         "invalid utf8 string with validation enabled",
+			validateUTF8: true,
+			items:        []string{"hello", string([]byte{0xff, 0xfe})},
+			expectErr:    true,
+		},
+		{
+			name:         "invalid utf8 string with validation disabled",
+			validateUTF8: false,
+			items:        []string{"hello", string([]byte{0xff, 0xfe})},
+			expectErr:    false,
+		},
+		{
+			name:         "empty sketch with validation enabled",
+			validateUTF8: true,
+			items:        []string{},
+			expectErr:    false,
+		},
+		{
+			name:         "single valid item with validation enabled",
+			validateUTF8: true,
+			items:        []string{"hello"},
+			expectErr:    false,
+		},
+		{
+			name:         "single invalid utf8 item with validation enabled",
+			validateUTF8: true,
+			items:        []string{string([]byte{0xff, 0xfe})},
+			expectErr:    true,
+		},
+		{
+			name:         "single invalid utf8 item with validation disabled",
+			validateUTF8: false,
+			items:        []string{string([]byte{0xff, 0xfe})},
+			expectErr:    false,
+		},
+		{
+			name:         "invalid utf8 as min item with validation enabled",
+			validateUTF8: true,
+			items:        []string{string([]byte{0x80}), "zzzz"},
+			expectErr:    true,
+		},
+		{
+			name:         "invalid utf8 as max item with validation enabled",
+			validateUTF8: true,
+			items:        []string{"aaaa", string([]byte{0xff, 0xfe})},
+			expectErr:    true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			serde := common.ItemSketchStringSerDe{ValidateUTF8: tt.validateUTF8}
+			sketch, err := NewKllItemsSketchWithDefault[string](comparator, serde)
+			assert.NoError(t, err)
+
+			for _, item := range tt.items {
+				sketch.Update(item)
+			}
+
+			_, err = sketch.ToSlice()
+			if tt.expectErr {
+				assert.ErrorIs(t, err, common.ErrInvalidUTF8)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestFromSliceValidateWithStringSerde(t *testing.T) {
+	comparator := common.ItemSketchStringComparator(false)
+	invalidMin := string([]byte{0x80})
+	invalidMax := string([]byte{0xff, 0xfe})
+	serdeNoValidation := common.ItemSketchStringSerDe{ValidateUTF8: false}
+	serdeWithValidation := common.ItemSketchStringSerDe{ValidateUTF8: true}
+
+	tests := []struct {
+		name             string
+		items            []string
+		serdeDeserialize common.ItemSketchStringSerDe
+		expectErr        bool
+	}{
+		{
+			name:             "valid utf8 deserialized with validation enabled",
+			items:            []string{"hello", "world", "안녕"},
+			serdeDeserialize: serdeWithValidation,
+			expectErr:        false,
+		},
+		{
+			name:             "invalid utf8 in retained items deserialized with validation enabled",
+			items:            []string{"hello", invalidMax},
+			serdeDeserialize: serdeWithValidation,
+			expectErr:        true,
+		},
+		{
+			name:             "invalid utf8 as min item deserialized with validation enabled",
+			items:            []string{invalidMin, "zzzz"},
+			serdeDeserialize: serdeWithValidation,
+			expectErr:        true,
+		},
+		{
+			name:             "invalid utf8 as max item deserialized with validation enabled",
+			items:            []string{"aaaa", invalidMax},
+			serdeDeserialize: serdeWithValidation,
+			expectErr:        true,
+		},
+		{
+			name:             "invalid utf8 deserialized with validation disabled",
+			items:            []string{"hello", invalidMax},
+			serdeDeserialize: serdeNoValidation,
+			expectErr:        false,
+		},
+		{
+			name:             "empty sketch deserialized with validation enabled",
+			items:            []string{},
+			serdeDeserialize: serdeWithValidation,
+			expectErr:        false,
+		},
+		{
+			name:             "single valid item deserialized with validation enabled",
+			items:            []string{"hello"},
+			serdeDeserialize: serdeWithValidation,
+			expectErr:        false,
+		},
+		{
+			name:             "single invalid utf8 item deserialized with validation enabled",
+			items:            []string{invalidMax},
+			serdeDeserialize: serdeWithValidation,
+			expectErr:        true,
+		},
+		{
+			name:             "single invalid utf8 item deserialized with validation disabled",
+			items:            []string{invalidMax},
+			serdeDeserialize: serdeNoValidation,
+			expectErr:        false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sketch, err := NewKllItemsSketchWithDefault[string](comparator, serdeNoValidation)
+			assert.NoError(t, err)
+
+			for _, item := range tt.items {
+				sketch.Update(item)
+			}
+
+			slc, err := sketch.ToSlice()
+			assert.NoError(t, err)
+
+			_, err = NewKllItemsSketchFromSlice[string](slc, comparator, tt.serdeDeserialize)
+			if tt.expectErr {
+				assert.ErrorIs(t, err, common.ErrInvalidUTF8)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

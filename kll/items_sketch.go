@@ -145,6 +145,12 @@ func NewKllItemsSketchFromSlice[C comparable](sl []byte, compareFn common.Compar
 		if err != nil {
 			return nil, err
 		}
+		if serdeWithValidation, ok := any(serde).(common.ItemSketchSerdeWithValidation[C]); ok {
+			if err := serdeWithValidation.ValidateOne(deserItems[0]); err != nil {
+				return nil, err
+			}
+		}
+
 		minItem = deserItems[0]
 		maxItem = deserItems[0]
 		hasMinMax = true
@@ -157,12 +163,25 @@ func NewKllItemsSketchFromSlice[C comparable](sl []byte, compareFn common.Compar
 			return nil, err
 		}
 		minItem = deserMinItems[0]
+		serdeWithValidation, isSerdeWithValidation := any(serde).(common.ItemSketchSerdeWithValidation[C])
+		if isSerdeWithValidation {
+			if err := serdeWithValidation.ValidateOne(minItem); err != nil {
+				return nil, err
+			}
+		}
+
 		offset += serde.SizeOf(minItem)
 		deserMaxItems, err := serde.DeserializeManyFromSlice(sl, offset, 1)
 		if err != nil {
 			return nil, err
 		}
 		maxItem = deserMaxItems[0]
+		if isSerdeWithValidation {
+			if err := serdeWithValidation.ValidateOne(maxItem); err != nil {
+				return nil, err
+			}
+		}
+
 		hasMinMax = true
 		offset += serde.SizeOf(maxItem)
 		numRetained := levelsArr[memVal.numLevels] - levelsArr[0]
@@ -170,6 +189,12 @@ func NewKllItemsSketchFromSlice[C comparable](sl []byte, compareFn common.Compar
 		if err != nil {
 			return nil, err
 		}
+		if isSerdeWithValidation {
+			if err := serdeWithValidation.ValidateMany(deseRetItems); err != nil {
+				return nil, err
+			}
+		}
+
 		for i := uint32(0); i < numRetained; i++ {
 			items[i+levelsArr[0]] = deseRetItems[i]
 		}
@@ -539,8 +564,14 @@ func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
 	numLevels := uint8(s.numLevels)
 	//end of full preamble
 	lvlsArr := s.getLevelsArray()
-	minMaxByteArr := s.getMinMaxByteArr()
-	itemsByteArr := s.getRetainedItemsByteArr()
+	minMaxByteArr, err := s.getMinMaxByteArr()
+	if err != nil {
+		return nil, err
+	}
+	itemsByteArr, err := s.getRetainedItemsByteArr()
+	if err != nil {
+		return nil, err
+	}
 
 	binary.LittleEndian.PutUint64(bytesOut[8:16], n)
 	binary.LittleEndian.PutUint16(bytesOut[16:18], minK)
@@ -624,13 +655,22 @@ func (s *ItemsSketch[C]) getMinMaxSizeBytes() int {
 	return s.serde.SizeOf(s.minItem) + s.serde.SizeOf(s.maxItem)
 }
 
-func (s *ItemsSketch[C]) getMinMaxByteArr() []byte {
+func (s *ItemsSketch[C]) getMinMaxByteArr() ([]byte, error) {
+	if serdeWithValidation, ok := any(s.serde).(common.ItemSketchSerdeWithValidation[C]); ok {
+		if err := serdeWithValidation.ValidateOne(s.minItem); err != nil {
+			return nil, err
+		}
+		if err := serdeWithValidation.ValidateOne(s.maxItem); err != nil {
+			return nil, err
+		}
+	}
+
 	minBytes := s.serde.SerializeOneToSlice(s.minItem)
 	maxBytes := s.serde.SerializeOneToSlice(s.maxItem)
 	minMaxBytes := make([]byte, len(minBytes)+len(maxBytes))
 	copy(minMaxBytes, minBytes)
 	copy(minMaxBytes[len(minBytes):], maxBytes)
-	return minMaxBytes
+	return minMaxBytes, nil
 }
 
 func (s *ItemsSketch[C]) getSingleItemSizeBytes() (int, error) {
@@ -645,6 +685,11 @@ func (s *ItemsSketch[C]) getSingleItemByteArr() ([]byte, error) {
 	v, err := s.getSingleItem()
 	if err != nil {
 		return nil, err
+	}
+	if serdeWithValidation, ok := any(s.serde).(common.ItemSketchSerdeWithValidation[C]); ok {
+		if err := serdeWithValidation.ValidateOne(v); err != nil {
+			return nil, err
+		}
 	}
 	return s.serde.SerializeOneToSlice(v), nil
 }
@@ -663,9 +708,14 @@ func (s *ItemsSketch[C]) getRetainedItemsArray() []C {
 	return outArr
 }
 
-func (s *ItemsSketch[C]) getRetainedItemsByteArr() []byte {
+func (s *ItemsSketch[C]) getRetainedItemsByteArr() ([]byte, error) {
 	retArr := s.getRetainedItemsArray()
-	return s.serde.SerializeManyToSlice(retArr)
+	if serdeWithValidation, ok := any(s.serde).(common.ItemSketchSerdeWithValidation[C]); ok {
+		if err := serdeWithValidation.ValidateMany(retArr); err != nil {
+			return nil, err
+		}
+	}
+	return s.serde.SerializeManyToSlice(retArr), nil
 }
 
 func (s *ItemsSketch[C]) getRetainedItemsSizeBytes() int {

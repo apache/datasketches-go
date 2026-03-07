@@ -17,6 +17,11 @@
 
 package tuple
 
+import (
+	"fmt"
+	"unicode/utf8"
+)
+
 type int32Summary struct {
 	value int32
 }
@@ -69,4 +74,38 @@ func (s int32ValueSummary) Update(value int32) {}
 
 func newInt32ValueSummary() int32ValueSummary {
 	return int32ValueSummary{}
+}
+
+type stringSummary struct {
+	value string
+}
+
+func (s *stringSummary) Reset() {
+	s.value = ""
+}
+
+func (s *stringSummary) Clone() Summary {
+	return &stringSummary{value: s.value}
+}
+
+func (s *stringSummary) Update(value string) {
+	s.value = value
+}
+
+func (s *stringSummary) ValidateBeforeEncode() error {
+	if !utf8.ValidString(s.value) {
+		return fmt.Errorf("invalid UTF-8 string")
+	}
+	return nil
+}
+
+func (s *stringSummary) ValidateAfterDecode() error {
+	if !utf8.ValidString(s.value) {
+		return fmt.Errorf("invalid UTF-8 string")
+	}
+	return nil
+}
+
+func newStringSummary() *stringSummary {
+	return &stringSummary{}
 }

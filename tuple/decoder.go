@@ -140,6 +140,12 @@ func (dec *Decoder[S]) Decode(r io.Reader) (*CompactSketch[S], error) {
 			return nil, err
 		}
 
+		if v, ok := any(summary).(AfterDecodeValidator); ok {
+			if err := v.ValidateAfterDecode(); err != nil {
+				return nil, err
+			}
+		}
+
 		entries[i] = entry[S]{Hash: hash, Summary: summary}
 	}
 

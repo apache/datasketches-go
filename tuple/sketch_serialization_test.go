@@ -31,6 +31,27 @@ import (
 	"github.com/apache/datasketches-go/theta"
 )
 
+func stringSummaryWriter(w io.Writer, s *stringSummary) error {
+	strBytes := []byte(s.value)
+	if err := binary.Write(w, binary.LittleEndian, uint32(len(strBytes))); err != nil {
+		return err
+	}
+	_, err := w.Write(strBytes)
+	return err
+}
+
+func stringSummaryReader(r io.Reader) (*stringSummary, error) {
+	var length uint32
+	if err := binary.Read(r, binary.LittleEndian, &length); err != nil {
+		return nil, err
+	}
+	buf := make([]byte, length)
+	if _, err := io.ReadFull(r, buf); err != nil {
+		return nil, err
+	}
+	return &stringSummary{value: string(buf)}, nil
+}
+
 func int32SummaryWriter(w io.Writer, s *int32Summary) error {
 	return binary.Write(w, binary.LittleEndian, s.value)
 }
@@ -441,5 +462,79 @@ func TestDecoderErrors(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "sketch type mismatch")
+	})
+}
+
+func TestStringSummaryUTF8Validation(t *testing.T) {
+	t.Run("Valid UTF-8 round-trip succeeds", func(t *testing.T) {
+		sketch, err := NewUpdateSketch[*stringSummary, string](newStringSummary)
+		assert.NoError(t, err)
+		err = sketch.UpdateString("key1", "hello")
+		assert.NoError(t, err)
+		err = sketch.UpdateString("key2", "안녕하세요")
+		assert.NoError(t, err)
+
+		compact, err := sketch.Compact(true)
+		assert.NoError(t, err)
+
+		var buf bytes.Buffer
+		encoder := NewEncoder[*stringSummary](&buf, stringSummaryWriter)
+		err = encoder.Encode(compact)
+		assert.NoError(t, err)
+
+		decoded, err := Decode[*stringSummary](buf.Bytes(), theta.DefaultSeed, stringSummaryReader)
+		assert.NoError(t, err)
+		assert.Equal(t, compact.NumRetained(), decoded.NumRetained())
+	})
+
+	t.Run("Invalid UTF-8 encode fails", func(t *testing.T) {
+		sketch, err := NewUpdateSketch[*stringSummary, string](newStringSummary)
+		assert.NoError(t, err)
+		err = sketch.UpdateString("key1", "valid")
+		assert.NoError(t, err)
+
+		compact, err := sketch.Compact(true)
+		assert.NoError(t, err)
+
+		// Inject invalid UTF-8 into the summary
+		for i := range compact.entries {
+			compact.entries[i].Summary = &stringSummary{value: "bad\xff\xfe"}
+		}
+
+		var buf bytes.Buffer
+		encoder := NewEncoder[*stringSummary](&buf, stringSummaryWriter)
+		err = encoder.Encode(compact)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid UTF-8 string")
+	})
+
+	t.Run("Invalid UTF-8 decode fails", func(t *testing.T) {
+		sketch, err := NewUpdateSketch[*stringSummary, string](newStringSummary)
+		assert.NoError(t, err)
+		err = sketch.UpdateString("key1", "hi")
+		assert.NoError(t, err)
+
+		compact, err := sketch.Compact(true)
+		assert.NoError(t, err)
+
+		var buf bytes.Buffer
+		encoder := NewEncoder[*stringSummary](&buf, stringSummaryWriter)
+		err = encoder.Encode(compact)
+		assert.NoError(t, err)
+
+		// Replace the string payload with invalid UTF-8.
+		// Use a custom reader that produces invalid UTF-8 for the summary.
+		invalidReader := func(r io.Reader) (*stringSummary, error) {
+			s, err := stringSummaryReader(r)
+			if err != nil {
+				return nil, err
+			}
+			s.value = "bad\xff\xfe"
+			return s, nil
+		}
+
+		_, err = Decode[*stringSummary](buf.Bytes(), theta.DefaultSeed, invalidReader)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid UTF-8 string")
 	})
 }

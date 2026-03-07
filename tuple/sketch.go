@@ -30,6 +30,18 @@ type Summary interface {
 	Clone() Summary
 }
 
+// BeforeEncodeValidator is an optional interface that summaries can implement
+// to validate their content before encoding.
+type BeforeEncodeValidator interface {
+	ValidateBeforeEncode() error
+}
+
+// AfterDecodeValidator is an optional interface that summaries can implement
+// to validate their content after decoding.
+type AfterDecodeValidator interface {
+	ValidateAfterDecode() error
+}
+
 // Sketch is the base interface for tuple sketches.
 // It extends Theta sketch to associate arbitrary summaries with each retained key.
 type Sketch[S Summary] interface {

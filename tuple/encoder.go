@@ -102,6 +102,12 @@ func (enc *Encoder[S]) Encode(sketch *CompactSketch[S]) error {
 		}
 	}
 	for _, entry := range sketch.entries {
+		if v, ok := any(entry.Summary).(BeforeEncodeValidator); ok {
+			if err := v.ValidateBeforeEncode(); err != nil {
+				return err
+			}
+		}
+
 		if err := binary.Write(enc.w, binary.LittleEndian, entry.Hash); err != nil {
 			return err
 		}

@@ -170,6 +170,13 @@ func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, hasher common.It
 	if err != nil {
 		return nil, err
 	}
+
+	if serdeWithValidation, ok := any(serde).(common.ItemSketchSerdeWithValidation[C]); ok {
+		if err := serdeWithValidation.ValidateMany(itemArray); err != nil {
+			return nil, err
+		}
+	}
+
 	// update the sketch
 	for j := 0; j < activeItems; j++ {
 		err := fis.UpdateMany(itemArray[j], countArray[j])
@@ -427,6 +434,11 @@ func (i *ItemsSketch[C]) ToSlice() ([]byte, error) {
 		outBytes = 8
 	} else {
 		preLongs = internal.FamilyEnum.Frequency.MaxPreLongs
+		if serdeWithValidation, ok := any(i.hashMap.serde).(common.ItemSketchSerdeWithValidation[C]); ok {
+			if err := serdeWithValidation.ValidateMany(i.hashMap.getActiveKeys()); err != nil {
+				return nil, err
+			}
+		}
 		bytes = i.hashMap.serde.SerializeManyToSlice(i.hashMap.getActiveKeys())
 		outBytes = ((preLongs + activeItems) << 3) + len(bytes)
 	}

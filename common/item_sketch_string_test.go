@@ -349,3 +349,117 @@ func TestItemSketchStringSerDe_DeserializeManyFromSlice(t *testing.T) {
 		})
 	}
 }
+
+func TestItemSketchStringSerDe_ValidateOne(t *testing.T) {
+	tests := []struct {
+		name         string
+		validateUTF8 bool
+		item         string
+		expectedErr  error
+	}{
+		{
+			name:         "valid ascii with validation enabled",
+			validateUTF8: true,
+			item:         "hello",
+			expectedErr:  nil,
+		},
+		{
+			name:         "valid multi-byte utf8 with validation enabled",
+			validateUTF8: true,
+			item:         "안녕하세요",
+			expectedErr:  nil,
+		},
+		{
+			name:         "empty string with validation enabled",
+			validateUTF8: true,
+			item:         "",
+			expectedErr:  nil,
+		},
+		{
+			name:         "invalid utf8 with validation enabled",
+			validateUTF8: true,
+			item:         string([]byte{0xff, 0xfe, 0xfd}),
+			expectedErr:  ErrInvalidUTF8,
+		},
+		{
+			name:         "invalid utf8 with validation disabled",
+			validateUTF8: false,
+			item:         string([]byte{0xff, 0xfe, 0xfd}),
+			expectedErr:  nil,
+		},
+		{
+			name:         "valid ascii with validation disabled",
+			validateUTF8: false,
+			item:         "hello",
+			expectedErr:  nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			serde := ItemSketchStringSerDe{ValidateUTF8: tt.validateUTF8}
+			err := serde.ValidateOne(tt.item)
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, err, tt.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestItemSketchStringSerDe_ValidateMany(t *testing.T) {
+	tests := []struct {
+		name         string
+		validateUTF8 bool
+		items        []string
+		expectedErr  error
+	}{
+		{
+			name:         "all valid strings with validation enabled",
+			validateUTF8: true,
+			items:        []string{"hello", "world", "안녕"},
+			expectedErr:  nil,
+		},
+		{
+			name:         "empty slice with validation enabled",
+			validateUTF8: true,
+			items:        []string{},
+			expectedErr:  nil,
+		},
+		{
+			name:         "one invalid string among valid with validation enabled",
+			validateUTF8: true,
+			items:        []string{"hello", string([]byte{0xff, 0xfe}), "world"},
+			expectedErr:  ErrInvalidUTF8,
+		},
+		{
+			name:         "all invalid strings with validation enabled",
+			validateUTF8: true,
+			items:        []string{string([]byte{0xff}), string([]byte{0xfe})},
+			expectedErr:  ErrInvalidUTF8,
+		},
+		{
+			name:         "invalid strings with validation disabled",
+			validateUTF8: false,
+			items:        []string{string([]byte{0xff}), string([]byte{0xfe})},
+			expectedErr:  nil,
+		},
+		{
+			name:         "valid strings with validation disabled",
+			validateUTF8: false,
+			items:        []string{"hello", "world"},
+			expectedErr:  nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			serde := ItemSketchStringSerDe{ValidateUTF8: tt.validateUTF8}
+			err := serde.ValidateMany(tt.items)
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, err, tt.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

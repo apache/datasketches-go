@@ -75,7 +75,7 @@ If you are interested in making contributions to this site please see our [Commu
 | 	| ArrayOfDoublesSketch  | ⚠️ |
 | 	| DoubleSketch  | ❌ |
 | 	| IntegerSketch  | ❌ |
-|	| ArrayOfStringsSketch | ❌ |
+|	| ArrayOfStringsSketch | ⚠️ |
 | 	| EngagementTest3 | ❌ |
 
 

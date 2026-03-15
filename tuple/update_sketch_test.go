@@ -391,6 +391,81 @@ func TestUpdateSketch_UpdateBytes(t *testing.T) {
 	})
 }
 
+func TestUpdateSketch_UpdateArrayOfStringsSummary(t *testing.T) {
+	newArrayOfStringsSummary := func() *ArrayOfStringsSummary {
+		return &ArrayOfStringsSummary{}
+	}
+
+	sketch, err := NewUpdateSketch[*ArrayOfStringsSummary, []string](newArrayOfStringsSummary)
+	assert.NoError(t, err)
+
+	updateByStringSliceHash := func(key []string, value []string) error {
+		hash := GenerateHashKeyFromStrings(key)
+		assert.NotZero(t, hash)
+
+		sketch.table.isEmpty = false
+
+		index, err := sketch.table.Find(hash)
+		if err != nil {
+			if err == ErrKeyNotFound {
+				sketch.insertOrUpdate(index, hash, value, true)
+				return nil
+			}
+			return err
+		}
+
+		sketch.insertOrUpdate(index, hash, value, false)
+		return nil
+	}
+
+	key1 := []string{"alpha", "beta"}
+	value1 := []string{"first", "value"}
+	hash1 := GenerateHashKeyFromStrings(key1)
+
+	err = updateByStringSliceHash(key1, value1)
+	assert.NoError(t, err)
+	assert.False(t, sketch.IsEmpty())
+	assert.Equal(t, uint32(1), sketch.NumRetained())
+
+	retained := make(map[uint64][]string)
+	for hash, summary := range sketch.All() {
+		retained[hash] = append([]string(nil), summary.values...)
+	}
+	assert.Equal(t, map[uint64][]string{
+		hash1: value1,
+	}, retained)
+
+	value2 := []string{"updated", "value"}
+	err = updateByStringSliceHash(key1, value2)
+	assert.NoError(t, err)
+	assert.Equal(t, uint32(1), sketch.NumRetained())
+
+	retained = make(map[uint64][]string)
+	for hash, summary := range sketch.All() {
+		retained[hash] = append([]string(nil), summary.values...)
+	}
+	assert.Equal(t, map[uint64][]string{
+		hash1: value2,
+	}, retained)
+
+	key2 := []string{"gamma", "delta"}
+	value3 := []string{"third", "value"}
+	hash2 := GenerateHashKeyFromStrings(key2)
+
+	err = updateByStringSliceHash(key2, value3)
+	assert.NoError(t, err)
+	assert.Equal(t, uint32(2), sketch.NumRetained())
+
+	retained = make(map[uint64][]string)
+	for hash, summary := range sketch.All() {
+		retained[hash] = append([]string(nil), summary.values...)
+	}
+	assert.Equal(t, map[uint64][]string{
+		hash1: value2,
+		hash2: value3,
+	}, retained)
+}
+
 func TestUpdateSketch_UpdateFloat64(t *testing.T) {
 	t.Run("Without SummaryUpdateFunc", func(t *testing.T) {
 		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)

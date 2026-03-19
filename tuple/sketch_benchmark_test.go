@@ -17,7 +17,9 @@
 
 package tuple
 
-import "testing"
+import (
+	"testing"
+)
 
 func BenchmarkUpdateSketch_PointerSummary(b *testing.B) {
 	b.ReportAllocs()

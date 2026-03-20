@@ -105,6 +105,10 @@ func NewFrequencyItemsSketchWithMaxMapSize[C comparable](maxMapSize int, hasher 
 // sketch and must be a power of 2.  The maximum capacity of this internal hash map is
 // 0.75 times * maxMapSize. Both the ultimate accuracy and size of this sketch are a
 // function of maxMapSize.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the serialized string data is encoded as valid UTF-8.
 func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, hasher common.ItemSketchHasher[C], serde common.ItemSketchSerde[C]) (*ItemsSketch[C], error) {
 	if serde == nil {
 		return nil, errors.New("no SerDe provided")
@@ -327,6 +331,10 @@ func (i *ItemsSketch[C]) IsEmpty() bool {
 // Update this sketch with an item and a frequency count of one.
 //
 // item for which the frequency should be increased.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (i *ItemsSketch[C]) Update(item C) error {
 	return i.UpdateMany(item, 1)
 }
@@ -337,6 +345,10 @@ func (i *ItemsSketch[C]) Update(item C) error {
 // and is only used by the sketch to determine uniqueness.
 // count the amount by which the frequency of the item should be increased.
 // A count of zero is a no-op, and a negative count will throw an exception.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that input strings are encoded as valid UTF-8.
 func (i *ItemsSketch[C]) UpdateMany(item C, count int64) error {
 	if internal.IsNil(item) || count == 0 {
 		return nil
@@ -374,6 +386,10 @@ func (i *ItemsSketch[C]) UpdateMany(item C, count int64) error {
 //
 // return a sketch whose estimates are within the guarantees of the largest error tolerance
 // of the two merged sketches.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that string values in both sketches are encoded as valid UTF-8.
 func (i *ItemsSketch[C]) Merge(other *ItemsSketch[C]) (*ItemsSketch[C], error) {
 	if other == nil || other.IsEmpty() {
 		return i, nil
@@ -412,7 +428,11 @@ func (i *ItemsSketch[C]) ToString() (string, error) {
 	return sb.String(), nil
 }
 
-// ToSlice returns a slice representation of this sketch
+// ToSlice returns a slice representation of this sketch.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the serialized string data is encoded as valid UTF-8.
 func (i *ItemsSketch[C]) ToSlice() ([]byte, error) {
 	if i.hashMap.serde == nil {
 		return nil, errors.New("no SerDe provided")

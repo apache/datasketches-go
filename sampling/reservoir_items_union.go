@@ -53,6 +53,10 @@ func NewReservoirItemsUnion[T any](maxK int) (*ReservoirItemsUnion[T], error) {
 }
 
 // Update adds a single item to the union.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (u *ReservoirItemsUnion[T]) Update(item T) {
 	if u.gadget == nil {
 		u.gadget, _ = NewReservoirItemsSketch[T](u.maxK)
@@ -62,6 +66,10 @@ func (u *ReservoirItemsUnion[T]) Update(item T) {
 
 // UpdateSketch merges another sketch into the union.
 // This implements Java's update(ReservoirItemsSketch) with twoWayMergeInternal logic.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that string values in both sketches are encoded as valid UTF-8.
 func (u *ReservoirItemsUnion[T]) UpdateSketch(sketch *ReservoirItemsSketch[T]) error {
 	if sketch == nil || sketch.IsEmpty() {
 		return nil
@@ -91,6 +99,10 @@ func (u *ReservoirItemsUnion[T]) UpdateSketch(sketch *ReservoirItemsSketch[T]) e
 
 // UpdateFromRaw creates a sketch from raw components and merges it.
 // Useful in distributed environments. Items slice is used directly, not copied.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that input strings are encoded as valid UTF-8.
 func (u *ReservoirItemsUnion[T]) UpdateFromRaw(n int64, k int, items []T) error {
 	if len(items) == 0 {
 		return nil
@@ -234,6 +246,10 @@ const (
 )
 
 // ToSlice serializes the union to a byte slice.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the serialized string data is encoded as valid UTF-8.
 func (u *ReservoirItemsUnion[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 	empty := u.gadget == nil || u.gadget.IsEmpty()
 
@@ -267,6 +283,10 @@ func (u *ReservoirItemsUnion[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 }
 
 // NewReservoirItemsUnionFromSlice deserializes a union from a byte slice.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the serialized string data is encoded as valid UTF-8.
 func NewReservoirItemsUnionFromSlice[T any](data []byte, serde ItemsSerDe[T]) (*ReservoirItemsUnion[T], error) {
 	if len(data) < 8 {
 		return nil, errors.New("data too short")

@@ -203,6 +203,10 @@ func (s *VarOptItemsSketch[T]) peekMin() (float64, error) {
 
 // Update adds an item with the given weight to the sketch.
 // Weight must be positive and finite.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *VarOptItemsSketch[T]) Update(item T, weight float64) error {
 	return s.update(item, weight, false)
 }

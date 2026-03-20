@@ -26,6 +26,10 @@ import (
 
 // SummaryWriter writes a summary to the writer.
 // Implementations should write the summary in a format that can be read by a corresponding SummaryReader.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that those strings are encoded as valid UTF-8.
 type SummaryWriter[S Summary] func(w io.Writer, s S) error
 
 // Encoder encodes a compact tuple sketch to bytes.

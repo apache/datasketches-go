@@ -317,12 +317,20 @@ func (s *UpdateSketch[S, V]) ResizeFactor() theta.ResizeFactor {
 	return s.table.rf
 }
 
-// UpdateUint64 updates this sketch with a given unsigned 64-bit integer
+// UpdateUint64 updates this sketch with a given unsigned 64-bit integer.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *UpdateSketch[S, V]) UpdateUint64(key uint64, value V) error {
 	return s.UpdateInt64(int64(key), value)
 }
 
-// UpdateInt64 updates this sketch with a given signed 64-bit integer
+// UpdateInt64 updates this sketch with a given signed 64-bit integer.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *UpdateSketch[S, V]) UpdateInt64(key int64, value V) error {
 	hash, err := s.table.HashInt64AndScreen(key)
 	if err != nil {
@@ -342,12 +350,20 @@ func (s *UpdateSketch[S, V]) UpdateInt64(key int64, value V) error {
 	return nil
 }
 
-// UpdateUint32 updates this sketch with a given unsigned 32-bit integer
+// UpdateUint32 updates this sketch with a given unsigned 32-bit integer.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *UpdateSketch[S, V]) UpdateUint32(key uint32, value V) error {
 	return s.UpdateInt64(int64(key), value)
 }
 
-// UpdateInt32 updates this sketch with a given signed 32-bit integer
+// UpdateInt32 updates this sketch with a given signed 32-bit integer.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *UpdateSketch[S, V]) UpdateInt32(key int32, value V) error {
 	hash, err := s.table.HashInt32AndScreen(key)
 	if err != nil {
@@ -367,27 +383,47 @@ func (s *UpdateSketch[S, V]) UpdateInt32(key int32, value V) error {
 	return nil
 }
 
-// UpdateUint16 updates this sketch with a given unsigned 16-bit integer
+// UpdateUint16 updates this sketch with a given unsigned 16-bit integer.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *UpdateSketch[S, V]) UpdateUint16(key uint16, value V) error {
 	return s.UpdateInt32(int32(key), value)
 }
 
-// UpdateInt16 updates this sketch with a given signed 16-bit integer
+// UpdateInt16 updates this sketch with a given signed 16-bit integer.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *UpdateSketch[S, V]) UpdateInt16(key int16, value V) error {
 	return s.UpdateInt32(int32(key), value)
 }
 
-// UpdateUint8 updates this sketch with a given unsigned 8-bit integer
+// UpdateUint8 updates this sketch with a given unsigned 8-bit integer.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *UpdateSketch[S, V]) UpdateUint8(key uint8, value V) error {
 	return s.UpdateInt32(int32(key), value)
 }
 
-// UpdateInt8 updates this sketch with a given signed 8-bit integer
+// UpdateInt8 updates this sketch with a given signed 8-bit integer.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *UpdateSketch[S, V]) UpdateInt8(key int8, value V) error {
 	return s.UpdateInt32(int32(key), value)
 }
 
-// UpdateFloat64 updates this sketch with a given double-precision floating point value
+// UpdateFloat64 updates this sketch with a given double-precision floating point value.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *UpdateSketch[S, V]) UpdateFloat64(key float64, value V) error {
 	return s.UpdateInt64(canonicalDouble(key), value)
 }
@@ -402,12 +438,20 @@ func canonicalDouble(value float64) int64 {
 	return int64(math.Float64bits(value))
 }
 
-// UpdateFloat32 updates this sketch with a given floating point value
+// UpdateFloat32 updates this sketch with a given floating point value.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *UpdateSketch[S, V]) UpdateFloat32(key float32, value V) error {
 	return s.UpdateFloat64(float64(key), value)
 }
 
-// UpdateString updates this sketch with a given string
+// UpdateString updates this sketch with a given string.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *UpdateSketch[S, V]) UpdateString(key string, value V) error {
 	if key == "" {
 		return ErrUpdateEmptyString
@@ -431,7 +475,11 @@ func (s *UpdateSketch[S, V]) UpdateString(key string, value V) error {
 	return nil
 }
 
-// UpdateBytes updates this sketch with given data
+// UpdateBytes updates this sketch with given data.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *UpdateSketch[S, V]) UpdateBytes(data []byte, value V) error {
 	hash, err := s.table.HashBytesAndScreen(data)
 	if err != nil {

@@ -139,7 +139,9 @@ func (u *ReservoirItemsUnion[T]) createNewGadget(source *ReservoirItemsSketch[T]
 		if err != nil {
 			return err
 		}
-		u.twoWayMergeInternalStandard(source)
+		if err := u.twoWayMergeInternalStandard(source); err != nil {
+			return err
+		}
 	} else {
 
 		u.gadget = source.Copy()
@@ -149,40 +151,56 @@ func (u *ReservoirItemsUnion[T]) createNewGadget(source *ReservoirItemsSketch[T]
 
 // twoWayMergeInternal performs the merge based on the state of both sketches.
 // This implements Java's twoWayMergeInternal logic.
-func (u *ReservoirItemsUnion[T]) twoWayMergeInternal(source *ReservoirItemsSketch[T]) {
+func (u *ReservoirItemsUnion[T]) twoWayMergeInternal(source *ReservoirItemsSketch[T]) error {
 	if source.N() <= int64(source.K()) {
 		// Case 1: source is in exact mode - use standard merge
-		u.twoWayMergeInternalStandard(source)
+		if err := u.twoWayMergeInternalStandard(source); err != nil {
+			return err
+		}
 	} else if u.gadget.N() < int64(u.gadget.K()) {
 		// Case 2: gadget is in exact mode, source is in sampling mode
 		// Swap: merge gadget into source (source becomes new gadget)
 		tmp := u.gadget
 		u.gadget = source.Copy()
-		u.twoWayMergeInternalStandard(tmp)
+		if err := u.twoWayMergeInternalStandard(tmp); err != nil {
+			return err
+		}
 	} else if source.ImplicitSampleWeight() < float64(u.gadget.N())/float64(u.gadget.K()-1) {
 		// Case 3: both in sampling mode, source is "lighter"
 		// Merge source into gadget
-		u.twoWayMergeInternalWeighted(source)
+		if err := u.twoWayMergeInternalWeighted(source); err != nil {
+			return err
+		}
 	} else {
 		// Case 4: both in sampling mode, gadget is "lighter"
 		// Swap: merge gadget into source
 		tmp := u.gadget
 		u.gadget = source.Copy()
-		u.twoWayMergeInternalWeighted(tmp)
+		if err := u.twoWayMergeInternalWeighted(tmp); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 // twoWayMergeInternalStandard merges a sketch in exact mode (N <= K) into gadget.
 // Simply updates gadget with each item from source.
-func (u *ReservoirItemsUnion[T]) twoWayMergeInternalStandard(source *ReservoirItemsSketch[T]) {
+func (u *ReservoirItemsUnion[T]) twoWayMergeInternalStandard(source *ReservoirItemsSketch[T]) error {
 	for i := 0; i < source.NumSamples(); i++ {
-		u.gadget.Update(source.valueAtPosition(i))
+		v, err := source.valueAtPosition(i)
+		if err != nil {
+			return err
+		}
+
+		u.gadget.Update(v)
 	}
+	return nil
 }
 
 // twoWayMergeInternalWeighted merges a "lighter" sketch into gadget using weighted sampling.
 // Uses the correct probability formula: P = (K * w) / targetTotal
-func (u *ReservoirItemsUnion[T]) twoWayMergeInternalWeighted(source *ReservoirItemsSketch[T]) {
+func (u *ReservoirItemsUnion[T]) twoWayMergeInternalWeighted(source *ReservoirItemsSketch[T]) error {
 	numSourceSamples := source.K()
 	sourceItemWeight := float64(source.N()) / float64(numSourceSamples)
 	rescaledProb := float64(u.gadget.K()) * sourceItemWeight
@@ -196,11 +214,20 @@ func (u *ReservoirItemsUnion[T]) twoWayMergeInternalWeighted(source *ReservoirIt
 		rescaledFlip := targetTotal * rand.Float64()
 		if rescaledFlip < rescaledProb {
 			slotNo := rand.Intn(tgtK)
-			u.gadget.insertValueAtPosition(source.valueAtPosition(i), slotNo)
+			v, err := source.valueAtPosition(i)
+			if err != nil {
+				return err
+			}
+
+			u.gadget.insertValueAtPosition(v, slotNo)
 		}
 	}
 
-	u.gadget.forceIncrementItemsSeen(source.N())
+	if err := u.gadget.forceIncrementItemsSeen(source.N()); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Result returns a copy of the internal sketch.

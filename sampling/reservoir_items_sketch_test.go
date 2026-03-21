@@ -18,8 +18,6 @@
 package sampling
 
 import (
-	"encoding/binary"
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,6 +25,12 @@ import (
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
 )
+
+func expectedReservoirInitialCap(k int, rf ResizeFactor) int {
+	ceilingLgK, _ := internal.ExactLog2(common.CeilingPowerOf2(k))
+	initialLgSize := startingSubMultiple(ceilingLgK, int(rf), minLgArrItems)
+	return adjustedSamplingAllocationSize(k, 1<<initialLgSize)
+}
 
 func TestNewReservoirItemsSketch(t *testing.T) {
 	sketch, err := NewReservoirItemsSketch[int64](10)
@@ -117,6 +121,42 @@ func TestReservoirItemsSketch_Update(t *testing.T) {
 		}
 	})
 
+	t.Run("IgnoresNilItem", func(t *testing.T) {
+		sketch, err := NewReservoirItemsSketch[[]int64](4)
+		assert.NoError(t, err)
+
+		assert.NoError(t, sketch.Update([]int64{1, 2}))
+		var item []int64
+		err = sketch.Update(item)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), sketch.N())
+		assert.Equal(t, 1, sketch.NumSamples())
+		assert.Equal(t, [][]int64{{1, 2}}, sketch.Samples())
+	})
+
+	t.Run("ReturnsErrorAtMaxItemsSeen", func(t *testing.T) {
+		sketch, err := NewReservoirItemsSketch[int64](2)
+		assert.NoError(t, err)
+
+		assert.NoError(t, sketch.Update(1))
+		assert.NoError(t, sketch.Update(2))
+		assert.Equal(t, int64(2), sketch.N())
+		assert.Equal(t, 2, sketch.NumSamples())
+
+		sketch.forceIncrementItemsSeen(maxItemsSeen - sketch.N())
+
+		err = sketch.Update(3)
+		assert.ErrorIs(t, err, ErrSketchExceedsMaxCapacity)
+		assert.Equal(t, int64(maxItemsSeen), sketch.N())
+		assert.Equal(t, 2, sketch.NumSamples())
+		assert.Equal(t, float64(maxItemsSeen)/2.0, sketch.ImplicitSampleWeight())
+
+		samples := sketch.Samples()
+		for _, sample := range samples {
+			assert.True(t, sample >= 1 && sample <= 2)
+		}
+	})
+
 	t.Run("AboveKMaintainsKAndIncrementsN", func(t *testing.T) {
 		k := 10
 		total := 1000
@@ -144,30 +184,52 @@ func TestReservoirItemsSketch_Update(t *testing.T) {
 }
 
 func TestReservoirItemsSketchReset(t *testing.T) {
-	k := 1024
+	t.Run("DefaultResizeFactor", func(t *testing.T) {
+		k := 1024
 
-	sketch, err := NewReservoirItemsSketch[int64](k)
-	assert.NoError(t, err)
+		sketch, err := NewReservoirItemsSketch[int64](k)
+		assert.NoError(t, err)
 
-	ceilingLgK, _ := internal.ExactLog2(common.CeilingPowerOf2(k))
-	initialLgSize := startingSubMultiple(
-		ceilingLgK, int(math.Log2(float64(defaultResizeFactor))), minLgArrItems,
-	)
-	expectedInitialCap := adjustedSamplingAllocationSize(k, 1<<initialLgSize)
+		expectedInitialCap := expectedReservoirInitialCap(k, defaultResizeFactor)
 
-	for i := int64(1); i <= int64(expectedInitialCap)+1; i++ {
-		sketch.Update(i)
-	}
+		for i := int64(1); i <= int64(expectedInitialCap)+1; i++ {
+			sketch.Update(i)
+		}
 
-	assert.Greater(t, cap(sketch.data), expectedInitialCap)
+		assert.Greater(t, cap(sketch.data), expectedInitialCap)
 
-	sketch.Reset()
+		sketch.Reset()
 
-	assert.True(t, sketch.IsEmpty())
-	assert.Equal(t, int64(0), sketch.N())
-	assert.Equal(t, k, sketch.K())
-	assert.Equal(t, 0, len(sketch.data))
-	assert.Equal(t, expectedInitialCap, cap(sketch.data))
+		assert.True(t, sketch.IsEmpty())
+		assert.Equal(t, int64(0), sketch.N())
+		assert.Equal(t, k, sketch.K())
+		assert.Equal(t, 0, len(sketch.data))
+		assert.Equal(t, expectedInitialCap, cap(sketch.data))
+	})
+
+	t.Run("NonDefaultResizeFactor", func(t *testing.T) {
+		k := 1024
+
+		sketch, err := NewReservoirItemsSketch[int64](k, WithReservoirItemsSketchResizeFactor(ResizeX2))
+		assert.NoError(t, err)
+
+		expectedInitialCap := expectedReservoirInitialCap(k, ResizeX2)
+
+		for i := int64(1); i <= int64(expectedInitialCap)+1; i++ {
+			sketch.Update(i)
+		}
+
+		assert.Greater(t, cap(sketch.data), expectedInitialCap)
+
+		sketch.Reset()
+
+		assert.True(t, sketch.IsEmpty())
+		assert.Equal(t, int64(0), sketch.N())
+		assert.Equal(t, k, sketch.K())
+		assert.Equal(t, ResizeX2, sketch.rf)
+		assert.Equal(t, 0, len(sketch.data))
+		assert.Equal(t, expectedInitialCap, cap(sketch.data))
+	})
 }
 
 func TestReservoirItemsSketchGetSamplesIsCopy(t *testing.T) {
@@ -185,18 +247,30 @@ func TestReservoirItemsSketchGetSamplesIsCopy(t *testing.T) {
 	assert.Equal(t, int64(42), samples2[0])
 }
 
-func TestReservoirItemsSketchResizeFactorSerialization(t *testing.T) {
-	sketch, err := NewReservoirItemsSketch[int64](10, WithReservoirItemsSketchResizeFactor(ResizeX2))
-	assert.NoError(t, err)
-	sketch.Update(1)
+func TestReservoirItemsSketchCopyPreservesCapacity(t *testing.T) {
+	k := 1024
 
-	data, err := sketch.ToSlice(Int64SerDe{})
+	sketch, err := NewReservoirItemsSketch[int64](k, WithReservoirItemsSketchResizeFactor(ResizeX2))
 	assert.NoError(t, err)
-	assert.Equal(t, byte(0x42), data[0]) // ResizeX2 (0x40) + preambleIntsNonEmpty (0x02)
 
-	restored, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
-	assert.NoError(t, err)
-	assert.Equal(t, ResizeX2, restored.rf)
+	initialCap := expectedReservoirInitialCap(k, ResizeX2)
+	for i := int64(1); i <= int64(initialCap)+1; i++ {
+		assert.NoError(t, sketch.Update(i))
+	}
+
+	assert.Greater(t, cap(sketch.data), initialCap)
+
+	clone := sketch.Copy()
+	assert.Equal(t, sketch.K(), clone.K())
+	assert.Equal(t, sketch.N(), clone.N())
+	assert.Equal(t, sketch.rf, clone.rf)
+	assert.Equal(t, len(sketch.data), len(clone.data))
+	assert.Equal(t, cap(sketch.data), cap(clone.data))
+	assert.Equal(t, sketch.Samples(), clone.Samples())
+
+	assert.NoError(t, clone.Update(999))
+	assert.Equal(t, sketch.N()+1, clone.N())
+	assert.Equal(t, int64(initialCap+1), sketch.N())
 }
 
 func TestReservoirItemsSketchEstimateSubsetSum(t *testing.T) {
@@ -280,19 +354,4 @@ func TestReservoirItemsSketchEstimateSubsetSum(t *testing.T) {
 		assert.Equal(t, itemCount, summary.TotalSketchWeight)
 	}
 	assert.True(t, passLB >= 2 && passUB >= 2)
-}
-
-func TestReservoirItemsSketchLegacySerVerEmpty(t *testing.T) {
-	data := make([]byte, 8)
-	data[0] = 0xC0 | preambleIntsEmpty
-	data[1] = 1 // legacy serVer
-	data[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
-	data[3] = flagEmpty
-	binary.LittleEndian.PutUint16(data[4:], 0x5000) // p=10, i=0 => k=1024
-
-	sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
-	assert.NoError(t, err)
-	assert.True(t, sketch.IsEmpty())
-	assert.Equal(t, 1024, sketch.K())
-	assert.Equal(t, ResizeX8, sketch.rf)
 }

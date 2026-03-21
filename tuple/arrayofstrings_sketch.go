@@ -78,6 +78,9 @@ func (s *ArrayOfStringsSummary) Update(values []string) {
 // ArrayOfStringsSummaryWriter writes an ArrayOfStringsSummary to the provided io.Writer in binary format.
 // It validates the length of the string slice and computes total bytes for serialization.
 // Returns an error if the input exceeds the maximum allowed slice length or if any write operation fails.
+//
+// If the caller cares about cross-language compatibility,
+// it is the caller's responsibility to ensure that those strings are encoded as valid UTF-8.
 func ArrayOfStringsSummaryWriter(w io.Writer, summary *ArrayOfStringsSummary) error {
 	return writeStrings(w, summary.values)
 }
@@ -121,6 +124,9 @@ func computeStringsTotalBytes(values []string) uint32 {
 // ArrayOfStringsSummaryReader reads an ArrayOfStringsSummary from the provided io.Reader in binary format.
 // It validates the length of the string slice and reads the total bytes for deserialization.
 // Returns an error if the input exceeds the maximum allowed slice length or if any read operation fails.
+//
+// If the caller cares about cross-language compatibility,
+// it is the caller's responsibility to ensure that the serialized string data is encoded as valid UTF-8.
 func ArrayOfStringsSummaryReader(r io.Reader) (*ArrayOfStringsSummary, error) {
 	values, err := readStrings(r)
 	if err != nil {
@@ -201,6 +207,9 @@ func ArrayOfStringsInlineSummaryUpdateFunc(s ArrayOfStringsInlineSummary, values
 // ArrayOfStringsInlineSummaryWriter writes an ArrayOfStringsInlineSummary to the provided io.Writer in binary format.
 // It validates the length of the string slice and computes total bytes for serialization.
 // Returns an error if the input exceeds the maximum allowed slice length or if any write operation fails.
+//
+// If the caller cares about cross-language compatibility,
+// it is the caller's responsibility to ensure that those strings are encoded as valid UTF-8.
 func ArrayOfStringsInlineSummaryWriter(w io.Writer, summary ArrayOfStringsInlineSummary) error {
 	return writeStrings(w, summary.values)
 }
@@ -208,6 +217,9 @@ func ArrayOfStringsInlineSummaryWriter(w io.Writer, summary ArrayOfStringsInline
 // ArrayOfStringsInlineSummaryReader reads an ArrayOfStringsInlineSummary from the provided io.Reader in binary format.
 // It validates the length of the string slice and reads the total bytes for deserialization.
 // Returns an error if the input exceeds the maximum allowed slice length or if any read operation fails.
+//
+// If the caller cares about cross-language compatibility,
+// it is the caller's responsibility to ensure that the serialized string data is encoded as valid UTF-8.
 func ArrayOfStringsInlineSummaryReader(r io.Reader) (ArrayOfStringsInlineSummary, error) {
 	values, err := readStrings(r)
 	if err != nil {

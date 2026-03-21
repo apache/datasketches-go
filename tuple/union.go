@@ -171,7 +171,11 @@ func NewUnionWithSummaryMergeFunc[S Summary](
 	}, nil
 }
 
-// Update adds a sketch to the union
+// Update adds a sketch to the union.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that both sketches use string values encoded as valid UTF-8.
 func (u *Union[S]) Update(sketch Sketch[S]) error {
 	if sketch.IsEmpty() {
 		return nil

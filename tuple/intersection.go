@@ -103,6 +103,10 @@ func NewIntersectionWithSummaryMergeFunc[S Summary](
 }
 
 // Update updates the intersection with a given sketch.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that both sketches use string values encoded as valid UTF-8.
 func (i *Intersection[S]) Update(sketch Sketch[S]) error {
 	if i.hashtable.isEmpty {
 		return nil

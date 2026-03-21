@@ -29,6 +29,10 @@ import (
 
 // SummaryReader reads and returns a summary from the reader.
 // Implementations should read the format written by a corresponding SummaryWriter.
+//
+// If the summary contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the serialized string data is encoded as valid UTF-8.
 type SummaryReader[S Summary] func(r io.Reader) (S, error)
 
 // Decoder decodes a compact sketch from the given reader.

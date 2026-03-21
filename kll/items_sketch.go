@@ -108,6 +108,10 @@ func NewKllItemsSketchWithDefault[C comparable](compareFn common.CompareFn[C], s
 }
 
 // NewKllItemsSketchFromSlice create a new ItemsSketch from the given byte slice (serialized sketch).
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the serialized string data is encoded as valid UTF-8.
 func NewKllItemsSketchFromSlice[C comparable](sl []byte, compareFn common.CompareFn[C], serde common.ItemSketchSerde[C]) (*ItemsSketch[C], error) {
 	if serde == nil {
 		return nil, fmt.Errorf("no SerDe provided")
@@ -447,12 +451,20 @@ func (s *ItemsSketch[C]) GetSortedView() (*ItemsSketchSortedView[C], error) {
 }
 
 // Update this sketch with the given item.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *ItemsSketch[C]) Update(item C) {
 	s.updateItem(item, s.compareFn)
 	s.sortedView = nil
 }
 
 // Merge the given sketch into this sketch.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that string values in both sketches are encoded as valid UTF-8.
 func (s *ItemsSketch[C]) Merge(other *ItemsSketch[C]) {
 	if other.IsEmpty() {
 		return
@@ -476,6 +488,10 @@ func (s *ItemsSketch[C]) Reset() {
 }
 
 // ToSlice returns the serialized byte array of this sketch.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the serialized string data is encoded as valid UTF-8.
 func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
 	if s.serde == nil {
 		return nil, fmt.Errorf("no SerDe provided")

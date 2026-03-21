@@ -95,6 +95,10 @@ func NewReservoirItemsSketch[T any](
 }
 
 // Update adds an item to the sketch using reservoir sampling algorithm.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (s *ReservoirItemsSketch[T]) Update(item T) {
 	if s.n < int64(s.k) {
 		// Initial phase: store all items until reservoir is full
@@ -304,6 +308,10 @@ func resizeFactorFromHeaderByte(b byte) (ResizeFactor, error) {
 }
 
 // ToSlice serializes the sketch to a byte slice.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the serialized string data is encoded as valid UTF-8.
 func (s *ReservoirItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 	rfBits, err := resizeFactorBitsFor(s.rf)
 	if err != nil {
@@ -365,6 +373,10 @@ func (s *ReservoirItemsSketch[T]) String() string {
 }
 
 // NewReservoirItemsSketchFromSlice deserializes a sketch from a byte slice.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the serialized string data is encoded as valid UTF-8.
 func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (*ReservoirItemsSketch[T], error) {
 	if len(data) < 8 {
 		return nil, errors.New("data too short")

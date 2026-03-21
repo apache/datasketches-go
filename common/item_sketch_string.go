@@ -67,6 +67,11 @@ func (f ItemSketchStringSerDe) SizeOfMany(mem []byte, offsetBytes int, numItems 
 	return offset - offsetBytes, nil
 }
 
+// SerializeOneToSlice writes the item to a byte slice.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the input string is encoded as valid UTF-8.
 func (f ItemSketchStringSerDe) SerializeOneToSlice(item string) []byte {
 	if len(item) == 0 {
 		return []byte{}
@@ -78,6 +83,11 @@ func (f ItemSketchStringSerDe) SerializeOneToSlice(item string) []byte {
 	return bytesOut
 }
 
+// SerializeManyToSlice writes items to a byte slice.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that those strings are encoded as valid UTF-8.
 func (f ItemSketchStringSerDe) SerializeManyToSlice(items []string) []byte {
 	if len(items) == 0 {
 		return []byte{}
@@ -98,6 +108,11 @@ func (f ItemSketchStringSerDe) SerializeManyToSlice(items []string) []byte {
 	return bytesOut
 }
 
+// DeserializeManyFromSlice reconstructs bytes from its serialized form.
+//
+// If the sketch contains string values and the caller cares about
+// cross-language compatibility, it is the caller's responsibility to ensure
+// that the serialized string data is encoded as valid UTF-8.
 func (f ItemSketchStringSerDe) DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]string, error) {
 	if numItems <= 0 {
 		return []string{}, nil

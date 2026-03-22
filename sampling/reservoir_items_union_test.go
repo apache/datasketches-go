@@ -103,6 +103,27 @@ func TestReservoirItemsUnionWithNilSketch(t *testing.T) {
 	assert.Equal(t, 1, result.NumSamples())
 }
 
+func TestReservoirItemsUnionUpdateIgnoresNilItem(t *testing.T) {
+	union, err := NewReservoirItemsUnion[[]int64](4)
+	assert.NoError(t, err)
+
+	var item []int64
+	assert.NoError(t, union.Update(item))
+
+	result, err := union.Result()
+	assert.NoError(t, err)
+	assert.Nil(t, result)
+
+	assert.NoError(t, union.Update([]int64{1, 2}))
+
+	result, err = union.Result()
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, int64(1), result.N())
+	assert.Equal(t, 1, result.NumSamples())
+	assert.Equal(t, [][]int64{{1, 2}}, result.Samples())
+}
+
 // === New tests based on Java's ReservoirItemsUnionTest.java ===
 
 // TestReservoirItemsUnionDownsampledUpdate tests the scenario where
@@ -184,11 +205,15 @@ func TestReservoirItemsUnionGadgetInitialization(t *testing.T) {
 	// Test case 1: Input K > maxK, in exact mode
 	// Result should use maxK
 	t.Run("InputK>MaxK_ExactMode", func(t *testing.T) {
-		bigKSketch := newBasicSketch(int64(maxK/2), bigK) // n=512, k=1536, exact mode
 		union, err := NewReservoirItemsUnion[int64](maxK)
 		assert.NoError(t, err)
 
-		assert.NoError(t, union.UpdateSketch(bigKSketch))
+		items := make([]int64, maxK/2)
+		for i := range items {
+			items[i] = int64(i)
+		}
+		assert.NoError(t, union.UpdateFromRaw(int64(maxK/2), bigK, items))
+
 		result, err := union.Result()
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -199,11 +224,15 @@ func TestReservoirItemsUnionGadgetInitialization(t *testing.T) {
 	// Test case 2: Input K < maxK and in sampling mode
 	// Result should preserve input's K (Java behavior)
 	t.Run("InputK<MaxK_SamplingMode", func(t *testing.T) {
-		smallKSketch := newBasicSketch(int64(maxK), smallK) // n=1024, k=128, sampling mode
 		union, err := NewReservoirItemsUnion[int64](maxK)
 		assert.NoError(t, err)
 
-		assert.NoError(t, union.UpdateSketch(smallKSketch))
+		items := make([]int64, smallK)
+		for i := range items {
+			items[i] = int64(i)
+		}
+		assert.NoError(t, union.UpdateFromRaw(int64(maxK), smallK, items))
+
 		result, err := union.Result()
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -216,11 +245,15 @@ func TestReservoirItemsUnionGadgetInitialization(t *testing.T) {
 	// Test case 3: Input K < maxK and in exact mode
 	// Result should use maxK
 	t.Run("InputK<MaxK_ExactMode", func(t *testing.T) {
-		smallKExactSketch := newBasicSketch(int64(smallK), smallK) // n=128, k=128, exact mode
 		union, err := NewReservoirItemsUnion[int64](maxK)
 		assert.NoError(t, err)
 
-		assert.NoError(t, union.UpdateSketch(smallKExactSketch))
+		items := make([]int64, smallK)
+		for i := range items {
+			items[i] = int64(i)
+		}
+		assert.NoError(t, union.UpdateFromRaw(int64(smallK), smallK, items))
+
 		result, err := union.Result()
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -257,12 +290,38 @@ func TestReservoirItemsUnionStandardMerge(t *testing.T) {
 	// Add a third sketch that will push into sampling mode
 	const n3 = 2048
 	sketch3 := newBasicSketch(n3, k)
-	assert.NoError(t, union.UpdateSketch(sketch3))
+	assert.NoError(t, union.UpdateFromRaw(int64(n3), k, sketch3.Samples()))
 
 	result, err = union.Result()
 	assert.NoError(t, err)
 	assert.Equal(t, k, result.K())
 	assert.Equal(t, int64(n1+n2+n3), result.N())
+	assert.Equal(t, k, result.NumSamples())
+}
+
+// TestReservoirItemsUnionStandardMergeWithCopy tests the standard merge route
+// where the incoming sketch must be copied to avoid modifying the caller-owned
+// sketch. Based on Java's checkStandardMergeWithCopy.
+func TestReservoirItemsUnionStandardMergeWithCopy(t *testing.T) {
+	const k = 1024
+	const n1 = 768
+	const n2 = 2048
+
+	sketch1 := newBasicSketch(n1, k)
+	sketch2 := newBasicSketch(n2, k)
+
+	union, err := NewReservoirItemsUnion[int64](k)
+	assert.NoError(t, err)
+
+	assert.NoError(t, union.UpdateSketch(sketch1))
+	assert.NoError(t, union.UpdateSketch(sketch2))
+	assert.NoError(t, union.Update(int64(10)))
+
+	result, err := union.Result()
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, k, result.K())
+	assert.Equal(t, int64(n1+n2+1), result.N())
 	assert.Equal(t, k, result.NumSamples())
 }
 
@@ -284,12 +343,12 @@ func TestReservoirItemsUnionSerialization(t *testing.T) {
 
 		result, err := restored.Result()
 		assert.NoError(t, err)
-		assert.True(t, result.IsEmpty())
+		assert.Nil(t, result)
 	})
 
 	t.Run("LegacySerVerEmptyUnion", func(t *testing.T) {
 		data := make([]byte, 8)
-		data[0] = unionPreambleLongs
+		data[0] = byte(internal.FamilyEnum.ReservoirUnion.MaxPreLongs)
 		data[1] = 1 // legacy serVer
 		data[2] = byte(internal.FamilyEnum.ReservoirUnion.Id)
 		data[3] = unionFlagEmpty
@@ -301,7 +360,7 @@ func TestReservoirItemsUnionSerialization(t *testing.T) {
 
 		result, err := union.Result()
 		assert.NoError(t, err)
-		assert.True(t, result.IsEmpty())
+		assert.Nil(t, result)
 	})
 
 	t.Run("NonEmptyUnion", func(t *testing.T) {
@@ -352,6 +411,32 @@ func TestReservoirItemsUnionSerialization(t *testing.T) {
 		assert.Equal(t, int64(n), result.N())
 		assert.Equal(t, k, result.NumSamples())
 	})
+
+	t.Run("DeserializeSamplingUnionPreservesSmallerGadgetK", func(t *testing.T) {
+		const maxK = 100
+		const smallK = 25
+		const n = 1000
+
+		union, err := NewReservoirItemsUnion[int64](maxK)
+		assert.NoError(t, err)
+
+		sketch := newBasicSketch(n, smallK)
+		assert.NoError(t, union.UpdateSketch(sketch))
+
+		bytes, err := union.ToSlice(Int64SerDe{})
+		assert.NoError(t, err)
+
+		restored, err := NewReservoirItemsUnionFromSlice[int64](bytes, Int64SerDe{})
+		assert.NoError(t, err)
+		assert.Equal(t, maxK, restored.MaxK())
+
+		result, err := restored.Result()
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, smallK, result.K())
+		assert.Equal(t, int64(n), result.N())
+		assert.Equal(t, smallK, result.NumSamples())
+	})
 }
 
 // === Additional tests based on Java's ReservoirItemsUnionTest ===
@@ -398,38 +483,70 @@ func TestReservoirItemsUnionEmpty(t *testing.T) {
 	union, err := NewReservoirItemsUnion[int64](100)
 	assert.NoError(t, err)
 
-	result, err := union.Result()
+	bytes, err := union.ToSlice(Int64SerDe{})
 	assert.NoError(t, err)
-	assert.NotNil(t, result)
-	assert.True(t, result.IsEmpty())
-	assert.Equal(t, 100, result.K())
+	assert.Equal(t, 8, len(bytes))
 }
 
 // TestReservoirItemsUnionInstantiation tests basic instantiation.
 // Based on Java's checkInstantiation.
 func TestReservoirItemsUnionInstantiation(t *testing.T) {
-	// Valid k
-	union, err := NewReservoirItemsUnion[int64](100)
+	const n = 100
+	const k = 25
+
+	union, err := NewReservoirItemsUnion[int64](k)
 	assert.NoError(t, err)
 	assert.NotNil(t, union)
-	assert.Equal(t, 100, union.MaxK())
+	assert.Equal(t, k, union.MaxK())
 
-	// Invalid k (too small)
-	_, err = NewReservoirItemsUnion[int64](0)
-	assert.Error(t, err)
+	result, err := union.Result()
+	assert.NoError(t, err)
+	assert.Nil(t, result)
+
+	assert.NoError(t, union.Update(int64(5)))
+	result, err = union.Result()
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+
+	sketch := newBasicSketch(n, k)
+	union.Reset()
+
+	result, err = union.Result()
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, int64(0), result.N())
+
+	assert.NoError(t, union.UpdateSketch(sketch))
+	result, err = union.Result()
+	assert.NoError(t, err)
+	assert.Equal(t, sketch.N(), result.N())
+
+	bytes, err := sketch.ToSlice(Int64SerDe{})
+	assert.NoError(t, err)
+
+	restoredSketch, err := NewReservoirItemsSketchFromSlice[int64](bytes, Int64SerDe{})
+	assert.NoError(t, err)
+
+	union, err = NewReservoirItemsUnion[int64](sketch.K())
+	assert.NoError(t, err)
+	assert.NoError(t, union.UpdateSketch(restoredSketch))
+
+	result, err = union.Result()
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
 }
 
 // TestReservoirItemsUnionResetWithSmallK tests reset behavior.
 // Based on Java's checkUnionResetWithInitialSmallK.
 func TestReservoirItemsUnionResetWithSmallK(t *testing.T) {
-	const maxK = 100
-	const smallK = 25
+	const maxK = 25
+	const smallK = 10
 
 	union, err := NewReservoirItemsUnion[int64](maxK)
 	assert.NoError(t, err)
 
 	// Add sketch with small K in sampling mode
-	sketch := newBasicSketch(1000, smallK) // n=1000, k=25, sampling mode
+	sketch := newBasicSketch(2*smallK, smallK)
 	assert.NoError(t, union.UpdateSketch(sketch))
 
 	result, err := union.Result()
@@ -441,55 +558,66 @@ func TestReservoirItemsUnionResetWithSmallK(t *testing.T) {
 
 	result, err = union.Result()
 	assert.NoError(t, err)
-	assert.True(t, result.IsEmpty())
-	assert.Equal(t, maxK, result.K()) // After reset, should be maxK
+	assert.NotNil(t, result)
+
+	// Feed in a larger sketch in sampling mode after reset.
+	sketch = newBasicSketch(2*maxK, maxK+1)
+	assert.NoError(t, union.UpdateSketch(sketch))
+
+	result, err = union.Result()
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, maxK, result.K())
 }
 
 // TestReservoirItemsUnionDeserializationErrors tests error handling during deserialization.
 // Based on Java's checkBadSerVer, checkBadFamily, checkBadPreLongs.
 func TestReservoirItemsUnionDeserializationErrors(t *testing.T) {
-	t.Run("TooShortData", func(t *testing.T) {
-		data := []byte{0x01, 0x02, 0x03} // Only 3 bytes
-		_, err := NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "too short")
-	})
-
 	t.Run("BadSerVer", func(t *testing.T) {
-		data := make([]byte, 8)
-		data[0] = 1    // preamble longs
-		data[1] = 99   // invalid ser ver
-		data[2] = 12   // family ID (RESERVOIR_UNION)
-		data[3] = 0x04 // empty flag
-		data[4] = 100  // maxK low byte
-		_, err := NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
+		union, err := NewReservoirItemsUnion[string](1024)
+		assert.NoError(t, err)
+
+		data, err := union.ToSlice(StringSerDe{})
+		assert.NoError(t, err)
+		data[1] = 0
+
+		_, err = NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "version")
 	})
 
 	t.Run("BadFamily", func(t *testing.T) {
-		data := make([]byte, 8)
-		data[0] = 1    // preamble longs
-		data[1] = 2    // ser ver
-		data[2] = 99   // invalid family ID
-		data[3] = 0x04 // empty flag
-		data[4] = 100  // maxK low byte
-		_, err := NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
+		union, err := NewReservoirItemsUnion[float64](1024)
+		assert.NoError(t, err)
+
+		data, err := union.ToSlice(Float64SerDe{})
+		assert.NoError(t, err)
+		data[2] = 0
+
+		_, err = NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "family")
 	})
 
 	t.Run("BadPreLongs", func(t *testing.T) {
-		data := make([]byte, 8)
-		data[0] = 5    // invalid preamble longs (should be 1)
-		data[1] = 2    // ser ver
-		data[2] = 12   // family ID (RESERVOIR_UNION)
-		data[3] = 0x04 // empty flag
-		data[4] = 100  // maxK low byte
-		_, err := NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
+		union, err := NewReservoirItemsUnion[int64](1024)
+		assert.NoError(t, err)
+
+		data, err := union.ToSlice(Int64SerDe{})
+		assert.NoError(t, err)
+		data[0] = 0
+
+		_, err = NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "preamble")
 	})
+}
+
+func TestReservoirItemsUnionFromSliceTooShortData(t *testing.T) {
+	data := []byte{0x01, 0x02, 0x03}
+	_, err := NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "too short")
 }
 
 // TestReservoirItemsUnionString tests the String() method.

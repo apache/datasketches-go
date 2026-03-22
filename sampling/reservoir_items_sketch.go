@@ -427,14 +427,14 @@ func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (
 		return nil, fmt.Errorf("possible corruption: Non-empty sketch with only %d preamble ints", preambleIntsEmpty)
 	}
 
-	ver := data[1] & 0xFF
+	ver := data[1]
 
-	family := data[2] & 0xFF
+	family := data[2]
 	if family != byte(internal.FamilyEnum.ReservoirItems.Id) {
 		return nil, errors.New("wrong sketch family")
 	}
 
-	flags := data[3] & 0xFF
+	flags := data[3]
 	isEmpty := (flags & flagEmpty) != 0
 	n := 0
 	if !isEmpty {
@@ -476,21 +476,37 @@ func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (
 		return nil, err
 	}
 
+	sketch, err := newReservoirItemsSketchFromStates(items, int64(n), rf, k)
+	if err != nil {
+		return nil, err
+	}
+
+	sketch.data = slices.Grow(sketch.data, capacity-cap(sketch.data))
+
+	return &ReservoirItemsSketch[T]{
+		k:    k,
+		n:    int64(n),
+		rf:   rf,
+		data: items,
+	}, nil
+}
+
+func newReservoirItemsSketchFromStates[T any](
+	items []T, n int64, rf ResizeFactor, k int,
+) (*ReservoirItemsSketch[T], error) {
 	if k < 2 {
 		return nil, errors.New("k must be at least 2")
 	}
 	if k < len(items) {
 		return nil, fmt.Errorf("k must be at least as large as the number of items, got %d < %d", k, len(items))
 	}
-	if (n >= k && len(items) < k) || (n < k && len(items) < n) {
+	if (n >= int64(k) && len(items) < k) || (n < int64(k) && int64(len(items)) < n) {
 		return nil, fmt.Errorf("sketch with too few items. items seen: %d, max size: %d, current items count: %d", n, k, len(items))
 	}
 
-	items = slices.Grow(items, capacity-cap(items))
-
 	return &ReservoirItemsSketch[T]{
 		k:    k,
-		n:    int64(n),
+		n:    n,
 		rf:   rf,
 		data: items,
 	}, nil

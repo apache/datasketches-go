@@ -31,7 +31,7 @@ const (
 )
 
 func decodeReservoirSize(encoded uint16) (int, error) {
-	value := int(encoded & 0xFFFF)
+	value := int(encoded)
 	if value > reservoirSizeMaxEncValue {
 		return 0, fmt.Errorf("maximum valid encoded value is %d, found: %d", reservoirSizeMaxEncValue, value)
 	}

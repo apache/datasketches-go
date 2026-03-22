@@ -57,8 +57,8 @@ If you are interested in making contributions to this site please see our [Commu
 |              | FreqItemsSketch<T>      | ⚠️ |
 |              | CountMinSketch          | ⚠️ |
 | Sampling     |                         |  |
-|              | ReservoirLongsSketch    | ❌ |
-|              | ReserviorItemsSketch<T> | 🚧 |
+|              | ReservoirLongsSketch    | ⚠️ |
+|              | ReserviorItemsSketch<T> | ⚠️ |
 | 	            | VarOptItemsSketch<T>    | 🚧 |
 | Membership   |                         | |
 |              | BloomFilter             | ⚠️ |

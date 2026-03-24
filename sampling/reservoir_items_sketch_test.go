@@ -38,7 +38,7 @@ func TestNewReservoirItemsSketch(t *testing.T) {
 	assert.NotNil(t, sketch)
 	assert.Equal(t, 10, sketch.K())
 	assert.Equal(t, int64(0), sketch.N())
-	assert.True(t, sketch.IsEmpty())
+	assert.True(t, sketch.isEmpty())
 }
 
 func TestReservoirItemsSketchWithStrings(t *testing.T) {
@@ -95,7 +95,7 @@ func TestReservoirItemsSketch_Update(t *testing.T) {
 
 		assert.Equal(t, int64(5), sketch.N())
 		assert.Equal(t, 5, sketch.NumSamples())
-		assert.Equal(t, 1.0, sketch.ImplicitSampleWeight())
+		assert.Equal(t, 1.0, sketch.implicitSampleWeight())
 
 		samples := sketch.Samples()
 		for i := int64(1); i <= 5; i++ {
@@ -113,7 +113,7 @@ func TestReservoirItemsSketch_Update(t *testing.T) {
 
 		assert.Equal(t, int64(8), sketch.N())
 		assert.Equal(t, 8, sketch.NumSamples())
-		assert.Equal(t, 1.0, sketch.ImplicitSampleWeight())
+		assert.Equal(t, 1.0, sketch.implicitSampleWeight())
 
 		samples := sketch.Samples()
 		for i := int64(1); i <= 8; i++ {
@@ -149,7 +149,7 @@ func TestReservoirItemsSketch_Update(t *testing.T) {
 		assert.ErrorIs(t, err, ErrSketchExceedsMaxCapacity)
 		assert.Equal(t, int64(maxItemsSeen), sketch.N())
 		assert.Equal(t, 2, sketch.NumSamples())
-		assert.Equal(t, float64(maxItemsSeen)/2.0, sketch.ImplicitSampleWeight())
+		assert.Equal(t, float64(maxItemsSeen)/2.0, sketch.implicitSampleWeight())
 
 		samples := sketch.Samples()
 		for _, sample := range samples {
@@ -170,7 +170,7 @@ func TestReservoirItemsSketch_Update(t *testing.T) {
 
 		assert.Equal(t, int64(total), sketch.N())
 		assert.Equal(t, k, sketch.NumSamples())
-		assert.Equal(t, float64(total)/float64(k), sketch.ImplicitSampleWeight())
+		assert.Equal(t, float64(total)/float64(k), sketch.implicitSampleWeight())
 
 		samples := sketch.Samples()
 		seen := make(map[int64]struct{}, len(samples))
@@ -200,7 +200,7 @@ func TestReservoirItemsSketchReset(t *testing.T) {
 
 		sketch.Reset()
 
-		assert.True(t, sketch.IsEmpty())
+		assert.True(t, sketch.isEmpty())
 		assert.Equal(t, int64(0), sketch.N())
 		assert.Equal(t, k, sketch.K())
 		assert.Equal(t, 0, len(sketch.data))
@@ -223,7 +223,7 @@ func TestReservoirItemsSketchReset(t *testing.T) {
 
 		sketch.Reset()
 
-		assert.True(t, sketch.IsEmpty())
+		assert.True(t, sketch.isEmpty())
 		assert.Equal(t, int64(0), sketch.N())
 		assert.Equal(t, k, sketch.K())
 		assert.Equal(t, ResizeX2, sketch.rf)

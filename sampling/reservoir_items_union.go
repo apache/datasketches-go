@@ -27,14 +27,21 @@ import (
 	"github.com/apache/datasketches-go/internal"
 )
 
-// ReservoirItemsUnion enables merging of multiple ReservoirItemsSketch instances.
-// This is useful for distributed sampling where each node maintains a local sketch,
-// and the results are merged to get a global sample.
+// ReservoirItemsUnion unions reservoir samples of generic items.
 //
-// The union maintains statistical correctness by:
-// - Dynamically choosing merge direction (lighter sketch merges into heavier)
-// - Using weighted sampling with correct probability formula
-// - Preserving the smaller K when merging sketches in sampling mode
+// For efficiency reasons, the unioning process picks one of the two sketches to use as the
+// base. As a result, we provide only a stateful union. Using the same approach for a merge would
+// result in unpredictable side effects on the underlying sketches.
+//
+// A union object is created with a maximum value of k, represented using the
+// ReservoirSize class. The unioning process may cause the actual number of samples to fall below
+// that maximum value, but never to exceed it. The result of a union will be a reservoir where
+// each item from the global input has a uniform probability of selection, but there are no
+// claims about higher order statistics. For instance, in general all possible permutations of
+// the global input are not equally likely.
+//
+// If taking the union of two reservoirs of different sizes, the output sample will contain no more
+// than MIN(k_1, k_2) samples.
 type ReservoirItemsUnion[T any] struct {
 	maxK   int                      // maximum k for the union
 	gadget *ReservoirItemsSketch[T] // internal sketch (may be nil initially)
@@ -68,8 +75,7 @@ func (u *ReservoirItemsUnion[T]) Update(item T) error {
 	return nil
 }
 
-// UpdateSketch merges another sketch into the union.
-// This implements Java's update(ReservoirItemsSketch) with twoWayMergeInternal logic.
+// UpdateSketch unions the given sketch. This method can be repeatedly called.
 //
 // If the sketch contains string values and the caller cares about
 // cross-language compatibility, it is the caller's responsibility to ensure
@@ -84,7 +90,7 @@ func (u *ReservoirItemsUnion[T]) UpdateSketch(sketch *ReservoirItemsSketch[T]) e
 	isModifiable := false
 	if sketch.K() > u.maxK {
 		var err error
-		ris, err = sketch.DownsampledCopy(u.maxK)
+		ris, err = sketch.downsampledCopy(u.maxK)
 		if err != nil {
 			return err
 		}
@@ -121,7 +127,7 @@ func (u *ReservoirItemsUnion[T]) UpdateFromRaw(n int64, k int, items []T) error 
 	}
 
 	if sketch.K() > u.maxK {
-		sketch, err = sketch.DownsampledCopy(u.maxK)
+		sketch, err = sketch.downsampledCopy(u.maxK)
 		if err != nil {
 			return err
 		}
@@ -179,7 +185,7 @@ func (u *ReservoirItemsUnion[T]) twoWayMergeInternal(
 		if err := u.twoWayMergeInternalStandard(tmp); err != nil {
 			return err
 		}
-	} else if source.ImplicitSampleWeight() < float64(u.gadget.N())/float64(u.gadget.K()-1) { // implicit weights in sketchIn are light enough to merge into gadget
+	} else if source.implicitSampleWeight() < float64(u.gadget.N())/float64(u.gadget.K()-1) { // implicit weights in sketchIn are light enough to merge into gadget
 		if err := u.twoWayMergeInternalWeighted(source); err != nil {
 			return err
 		}

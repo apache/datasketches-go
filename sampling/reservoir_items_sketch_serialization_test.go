@@ -24,8 +24,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 // Note: Go only has generic ReservoirItemsSketch[T], no separate ReservoirLongsSketch.
@@ -156,7 +157,7 @@ func TestSerializationCompatibilityEmpty(t *testing.T) {
 
 	sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
 	assert.NoError(t, err)
-	assert.True(t, sketch.IsEmpty())
+	assert.True(t, sketch.isEmpty())
 	assert.Equal(t, 128, sketch.K())
 	assert.Equal(t, int64(0), sketch.N())
 }
@@ -326,7 +327,7 @@ func TestReservoirItemsSketch_JavaCompat(t *testing.T) {
 
 			assert.Equal(t, tc.k, sketch.K(), "k mismatch")
 			assert.Equal(t, tc.n, sketch.N(), "n mismatch")
-			assert.Equal(t, tc.isEmpty, sketch.IsEmpty(), "isEmpty mismatch")
+			assert.Equal(t, tc.isEmpty, sketch.isEmpty(), "isEmpty mismatch")
 
 			if !tc.isEmpty {
 				samples := sketch.Samples()
@@ -352,7 +353,7 @@ func TestReservoirItemsSketchLegacySerVerEmpty(t *testing.T) {
 
 	sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
 	assert.NoError(t, err)
-	assert.True(t, sketch.IsEmpty())
+	assert.True(t, sketch.isEmpty())
 	assert.Equal(t, 1024, sketch.K())
 	assert.Equal(t, ResizeX8, sketch.rf)
 }

@@ -45,14 +45,8 @@ var (
 	ErrSketchExceedsMaxCapacity = fmt.Errorf("sketch cannot process more than %d items", maxItemsSeen)
 )
 
-// ReservoirItemsSketch provides a uniform random sample of items
-// from a stream of unknown size using the reservoir sampling algorithm.
-//
-// The algorithm works in two phases:
-//   - Initial phase (n < k): all items are stored
-//   - Steady state (n >= k): each new item replaces a random item with probability k/n
-//
-// This ensures each item has equal probability k/n of being in the final sample.
+// ReservoirItemsSketch provides a reservoir sample over an input stream of items. The sketch contains a
+// uniform random sample of unweighted items from the stream.
 type ReservoirItemsSketch[T any] struct {
 	k    int   // maximum reservoir size
 	n    int64 // total items seen
@@ -101,7 +95,7 @@ func NewReservoirItemsSketch[T any](
 	}, nil
 }
 
-// Update adds an item to the sketch using reservoir sampling algorithm.
+// Update adds randomly whether to include an item in the sample set.
 //
 // If the sketch contains string values and the caller cares about
 // cross-language compatibility, it is the caller's responsibility to ensure
@@ -142,11 +136,12 @@ func (s *ReservoirItemsSketch[T]) growReservoir() {
 }
 
 // K returns the maximum reservoir capacity.
+// The current number of items in the sketch may be lower.
 func (s *ReservoirItemsSketch[T]) K() int {
 	return s.k
 }
 
-// N returns the total number of items seen by the sketch.
+// N returns the number of items processed from the input stream
 func (s *ReservoirItemsSketch[T]) N() int64 {
 	return s.n
 }
@@ -163,8 +158,7 @@ func (s *ReservoirItemsSketch[T]) Samples() []T {
 	return result
 }
 
-// IsEmpty returns true if no items have been seen.
-func (s *ReservoirItemsSketch[T]) IsEmpty() bool {
+func (s *ReservoirItemsSketch[T]) isEmpty() bool {
 	return s.n == 0
 }
 
@@ -179,8 +173,7 @@ func (s *ReservoirItemsSketch[T]) Reset() {
 	s.data = make([]T, 0, adjustedSamplingAllocationSize(s.k, 1<<initialLgSize))
 }
 
-// ImplicitSampleWeight returns N/K when in sampling mode, or 1.0 in exact mode.
-func (s *ReservoirItemsSketch[T]) ImplicitSampleWeight() float64 {
+func (s *ReservoirItemsSketch[T]) implicitSampleWeight() float64 {
 	if s.n < int64(s.k) {
 		return 1.0
 	}
@@ -247,15 +240,24 @@ func (s *ReservoirItemsSketch[T]) EstimateSubsetSum(predicate func(T) bool) (Sam
 	}, nil
 }
 
-// DownsampledCopy returns a copy with a reduced reservoir size.
-func (s *ReservoirItemsSketch[T]) DownsampledCopy(newK int) (*ReservoirItemsSketch[T], error) {
+// Note: the downsampling approach may appear strange but avoids several edge cases
+//
+//	Q1: Why not just permute samples and then take the first "newK" of them?
+//	A1: We're assuming the sketch source is read-only
+//	Q2: Why not copy the source sketch, permute samples, then truncate the sample array and
+//	    reduce k?
+//	A2: That would involve allocating a MemorySegment proportional to the old k. Even if only a
+//	    temporary violation of maxK, we're avoiding violating it at all.
+func (s *ReservoirItemsSketch[T]) downsampledCopy(newK int) (*ReservoirItemsSketch[T], error) {
 	result, err := NewReservoirItemsSketch[T](newK, WithReservoirItemsSketchResizeFactor(s.rf))
 	if err != nil {
 		return nil, err
 	}
 
 	for _, item := range s.Samples() {
-		result.Update(item)
+		if err := result.Update(item); err != nil {
+			return nil, err
+		}
 	}
 
 	// Adjust N to preserve correct implicit weights
@@ -353,7 +355,7 @@ func (s *ReservoirItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 		return nil, err
 	}
 
-	if s.IsEmpty() {
+	if s.isEmpty() {
 		buf := make([]byte, 8)
 		buf[0] = rfBits | preambleIntsEmpty
 		buf[1] = serVer

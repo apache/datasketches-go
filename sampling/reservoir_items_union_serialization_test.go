@@ -228,7 +228,7 @@ func TestReservoirItemsUnion_JavaCompat(t *testing.T) {
 
 				assert.Equal(t, tc.maxK, result.K())
 				assert.Equal(t, tc.n, result.N())
-				assert.Equal(t, tc.isEmpty, result.IsEmpty())
+				assert.Equal(t, tc.isEmpty, result.isEmpty())
 
 				if tc.expected != nil {
 					assert.Equal(t, tc.expected, result.Samples())
@@ -280,7 +280,7 @@ func TestReservoirItemsUnion_JavaCompat(t *testing.T) {
 
 				assert.Equal(t, tc.maxK, result.K())
 				assert.Equal(t, tc.n, result.N())
-				assert.Equal(t, tc.isEmpty, result.IsEmpty())
+				assert.Equal(t, tc.isEmpty, result.isEmpty())
 
 				if tc.expected != nil {
 					assert.Equal(t, tc.expected, result.Samples())
@@ -332,7 +332,7 @@ func TestReservoirItemsUnion_JavaCompat(t *testing.T) {
 
 				assert.Equal(t, tc.maxK, result.K())
 				assert.Equal(t, tc.n, result.N())
-				assert.Equal(t, tc.isEmpty, result.IsEmpty())
+				assert.Equal(t, tc.isEmpty, result.isEmpty())
 
 				if tc.expected != nil {
 					assert.Equal(t, tc.expected, result.Samples())

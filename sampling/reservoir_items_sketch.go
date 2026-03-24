@@ -21,7 +21,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 	"math/rand"
 	"slices"
 	"strings"
@@ -36,16 +35,18 @@ const (
 
 	// smallest sampling array allocated: 16
 	minLgArrItems = 4
+
+	// Using 48 bits to capture number of items seen,
+	// so sketch cannot process more after this many items capacity
+	maxItemsSeen = 0xFFFFFFFFFFFF
 )
 
-// ReservoirItemsSketch provides a uniform random sample of items
-// from a stream of unknown size using the reservoir sampling algorithm.
-//
-// The algorithm works in two phases:
-//   - Initial phase (n < k): all items are stored
-//   - Steady state (n >= k): each new item replaces a random item with probability k/n
-//
-// This ensures each item has equal probability k/n of being in the final sample.
+var (
+	ErrSketchExceedsMaxCapacity = fmt.Errorf("sketch cannot process more than %d items", maxItemsSeen)
+)
+
+// ReservoirItemsSketch provides a reservoir sample over an input stream of items. The sketch contains a
+// uniform random sample of unweighted items from the stream.
 type ReservoirItemsSketch[T any] struct {
 	k    int   // maximum reservoir size
 	n    int64 // total items seen
@@ -94,16 +95,26 @@ func NewReservoirItemsSketch[T any](
 	}, nil
 }
 
-// Update adds an item to the sketch using reservoir sampling algorithm.
+// Update adds randomly whether to include an item in the sample set.
 //
 // If the sketch contains string values and the caller cares about
 // cross-language compatibility, it is the caller's responsibility to ensure
 // that the input string is encoded as valid UTF-8.
-func (s *ReservoirItemsSketch[T]) Update(item T) {
+func (s *ReservoirItemsSketch[T]) Update(item T) error {
+	if s.n == maxItemsSeen {
+		return ErrSketchExceedsMaxCapacity
+	}
+	if internal.IsNil(item) {
+		return nil
+	}
+
 	if s.n < int64(s.k) {
 		// Initial phase: store all items until reservoir is full
 		if s.n >= int64(cap(s.data)) {
 			s.growReservoir()
+		}
+		if s.n >= int64(cap(s.data)) {
+			return ErrSketchExceedsMaxCapacity
 		}
 
 		s.data = append(s.data, item)
@@ -115,19 +126,22 @@ func (s *ReservoirItemsSketch[T]) Update(item T) {
 		}
 	}
 	s.n++
+
+	return nil
 }
 
 func (s *ReservoirItemsSketch[T]) growReservoir() {
 	adjustedSize := adjustedSamplingAllocationSize(s.k, cap(s.data)<<int(s.rf))
-	s.data = slices.Grow(s.data, adjustedSize)
+	s.data = slices.Grow(s.data, adjustedSize-cap(s.data))
 }
 
 // K returns the maximum reservoir capacity.
+// The current number of items in the sketch may be lower.
 func (s *ReservoirItemsSketch[T]) K() int {
 	return s.k
 }
 
-// N returns the total number of items seen by the sketch.
+// N returns the number of items processed from the input stream
 func (s *ReservoirItemsSketch[T]) N() int64 {
 	return s.n
 }
@@ -144,8 +158,7 @@ func (s *ReservoirItemsSketch[T]) Samples() []T {
 	return result
 }
 
-// IsEmpty returns true if no items have been seen.
-func (s *ReservoirItemsSketch[T]) IsEmpty() bool {
+func (s *ReservoirItemsSketch[T]) isEmpty() bool {
 	return s.n == 0
 }
 
@@ -153,15 +166,14 @@ func (s *ReservoirItemsSketch[T]) IsEmpty() bool {
 func (s *ReservoirItemsSketch[T]) Reset() {
 	ceilingLgK, _ := internal.ExactLog2(common.CeilingPowerOf2(s.k))
 	initialLgSize := startingSubMultiple(
-		ceilingLgK, int(math.Log2(float64(s.rf))), minLgArrItems,
+		ceilingLgK, int(float64(s.rf)), minLgArrItems,
 	)
 
 	s.n = 0
 	s.data = make([]T, 0, adjustedSamplingAllocationSize(s.k, 1<<initialLgSize))
 }
 
-// ImplicitSampleWeight returns N/K when in sampling mode, or 1.0 in exact mode.
-func (s *ReservoirItemsSketch[T]) ImplicitSampleWeight() float64 {
+func (s *ReservoirItemsSketch[T]) implicitSampleWeight() float64 {
 	if s.n < int64(s.k) {
 		return 1.0
 	}
@@ -170,7 +182,7 @@ func (s *ReservoirItemsSketch[T]) ImplicitSampleWeight() float64 {
 
 // Copy returns a deep copy of the sketch.
 func (s *ReservoirItemsSketch[T]) Copy() *ReservoirItemsSketch[T] {
-	dataCopy := make([]T, len(s.data))
+	dataCopy := make([]T, len(s.data), cap(s.data))
 	copy(dataCopy, s.data)
 	return &ReservoirItemsSketch[T]{
 		k:    s.k,
@@ -228,53 +240,78 @@ func (s *ReservoirItemsSketch[T]) EstimateSubsetSum(predicate func(T) bool) (Sam
 	}, nil
 }
 
-// DownsampledCopy returns a copy with a reduced reservoir size.
-// If newK >= current K, returns a regular copy.
-func (s *ReservoirItemsSketch[T]) DownsampledCopy(newK int) (*ReservoirItemsSketch[T], error) {
-	if newK >= s.k {
-		return s.Copy(), nil
-	}
-
+// Note: the downsampling approach may appear strange but avoids several edge cases
+//
+//	Q1: Why not just permute samples and then take the first "newK" of them?
+//	A1: We're assuming the sketch source is read-only
+//	Q2: Why not copy the source sketch, permute samples, then truncate the sample array and
+//	    reduce k?
+//	A2: That would involve allocating a MemorySegment proportional to the old k. Even if only a
+//	    temporary violation of maxK, we're avoiding violating it at all.
+func (s *ReservoirItemsSketch[T]) downsampledCopy(newK int) (*ReservoirItemsSketch[T], error) {
 	result, err := NewReservoirItemsSketch[T](newK, WithReservoirItemsSketchResizeFactor(s.rf))
 	if err != nil {
 		return nil, err
 	}
 
-	samples := s.Samples()
-	for _, item := range samples {
-		result.Update(item)
+	for _, item := range s.Samples() {
+		if err := result.Update(item); err != nil {
+			return nil, err
+		}
 	}
 
 	// Adjust N to preserve correct implicit weights
 	if result.n < s.n {
-		result.forceIncrementItemsSeen(s.n - result.n)
+		if err := result.forceIncrementItemsSeen(s.n - result.n); err != nil {
+			return nil, err
+		}
 	}
 
 	return result, nil
 }
 
 // valueAtPosition returns the item at the given position.
-func (s *ReservoirItemsSketch[T]) valueAtPosition(pos int) T {
-	return s.data[pos]
+func (s *ReservoirItemsSketch[T]) valueAtPosition(pos int) (T, error) {
+	if s.n == 0 {
+		var zeroValue T
+		return zeroValue, errors.New("sketch is empty")
+	}
+
+	if pos < 0 || pos >= s.NumSamples() {
+		var zeroValue T
+		return zeroValue, fmt.Errorf("position out of range. size: %d, pos: %d", s.NumSamples(), pos)
+	}
+
+	return s.data[pos], nil
 }
 
 // insertValueAtPosition replaces the item at the given position.
-func (s *ReservoirItemsSketch[T]) insertValueAtPosition(item T, pos int) {
+func (s *ReservoirItemsSketch[T]) insertValueAtPosition(item T, pos int) error {
+	if pos < 0 || pos >= s.NumSamples() {
+		return fmt.Errorf("position out of range. size: %d, pos: %d", s.NumSamples(), pos)
+	}
+
 	s.data[pos] = item
+
+	return nil
 }
 
 // forceIncrementItemsSeen adds delta to the items seen count.
-func (s *ReservoirItemsSketch[T]) forceIncrementItemsSeen(delta int64) {
+func (s *ReservoirItemsSketch[T]) forceIncrementItemsSeen(delta int64) error {
 	s.n += delta
+
+	if s.n > maxItemsSeen {
+		return fmt.Errorf("n (%d) exceeds maxItemsSeen (%d)", s.n, maxItemsSeen)
+	}
+	return nil
 }
 
 // Serialization constants
 const (
-	preambleIntsEmpty    = 1
-	preambleIntsNonEmpty = 2
-	serVer               = 2
-	flagEmpty            = 0x04
-	resizeFactorMask     = 0xC0
+	preambleIntsEmpty = 1
+	serVer            = 2
+	flagEmpty         = 0x04
+	resizeFactorMask  = 0xC0
 )
 
 func resizeFactorBitsFor(rf ResizeFactor) (byte, error) {
@@ -293,7 +330,7 @@ func resizeFactorBitsFor(rf ResizeFactor) (byte, error) {
 }
 
 func resizeFactorFromHeaderByte(b byte) (ResizeFactor, error) {
-	switch (b & resizeFactorMask) >> 6 {
+	switch ((b & resizeFactorMask) >> 6) & 0x3 {
 	case 0:
 		return ResizeX1, nil
 	case 1:
@@ -318,7 +355,7 @@ func (s *ReservoirItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 		return nil, err
 	}
 
-	if s.IsEmpty() {
+	if s.isEmpty() {
 		buf := make([]byte, 8)
 		buf[0] = rfBits | preambleIntsEmpty
 		buf[1] = serVer
@@ -333,17 +370,18 @@ func (s *ReservoirItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 		return nil, err
 	}
 
-	preambleBytes := preambleIntsNonEmpty * 8
-	buf := make([]byte, preambleBytes+len(itemsBytes))
+	preLongs := internal.FamilyEnum.ReservoirItems.MaxPreLongs
+	preBytes := preLongs * 8
+	buf := make([]byte, preBytes+len(itemsBytes))
 
-	buf[0] = rfBits | preambleIntsNonEmpty
+	buf[0] = rfBits | byte(preLongs)
 	buf[1] = serVer
 	buf[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
 	buf[3] = 0
 	binary.LittleEndian.PutUint32(buf[4:], uint32(s.k))
 	binary.LittleEndian.PutUint64(buf[8:], uint64(s.n))
 
-	copy(buf[preambleBytes:], itemsBytes)
+	copy(buf[preBytes:], itemsBytes)
 
 	return buf, nil
 }
@@ -362,7 +400,7 @@ func (s *ReservoirItemsSketch[T]) String() string {
 	sb.WriteString(fmt.Sprintf("%d", s.n))
 	sb.WriteString("\n")
 	sb.WriteString("   Current size : ")
-	sb.WriteString(fmt.Sprintf("%d", len(s.data)))
+	sb.WriteString(fmt.Sprintf("%d", cap(s.data)))
 	sb.WriteString("\n")
 	sb.WriteString("   Resize factor: ")
 	sb.WriteString(fmt.Sprintf("%d", s.rf))
@@ -382,15 +420,30 @@ func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (
 		return nil, errors.New("data too short")
 	}
 
-	preambleInts := int(data[0] & 0x3F)
-	ver := data[1]
-	family := data[2]
-	flags := data[3]
-	k := int(binary.LittleEndian.Uint32(data[4:]))
+	preambleLong := int(data[0] & 0x3F)
 	rf, err := resizeFactorFromHeaderByte(data[0])
 	if err != nil {
 		return nil, err
 	}
+	if preambleLong != preambleIntsEmpty && preambleLong != internal.FamilyEnum.ReservoirItems.MaxPreLongs {
+		return nil, fmt.Errorf("possible corruption: Non-empty sketch with only %d preamble ints", preambleIntsEmpty)
+	}
+
+	ver := data[1]
+
+	family := data[2]
+	if family != byte(internal.FamilyEnum.ReservoirItems.Id) {
+		return nil, errors.New("wrong sketch family")
+	}
+
+	flags := data[3]
+	isEmpty := (flags & flagEmpty) != 0
+	n := 0
+	if !isEmpty {
+		n = int(binary.LittleEndian.Uint64(data[8:]))
+	}
+
+	k := int(binary.LittleEndian.Uint32(data[4:]))
 
 	if ver != serVer {
 		if ver == 1 {
@@ -404,27 +457,53 @@ func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (
 			return nil, errors.New("unsupported serialization version")
 		}
 	}
-	if family != byte(internal.FamilyEnum.ReservoirItems.Id) {
-		return nil, errors.New("wrong sketch family")
-	}
 
-	if (flags&flagEmpty) != 0 || preambleInts == preambleIntsEmpty {
+	if isEmpty {
 		return NewReservoirItemsSketch[T](k, WithReservoirItemsSketchResizeFactor(rf))
 	}
 
-	preambleBytes := preambleIntsNonEmpty * 8
-	if len(data) < preambleBytes {
-		return nil, errors.New("data too short for non-empty sketch")
+	preambleLongBytes := internal.FamilyEnum.ReservoirItems.MaxPreLongs * 8
+	capacity := k
+	if n < k {
+		ceilingLgK, _ := internal.ExactLog2(common.CeilingPowerOf2(k))
+		minLgSize, _ := internal.ExactLog2(common.CeilingPowerOf2(n))
+		initialLgSize := startingSubMultiple(ceilingLgK, int(rf), max(minLgSize, minLgArrItems))
+		capacity = adjustedSamplingAllocationSize(k, 1<<initialLgSize)
 	}
 
-	n := int64(binary.LittleEndian.Uint64(data[8:]))
-	numSamples := int(min(n, int64(k)))
-
-	itemsData := data[preambleBytes:]
-
+	numSamples := min(n, k)
+	itemsData := data[preambleLongBytes:]
 	items, err := serde.DeserializeFromBytes(itemsData, numSamples)
 	if err != nil {
 		return nil, err
+	}
+
+	sketch, err := newReservoirItemsSketchFromStates(items, int64(n), rf, k)
+	if err != nil {
+		return nil, err
+	}
+
+	sketch.data = slices.Grow(sketch.data, capacity-cap(sketch.data))
+
+	return &ReservoirItemsSketch[T]{
+		k:    k,
+		n:    int64(n),
+		rf:   rf,
+		data: items,
+	}, nil
+}
+
+func newReservoirItemsSketchFromStates[T any](
+	items []T, n int64, rf ResizeFactor, k int,
+) (*ReservoirItemsSketch[T], error) {
+	if k < 2 {
+		return nil, errors.New("k must be at least 2")
+	}
+	if k < len(items) {
+		return nil, fmt.Errorf("k must be at least as large as the number of items, got %d < %d", k, len(items))
+	}
+	if (n >= int64(k) && len(items) < k) || (n < int64(k) && int64(len(items)) < n) {
+		return nil, fmt.Errorf("sketch with too few items. items seen: %d, max size: %d, current items count: %d", n, k, len(items))
 	}
 
 	return &ReservoirItemsSketch[T]{

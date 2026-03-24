@@ -118,6 +118,6 @@ func TestSketchSerializationEmpty(t *testing.T) {
 
 	restored, err := NewReservoirItemsSketchFromSlice[int64](bytes, Int64SerDe{})
 	assert.NoError(t, err)
-	assert.True(t, restored.IsEmpty())
+	assert.True(t, restored.isEmpty())
 	assert.Equal(t, 10, restored.K())
 }

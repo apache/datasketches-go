@@ -17,7 +17,9 @@
 
 package sampling
 
-import "errors"
+import (
+	"fmt"
+)
 
 const (
 	reservoirSizeBinsPerOctave    = 2048
@@ -31,7 +33,7 @@ const (
 func decodeReservoirSize(encoded uint16) (int, error) {
 	value := int(encoded)
 	if value > reservoirSizeMaxEncValue {
-		return 0, errors.New("invalid encoded reservoir size")
+		return 0, fmt.Errorf("maximum valid encoded value is %d, found: %d", reservoirSizeMaxEncValue, value)
 	}
 
 	p := (value >> reservoirSizeExponentShift) & reservoirSizeExponentMask

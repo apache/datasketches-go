@@ -132,7 +132,7 @@ func (s *ReservoirItemsSketch[T]) Update(item T) error {
 
 func (s *ReservoirItemsSketch[T]) growReservoir() {
 	adjustedSize := adjustedSamplingAllocationSize(s.k, cap(s.data)<<int(s.rf))
-	s.data = slices.Grow(s.data, adjustedSize-cap(s.data))
+	s.data = slices.Grow(s.data, adjustedSize)
 }
 
 // K returns the maximum reservoir capacity.
@@ -483,7 +483,7 @@ func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (
 		return nil, err
 	}
 
-	sketch.data = slices.Grow(sketch.data, capacity-cap(sketch.data))
+	sketch.data = slices.Grow(sketch.data, capacity)
 
 	return &ReservoirItemsSketch[T]{
 		k:    k,

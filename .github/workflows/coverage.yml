@@ -18,6 +18,7 @@
 name: Coverage
 
 on:
+  pull_request:
   push:
     branches: [ "main" ]
 
@@ -41,9 +42,9 @@ jobs:
       - name: Run tests with coverage
         run: make test
 
-      - name: Upload coverage to Coveralls
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: coverallsapp/github-action@v2
-        with:
-          file: coverage.out
-          format: golang
+      - name: Post to Coveralls
+        run: |
+          curl -sL https://coveralls.io/coveralls-linux.tar.gz | tar -xz
+          ./coveralls report coverage.out
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}

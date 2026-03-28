@@ -124,3 +124,7 @@ Once you receive at least three +1 binding votes from PMC members and no vetos:
 4. **Create GitHub Release**: Create a new release on GitHub with the tag `v${VERSION}` and link to the release notes.
 5. **Announce**: Wait 24 hours for mirrors to sync, then email announce@apache.org.
 6. **Update Website**: Update the [Apache DataSketches website](https://github.com/apache/datasketches-website) to reflect the new released version for datasketches-go.
+```
+cd asf-dist-dev/scripts
+./createDownloadsInclude.sh /path/to/datasketches-website
+```

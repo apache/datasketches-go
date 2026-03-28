@@ -18,6 +18,9 @@
 package internal
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/apache/datasketches-go/common"
 )
 
@@ -30,9 +33,16 @@ const (
 	InequalityGT
 )
 
-func FindWithInequality[C comparable](arr []C, low int, high int, v C, crit Inequality, comparator common.CompareFn[C]) int {
+// FindWithInequality performs a binary search for the index of the value in the given search range
+// that satisfies the given inequality criterion.
+// It returns -1 if there are no values in the search range that satisfy the criterion.
+//
+// The arr must be sorted in increasing order according to the comparator.
+// The low and high parameters define the inclusive search range [low, high].
+// The crit parameter must be one of InequalityLT, InequalityLE, InequalityGE, or InequalityGT.
+func FindWithInequality[C comparable](arr []C, low int, high int, v C, crit Inequality, comparator common.CompareFn[C]) (int, error) {
 	if len(arr) == 0 {
-		return -1
+		return 0, errors.New("empty array")
 	}
 	lo := low
 	hi := high
@@ -41,7 +51,12 @@ func FindWithInequality[C comparable](arr []C, low int, high int, v C, crit Ineq
 			return resolve(arr, lo, hi, v, crit, comparator)
 		}
 		mid := lo + (hi-lo)/2
-		ret := compare(arr, mid, mid+1, v, crit, comparator)
+
+		ret, err := compare(arr, mid, mid+1, v, crit, comparator)
+		if err != nil {
+			return 0, err
+		}
+
 		if ret == -1 {
 			hi = mid
 		} else if ret == 1 {
@@ -50,10 +65,10 @@ func FindWithInequality[C comparable](arr []C, low int, high int, v C, crit Ineq
 			return getIndex(arr, mid, mid+1, v, crit, comparator)
 		}
 	}
-	return -1
+	return -1, nil
 }
 
-func resolve[C comparable](arr []C, lo int, hi int, v C, crit Inequality, compareFn common.CompareFn[C]) int {
+func resolve[C comparable](arr []C, lo int, hi int, v C, crit Inequality, compareFn common.CompareFn[C]) (int, error) {
 	result := 0
 	switch crit {
 	case InequalityLT:
@@ -121,14 +136,14 @@ func resolve[C comparable](arr []C, lo int, hi int, v C, crit Inequality, compar
 				result = -1
 			}
 		}
-	default:
-		panic("invalid inequality")
+	default: // should never happen.
+		return 0, fmt.Errorf("unknown inequality: %d", crit)
 	}
 
-	return result
+	return result, nil
 }
 
-func compare[C comparable](arr []C, a int, b int, v C, crit Inequality, compareFn common.CompareFn[C]) int {
+func compare[C comparable](arr []C, a int, b int, v C, crit Inequality, compareFn common.CompareFn[C]) (int, error) {
 	result := 0
 	switch crit {
 	case InequalityLT, InequalityGE:
@@ -147,21 +162,21 @@ func compare[C comparable](arr []C, a int, b int, v C, crit Inequality, compareF
 		} else {
 			result = 0
 		}
-	default:
-		panic("invalid inequality")
+	default: // should never happen.
+		return 0, fmt.Errorf("unknown inequality: %d", crit)
 	}
-	return result
+	return result, nil
 }
 
-func getIndex[C comparable](arr []C, a int, b int, v C, crit Inequality, compareFn common.CompareFn[C]) int {
+func getIndex[C comparable](arr []C, a int, b int, v C, crit Inequality, compareFn common.CompareFn[C]) (int, error) {
 	result := 0
 	switch crit {
 	case InequalityLT, InequalityLE:
 		result = a
 	case InequalityGE, InequalityGT:
 		result = b
-	default:
-		panic("invalid inequality")
+	default: // should never happen.
+		return 0, fmt.Errorf("unknown inequality: %d", crit)
 	}
-	return result
+	return result, nil
 }

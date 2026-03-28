@@ -83,7 +83,10 @@ func (s *ItemsSketchSortedView[C]) GetRank(item C, inclusive bool) (float64, err
 	if inclusive {
 		crit = internal.InequalityLE
 	}
-	index := internal.FindWithInequality(s.quantiles, 0, length-1, item, crit, s.compareFn)
+	index, err := internal.FindWithInequality(s.quantiles, 0, length-1, item, crit, s.compareFn)
+	if err != nil {
+		return 0, err
+	}
 	if index == -1 {
 		return 0, nil //EXCLUSIVE (LT) case: quantile <= minQuantile; INCLUSIVE (LE) case: quantile < minQuantile
 	}
@@ -92,13 +95,19 @@ func (s *ItemsSketchSortedView[C]) GetRank(item C, inclusive bool) (float64, err
 
 func (s *ItemsSketchSortedView[C]) GetQuantile(rank float64, inclusive bool) (C, error) {
 	if s.totalN == 0 {
-		return *new(C), errors.New("empty sketch")
+		var zero C
+		return zero, errors.New("empty sketch")
 	}
 	err := checkNormalizedRankBounds(rank)
 	if err != nil {
-		return *new(C), err
+		var zero C
+		return zero, err
 	}
-	index := s.getQuantileIndex(rank, inclusive)
+	index, err := s.getQuantileIndex(rank, inclusive)
+	if err != nil {
+		var zero C
+		return zero, err
+	}
 	return s.quantiles[index], nil
 }
 
@@ -144,20 +153,23 @@ func (s *ItemsSketchSortedView[C]) Iterator() *ItemsSketchSortedViewIterator[C] 
 	return newItemsSketchSortedViewIterator(s.quantiles, s.cumWeights)
 }
 
-func (s *ItemsSketchSortedView[C]) getQuantileIndex(rank float64, inclusive bool) int {
+func (s *ItemsSketchSortedView[C]) getQuantileIndex(rank float64, inclusive bool) (int, error) {
 	length := len(s.quantiles)
 	naturalRank := getNaturalRank(rank, s.totalN, inclusive)
 	crit := internal.InequalityGT
 	if inclusive {
 		crit = internal.InequalityGE
 	}
-	index := internal.FindWithInequality(s.cumWeights, 0, length-1, naturalRank, crit, func(a, b int64) bool {
+	index, err := internal.FindWithInequality(s.cumWeights, 0, length-1, naturalRank, crit, func(a, b int64) bool {
 		return a < b
 	})
-	if index == -1 {
-		return length - 1
+	if err != nil {
+		return 0, err
 	}
-	return index
+	if index == -1 {
+		return length - 1, nil
+	}
+	return index, nil
 }
 
 func (s *ItemsSketchSortedView[C]) GetNumRetained() int {
@@ -180,7 +192,11 @@ func (s *ItemsSketchSortedView[C]) GetPartitionBoundaries(numEquallySized int, i
 	evSpQuantiles := make([]C, len(evSpNormRanks))
 	evSpNatRanks := make([]int64, len(evSpNormRanks))
 	for i := 0; i < len(evSpNormRanks); i++ {
-		index := s.getQuantileIndex(evSpNormRanks[i], inclusive)
+		index, err := s.getQuantileIndex(evSpNormRanks[i], inclusive)
+		if err != nil {
+			return nil, err
+		}
+
 		evSpQuantiles[i] = s.quantiles[index]
 		evSpNatRanks[i] = s.cumWeights[index]
 	}
@@ -241,8 +257,8 @@ func blockyTandemMergeSortRecursion[C comparable](quantilesSrc []C, weightsSrc [
 	startingLevel1 := startingLevel
 	startingLevel2 := startingLevel + numLevels1
 	// swap roles of src and dst
-	blockyTandemMergeSortRecursion(quantilesDst, weightsDst, quantilesSrc, weightsSrc, levels, startingLevel1, numLevels1, compareFn)
-	blockyTandemMergeSortRecursion(quantilesDst, weightsDst, quantilesSrc, weightsSrc, levels, startingLevel2, numLevels2, compareFn)
+	blockyTandemMergeSortRecursion[C](quantilesDst, weightsDst, quantilesSrc, weightsSrc, levels, startingLevel1, numLevels1, compareFn)
+	blockyTandemMergeSortRecursion[C](quantilesDst, weightsDst, quantilesSrc, weightsSrc, levels, startingLevel2, numLevels2, compareFn)
 	tandemMerge(quantilesSrc, weightsSrc, quantilesDst, weightsDst, levels, startingLevel1, numLevels1, startingLevel2, numLevels2, compareFn)
 }
 

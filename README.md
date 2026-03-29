@@ -27,6 +27,8 @@
 # Apache<sup>&reg;</sup> DataSketches&trade; Core Go Library Component
 This is the core Go component of the DataSketches library.  It contains some of the sketching algorithms and can be accessed directly from user applications.
 
+**This project is currently under development. Breaking changes may occur before a stable release.**
+
 Note that we have a parallel core component for C++, Java and Python implementations of the same sketch algorithms,
 [datasketches-cpp](https://github.com/apache/datasketches-cpp) and [datasketches-java](https://github.com/apache/datasketches-java).
 
@@ -38,32 +40,32 @@ If you are interested in making contributions to this site please see our [Commu
 
 ## Major Sketches
 | Type         | Implementation          | Status |
-|--------------|-------------------------|--|
-| Cardinality	 |                         |  |
-| 	            | CpcSketch               | ⚠️ |
-| 	            | HllSketch               | ⚠️ |
-| 	            | ThetaSketch             | ⚠️ |
-| 	            | TupleSketch<S>          | ⚠️ |
-| Quantiles	   |                         |  |
-| 	            | CormodeDoublesSketch    | ❌ |
-| 	            | CormodeItemsSketch<T>   | ❌ |
-| 	            | KllDoublesSketch        | ⚠️ |
-| 	            | KllFloatsSketch         | ⚠️ |
-| 	            | KllSketch<T>            | ⚠️ |
-| 	            | ReqFloatsSketch         | 🚧 |
-| 	            | TDigestDouble           | ⚠️ |
-| Frequencies  |                         | ️ |
-|              | FreqLongsSketch         | ⚠️ |
-|              | FreqItemsSketch<T>      | ⚠️ |
-|              | CountMinSketch          | ⚠️ |
-| Sampling     |                         |  |
-|              | ReservoirLongsSketch    | ⚠️ |
-|              | ReserviorItemsSketch<T> | ⚠️ |
-| 	            | VarOptItemsSketch<T>    | 🚧 |
-| Membership   |                         | |
-|              | BloomFilter             | ⚠️ |
-| Density      |                         | |
-|              | DensitySketch           | ❌ | 
+|--------------|-------------------------|--------|
+| Cardinality	 |                         |        |
+| 	            | CpcSketch               | ✅      |
+| 	            | HllSketch               | ✅      |
+| 	            | ThetaSketch             | ✅      |
+| 	            | TupleSketch<S>          | ✅      |
+| Quantiles	   |                         |        |
+| 	            | CormodeDoublesSketch    | ❌      |
+| 	            | CormodeItemsSketch<T>   | ❌      |
+| 	            | KllDoublesSketch        | ✅      |
+| 	            | KllFloatsSketch         | ⚠️     |
+| 	            | KllSketch<T>            | ✅      |
+| 	            | ReqFloatsSketch         | 🚧     |
+| 	            | TDigestDouble           | ✅      |
+| Frequencies  |                         | ️      |
+|              | FreqLongsSketch         | ✅      |
+|              | FreqItemsSketch<T>      | ✅      |
+|              | CountMinSketch          | ✅      |
+| Sampling     |                         |        |
+|              | ReservoirLongsSketch    | ✅*     |
+|              | ReserviorItemsSketch<T> | ✅*     |
+| 	            | VarOptItemsSketch<T>    | ✅*     |
+| Membership   |                         |        |
+|              | BloomFilter             | ✅      |
+| Density      |                         |        |
+|              | DensitySketch           | ❌      | 
 
 
 ## Specialty Sketches
@@ -72,12 +74,16 @@ If you are interested in making contributions to this site please see our [Commu
 | Cardinality/FM85 | UniqueCountMap  | ❌ |
 | Cardinality/Tuple	| | |
 | 	| FdtSketch | ❌ |
-| 	| ArrayOfDoublesSketch  | ⚠️ |
+| 	| ArrayOfDoublesSketch  | ✅ |
 | 	| DoubleSketch  | ❌ |
 | 	| IntegerSketch  | ❌ |
 |	| ArrayOfStringsSketch | ⚠️ |
 | 	| EngagementTest3 | ❌ |
 
+
+✅ = Released in v0.1.0
+
+✅* = Released in v0.1.0, but partially implemented and unstable (API may change)
 
 ❌ = Not yet implemented
 

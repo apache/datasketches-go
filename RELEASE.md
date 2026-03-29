@@ -120,7 +120,21 @@ Once you receive at least three +1 binding votes from PMC members and no vetos:
 
 1. **Move to Release**: Move the files from `dist/dev/${PROJECT}/${LANGUAGE}/${VERSION}-RC${RC#rc}` to `dist/release/${PROJECT}/${LANGUAGE}/${VERSION}` via SVN.
 2. **Delete Old RCs**: Remove the candidate files from the dev directory.
+
+```bash
+cd asf-dist-dev
+
+svn rm "${LANGUAGE}/${VERSION}-RC"*
+
+svn commit -m "Remove ${LANGUAGE} ${VERSION} release candidates from dev dist"
+```
+
 3. **Promote Tag**: Create a final version tag `v${VERSION}` from the successful `v${CANDIDATE_NAME}` and push.
 4. **Create GitHub Release**: Create a new release on GitHub with the tag `v${VERSION}` and link to the release notes.
 5. **Announce**: Wait 24 hours for mirrors to sync, then email announce@apache.org.
 6. **Update Website**: Update the [Apache DataSketches website](https://github.com/apache/datasketches-website) to reflect the new released version for datasketches-go.
+
+```bash
+cd asf-dist-dev/scripts
+./createDownloadsInclude.sh /path/to/datasketches-website
+```

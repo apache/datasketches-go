@@ -24,6 +24,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/apache/datasketches-go/internal/quantiles"
 )
 
 const (
@@ -49,13 +51,11 @@ const (
 )
 
 var (
-	ErrEmpty              = errors.New("operation is undefined for an empty sketch")
-	ErrNaN                = errors.New("operation is undefined for NaN")
-	ErrInfinity           = errors.New("operation is undefined for Infinity")
-	ErrInvalidRank        = errors.New("normalized rank must be between 0 and 1 inclusive")
-	ErrInvalidK           = errors.New("k must be at least 10")
-	errNanInSplitPoints   = errors.New("NaN in split points")
-	errInvalidSplitPoints = errors.New("values must be unique and monotonically increasing")
+	ErrEmpty       = errors.New("operation is undefined for an empty sketch")
+	ErrNaN         = errors.New("operation is undefined for NaN")
+	ErrInfinity    = errors.New("operation is undefined for Infinity")
+	ErrInvalidRank = errors.New("normalized rank must be between 0 and 1 inclusive")
+	ErrInvalidK    = errors.New("k must be at least 10")
 )
 
 func doublePrecisionCentroidSortFunc(c1, c2 doublePrecisionCentroid) int {
@@ -427,7 +427,7 @@ func (d *Double) PMF(splitPoints []float64) ([]float64, error) {
 // CDF returns an approximation to the Cumulative Distribution Function (CDF)
 // which is the cumulative analog of the PMF of the input stream.
 func (d *Double) CDF(splitPoints []float64) ([]float64, error) {
-	if err := validateSplitPoints(splitPoints); err != nil {
+	if err := quantiles.ValidateSplitPoints(splitPoints); err != nil {
 		return nil, err
 	}
 	ranks := make([]float64, 0, len(splitPoints)+1)
@@ -562,16 +562,4 @@ func (d *Double) isSingleValue() bool {
 
 func weightedAverage(x1, w1, x2, w2 float64) float64 {
 	return (x1*w1 + x2*w2) / (w1 + w2)
-}
-
-func validateSplitPoints(values []float64) error {
-	for i, v := range values {
-		if math.IsNaN(v) {
-			return errNanInSplitPoints
-		}
-		if i < len(values)-1 && !(v < values[i+1]) {
-			return errInvalidSplitPoints
-		}
-	}
-	return nil
 }

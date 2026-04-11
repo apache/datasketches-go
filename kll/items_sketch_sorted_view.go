@@ -23,6 +23,7 @@ import (
 
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/quantiles"
 )
 
 type ItemsSketchSortedView[C comparable] struct {
@@ -98,7 +99,7 @@ func (s *ItemsSketchSortedView[C]) GetQuantile(rank float64, inclusive bool) (C,
 		var zero C
 		return zero, errors.New("empty sketch")
 	}
-	err := checkNormalizedRankBounds(rank)
+	err := quantiles.ValidateNormalizedRankBounds(rank)
 	if err != nil {
 		var zero C
 		return zero, err
@@ -155,7 +156,7 @@ func (s *ItemsSketchSortedView[C]) Iterator() *ItemsSketchSortedViewIterator[C] 
 
 func (s *ItemsSketchSortedView[C]) getQuantileIndex(rank float64, inclusive bool) (int, error) {
 	length := len(s.quantiles)
-	naturalRank := getNaturalRank(rank, s.totalN, inclusive)
+	naturalRank := quantiles.ComputeNaturalRank(rank, s.totalN, inclusive)
 	crit := internal.InequalityGT
 	if inclusive {
 		crit = internal.InequalityGE

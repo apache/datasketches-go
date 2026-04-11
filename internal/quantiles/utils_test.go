@@ -49,3 +49,59 @@ func TestValidateSplitPoints(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateNormalizedRankBounds(t *testing.T) {
+	tests := []struct {
+		name    string
+		rank    float64
+		wantErr string
+	}{
+		{"below zero", -0.1, "rank must be between 0 and 1 inclusive"},
+		{"zero", 0, ""},
+		{"middle", 0.5, ""},
+		{"one", 1, ""},
+		{"above one", 1.1, "rank must be between 0 and 1 inclusive"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateNormalizedRankBounds(tt.rank)
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestComputeNaturalRank(t *testing.T) {
+	rankJustBelowThreeNoRounding := math.Nextafter(3.0/10000001.0, 0)
+
+	tests := []struct {
+		name           string
+		normalizedRank float64
+		totalN         uint64
+		inclusive      bool
+		want           int64
+	}{
+		{"zero exclusive", 0, 10, false, 0},
+		{"zero inclusive", 0, 10, true, 0},
+		{"one exclusive", 1, 10, false, 10},
+		{"one inclusive", 1, 10, true, 10},
+		{"exact integer exclusive", 0.5, 10, false, 5},
+		{"exact integer inclusive", 0.5, 10, true, 5},
+		{"fractional exclusive floors", 0.21, 10, false, 2},
+		{"fractional inclusive ceils", 0.21, 10, true, 3},
+		{"rounding enabled exclusive", 0.299999996, 10, false, 3},
+		{"rounding enabled inclusive", 0.299999996, 10, true, 3},
+		{"rounding disabled exclusive", rankJustBelowThreeNoRounding, 10000001, false, 2},
+		{"rounding disabled inclusive", rankJustBelowThreeNoRounding, 10000001, true, 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ComputeNaturalRank(tt.normalizedRank, tt.totalN, tt.inclusive)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

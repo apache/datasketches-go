@@ -28,8 +28,6 @@ import (
 )
 
 const (
-	tailRoundingFactor = 1e7
-
 	_PMF_COEF = 2.446
 	_PMF_EXP  = 0.9433
 	_CDF_COEF = 2.296
@@ -45,17 +43,6 @@ func convertToCumulative(array []int64) int64 {
 	return subtotal
 }
 
-func getNaturalRank(normalizedRank float64, totalN uint64, inclusive bool) int64 {
-	naturalRank := normalizedRank * float64(totalN)
-	if totalN <= tailRoundingFactor {
-		naturalRank = math.Round(naturalRank*tailRoundingFactor) / tailRoundingFactor
-	}
-	if inclusive {
-		return int64(math.Ceil(naturalRank))
-	}
-	return int64(math.Floor(naturalRank))
-}
-
 func checkK(k uint16, m uint8) error {
 	if k < uint16(m) || k > _MAX_K {
 		return errors.New("K must be >= " + strconv.Itoa(int(m)) + " and <= " + strconv.Itoa(_MAX_K) + ": " + strconv.Itoa(int(k)))
@@ -66,13 +53,6 @@ func checkK(k uint16, m uint8) error {
 func checkM(m uint8) error {
 	if m < _MIN_M || m > _MAX_M || ((m & 1) == 1) {
 		return errors.New("M must be >= 2, <= 8 and even: " + strconv.Itoa(int(m)))
-	}
-	return nil
-}
-
-func checkNormalizedRankBounds(rank float64) error {
-	if rank < 0 || rank > 1 {
-		return errors.New("rank must be between 0 and 1 inclusive")
 	}
 	return nil
 }

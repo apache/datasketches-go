@@ -22,9 +22,13 @@ import (
 	"math"
 )
 
-var ErrNanInSplitPoints = errors.New("NaN in split points")
+const tailRoundingFactor = 1e7
 
-var ErrInvalidSplitPoints = errors.New("values must be unique and monotonically increasing")
+// errors.
+var (
+	ErrNanInSplitPoints   = errors.New("NaN in split points")
+	ErrInvalidSplitPoints = errors.New("values must be unique and monotonically increasing")
+)
 
 type Number interface {
 	float32 | float64 | int64
@@ -40,4 +44,23 @@ func ValidateSplitPoints[N Number](values []N) error {
 		}
 	}
 	return nil
+}
+
+func ValidateNormalizedRankBounds(rank float64) error {
+	if rank < 0 || rank > 1 {
+		return errors.New("rank must be between 0 and 1 inclusive")
+	}
+	return nil
+}
+
+// ComputeNaturalRank Computes the closest Natural Rank from a given Normalized Rank
+func ComputeNaturalRank(normalizedRank float64, totalN uint64, inclusive bool) int64 {
+	naturalRank := normalizedRank * float64(totalN)
+	if totalN <= tailRoundingFactor {
+		naturalRank = math.Round(naturalRank*tailRoundingFactor) / tailRoundingFactor
+	}
+	if inclusive {
+		return int64(math.Ceil(naturalRank))
+	}
+	return int64(math.Floor(naturalRank))
 }

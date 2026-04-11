@@ -27,17 +27,17 @@ import (
 func TestSortedViewIteratorNext(t *testing.T) {
 	tests := []struct {
 		name       string
-		quantiles  []int
+		quantiles  []int64
 		cumWeights []int64
 		wantCount  int
 	}{
-		{"empty", []int{}, []int64{}, 0},
-		{"single element", []int{42}, []int64{1}, 1},
-		{"multiple elements", []int{10, 20, 30}, []int64{1, 3, 6}, 3},
+		{"empty", []int64{}, []int64{}, 0},
+		{"single element", []int64{42}, []int64{1}, 1},
+		{"multiple elements", []int64{10, 20, 30}, []int64{1, 3, 6}, 3},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			it := NewSortedViewIterator(tt.quantiles, tt.cumWeights)
+			it := NewNumericSortedViewIterator(tt.quantiles, tt.cumWeights)
 			count := 0
 			for it.Next() {
 				count++
@@ -51,10 +51,10 @@ func TestSortedViewIteratorNext(t *testing.T) {
 func TestSortedViewIteratorQuantile(t *testing.T) {
 	tests := []struct {
 		name      string
-		quantiles []int
+		quantiles []int64
 	}{
-		{"single element", []int{42}},
-		{"multiple elements", []int{10, 20, 30}},
+		{"single element", []int64{42}},
+		{"multiple elements", []int64{10, 20, 30}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -62,8 +62,8 @@ func TestSortedViewIteratorQuantile(t *testing.T) {
 			for i := range cumWeights {
 				cumWeights[i] = int64(i + 1)
 			}
-			it := NewSortedViewIterator(tt.quantiles, cumWeights)
-			var got []int
+			it := NewNumericSortedViewIterator(tt.quantiles, cumWeights)
+			var got []int64
 			for it.Next() {
 				v, err := it.Quantile()
 				require.NoError(t, err)
@@ -86,7 +86,7 @@ func TestSortedViewIteratorN(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			it := NewSortedViewIterator([]int{}, tt.cumWeights)
+			it := NewNumericSortedViewIterator([]int64{}, tt.cumWeights)
 			assert.Equal(t, tt.wantN, it.N())
 		})
 	}
@@ -103,8 +103,8 @@ func TestSortedViewIteratorNaturalRank(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			quantiles := make([]int, len(tt.cumWeights))
-			it := NewSortedViewIterator(quantiles, tt.cumWeights)
+			quantiles := make([]int64, len(tt.cumWeights))
+			it := NewNumericSortedViewIterator(quantiles, tt.cumWeights)
 			i := 0
 			for it.Next() {
 				got, err := it.NaturalRank()
@@ -118,7 +118,7 @@ func TestSortedViewIteratorNaturalRank(t *testing.T) {
 
 func TestSortedViewIteratorNaturalRankWithCriterion(t *testing.T) {
 	cumWeights := []int64{2, 5, 7, 10}
-	quantiles := make([]int, len(cumWeights))
+	quantiles := make([]int64, len(cumWeights))
 
 	tests := []struct {
 		name        string
@@ -130,7 +130,7 @@ func TestSortedViewIteratorNaturalRankWithCriterion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			it := NewSortedViewIterator(quantiles, cumWeights)
+			it := NewNumericSortedViewIterator(quantiles, cumWeights)
 			i := 0
 			for it.Next() {
 				got, err := it.NaturalRankWithCriterion(tt.isInclusive)
@@ -154,8 +154,8 @@ func TestSortedViewIteratorNormalizedRank(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			quantiles := make([]int, len(tt.cumWeights))
-			it := NewSortedViewIterator(quantiles, tt.cumWeights)
+			quantiles := make([]int64, len(tt.cumWeights))
+			it := NewNumericSortedViewIterator(quantiles, tt.cumWeights)
 			i := 0
 			for it.Next() {
 				got, err := it.NormalizedRank()
@@ -169,7 +169,7 @@ func TestSortedViewIteratorNormalizedRank(t *testing.T) {
 
 func TestSortedViewIteratorNormalizedRankWithCriterion(t *testing.T) {
 	cumWeights := []int64{2, 5, 10}
-	quantiles := make([]int, len(cumWeights))
+	quantiles := make([]int64, len(cumWeights))
 	totalN := float64(10)
 
 	tests := []struct {
@@ -182,7 +182,7 @@ func TestSortedViewIteratorNormalizedRankWithCriterion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			it := NewSortedViewIterator(quantiles, cumWeights)
+			it := NewNumericSortedViewIterator(quantiles, cumWeights)
 			i := 0
 			for it.Next() {
 				got, err := it.NormalizedRankWithCriterion(tt.isInclusive)
@@ -206,8 +206,8 @@ func TestSortedViewIteratorWeight(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			quantiles := make([]int, len(tt.cumWeights))
-			it := NewSortedViewIterator(quantiles, tt.cumWeights)
+			quantiles := make([]int64, len(tt.cumWeights))
+			it := NewNumericSortedViewIterator(quantiles, tt.cumWeights)
 			i := 0
 			for it.Next() {
 				got, err := it.Weight()
@@ -220,23 +220,23 @@ func TestSortedViewIteratorWeight(t *testing.T) {
 }
 
 func TestSortedViewIteratorInvalidIndex(t *testing.T) {
-	quantiles := []int{10, 20, 30}
+	quantiles := []int64{10, 20, 30}
 	cumWeights := []int64{1, 3, 6}
 
 	tests := []struct {
 		name  string
-		setup func() *NumericSortedViewIterator[int]
+		setup func() *NumericSortedViewIterator[int64]
 	}{
 		{
 			"before first Next",
-			func() *NumericSortedViewIterator[int] {
-				return NewSortedViewIterator(quantiles, cumWeights)
+			func() *NumericSortedViewIterator[int64] {
+				return NewNumericSortedViewIterator(quantiles, cumWeights)
 			},
 		},
 		{
 			"after iteration exhausted",
-			func() *NumericSortedViewIterator[int] {
-				it := NewSortedViewIterator(quantiles, cumWeights)
+			func() *NumericSortedViewIterator[int64] {
+				it := NewNumericSortedViewIterator(quantiles, cumWeights)
 				for it.Next() {
 				}
 				return it

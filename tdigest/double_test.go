@@ -22,6 +22,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/internal/quantiles"
 )
 
 func TestNewDouble(t *testing.T) {
@@ -774,7 +776,7 @@ func TestDouble_PMF(t *testing.T) {
 		err = sk.Update(1.0)
 		assert.NoError(t, err)
 		_, err = sk.PMF([]float64{math.NaN()})
-		assert.ErrorIs(t, err, errNanInSplitPoints)
+		assert.ErrorIs(t, err, quantiles.ErrNanInSplitPoints)
 	})
 
 	t.Run("Invalid Split Points Not Increasing", func(t *testing.T) {
@@ -784,7 +786,7 @@ func TestDouble_PMF(t *testing.T) {
 		err = sk.Update(1.0)
 		assert.NoError(t, err)
 		_, err = sk.PMF([]float64{5.0, 3.0})
-		assert.ErrorIs(t, err, errInvalidSplitPoints)
+		assert.ErrorIs(t, err, quantiles.ErrInvalidSplitPoints)
 	})
 
 	t.Run("Single Split Point", func(t *testing.T) {
@@ -846,7 +848,7 @@ func TestDouble_CDF(t *testing.T) {
 		err = sk.Update(1.0)
 		assert.NoError(t, err)
 		_, err = sk.CDF([]float64{math.NaN()})
-		assert.ErrorIs(t, err, errNanInSplitPoints)
+		assert.ErrorIs(t, err, quantiles.ErrNanInSplitPoints)
 	})
 
 	t.Run("Invalid Split Points Not Increasing", func(t *testing.T) {
@@ -856,7 +858,7 @@ func TestDouble_CDF(t *testing.T) {
 		err = sk.Update(1.0)
 		assert.NoError(t, err)
 		_, err = sk.CDF([]float64{5.0, 3.0})
-		assert.ErrorIs(t, err, errInvalidSplitPoints)
+		assert.ErrorIs(t, err, quantiles.ErrInvalidSplitPoints)
 	})
 
 	t.Run("Single Split Point", func(t *testing.T) {

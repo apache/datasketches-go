@@ -59,15 +59,15 @@ func WithK(k int) SketchOptionFunc {
 }
 
 type Sketch struct {
-	k                      int
-	isHighRankAccuracyMode bool
 	n                      int64
+	compactors             []*compactor
+	numRetained            int
+	maxNomSize             int
 	minItem                float32
 	maxItem                float32
-	numRetained            int
-	maxNomSize             int // sum of nominal capacities of all compactors.
 	sortedView             *quantilecommon.NumericSortedView[float32]
-	compactors             []*compactor
+	k                      int
+	isHighRankAccuracyMode bool
 }
 
 func NewSketch(options ...SketchOptionFunc) (*Sketch, error) {

@@ -23,17 +23,11 @@ import (
 	"fmt"
 	"math"
 	"math/bits"
-	"math/rand"
+	"math/rand/v2"
 	"slices"
 	"strings"
 
 	"github.com/apache/datasketches-go/internal"
-)
-
-const (
-	initNumberOfSections = 3
-	minK                 = 4
-	nomCapMul            = 2
 )
 
 type compactResult struct {
@@ -121,7 +115,7 @@ func numberOfTrailingOnes(v int64) int {
 	return bits.TrailingZeros64(uint64(^v))
 }
 
-func (c *compactor) Compact(next *compactor, rng *rand.Rand) (compactResult, error) {
+func (c *compactor) Compact(next *compactor) (compactResult, error) {
 	startRetItems := c.Count()
 	startNomCap := c.NomCapacity()
 
@@ -141,7 +135,7 @@ func (c *compactor) Compact(next *compactor, rng *rand.Rand) (compactResult, err
 	if (c.state & 1) == 1 {
 		c.coin = !c.coin // if numCompactions odd, flip coin
 	} else {
-		c.coin = rng.Intn(2) == 1 // random coin flip
+		c.coin = rand.IntN(2) == 1 // random coin flip
 	}
 
 	promoteCount, err := c.promoteEvensOrOddsInto(next, compactionStart, compactionEnd, c.coin)
@@ -161,10 +155,6 @@ func (c *compactor) Compact(next *compactor, rng *rand.Rand) (compactResult, err
 
 func (c *compactor) Coin() bool {
 	return c.coin
-}
-
-func (c *compactor) LgWeight() byte {
-	return c.lgWeight
 }
 
 func (c *compactor) NomCapacity() int {
@@ -398,7 +388,7 @@ func (c *compactor) marshalItems() []byte {
 }
 
 // itemsToString returns a formatted string of the items.
-func (c *compactor) itemsToString(format string, width int) string {
+func (c *compactor) itemsToString(width int) string {
 	var sb strings.Builder
 	spaces := "  "
 	var start, end int
@@ -413,7 +403,7 @@ func (c *compactor) itemsToString(format string, width int) string {
 	cnt := 0
 	sb.WriteString(spaces)
 	for i := start; i < end; i++ {
-		str := fmt.Sprintf(format, c.items[i])
+		str := fmt.Sprintf("%f", c.items[i])
 		if i > start {
 			cnt++
 			if cnt%width == 0 {

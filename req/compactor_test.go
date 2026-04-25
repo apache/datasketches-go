@@ -409,3 +409,13 @@ func TestNumberOfTrailingOnes(t *testing.T) {
 		})
 	}
 }
+
+func TestCompactorGetters(t *testing.T) {
+	c := newCompactor(0, true, 12)
+	assert.False(t, c.Coin())
+	assert.Greater(t, c.NumSections(), 0)
+	assert.Greater(t, c.SectionSize(), 0)
+	assert.Greater(t, c.SectionSizeFlt(), float32(0))
+	assert.True(t, c.IsHighRankAccuracyMode())
+	assert.Equal(t, int64(0), c.State())
+}

@@ -18,6 +18,8 @@
 package req
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"testing"
@@ -418,4 +420,204 @@ func TestCompactorGetters(t *testing.T) {
 	assert.Greater(t, c.SectionSizeFlt(), float32(0))
 	assert.True(t, c.IsHighRankAccuracyMode())
 	assert.Equal(t, int64(0), c.State())
+}
+
+// TestCompactorItemsSerDe tests marshalItems/decode round-trip with raw array
+// position checks, ported from Java ReqFloatBufferTest.checkSerDe.
+func TestCompactorItemsSerDe(t *testing.T) {
+	t.Run("HRA", func(t *testing.T) {
+		runCompactorItemsSerDe(t, true)
+	})
+	t.Run("LRA", func(t *testing.T) {
+		runCompactorItemsSerDe(t, false)
+	})
+}
+
+func runCompactorItemsSerDe(t *testing.T, hra bool) {
+	t.Helper()
+	c := newCompactor(0, hra, minK)
+	initialCap := c.Capacity()
+
+	// Append more items than initial capacity to trigger growth.
+	numItems := initialCap + 1
+	for i := 0; i < numItems; i++ {
+		c.Append(float32(i))
+	}
+	assert.Greater(t, c.Capacity(), initialCap)
+
+	capacity := c.Capacity()
+	count := c.Count()
+	sorted := c.sorted
+
+	// Verify raw item positions before serialization.
+	if hra {
+		assert.Equal(t, float32(numItems-1), c.items[capacity-count])
+		assert.Equal(t, float32(0), c.items[capacity-1])
+	} else {
+		assert.Equal(t, float32(0), c.items[0])
+		assert.Equal(t, float32(numItems-1), c.items[count-1])
+	}
+
+	// Verify marshalItems byte output matches Item(i) order.
+	itemBytes := c.marshalItems()
+	assert.Equal(t, count*4, len(itemBytes))
+	for i := 0; i < count; i++ {
+		bits := binary.LittleEndian.Uint32(itemBytes[i*4:])
+		got := math.Float32frombits(bits)
+		assert.Equal(t, c.Item(i), got, "serialized item mismatch at offset %d", i)
+	}
+
+	// Full round-trip via MarshalBinary + decodeCompactor.
+	fullBytes, err := c.MarshalBinary()
+	assert.NoError(t, err)
+	result, err := decodeCompactor(fullBytes, 0, sorted, hra)
+	assert.NoError(t, err)
+	c2 := result.compactor
+
+	assert.Equal(t, count, c2.Count())
+	assert.Equal(t, sorted, c2.sorted)
+	assert.Equal(t, hra, c2.isHighRankAccuracyMode)
+
+	// Verify raw positions in deserialized compactor.
+	if hra {
+		cap2 := c2.Capacity()
+		assert.Equal(t, float32(numItems-1), c2.items[cap2-c2.count])
+		assert.Equal(t, float32(0), c2.items[cap2-1])
+	} else {
+		assert.Equal(t, float32(0), c2.items[0])
+		assert.Equal(t, float32(numItems-1), c2.items[c2.count-1])
+	}
+
+	// Verify all items match by logical offset.
+	for i := 0; i < count; i++ {
+		assert.Equal(t, c.Item(i), c2.Item(i), "item mismatch at offset %d", i)
+	}
+}
+
+func TestCompactorSerializationDeserialization(t *testing.T) {
+	t.Run("LRA", func(t *testing.T) {
+		runCompactorSerializationDeserialization(t, 12, false)
+	})
+	t.Run("HRA", func(t *testing.T) {
+		runCompactorSerializationDeserialization(t, 12, true)
+	})
+}
+
+func runCompactorSerializationDeserialization(t *testing.T, k int, hra bool) {
+	t.Helper()
+	c1 := newCompactor(0, hra, k)
+	nomCap := nomCapMul * initNumberOfSections * k
+	expectedCap := 2 * nomCap
+	expectedDelta := nomCap
+
+	for i := 1; i <= nomCap; i++ {
+		c1.Append(float32(i))
+	}
+
+	sectionSizeFlt := c1.SectionSizeFlt()
+	sectionSize := c1.SectionSize()
+	numSections := c1.NumSections()
+	state := c1.State()
+	lgWt := c1.lgWeight
+	sorted := c1.sorted
+
+	// serialize
+	c1ser, err := c1.MarshalBinary()
+	assert.NoError(t, err)
+
+	// deserialize via buffer
+	result, err := decodeCompactor(c1ser, 0, sorted, hra)
+	assert.NoError(t, err)
+	c2 := result.compactor
+
+	assert.Equal(t, float32(1), result.minItem)
+	assert.Equal(t, float32(nomCap), result.maxItem)
+	assert.Equal(t, int64(nomCap), result.n)
+	assert.Equal(t, sectionSizeFlt, c2.SectionSizeFlt())
+	assert.Equal(t, sectionSize, c2.SectionSize())
+	assert.Equal(t, numSections, c2.NumSections())
+	assert.Equal(t, state, c2.State())
+	assert.Equal(t, lgWt, c2.lgWeight)
+	assert.Equal(t, hra, c2.IsHighRankAccuracyMode())
+	if hra {
+		assert.Equal(t, expectedCap, c2.Capacity())
+	} else {
+		// LRA decoder keeps items at count-sized capacity (not expanded to nomCap).
+		assert.Equal(t, nomCap, c2.Capacity())
+	}
+	assert.Equal(t, expectedDelta, c2.delta)
+
+	for i := 0; i < nomCap; i++ {
+		assert.Equal(t, c1.Item(i), c2.Item(i), "item mismatch at offset %d", i)
+	}
+
+	// deserialize via stream
+	decoder := newCompactorDecoder(sorted, hra)
+	result2, err := decoder.Decode(bytes.NewReader(c1ser))
+	assert.NoError(t, err)
+	c3 := result2.compactor
+
+	assert.Equal(t, float32(1), result2.minItem)
+	assert.Equal(t, float32(nomCap), result2.maxItem)
+	assert.Equal(t, int64(nomCap), result2.n)
+	assert.Equal(t, sectionSizeFlt, c3.SectionSizeFlt())
+	assert.Equal(t, sectionSize, c3.SectionSize())
+	for i := 0; i < nomCap; i++ {
+		assert.Equal(t, c1.Item(i), c3.Item(i), "stream: item mismatch at offset %d", i)
+	}
+}
+
+func TestCompactorSerializationDeserializationWithNegativeValues(t *testing.T) {
+	t.Run("LRA", func(t *testing.T) {
+		runCompactorSerializationDeserializationNegative(t, 12, false)
+	})
+	t.Run("HRA", func(t *testing.T) {
+		runCompactorSerializationDeserializationNegative(t, 12, true)
+	})
+}
+
+func runCompactorSerializationDeserializationNegative(t *testing.T, k int, hra bool) {
+	t.Helper()
+	c1 := newCompactor(0, hra, k)
+	nomCap := nomCapMul * initNumberOfSections * k
+
+	for i := 1; i <= nomCap; i++ {
+		c1.Append(float32(-i))
+	}
+
+	c1ser, err := c1.MarshalBinary()
+	assert.NoError(t, err)
+
+	result, err := decodeCompactor(c1ser, 0, c1.sorted, hra)
+	assert.NoError(t, err)
+	assert.Equal(t, float32(-nomCap), result.minItem)
+	assert.Equal(t, float32(-1), result.maxItem)
+}
+
+func TestCompactorSerializationDeserializationWithMixedValues(t *testing.T) {
+	t.Run("LRA", func(t *testing.T) {
+		runCompactorSerializationDeserializationMixed(t, 12, false)
+	})
+	t.Run("HRA", func(t *testing.T) {
+		runCompactorSerializationDeserializationMixed(t, 12, true)
+	})
+}
+
+func runCompactorSerializationDeserializationMixed(t *testing.T, k int, hra bool) {
+	t.Helper()
+	c1 := newCompactor(0, hra, k)
+	nomCap := nomCapMul * initNumberOfSections * k
+	half := nomCap / 2
+
+	for i := 0; i < nomCap; i++ {
+		c1.Append(float32(i - half))
+	}
+
+	c1ser, err := c1.MarshalBinary()
+	assert.NoError(t, err)
+
+	result, err := decodeCompactor(c1ser, 0, c1.sorted, hra)
+	assert.NoError(t, err)
+	assert.Equal(t, float32(-half), result.minItem)
+	assert.Equal(t, float32(half-1), result.maxItem)
 }

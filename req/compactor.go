@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/bits"
 	"math/rand/v2"
@@ -82,32 +83,6 @@ func copyCompactor(other *compactor) *compactor {
 		sorted:                 other.sorted,
 		items:                  itemsCopy,
 		count:                  other.count,
-	}
-}
-
-func reconstructCompactor(
-	lgWeight byte,
-	hra bool,
-	state int64,
-	sectionSizeFlt float32,
-	numSections byte,
-	delta int,
-	sorted bool,
-	items []float32,
-	count int,
-) *compactor {
-	return &compactor{
-		lgWeight:               lgWeight,
-		isHighRankAccuracyMode: hra,
-		sectionSizeFlt:         sectionSizeFlt,
-		numSections:            numSections,
-		state:                  state,
-		coin:                   false,
-		delta:                  delta,
-		sorted:                 sorted,
-		items:                  items,
-		count:                  count,
-		sectionSize:            nearestEven(sectionSizeFlt),
 	}
 }
 
@@ -247,7 +222,7 @@ func nearestEven(val float32) int {
 	return int(math.Round(float64(val)/2.0)) << 1
 }
 
-func (c *compactor) Marshal() ([]byte, error) {
+func (c *compactor) MarshalBinary() ([]byte, error) {
 	size := c.SerializationBytes()
 	arr := make([]byte, size)
 	offset := 0
@@ -560,4 +535,191 @@ func (c *compactor) ensureCapacity(newCapacity int) {
 		copy(out[destPos:destPos+c.count], c.items[srcPos:srcPos+c.count])
 		c.items = out
 	}
+}
+
+type compactorDecodingResult struct {
+	compactor      *compactor
+	bufferEndIndex int
+	minItem        float32
+	maxItem        float32
+	n              int64
+}
+
+func decodeCompactor(
+	buf []byte, index int, isLevel0Sorted, isHighRankAccuracyMode bool,
+) (compactorDecodingResult, error) { // the second returned value is the end index of after decoding.
+	if err := validateBuffer(buf, index+8); err != nil {
+		return compactorDecodingResult{}, err
+	}
+	state := binary.LittleEndian.Uint64(buf[index : index+8])
+	index += 8
+
+	if err := validateBuffer(buf, index+4); err != nil {
+		return compactorDecodingResult{}, err
+	}
+	sectionSizeFloat := math.Float32frombits(binary.LittleEndian.Uint32(buf[index : index+4]))
+	sectionSize := math.Round(float64(sectionSizeFloat))
+	index += 4
+
+	if err := validateBuffer(buf, index+1); err != nil {
+		return compactorDecodingResult{}, err
+	}
+	lgWeight := buf[index]
+	index++
+
+	if err := validateBuffer(buf, index+1); err != nil {
+		return compactorDecodingResult{}, err
+	}
+	numSections := buf[index]
+	index++
+
+	index += 2 // pad
+
+	if err := validateBuffer(buf, index+4); err != nil {
+		return compactorDecodingResult{}, err
+	}
+	count := binary.LittleEndian.Uint32(buf[index : index+4])
+	index += 4
+
+	var (
+		minItem = float32(math.MaxFloat32)
+		maxItem = float32(-math.MaxFloat32)
+	)
+	items := make([]float32, 0, count)
+	for i := uint32(0); i < count; i++ {
+		if err := validateBuffer(buf, index+4); err != nil {
+			return compactorDecodingResult{}, err
+		}
+
+		item := math.Float32frombits(binary.LittleEndian.Uint32(buf[index : index+4]))
+		items = append(items, item)
+
+		minItem = min(minItem, item)
+		maxItem = max(maxItem, item)
+
+		index += 4
+	}
+
+	delta := 2 * int(sectionSize) * int(numSections)
+	nomCap := 2 * delta
+	capacity := max(int(count), nomCap)
+
+	if isHighRankAccuracyMode {
+		newItems := make([]float32, capacity)
+		copy(newItems[capacity-int(count):], items)
+		items = newItems
+	}
+
+	return compactorDecodingResult{
+		compactor: &compactor{
+			lgWeight:               lgWeight,
+			items:                  items,
+			count:                  int(count),
+			delta:                  delta,
+			sorted:                 isLevel0Sorted,
+			isHighRankAccuracyMode: isHighRankAccuracyMode,
+			sectionSizeFlt:         sectionSizeFloat,
+			numSections:            numSections,
+			state:                  int64(state),
+			coin:                   false,
+			sectionSize:            nearestEven(sectionSizeFloat),
+		},
+		bufferEndIndex: index,
+		minItem:        minItem,
+		maxItem:        maxItem,
+		n:              int64(count),
+	}, nil
+}
+
+type compactorDecoder struct {
+	isLevel0Sorted         bool
+	isHighRankAccuracyMode bool
+}
+
+func newCompactorDecoder(isLevel0Sorted, isHighRankAccuracyMode bool) compactorDecoder {
+	return compactorDecoder{
+		isLevel0Sorted:         isLevel0Sorted,
+		isHighRankAccuracyMode: isHighRankAccuracyMode,
+	}
+}
+
+func (d *compactorDecoder) Decode(r io.Reader) (compactorDecodingResult, error) {
+	var state uint64
+	if err := binary.Read(r, binary.LittleEndian, &state); err != nil {
+		return compactorDecodingResult{}, err
+	}
+
+	var sectionSizeFltRaw uint32
+	if err := binary.Read(r, binary.LittleEndian, &sectionSizeFltRaw); err != nil {
+		return compactorDecodingResult{}, err
+	}
+	sectionSizeFlt := math.Float32frombits(sectionSizeFltRaw)
+	sectionSize := math.Round(float64(sectionSizeFlt))
+
+	var lgWeight byte
+	if err := binary.Read(r, binary.LittleEndian, &lgWeight); err != nil {
+		return compactorDecodingResult{}, err
+	}
+
+	var numSections byte
+	if err := binary.Read(r, binary.LittleEndian, &numSections); err != nil {
+		return compactorDecodingResult{}, err
+	}
+
+	var pad uint16
+	if err := binary.Read(r, binary.LittleEndian, &pad); err != nil {
+		return compactorDecodingResult{}, err
+	}
+
+	var count uint32
+	if err := binary.Read(r, binary.LittleEndian, &count); err != nil {
+		return compactorDecodingResult{}, err
+	}
+
+	var (
+		minItem = float32(math.MaxFloat32)
+		maxItem = float32(-math.MaxFloat32)
+	)
+	items := make([]float32, 0, count)
+	for i := uint32(0); i < count; i++ {
+		var itemRaw uint32
+		if err := binary.Read(r, binary.LittleEndian, &itemRaw); err != nil {
+			return compactorDecodingResult{}, err
+		}
+
+		item := math.Float32frombits(itemRaw)
+		items = append(items, item)
+
+		minItem = min(minItem, item)
+		maxItem = max(maxItem, item)
+	}
+
+	delta := 2 * int(sectionSize) * int(numSections)
+	nomCap := 2 * delta
+	capacity := max(int(count), nomCap)
+
+	if d.isHighRankAccuracyMode {
+		newItems := make([]float32, capacity)
+		copy(newItems[capacity-int(count):], items)
+		items = newItems
+	}
+
+	return compactorDecodingResult{
+		compactor: &compactor{
+			lgWeight:               lgWeight,
+			items:                  items,
+			count:                  int(count),
+			delta:                  delta,
+			sorted:                 d.isLevel0Sorted,
+			isHighRankAccuracyMode: d.isHighRankAccuracyMode,
+			sectionSizeFlt:         sectionSizeFlt,
+			numSections:            numSections,
+			state:                  int64(state),
+			coin:                   false,
+			sectionSize:            nearestEven(sectionSizeFlt),
+		},
+		minItem: minItem,
+		maxItem: maxItem,
+		n:       int64(count),
+	}, nil
 }

@@ -308,10 +308,10 @@ func (s *ReservoirItemsSketch[T]) forceIncrementItemsSeen(delta int64) error {
 
 // Serialization constants
 const (
-	preambleIntsEmpty = 1
-	serVer            = 2
-	flagEmpty         = 0x04
-	resizeFactorMask  = 0xC0
+	preambleIntsEmpty                 = 1
+	reservoirItemsSketchSerialVersion = 2
+	flagEmpty                         = 0x04
+	resizeFactorMask                  = 0xC0
 )
 
 func resizeFactorBitsFor(rf ResizeFactor) (byte, error) {
@@ -358,7 +358,7 @@ func (s *ReservoirItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 	if s.isEmpty() {
 		buf := make([]byte, 8)
 		buf[0] = rfBits | preambleIntsEmpty
-		buf[1] = serVer
+		buf[1] = reservoirItemsSketchSerialVersion
 		buf[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
 		buf[3] = flagEmpty
 		binary.LittleEndian.PutUint32(buf[4:], uint32(s.k))
@@ -375,7 +375,7 @@ func (s *ReservoirItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 	buf := make([]byte, preBytes+len(itemsBytes))
 
 	buf[0] = rfBits | byte(preLongs)
-	buf[1] = serVer
+	buf[1] = reservoirItemsSketchSerialVersion
 	buf[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
 	buf[3] = 0
 	binary.LittleEndian.PutUint32(buf[4:], uint32(s.k))
@@ -445,7 +445,7 @@ func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (
 
 	k := int(binary.LittleEndian.Uint32(data[4:]))
 
-	if ver != serVer {
+	if ver != reservoirItemsSketchSerialVersion {
 		if ver == 1 {
 			encK := binary.LittleEndian.Uint16(data[4:])
 			decodedK, err := decodeReservoirSize(encK)

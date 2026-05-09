@@ -23,10 +23,10 @@ type ItemSketchHasher[C comparable] interface {
 	Hash(item C) uint64
 }
 
-type ItemSketchSerde[C comparable] interface {
-	SizeOf(item C) int
+type ItemSketchSerde[T any] interface {
+	SizeOf(item T) int
 	SizeOfMany(mem []byte, offsetBytes int, numItems int) (int, error)
-	SerializeManyToSlice(items []C) []byte
-	SerializeOneToSlice(item C) []byte
-	DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]C, error)
+	SerializeManyToSlice(items []T) []byte
+	SerializeOneToSlice(item T) []byte
+	DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]T, error)
 }

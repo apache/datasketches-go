@@ -375,7 +375,7 @@ func TestReservoirItemsSketchDeserializationErrors(t *testing.T) {
 	t.Run("BadFamily", func(t *testing.T) {
 		data := make([]byte, 8)
 		data[0] = 0xC0 | preambleIntsEmpty
-		data[1] = serVer
+		data[1] = reservoirItemsSketchSerialVersion
 		data[2] = 99 // invalid family ID
 		data[3] = flagEmpty
 		binary.LittleEndian.PutUint32(data[4:], 100)
@@ -388,7 +388,7 @@ func TestReservoirItemsSketchDeserializationErrors(t *testing.T) {
 	t.Run("BadPreLongs", func(t *testing.T) {
 		data := make([]byte, 8)
 		data[0] = 0xC0 | 5 // invalid preamble longs
-		data[1] = serVer
+		data[1] = reservoirItemsSketchSerialVersion
 		data[2] = byte(internal.FamilyEnum.ReservoirItems.Id)
 		data[3] = flagEmpty
 		binary.LittleEndian.PutUint32(data[4:], 100)

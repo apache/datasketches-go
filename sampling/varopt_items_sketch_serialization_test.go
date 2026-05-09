@@ -265,6 +265,14 @@ func TestVarOptItemsSketchCppCompat(t *testing.T) {
 }
 
 func TestVarOptItemsSketchSerialization(t *testing.T) {
+	t.Run("nil sketch encode", func(t *testing.T) {
+		var buf bytes.Buffer
+		encoder := NewVarOptItemsSketchEncoder[int64](&buf, common.ItemSketchLongSerDe{})
+
+		err := encoder.Encode(nil)
+		require.ErrorContains(t, err, "cannot encode nil VarOptItemsSketch")
+	})
+
 	t.Run("bad serialization version", func(t *testing.T) {
 		sketch := createUnweightedVarOptItemsSketch(t, 16, 16)
 		data := encodeVarOptItemsSketch(t, sketch, common.ItemSketchLongSerDe{})
@@ -331,6 +339,14 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 			_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
 			require.ErrorContains(t, err, "invalid state in warmup mode: expected r==0, got r=4294967168")
 		})
+
+		t.Run("warmup preamble in full mode", func(t *testing.T) {
+			data := encodeVarOptItemsSketch(t, createUnweightedVarOptItemsSketch(t, 32, 33), common.ItemSketchLongSerDe{})
+			data[0] = (data[0] & 0xc0) | preambleLongsWarmup
+
+			_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			require.ErrorContains(t, err, "invalid preamble longs: expected full because n>k, got 3")
+		})
 	})
 
 	t.Run("empty sketch", func(t *testing.T) {
@@ -361,7 +377,41 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 		require.ErrorContains(t, err, "invalid preamble longs: expected warmup or full, got 1")
 	})
 
-	t.Run("corrupt serialized weight", func(t *testing.T) {
+	t.Run("invalid full mode H plus R count", func(t *testing.T) {
+		data := encodeVarOptItemsSketch(t, createUnweightedVarOptItemsSketch(t, 32, 33), common.ItemSketchLongSerDe{})
+		binary.LittleEndian.PutUint32(data[20:], 0)
+
+		_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+		require.ErrorContains(t, err, "invalid state in full mode: expected h+r==k")
+	})
+
+	t.Run("corrupt serialized R weight", func(t *testing.T) {
+		t.Run("zero", func(t *testing.T) {
+			data := encodeVarOptItemsSketch(t, createUnweightedVarOptItemsSketch(t, 32, 33), common.ItemSketchLongSerDe{})
+			binary.LittleEndian.PutUint64(data[24:], math.Float64bits(0))
+
+			_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			require.ErrorContains(t, err, "data is corrupt in full mode: invalid R region weight")
+		})
+
+		t.Run("negative", func(t *testing.T) {
+			data := encodeVarOptItemsSketch(t, createUnweightedVarOptItemsSketch(t, 32, 33), common.ItemSketchLongSerDe{})
+			binary.LittleEndian.PutUint64(data[24:], math.Float64bits(-1.5))
+
+			_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			require.ErrorContains(t, err, "data is corrupt in full mode: invalid R region weight")
+		})
+
+		t.Run("nan", func(t *testing.T) {
+			data := encodeVarOptItemsSketch(t, createUnweightedVarOptItemsSketch(t, 32, 33), common.ItemSketchLongSerDe{})
+			binary.LittleEndian.PutUint64(data[24:], math.Float64bits(math.NaN()))
+
+			_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			require.ErrorContains(t, err, "data is corrupt in full mode: invalid R region weight")
+		})
+	})
+
+	t.Run("corrupt serialized H weight", func(t *testing.T) {
 		sketch := createUnweightedVarOptItemsSketch(t, 100, 20)
 		data := encodeVarOptItemsSketch(t, sketch, common.ItemSketchLongSerDe{})
 		preambleBytes := int(data[0]&0x3f) << 3

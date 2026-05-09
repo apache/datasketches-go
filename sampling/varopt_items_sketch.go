@@ -782,7 +782,7 @@ func (s *VarOptItemsSketch[T]) EstimateSubsetSum(predicate func(T) bool) (Sample
 }
 
 // SerializedSizeBytes computes size needed to serialize the current state of the sketch.
-func (s *VarOptItemsSketch[T]) SerializedSizeBytes(serde ItemsSerDe[T]) int {
+func (s *VarOptItemsSketch[T]) SerializedSizeBytes(serde common.ItemSketchSerde[T]) int {
 	if s.IsEmpty() {
 		return preambleIntsEmpty << 3
 	}
@@ -801,6 +801,9 @@ func (s *VarOptItemsSketch[T]) SerializedSizeBytes(serde ItemsSerDe[T]) int {
 		}
 	}
 
-	numBytes += serde.SizeOfItem() * (s.h + s.r)
+	for sample := range s.All() {
+		numBytes += serde.SizeOf(sample.Item)
+	}
+
 	return numBytes
 }

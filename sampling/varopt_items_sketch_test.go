@@ -18,9 +18,11 @@
 package sampling
 
 import (
+	"bytes"
 	"math"
 	"testing"
 
+	"github.com/apache/datasketches-go/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -121,6 +123,80 @@ func TestVarOptItemsSketch_Reset(t *testing.T) {
 		assert.True(t, sketch.IsEmpty())
 		assert.Equal(t, 0, sketch.H())
 		assert.Equal(t, 0, sketch.R())
+	})
+}
+
+func TestVarOptItemsSketch_SerializedSizeBytes(t *testing.T) {
+	t.Run("empty sketch", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int64](10)
+		assert.NoError(t, err)
+
+		var buf bytes.Buffer
+		encoder := NewVarOptItemsSketchEncoder(&buf, common.ItemSketchLongSerDe{})
+		err = encoder.Encode(sketch)
+		assert.NoError(t, err)
+
+		assert.Equal(t, buf.Len(), sketch.SerializedSizeBytes(common.ItemSketchLongSerDe{}))
+		assert.Equal(t, int(preambleLongsEmpty<<3), sketch.SerializedSizeBytes(common.ItemSketchLongSerDe{}))
+	})
+
+	t.Run("warmup sketch", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int64](10)
+		assert.NoError(t, err)
+		for i := int64(1); i <= 5; i++ {
+			err = sketch.Update(i, float64(i))
+			assert.NoError(t, err)
+		}
+		assert.Equal(t, 0, sketch.R())
+
+		var buf bytes.Buffer
+		encoder := NewVarOptItemsSketchEncoder(&buf, common.ItemSketchLongSerDe{})
+		err = encoder.Encode(sketch)
+		assert.NoError(t, err)
+
+		assert.Equal(t, buf.Len(), sketch.SerializedSizeBytes(common.ItemSketchLongSerDe{}))
+		assert.Equal(t, int(preambleLongsWarmup<<3)+sketch.H()*8+sketch.H()*8, sketch.SerializedSizeBytes(common.ItemSketchLongSerDe{}))
+	})
+
+	t.Run("warmup string sketch", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[string](10)
+		assert.NoError(t, err)
+		for i, item := range []string{"a", "bc", "def"} {
+			err = sketch.Update(item, float64(i+1))
+			assert.NoError(t, err)
+		}
+		assert.Equal(t, 0, sketch.R())
+
+		var buf bytes.Buffer
+		encoder := NewVarOptItemsSketchEncoder(&buf, common.ItemSketchStringSerDe{})
+		err = encoder.Encode(sketch)
+		assert.NoError(t, err)
+
+		expectedSize := int(preambleLongsWarmup << 3)
+		expectedSize += sketch.H() * 8
+		expectedSize += common.ItemSketchStringSerDe{}.SizeOf("a")
+		expectedSize += common.ItemSketchStringSerDe{}.SizeOf("bc")
+		expectedSize += common.ItemSketchStringSerDe{}.SizeOf("def")
+		assert.Equal(t, buf.Len(), sketch.SerializedSizeBytes(common.ItemSketchStringSerDe{}))
+		assert.Equal(t, expectedSize, sketch.SerializedSizeBytes(common.ItemSketchStringSerDe{}))
+	})
+
+	t.Run("full sketch", func(t *testing.T) {
+		sketch, err := NewVarOptItemsSketch[int64](10)
+		assert.NoError(t, err)
+		for i := int64(1); i <= 20; i++ {
+			err = sketch.Update(i, 1.0)
+			assert.NoError(t, err)
+		}
+		assert.Greater(t, sketch.R(), 0)
+
+		var buf bytes.Buffer
+		encoder := NewVarOptItemsSketchEncoder(&buf, common.ItemSketchLongSerDe{})
+		err = encoder.Encode(sketch)
+		assert.NoError(t, err)
+
+		assert.Equal(t, buf.Len(), sketch.SerializedSizeBytes(common.ItemSketchLongSerDe{}))
+		assert.Equal(t, int(preambleLongsFull<<3)+sketch.H()*8+(sketch.H()+sketch.R())*8, sketch.SerializedSizeBytes(common.ItemSketchLongSerDe{}))
 	})
 }
 

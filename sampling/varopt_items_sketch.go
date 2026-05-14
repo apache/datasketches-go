@@ -26,6 +26,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
 )
 
@@ -81,12 +82,15 @@ type varOptConfig struct {
 	resizeFactor ResizeFactor
 }
 
+// WithResizeFactor sets the resize factor in the VarOpt configuration.
 func WithResizeFactor(rf ResizeFactor) VarOptOption {
 	return func(c *varOptConfig) {
 		c.resizeFactor = rf
 	}
 }
 
+// NewVarOptItemsSketch creates a new VarOptItemsSketch with a specified maximum capacity `k` and optional configurations.
+// It returns an error if `k` is less than 1 or exceeds the maximum allowed value (2^31 - 2).
 func NewVarOptItemsSketch[T any](k uint, opts ...VarOptOption) (*VarOptItemsSketch[T], error) {
 	if k < 1 || k > varOptMaxK {
 		return nil, errors.New("k must be at least 1 and less than 2^31 - 1")
@@ -116,6 +120,42 @@ func NewVarOptItemsSketch[T any](k uint, opts ...VarOptOption) (*VarOptItemsSket
 		data:         make([]T, 0, currItemsAlloc),
 		weights:      make([]float64, 0, currItemsAlloc),
 		rf:           cfg.resizeFactor,
+		numMarksInH:  0,
+	}, nil
+}
+
+func newVarOptItemsSketchFromState[T any](
+	k int, rf ResizeFactor, isGadget bool,
+) (*VarOptItemsSketch[T], error) {
+	if k == 0 || k > varOptMaxK {
+		return nil, errors.New("k must be at least 1 and less than 2^31 - 1")
+	}
+
+	ceilingLgK := math.Log2(float64(common.CeilingPowerOf2(k)))
+	initialLgSize := startingSubMultiple(int(ceilingLgK), int(rf), minLgArrItems)
+	currItemsAlloc := adjustedSamplingAllocationSize(k, 1<<initialLgSize)
+	if currItemsAlloc == k {
+		currItemsAlloc++
+	}
+
+	data := make([]T, 0, currItemsAlloc)
+	weights := make([]float64, 0, currItemsAlloc)
+	var marks []bool
+	if isGadget {
+		marks = make([]bool, 0, currItemsAlloc)
+	}
+
+	return &VarOptItemsSketch[T]{
+		k:            k,
+		h:            0,
+		m:            0,
+		r:            0,
+		n:            0,
+		totalWeightR: 0.0,
+		rf:           rf,
+		marks:        marks,
+		data:         data,
+		weights:      weights,
 		numMarksInH:  0,
 	}, nil
 }
@@ -739,4 +779,31 @@ func (s *VarOptItemsSketch[T]) EstimateSubsetSum(predicate func(T) bool) (Sample
 		UpperBound:        trueWeightInH + s.totalWeightR*upperTrueFraction,
 		TotalSketchWeight: weightSumInH + s.totalWeightR,
 	}, nil
+}
+
+// SerializedSizeBytes computes size needed to serialize the current state of the sketch.
+func (s *VarOptItemsSketch[T]) SerializedSizeBytes(serde common.ItemSketchSerde[T]) int {
+	if s.IsEmpty() {
+		return preambleIntsEmpty << 3
+	}
+
+	numBytes := int(preambleLongsFull << 3)
+	if s.r == 0 {
+		numBytes = int(preambleLongsWarmup << 3)
+	}
+
+	numBytes += s.h * 8 // weights.
+
+	if s.marks != nil {
+		numBytes += s.h / 8
+		if s.h%8 > 0 {
+			numBytes++
+		}
+	}
+
+	for sample := range s.All() {
+		numBytes += serde.SizeOf(sample.Item)
+	}
+
+	return numBytes
 }

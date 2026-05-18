@@ -29,14 +29,16 @@ This is the core Go component of the DataSketches library.  It contains some of 
 
 **This project is currently under development. Breaking changes may occur before a stable release.**
 
-Note that we have a parallel core component for C++, Java and Python implementations of the same sketch algorithms,
-[datasketches-cpp](https://github.com/apache/datasketches-cpp) and [datasketches-java](https://github.com/apache/datasketches-java).
+Note that we have parallel core library components for C++, Java, Python, and Rust implementations of many of the same sketch algorithms:
+
+- [datasketches-cpp](https://github.com/apache/datasketches-cpp)
+- [datasketches-java](https://github.com/apache/datasketches-java)
+- [datasketches-python](https://github.com/apache/datasketches-python)
+- [datasketches-rust](https://github.com/apache/datasketches-rust)
 
 Please visit the main [DataSketches website](https://datasketches.apache.org) for more information.
 
-If you are interested in making contributions to this site please see our [Community](https://datasketches.apache.org/docs/Community/) page for how to contact us.
-
-
+If you are interested in making contributions to this site, please see our [Community](https://datasketches.apache.org/docs/Community/) page for information on how to contact us.
 
 ## Major Sketches
 | Type         | Implementation          | Status |

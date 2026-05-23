@@ -677,8 +677,8 @@ func (d *compactorDecoder) Decode(r io.Reader) (compactorDecodingResult, error) 
 	}
 
 	var (
-		minItem = float32(math.MaxFloat32)
-		maxItem = float32(-math.MaxFloat32)
+		minItem = float32(math.Inf(1))
+		maxItem = float32(math.Inf(-1))
 	)
 	items := make([]float32, 0, count)
 	for i := uint32(0); i < count; i++ {

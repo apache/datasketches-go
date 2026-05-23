@@ -592,6 +592,12 @@ func runCompactorSerializationDeserializationNegative(t *testing.T, k int, hra b
 	assert.NoError(t, err)
 	assert.Equal(t, float32(-nomCap), result.minItem)
 	assert.Equal(t, float32(-1), result.maxItem)
+
+	decoder := newCompactorDecoder(c1.sorted, hra)
+	result2, err := decoder.Decode(bytes.NewReader(c1ser))
+	assert.NoError(t, err)
+	assert.Equal(t, float32(-nomCap), result2.minItem)
+	assert.Equal(t, float32(-1), result2.maxItem)
 }
 
 func TestCompactorSerializationDeserializationWithMixedValues(t *testing.T) {
@@ -620,4 +626,45 @@ func runCompactorSerializationDeserializationMixed(t *testing.T, k int, hra bool
 	assert.NoError(t, err)
 	assert.Equal(t, float32(-half), result.minItem)
 	assert.Equal(t, float32(half-1), result.maxItem)
+
+	decoder := newCompactorDecoder(c1.sorted, hra)
+	result2, err := decoder.Decode(bytes.NewReader(c1ser))
+	assert.NoError(t, err)
+	assert.Equal(t, float32(-half), result2.minItem)
+	assert.Equal(t, float32(half-1), result2.maxItem)
+}
+
+func TestCompactorSerializationDeserializationWithInfiniteValues(t *testing.T) {
+	t.Run("LRA", func(t *testing.T) {
+		runCompactorSerializationDeserializationInfinite(t, 12, false)
+	})
+	t.Run("HRA", func(t *testing.T) {
+		runCompactorSerializationDeserializationInfinite(t, 12, true)
+	})
+}
+
+func runCompactorSerializationDeserializationInfinite(t *testing.T, k int, hra bool) {
+	t.Helper()
+	c1 := newCompactor(0, hra, k)
+	posInf := float32(math.Inf(1))
+	negInf := float32(math.Inf(-1))
+
+	c1.Append(posInf)
+	c1.Append(1)
+	c1.Append(negInf)
+	c1.Append(-1)
+
+	c1ser, err := c1.MarshalBinary()
+	assert.NoError(t, err)
+
+	result, err := decodeCompactor(c1ser, 0, c1.sorted, hra)
+	assert.NoError(t, err)
+	assert.Equal(t, negInf, result.minItem)
+	assert.Equal(t, posInf, result.maxItem)
+
+	decoder := newCompactorDecoder(c1.sorted, hra)
+	result2, err := decoder.Decode(bytes.NewReader(c1ser))
+	assert.NoError(t, err)
+	assert.Equal(t, negInf, result2.minItem)
+	assert.Equal(t, posInf, result2.maxItem)
 }

@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"strings"
 
+	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
 )
 
@@ -294,7 +295,7 @@ const (
 // If the sketch contains string values and the caller cares about
 // cross-language compatibility, it is the caller's responsibility to ensure
 // that the serialized string data is encoded as valid UTF-8.
-func (u *ReservoirItemsUnion[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
+func (u *ReservoirItemsUnion[T]) ToSlice(serde common.ItemSketchSerde[T]) ([]byte, error) {
 	empty := u.gadget == nil || u.gadget.NumSamples() == 0
 
 	if empty {
@@ -330,7 +331,7 @@ func (u *ReservoirItemsUnion[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 // If the sketch contains string values and the caller cares about
 // cross-language compatibility, it is the caller's responsibility to ensure
 // that the serialized string data is encoded as valid UTF-8.
-func NewReservoirItemsUnionFromSlice[T any](data []byte, serde ItemsSerDe[T]) (*ReservoirItemsUnion[T], error) {
+func NewReservoirItemsUnionFromSlice[T any](data []byte, serde common.ItemSketchSerde[T]) (*ReservoirItemsUnion[T], error) {
 	if len(data) < 8 {
 		return nil, errors.New("data too short")
 	}

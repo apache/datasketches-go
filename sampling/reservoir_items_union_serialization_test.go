@@ -23,8 +23,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal"
 )
 
 func TestGenerateGoUnionBinariesForCompatibilityTesting(t *testing.T) {
@@ -43,7 +45,7 @@ func TestGenerateGoUnionBinariesForCompatibilityTesting(t *testing.T) {
 		// Empty
 		t.Run("empty_maxk128", func(t *testing.T) {
 			union, _ := NewReservoirItemsUnion[int64](128)
-			data, _ := union.ToSlice(Int64SerDe{})
+			data, _ := union.ToSlice(common.ItemSketchLongSerDe{})
 			os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_long_empty_maxk128_go.sk", internal.GoPath), data, 0644)
 		})
 		// Exact
@@ -54,7 +56,7 @@ func TestGenerateGoUnionBinariesForCompatibilityTesting(t *testing.T) {
 				for i := 0; i < n; i++ {
 					union.Update(int64(i))
 				}
-				data, _ := union.ToSlice(Int64SerDe{})
+				data, _ := union.ToSlice(common.ItemSketchLongSerDe{})
 				os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_long_exact_n%d_maxk128_go.sk", internal.GoPath, n), data, 0644)
 			})
 		}
@@ -66,7 +68,7 @@ func TestGenerateGoUnionBinariesForCompatibilityTesting(t *testing.T) {
 				for i := 0; i < 1000; i++ {
 					union.Update(int64(i))
 				}
-				data, _ := union.ToSlice(Int64SerDe{})
+				data, _ := union.ToSlice(common.ItemSketchLongSerDe{})
 				os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_long_sampling_n1000_maxk%d_go.sk", internal.GoPath, k), data, 0644)
 			})
 		}
@@ -77,7 +79,7 @@ func TestGenerateGoUnionBinariesForCompatibilityTesting(t *testing.T) {
 		// Empty
 		t.Run("empty_maxk128", func(t *testing.T) {
 			union, _ := NewReservoirItemsUnion[float64](128)
-			data, _ := union.ToSlice(Float64SerDe{})
+			data, _ := union.ToSlice(common.ItemSketchDoubleSerDe{})
 			os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_double_empty_maxk128_go.sk", internal.GoPath), data, 0644)
 		})
 		// Exact
@@ -88,7 +90,7 @@ func TestGenerateGoUnionBinariesForCompatibilityTesting(t *testing.T) {
 				for i := 0; i < n; i++ {
 					union.Update(float64(i))
 				}
-				data, _ := union.ToSlice(Float64SerDe{})
+				data, _ := union.ToSlice(common.ItemSketchDoubleSerDe{})
 				os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_double_exact_n%d_maxk128_go.sk", internal.GoPath, n), data, 0644)
 			})
 		}
@@ -100,7 +102,7 @@ func TestGenerateGoUnionBinariesForCompatibilityTesting(t *testing.T) {
 				for i := 0; i < 1000; i++ {
 					union.Update(float64(i))
 				}
-				data, _ := union.ToSlice(Float64SerDe{})
+				data, _ := union.ToSlice(common.ItemSketchDoubleSerDe{})
 				os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_double_sampling_n1000_maxk%d_go.sk", internal.GoPath, k), data, 0644)
 			})
 		}
@@ -111,7 +113,7 @@ func TestGenerateGoUnionBinariesForCompatibilityTesting(t *testing.T) {
 		// Empty
 		t.Run("empty_maxk128", func(t *testing.T) {
 			union, _ := NewReservoirItemsUnion[string](128)
-			data, _ := union.ToSlice(StringSerDe{})
+			data, _ := union.ToSlice(common.ItemSketchStringSerDe{})
 			os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_string_empty_maxk128_go.sk", internal.GoPath), data, 0644)
 		})
 		// Exact
@@ -122,7 +124,7 @@ func TestGenerateGoUnionBinariesForCompatibilityTesting(t *testing.T) {
 				for i := 0; i < n; i++ {
 					union.Update(fmt.Sprintf("item%d", i))
 				}
-				data, _ := union.ToSlice(StringSerDe{})
+				data, _ := union.ToSlice(common.ItemSketchStringSerDe{})
 				os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_string_exact_n%d_maxk128_go.sk", internal.GoPath, n), data, 0644)
 			})
 		}
@@ -134,7 +136,7 @@ func TestGenerateGoUnionBinariesForCompatibilityTesting(t *testing.T) {
 				for i := 0; i < 1000; i++ {
 					union.Update(fmt.Sprintf("item%d", i))
 				}
-				data, _ := union.ToSlice(StringSerDe{})
+				data, _ := union.ToSlice(common.ItemSketchStringSerDe{})
 				os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_string_sampling_n1000_maxk%d_go.sk", internal.GoPath, k), data, 0644)
 			})
 		}
@@ -217,7 +219,7 @@ func TestReservoirItemsUnion_JavaCompat(t *testing.T) {
 				data, err := os.ReadFile(path)
 				assert.NoError(t, err)
 
-				union, err := NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
+				union, err := NewReservoirItemsUnionFromSlice[int64](data, common.ItemSketchLongSerDe{})
 				assert.NoError(t, err)
 				result, err := union.Result()
 				assert.NoError(t, err)
@@ -269,7 +271,7 @@ func TestReservoirItemsUnion_JavaCompat(t *testing.T) {
 				data, err := os.ReadFile(path)
 				assert.NoError(t, err)
 
-				union, err := NewReservoirItemsUnionFromSlice[float64](data, Float64SerDe{})
+				union, err := NewReservoirItemsUnionFromSlice[float64](data, common.ItemSketchDoubleSerDe{})
 				assert.NoError(t, err)
 				result, err := union.Result()
 				assert.NoError(t, err)
@@ -321,7 +323,7 @@ func TestReservoirItemsUnion_JavaCompat(t *testing.T) {
 				data, err := os.ReadFile(path)
 				assert.NoError(t, err)
 
-				union, err := NewReservoirItemsUnionFromSlice[string](data, StringSerDe{})
+				union, err := NewReservoirItemsUnionFromSlice[string](data, common.ItemSketchStringSerDe{})
 				assert.NoError(t, err)
 				result, err := union.Result()
 				assert.NoError(t, err)

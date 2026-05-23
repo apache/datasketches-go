@@ -26,6 +26,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
 )
 
@@ -47,7 +48,7 @@ func TestGenerateGoSketchBinariesForCompatibilityTesting(t *testing.T) {
 		// Empty
 		t.Run("empty_k128", func(t *testing.T) {
 			sketch, _ := NewReservoirItemsSketch[int64](128)
-			data, _ := sketch.ToSlice(Int64SerDe{})
+			data, _ := sketch.ToSlice(common.ItemSketchLongSerDe{})
 			os.WriteFile(fmt.Sprintf("%s/reservoir_items_long_empty_k128_go.sk", internal.GoPath), data, 0644)
 		})
 		// Exact
@@ -58,7 +59,7 @@ func TestGenerateGoSketchBinariesForCompatibilityTesting(t *testing.T) {
 				for i := int64(0); i < int64(n); i++ {
 					sketch.Update(i)
 				}
-				data, _ := sketch.ToSlice(Int64SerDe{})
+				data, _ := sketch.ToSlice(common.ItemSketchLongSerDe{})
 				os.WriteFile(fmt.Sprintf("%s/reservoir_items_long_exact_n%d_k128_go.sk", internal.GoPath, n), data, 0644)
 			})
 		}
@@ -70,7 +71,7 @@ func TestGenerateGoSketchBinariesForCompatibilityTesting(t *testing.T) {
 				for i := int64(0); i < 1000; i++ {
 					sketch.Update(i)
 				}
-				data, _ := sketch.ToSlice(Int64SerDe{})
+				data, _ := sketch.ToSlice(common.ItemSketchLongSerDe{})
 				os.WriteFile(fmt.Sprintf("%s/reservoir_items_long_sampling_n1000_k%d_go.sk", internal.GoPath, k), data, 0644)
 			})
 		}
@@ -81,7 +82,7 @@ func TestGenerateGoSketchBinariesForCompatibilityTesting(t *testing.T) {
 		// Empty
 		t.Run("empty_k128", func(t *testing.T) {
 			sketch, _ := NewReservoirItemsSketch[float64](128)
-			data, _ := sketch.ToSlice(Float64SerDe{})
+			data, _ := sketch.ToSlice(common.ItemSketchDoubleSerDe{})
 			os.WriteFile(fmt.Sprintf("%s/reservoir_items_double_empty_k128_go.sk", internal.GoPath), data, 0644)
 		})
 		// Exact
@@ -92,7 +93,7 @@ func TestGenerateGoSketchBinariesForCompatibilityTesting(t *testing.T) {
 				for i := 0; i < n; i++ {
 					sketch.Update(float64(i))
 				}
-				data, _ := sketch.ToSlice(Float64SerDe{})
+				data, _ := sketch.ToSlice(common.ItemSketchDoubleSerDe{})
 				os.WriteFile(fmt.Sprintf("%s/reservoir_items_double_exact_n%d_k128_go.sk", internal.GoPath, n), data, 0644)
 			})
 		}
@@ -104,7 +105,7 @@ func TestGenerateGoSketchBinariesForCompatibilityTesting(t *testing.T) {
 				for i := 0; i < 1000; i++ {
 					sketch.Update(float64(i))
 				}
-				data, _ := sketch.ToSlice(Float64SerDe{})
+				data, _ := sketch.ToSlice(common.ItemSketchDoubleSerDe{})
 				os.WriteFile(fmt.Sprintf("%s/reservoir_items_double_sampling_n1000_k%d_go.sk", internal.GoPath, k), data, 0644)
 			})
 		}
@@ -115,7 +116,7 @@ func TestGenerateGoSketchBinariesForCompatibilityTesting(t *testing.T) {
 		// Empty
 		t.Run("empty_k128", func(t *testing.T) {
 			sketch, _ := NewReservoirItemsSketch[string](128)
-			data, _ := sketch.ToSlice(StringSerDe{})
+			data, _ := sketch.ToSlice(common.ItemSketchStringSerDe{})
 			os.WriteFile(fmt.Sprintf("%s/reservoir_items_string_empty_k128_go.sk", internal.GoPath), data, 0644)
 		})
 		// Exact
@@ -126,7 +127,7 @@ func TestGenerateGoSketchBinariesForCompatibilityTesting(t *testing.T) {
 				for i := 0; i < n; i++ {
 					sketch.Update(fmt.Sprintf("item%d", i))
 				}
-				data, _ := sketch.ToSlice(StringSerDe{})
+				data, _ := sketch.ToSlice(common.ItemSketchStringSerDe{})
 				os.WriteFile(fmt.Sprintf("%s/reservoir_items_string_exact_n%d_k128_go.sk", internal.GoPath, n), data, 0644)
 			})
 		}
@@ -138,7 +139,7 @@ func TestGenerateGoSketchBinariesForCompatibilityTesting(t *testing.T) {
 				for i := 0; i < 1000; i++ {
 					sketch.Update(fmt.Sprintf("item%d", i))
 				}
-				data, _ := sketch.ToSlice(StringSerDe{})
+				data, _ := sketch.ToSlice(common.ItemSketchStringSerDe{})
 				os.WriteFile(fmt.Sprintf("%s/reservoir_items_string_sampling_n1000_k%d_go.sk", internal.GoPath, k), data, 0644)
 			})
 		}
@@ -155,7 +156,7 @@ func TestSerializationCompatibilityEmpty(t *testing.T) {
 	data, err := os.ReadFile(filename)
 	assert.NoError(t, err)
 
-	sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
+	sketch, err := NewReservoirItemsSketchFromSlice[int64](data, common.ItemSketchLongSerDe{})
 	assert.NoError(t, err)
 	assert.True(t, sketch.isEmpty())
 	assert.Equal(t, 128, sketch.K())
@@ -186,7 +187,7 @@ func TestSerializationCompatibilityExact(t *testing.T) {
 			data, err := os.ReadFile(filename)
 			assert.NoError(t, err)
 
-			sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
+			sketch, err := NewReservoirItemsSketchFromSlice[int64](data, common.ItemSketchLongSerDe{})
 			assert.NoError(t, err)
 			assert.Equal(t, tc.k, sketch.K())
 			assert.Equal(t, tc.n, sketch.N())
@@ -217,7 +218,7 @@ func TestSerializationCompatibilityWithSampling(t *testing.T) {
 			data, err := os.ReadFile(filename)
 			assert.NoError(t, err)
 
-			sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
+			sketch, err := NewReservoirItemsSketchFromSlice[int64](data, common.ItemSketchLongSerDe{})
 			assert.NoError(t, err)
 			assert.Equal(t, tc.k, sketch.K())
 			assert.Equal(t, tc.n, sketch.N())
@@ -235,7 +236,7 @@ func TestSerializationRoundTrip(t *testing.T) {
 	}
 
 	// Serialize
-	data, err := sketch.ToSlice(Int64SerDe{})
+	data, err := sketch.ToSlice(common.ItemSketchLongSerDe{})
 	assert.NoError(t, err)
 
 	// Verify preamble structure (Java-compatible format)
@@ -245,7 +246,7 @@ func TestSerializationRoundTrip(t *testing.T) {
 	assert.Equal(t, byte(internal.FamilyEnum.ReservoirItems.Id), data[2]) // familyID
 
 	// Deserialize and verify
-	restored, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
+	restored, err := NewReservoirItemsSketchFromSlice[int64](data, common.ItemSketchLongSerDe{})
 	assert.NoError(t, err)
 	assert.Equal(t, sketch.K(), restored.K())
 	assert.Equal(t, sketch.N(), restored.N())
@@ -322,7 +323,7 @@ func TestReservoirItemsSketch_JavaCompat(t *testing.T) {
 			data, err := os.ReadFile(filepath)
 			assert.NoError(t, err)
 
-			sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
+			sketch, err := NewReservoirItemsSketchFromSlice[int64](data, common.ItemSketchLongSerDe{})
 			assert.NoError(t, err)
 
 			assert.Equal(t, tc.k, sketch.K(), "k mismatch")
@@ -351,7 +352,7 @@ func TestReservoirItemsSketchLegacySerVerEmpty(t *testing.T) {
 	data[3] = flagEmpty
 	binary.LittleEndian.PutUint16(data[4:], 0x5000) // p=10, i=0 => k=1024
 
-	sketch, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
+	sketch, err := NewReservoirItemsSketchFromSlice[int64](data, common.ItemSketchLongSerDe{})
 	assert.NoError(t, err)
 	assert.True(t, sketch.isEmpty())
 	assert.Equal(t, 1024, sketch.K())
@@ -367,7 +368,7 @@ func TestReservoirItemsSketchDeserializationErrors(t *testing.T) {
 		data[3] = flagEmpty
 		binary.LittleEndian.PutUint32(data[4:], 100)
 
-		_, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
+		_, err := NewReservoirItemsSketchFromSlice[int64](data, common.ItemSketchLongSerDe{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "version")
 	})
@@ -380,7 +381,7 @@ func TestReservoirItemsSketchDeserializationErrors(t *testing.T) {
 		data[3] = flagEmpty
 		binary.LittleEndian.PutUint32(data[4:], 100)
 
-		_, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
+		_, err := NewReservoirItemsSketchFromSlice[int64](data, common.ItemSketchLongSerDe{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "family")
 	})
@@ -393,7 +394,7 @@ func TestReservoirItemsSketchDeserializationErrors(t *testing.T) {
 		data[3] = flagEmpty
 		binary.LittleEndian.PutUint32(data[4:], 100)
 
-		_, err := NewReservoirItemsSketchFromSlice[int64](data, Int64SerDe{})
+		_, err := NewReservoirItemsSketchFromSlice[int64](data, common.ItemSketchLongSerDe{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "preamble")
 	})

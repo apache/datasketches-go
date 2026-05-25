@@ -224,7 +224,7 @@ func (s *VarOptItemsSketch[T]) All() iter.Seq[Sample[T]] {
 		// R region: items with weight = tau
 		if s.r > 0 {
 			tau := s.tau()
-			for i := s.h + 1; i <= s.k; i++ {
+			for i := s.h + 1; i <= s.NumSamples(); i++ {
 				if !yield(Sample[T]{Item: s.data[i], Weight: tau}) {
 					return
 				}
@@ -806,4 +806,118 @@ func (s *VarOptItemsSketch[T]) SerializedSizeBytes(serde common.ItemSketchSerde[
 	}
 
 	return numBytes
+}
+
+func (s *VarOptItemsSketch[T]) hRegionSamplesWithMark() iter.Seq2[Sample[T], *bool] {
+	return func(yield func(Sample[T], *bool) bool) {
+		for i := 0; i < s.h; i++ {
+			if s.marks == nil {
+				if !yield(Sample[T]{Item: s.data[i], Weight: s.weights[i]}, nil) {
+					return
+				}
+			} else {
+				if !yield(Sample[T]{Item: s.data[i], Weight: s.weights[i]}, &s.marks[i]) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func (s *VarOptItemsSketch[T]) rRegionSamples() iter.Seq[Sample[T]] {
+	return func(yield func(Sample[T]) bool) {
+		tau := s.tau()
+		for i := s.h + 1; i <= s.NumSamples(); i++ {
+			if !yield(Sample[T]{Item: s.data[i], Weight: tau}) {
+				return
+			}
+		}
+	}
+}
+
+func (s *VarOptItemsSketch[T]) weightCorrRRegionSamples() iter.Seq[Sample[T]] {
+	return func(yield func(Sample[T]) bool) {
+		lastIdx := s.NumSamples()
+		cumWeight := float64(0)
+		rWeight := s.tau()
+		for i := s.h + 1; i <= lastIdx; i++ {
+			if i == lastIdx {
+				if !yield(Sample[T]{Item: s.data[i], Weight: s.totalWeightR - cumWeight}) {
+					return
+				}
+			} else {
+				if !yield(Sample[T]{Item: s.data[i], Weight: rWeight}) {
+					return
+				}
+				cumWeight += rWeight
+			}
+		}
+	}
+}
+
+func (s *VarOptItemsSketch[T]) decreaseKBy1() error {
+	if s.k <= 1 {
+		return errors.New("cannot decrease k below 1 in union")
+	}
+
+	switch {
+	case s.h == 0 && s.r == 0:
+		// exact mode, but no data yet; this reduction is somewhat gratuitous
+		s.k--
+	case s.h > 0 && s.r == 0:
+		// exact mode, but we have some data
+		s.k--
+		if s.h > s.k {
+			if err := s.transitionFromWarmup(); err != nil {
+				return err
+			}
+		}
+	case s.h > 0 && s.r > 0:
+		// reservoir mode, but we have some exact samples.
+		// Our strategy will be to pull an item out of H (which we are allowed to do since it's
+		// still just data), reduce k, and then re-insert the item
+
+		// first, slide the R zone to the left by 1, temporarily filling the gap
+		oldGapIdx := s.h
+		oldFinalRIdx := (s.h + 1 + s.r) - 1
+		if oldFinalRIdx != s.k {
+			return fmt.Errorf("invalid state when reducing k: %d != %d", oldFinalRIdx, s.k)
+		}
+		s.swap(oldFinalRIdx, oldGapIdx)
+
+		// now we pull an item out of H; any item is ok, but if we grab the rightmost and then
+		// reduce h_, the heap invariant will be preserved (and the gap will be restored), plus
+		// the push() of the item that will probably happen later will be cheap.
+
+		pulledIdx := s.h - 1
+		pulledItem := s.data[pulledIdx]
+		pulledWeight := s.weights[pulledIdx]
+		pulledMark := s.marks[pulledIdx]
+		if s.marks[pulledIdx] {
+			s.numMarksInH--
+		}
+		s.weights[pulledIdx] = -1.0 // to make bugs easier to spot
+
+		s.h--
+		s.k--
+		s.n-- // will be re-incremented with the update
+
+		s.update(pulledItem, pulledWeight, pulledMark)
+	case s.h == 0 && s.r > 0:
+		// pure reservoir mode, so can simply eject a randomly chosen sample from the reservoir
+		if s.r < 2 {
+			return errors.New("cannot reduce k below 1 in union")
+		}
+
+		rIdxToDelete := 1 + rand.Intn(s.r) // 1 for the gap
+		rightMostRIdx := (1 + s.r) - 1
+		s.swap(rIdxToDelete, rightMostRIdx)
+		s.weights[rightMostRIdx] = -1.0
+
+		s.k--
+		s.r--
+	default:
+	}
+
+	return nil
 }

@@ -21,8 +21,10 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal"
 )
 
 // Helper function to create a basic sketch with n items and capacity k
@@ -332,12 +334,12 @@ func TestReservoirItemsUnionSerialization(t *testing.T) {
 		union, err := NewReservoirItemsUnion[int64](100)
 		assert.NoError(t, err)
 
-		bytes, err := union.ToSlice(Int64SerDe{})
+		bytes, err := union.ToSlice(common.ItemSketchLongSerDe{})
 		assert.NoError(t, err)
 		assert.Equal(t, 8, len(bytes)) // Empty union is 8 bytes
 
 		// Deserialize
-		restored, err := NewReservoirItemsUnionFromSlice[int64](bytes, Int64SerDe{})
+		restored, err := NewReservoirItemsUnionFromSlice[int64](bytes, common.ItemSketchLongSerDe{})
 		assert.NoError(t, err)
 		assert.Equal(t, 100, restored.MaxK())
 
@@ -354,7 +356,7 @@ func TestReservoirItemsUnionSerialization(t *testing.T) {
 		data[3] = unionFlagEmpty
 		binary.LittleEndian.PutUint16(data[4:], 0x5000) // p=10, i=0 => maxK=1024
 
-		union, err := NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
+		union, err := NewReservoirItemsUnionFromSlice[int64](data, common.ItemSketchLongSerDe{})
 		assert.NoError(t, err)
 		assert.Equal(t, 1024, union.MaxK())
 
@@ -372,12 +374,12 @@ func TestReservoirItemsUnionSerialization(t *testing.T) {
 			union.Update(i)
 		}
 
-		bytes, err := union.ToSlice(Int64SerDe{})
+		bytes, err := union.ToSlice(common.ItemSketchLongSerDe{})
 		assert.NoError(t, err)
 		assert.Greater(t, len(bytes), 8) // Non-empty should be larger
 
 		// Deserialize
-		restored, err := NewReservoirItemsUnionFromSlice[int64](bytes, Int64SerDe{})
+		restored, err := NewReservoirItemsUnionFromSlice[int64](bytes, common.ItemSketchLongSerDe{})
 		assert.NoError(t, err)
 		assert.Equal(t, 100, restored.MaxK())
 
@@ -398,11 +400,11 @@ func TestReservoirItemsUnionSerialization(t *testing.T) {
 		assert.NoError(t, union.UpdateSketch(sketch))
 
 		// Serialize
-		bytes, err := union.ToSlice(Int64SerDe{})
+		bytes, err := union.ToSlice(common.ItemSketchLongSerDe{})
 		assert.NoError(t, err)
 
 		// Deserialize
-		restored, err := NewReservoirItemsUnionFromSlice[int64](bytes, Int64SerDe{})
+		restored, err := NewReservoirItemsUnionFromSlice[int64](bytes, common.ItemSketchLongSerDe{})
 		assert.NoError(t, err)
 
 		result, err := restored.Result()
@@ -423,10 +425,10 @@ func TestReservoirItemsUnionSerialization(t *testing.T) {
 		sketch := newBasicSketch(n, smallK)
 		assert.NoError(t, union.UpdateSketch(sketch))
 
-		bytes, err := union.ToSlice(Int64SerDe{})
+		bytes, err := union.ToSlice(common.ItemSketchLongSerDe{})
 		assert.NoError(t, err)
 
-		restored, err := NewReservoirItemsUnionFromSlice[int64](bytes, Int64SerDe{})
+		restored, err := NewReservoirItemsUnionFromSlice[int64](bytes, common.ItemSketchLongSerDe{})
 		assert.NoError(t, err)
 		assert.Equal(t, maxK, restored.MaxK())
 
@@ -483,7 +485,7 @@ func TestReservoirItemsUnionEmpty(t *testing.T) {
 	union, err := NewReservoirItemsUnion[int64](100)
 	assert.NoError(t, err)
 
-	bytes, err := union.ToSlice(Int64SerDe{})
+	bytes, err := union.ToSlice(common.ItemSketchLongSerDe{})
 	assert.NoError(t, err)
 	assert.Equal(t, 8, len(bytes))
 }
@@ -521,10 +523,10 @@ func TestReservoirItemsUnionInstantiation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, sketch.N(), result.N())
 
-	bytes, err := sketch.ToSlice(Int64SerDe{})
+	bytes, err := sketch.ToSlice(common.ItemSketchLongSerDe{})
 	assert.NoError(t, err)
 
-	restoredSketch, err := NewReservoirItemsSketchFromSlice[int64](bytes, Int64SerDe{})
+	restoredSketch, err := NewReservoirItemsSketchFromSlice[int64](bytes, common.ItemSketchLongSerDe{})
 	assert.NoError(t, err)
 
 	union, err = NewReservoirItemsUnion[int64](sketch.K())
@@ -577,11 +579,11 @@ func TestReservoirItemsUnionDeserializationErrors(t *testing.T) {
 		union, err := NewReservoirItemsUnion[string](1024)
 		assert.NoError(t, err)
 
-		data, err := union.ToSlice(StringSerDe{})
+		data, err := union.ToSlice(common.ItemSketchStringSerDe{})
 		assert.NoError(t, err)
 		data[1] = 0
 
-		_, err = NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
+		_, err = NewReservoirItemsUnionFromSlice[int64](data, common.ItemSketchLongSerDe{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "version")
 	})
@@ -590,11 +592,11 @@ func TestReservoirItemsUnionDeserializationErrors(t *testing.T) {
 		union, err := NewReservoirItemsUnion[float64](1024)
 		assert.NoError(t, err)
 
-		data, err := union.ToSlice(Float64SerDe{})
+		data, err := union.ToSlice(common.ItemSketchDoubleSerDe{})
 		assert.NoError(t, err)
 		data[2] = 0
 
-		_, err = NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
+		_, err = NewReservoirItemsUnionFromSlice[int64](data, common.ItemSketchLongSerDe{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "family")
 	})
@@ -603,11 +605,11 @@ func TestReservoirItemsUnionDeserializationErrors(t *testing.T) {
 		union, err := NewReservoirItemsUnion[int64](1024)
 		assert.NoError(t, err)
 
-		data, err := union.ToSlice(Int64SerDe{})
+		data, err := union.ToSlice(common.ItemSketchLongSerDe{})
 		assert.NoError(t, err)
 		data[0] = 0
 
-		_, err = NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
+		_, err = NewReservoirItemsUnionFromSlice[int64](data, common.ItemSketchLongSerDe{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "preamble")
 	})
@@ -615,7 +617,7 @@ func TestReservoirItemsUnionDeserializationErrors(t *testing.T) {
 
 func TestReservoirItemsUnionFromSliceTooShortData(t *testing.T) {
 	data := []byte{0x01, 0x02, 0x03}
-	_, err := NewReservoirItemsUnionFromSlice[int64](data, Int64SerDe{})
+	_, err := NewReservoirItemsUnionFromSlice[int64](data, common.ItemSketchLongSerDe{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "too short")
 }

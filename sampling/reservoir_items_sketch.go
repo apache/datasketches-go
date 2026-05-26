@@ -349,7 +349,7 @@ func resizeFactorFromHeaderByte(b byte) (ResizeFactor, error) {
 // If the sketch contains string values and the caller cares about
 // cross-language compatibility, it is the caller's responsibility to ensure
 // that the serialized string data is encoded as valid UTF-8.
-func (s *ReservoirItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
+func (s *ReservoirItemsSketch[T]) ToSlice(serde common.ItemSketchSerde[T]) ([]byte, error) {
 	rfBits, err := resizeFactorBitsFor(s.rf)
 	if err != nil {
 		return nil, err
@@ -365,10 +365,7 @@ func (s *ReservoirItemsSketch[T]) ToSlice(serde ItemsSerDe[T]) ([]byte, error) {
 		return buf, nil
 	}
 
-	itemsBytes, err := serde.SerializeToBytes(s.data)
-	if err != nil {
-		return nil, err
-	}
+	itemsBytes := serde.SerializeManyToSlice(s.data)
 
 	preLongs := internal.FamilyEnum.ReservoirItems.MaxPreLongs
 	preBytes := preLongs * 8
@@ -415,7 +412,7 @@ func (s *ReservoirItemsSketch[T]) String() string {
 // If the sketch contains string values and the caller cares about
 // cross-language compatibility, it is the caller's responsibility to ensure
 // that the serialized string data is encoded as valid UTF-8.
-func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (*ReservoirItemsSketch[T], error) {
+func NewReservoirItemsSketchFromSlice[T any](data []byte, serde common.ItemSketchSerde[T]) (*ReservoirItemsSketch[T], error) {
 	if len(data) < 8 {
 		return nil, errors.New("data too short")
 	}
@@ -472,8 +469,7 @@ func NewReservoirItemsSketchFromSlice[T any](data []byte, serde ItemsSerDe[T]) (
 	}
 
 	numSamples := min(n, k)
-	itemsData := data[preambleLongBytes:]
-	items, err := serde.DeserializeFromBytes(itemsData, numSamples)
+	items, err := serde.DeserializeManyFromSlice(data, preambleLongBytes, numSamples)
 	if err != nil {
 		return nil, err
 	}

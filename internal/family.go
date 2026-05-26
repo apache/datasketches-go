@@ -23,18 +23,19 @@ type family struct {
 }
 
 type families struct {
-	HLL            family
-	Frequency      family
-	Kll            family
-	CPC            family
-	CountMinSketch family
-	BloomFilter    family
-	Tuple          family
-	Theta          family
-	TDigest        family
-	ReservoirItems family
-	VarOptItems    family
-	ReservoirUnion family
+	HLL              family
+	Frequency        family
+	Kll              family
+	CPC              family
+	CountMinSketch   family
+	BloomFilter      family
+	Tuple            family
+	Theta            family
+	TDigest          family
+	ReservoirItems   family
+	VarOptItems      family
+	ReservoirUnion   family
+	VarOptItemsUnion family
 }
 
 var FamilyEnum = &families{
@@ -85,5 +86,9 @@ var FamilyEnum = &families{
 	ReservoirUnion: family{
 		Id:          12,
 		MaxPreLongs: 1,
+	},
+	VarOptItemsUnion: family{
+		Id:          14,
+		MaxPreLongs: 4,
 	},
 }

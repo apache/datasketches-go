@@ -102,7 +102,7 @@ func TestVarOptItemsSketchJavaCompat(t *testing.T) {
 				}
 				require.NoError(t, err)
 
-				sketch, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+				sketch, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 				require.NoError(t, err)
 				assert.Equal(t, n == 0, sketch.IsEmpty())
 				assert.Equal(t, 32, sketch.K())
@@ -129,7 +129,7 @@ func TestVarOptItemsSketchJavaCompat(t *testing.T) {
 		}
 		require.NoError(t, err)
 
-		sketch, err := Decode[string](data, common.ItemSketchStringSerDe{})
+		sketch, err := DecodeVarOptItemsSketch[string](data, common.ItemSketchStringSerDe{})
 		require.NoError(t, err)
 		assert.False(t, sketch.IsEmpty())
 		assert.Equal(t, 1024, sketch.K())
@@ -155,7 +155,7 @@ func TestVarOptItemsSketchJavaCompat(t *testing.T) {
 		}
 		require.NoError(t, err)
 
-		sketch, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+		sketch, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 		require.NoError(t, err)
 		assert.False(t, sketch.IsEmpty())
 		assert.Equal(t, 1024, sketch.K())
@@ -189,7 +189,7 @@ func TestVarOptItemsSketchCppCompat(t *testing.T) {
 				}
 				require.NoError(t, err)
 
-				sketch, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+				sketch, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 				require.NoError(t, err)
 				assert.Equal(t, n == 0, sketch.IsEmpty())
 				assert.Equal(t, 32, sketch.K())
@@ -216,7 +216,7 @@ func TestVarOptItemsSketchCppCompat(t *testing.T) {
 		}
 		require.NoError(t, err)
 
-		sketch, err := Decode[string](data, common.ItemSketchStringSerDe{})
+		sketch, err := DecodeVarOptItemsSketch[string](data, common.ItemSketchStringSerDe{})
 		require.NoError(t, err)
 		assert.False(t, sketch.IsEmpty())
 		assert.Equal(t, 1024, sketch.K())
@@ -242,7 +242,7 @@ func TestVarOptItemsSketchCppCompat(t *testing.T) {
 		}
 		require.NoError(t, err)
 
-		sketch, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+		sketch, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 		require.NoError(t, err)
 		assert.False(t, sketch.IsEmpty())
 		assert.Equal(t, 1024, sketch.K())
@@ -278,7 +278,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 		data := encodeVarOptItemsSketch(t, sketch, common.ItemSketchLongSerDe{})
 		data[1] = 0
 
-		_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+		_, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 		require.ErrorContains(t, err, "invalid serialization version: expected 2, got 0")
 	})
 
@@ -287,7 +287,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 		data := encodeVarOptItemsSketch(t, sketch, common.ItemSketchLongSerDe{})
 		data[2] = 0
 
-		_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+		_, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 		require.ErrorContains(t, err, "invalid family ID: expected 13, got 0")
 	})
 
@@ -299,7 +299,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 				data := encodeVarOptItemsSketch(t, sketch, common.ItemSketchLongSerDe{})
 				data[0] = preLongs
 
-				_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+				_, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 				require.ErrorContains(t, err, fmt.Sprintf("invalid preamble longs: expected warmup or full, got %d", preLongs))
 			})
 		}
@@ -312,7 +312,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 			data := cloneBytes(source)
 			data[0] = preambleLongsFull
 
-			_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			_, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 			require.ErrorContains(t, err, "invalid preamble longs: expected warmup because n<=k, got 4")
 		})
 
@@ -320,7 +320,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 			data := cloneBytes(source)
 			binary.LittleEndian.PutUint32(data[4:], 0)
 
-			_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			_, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 			require.ErrorContains(t, err, "k must be at least 1 and less than 2^31 - 1")
 		})
 
@@ -328,7 +328,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 			data := cloneBytes(source)
 			binary.LittleEndian.PutUint32(data[16:], math.MaxUint32)
 
-			_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			_, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 			require.ErrorContains(t, err, "invalid state in warmup mode: expected n==h, got n=50, h=4294967295")
 		})
 
@@ -336,7 +336,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 			data := cloneBytes(source)
 			binary.LittleEndian.PutUint32(data[20:], uint32(0xffffff80))
 
-			_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			_, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 			require.ErrorContains(t, err, "invalid state in warmup mode: expected r==0, got r=4294967168")
 		})
 
@@ -344,7 +344,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 			data := encodeVarOptItemsSketch(t, createUnweightedVarOptItemsSketch(t, 32, 33), common.ItemSketchLongSerDe{})
 			data[0] = (data[0] & 0xc0) | preambleLongsWarmup
 
-			_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			_, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 			require.ErrorContains(t, err, "invalid preamble longs: expected full because n>k, got 3")
 		})
 	})
@@ -356,7 +356,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 		data := encodeVarOptItemsSketch(t, sketch, common.ItemSketchStringSerDe{})
 		require.Len(t, data, int(preambleLongsEmpty<<3))
 
-		loaded, err := Decode[string](data, common.ItemSketchStringSerDe{})
+		loaded, err := DecodeVarOptItemsSketch[string](data, common.ItemSketchStringSerDe{})
 		require.NoError(t, err)
 		assert.Equal(t, int64(0), loaded.N())
 		assert.Equal(t, 0, loaded.NumSamples())
@@ -373,7 +373,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 		}
 		data[3] = 0
 
-		_, err = Decode[string](data, common.ItemSketchStringSerDe{})
+		_, err = DecodeVarOptItemsSketch[string](data, common.ItemSketchStringSerDe{})
 		require.ErrorContains(t, err, "invalid preamble longs: expected warmup or full, got 1")
 	})
 
@@ -381,7 +381,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 		data := encodeVarOptItemsSketch(t, createUnweightedVarOptItemsSketch(t, 32, 33), common.ItemSketchLongSerDe{})
 		binary.LittleEndian.PutUint32(data[20:], 0)
 
-		_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+		_, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 		require.ErrorContains(t, err, "invalid state in full mode: expected h+r==k")
 	})
 
@@ -390,7 +390,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 			data := encodeVarOptItemsSketch(t, createUnweightedVarOptItemsSketch(t, 32, 33), common.ItemSketchLongSerDe{})
 			binary.LittleEndian.PutUint64(data[24:], math.Float64bits(0))
 
-			_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			_, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 			require.ErrorContains(t, err, "data is corrupt in full mode: invalid R region weight")
 		})
 
@@ -398,7 +398,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 			data := encodeVarOptItemsSketch(t, createUnweightedVarOptItemsSketch(t, 32, 33), common.ItemSketchLongSerDe{})
 			binary.LittleEndian.PutUint64(data[24:], math.Float64bits(-1.5))
 
-			_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			_, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 			require.ErrorContains(t, err, "data is corrupt in full mode: invalid R region weight")
 		})
 
@@ -406,7 +406,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 			data := encodeVarOptItemsSketch(t, createUnweightedVarOptItemsSketch(t, 32, 33), common.ItemSketchLongSerDe{})
 			binary.LittleEndian.PutUint64(data[24:], math.Float64bits(math.NaN()))
 
-			_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			_, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 			require.ErrorContains(t, err, "data is corrupt in full mode: invalid R region weight")
 		})
 	})
@@ -417,7 +417,7 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 		preambleBytes := int(data[0]&0x3f) << 3
 		binary.LittleEndian.PutUint64(data[preambleBytes:], math.Float64bits(-1.5))
 
-		_, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+		_, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 		require.ErrorContains(t, err, "non-positive weight: -1.500000")
 	})
 
@@ -426,11 +426,11 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 			sketch := createUnweightedVarOptItemsSketch(t, 100, 10)
 			data := encodeVarOptItemsSketch(t, sketch, common.ItemSketchLongSerDe{})
 
-			loaded, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			loaded, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 			require.NoError(t, err)
 			assertVarOptItemsSketchEqual(t, sketch, loaded)
 
-			_, err = Decode[int64](data[:len(data)-1], common.ItemSketchLongSerDe{})
+			_, err = DecodeVarOptItemsSketch[int64](data[:len(data)-1], common.ItemSketchLongSerDe{})
 			require.ErrorContains(t, err, "unexpected EOF")
 		})
 
@@ -439,11 +439,11 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 			data := encodeVarOptItemsSketch(t, sketch, common.ItemSketchLongSerDe{})
 			require.Equal(t, preambleLongsWarmup, data[0]&0x3f)
 
-			loaded, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			loaded, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 			require.NoError(t, err)
 			assertVarOptItemsSketchEqual(t, sketch, loaded)
 
-			_, err = Decode[int64](data[:len(data)-1000], common.ItemSketchLongSerDe{})
+			_, err = DecodeVarOptItemsSketch[int64](data[:len(data)-1000], common.ItemSketchLongSerDe{})
 			require.ErrorContains(t, err, "unexpected EOF")
 		})
 
@@ -470,11 +470,11 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 			data := encodeVarOptItemsSketch(t, sketch, common.ItemSketchLongSerDe{})
 			require.Equal(t, preambleLongsFull, data[0]&0x3f)
 
-			loaded, err := Decode[int64](data, common.ItemSketchLongSerDe{})
+			loaded, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 			require.NoError(t, err)
 			assertVarOptItemsSketchEqual(t, sketch, loaded)
 
-			_, err = Decode[int64](data[:len(data)-100], common.ItemSketchLongSerDe{})
+			_, err = DecodeVarOptItemsSketch[int64](data[:len(data)-100], common.ItemSketchLongSerDe{})
 			require.ErrorContains(t, err, "unexpected EOF")
 		})
 
@@ -487,11 +487,11 @@ func TestVarOptItemsSketchSerialization(t *testing.T) {
 			require.NoError(t, sketch.Update("heavy item", 100.0))
 
 			data := encodeVarOptItemsSketch(t, sketch, common.ItemSketchStringSerDe{})
-			loaded, err := Decode[string](data, common.ItemSketchStringSerDe{})
+			loaded, err := DecodeVarOptItemsSketch[string](data, common.ItemSketchStringSerDe{})
 			require.NoError(t, err)
 			assertVarOptItemsSketchEqual(t, sketch, loaded)
 
-			_, err = Decode[string](data[:len(data)-12], common.ItemSketchStringSerDe{})
+			_, err = DecodeVarOptItemsSketch[string](data[:len(data)-12], common.ItemSketchStringSerDe{})
 			require.ErrorContains(t, err, "offset out of bounds")
 		})
 	})

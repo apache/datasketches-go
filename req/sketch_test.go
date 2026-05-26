@@ -905,6 +905,52 @@ func TestSketchReset(t *testing.T) {
 	})
 }
 
+func TestSketchSerializedSizeBytes(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		sk, err := NewSketch()
+		assert.NoError(t, err)
+		assert.Equal(t, 8, sk.SerializedSizeBytes())
+	})
+
+	t.Run("raw items", func(t *testing.T) {
+		sk, err := NewSketch()
+		assert.NoError(t, err)
+		for i := 1; i <= 4; i++ {
+			assert.NoError(t, sk.Update(float32(i)))
+		}
+		assert.Equal(t, int64(4), sk.N())
+		assert.Equal(t, 4*4+8, sk.SerializedSizeBytes())
+
+		b, err := sk.MarshalBinary()
+		assert.NoError(t, err)
+		assert.Equal(t, sk.SerializedSizeBytes(), len(b))
+	})
+
+	t.Run("exact", func(t *testing.T) {
+		sk, err := NewSketch(WithK(20))
+		assert.NoError(t, err)
+		for i := 1; i <= 10; i++ {
+			assert.NoError(t, sk.Update(float32(i)))
+		}
+		assert.False(t, sk.IsEstimationMode())
+		assert.Greater(t, sk.SerializedSizeBytes(), 8)
+
+		b, err := sk.MarshalBinary()
+		assert.NoError(t, err)
+		assert.Equal(t, sk.SerializedSizeBytes(), len(b))
+	})
+
+	t.Run("estimation", func(t *testing.T) {
+		sk := loadSketch(t, 20, 1, 200, true, true)
+		assert.True(t, sk.IsEstimationMode())
+		assert.Greater(t, sk.SerializedSizeBytes(), 24)
+
+		b, err := sk.MarshalBinary()
+		assert.NoError(t, err)
+		assert.Equal(t, sk.SerializedSizeBytes(), len(b))
+	})
+}
+
 func TestSketchMinMaxItem(t *testing.T) {
 	t.Run("sequential values", func(t *testing.T) {
 		sk := loadSketch(t, 12, 1, 100, true, true)

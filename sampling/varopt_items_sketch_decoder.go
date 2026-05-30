@@ -30,9 +30,9 @@ import (
 
 // TODO: Support Stream I/O.
 
-// Decode reconstructs a VarOptItemsSketch from a byte slice using the provided ItemsSerDe implementation for deserialization.
+// DecodeVarOptItemsSketch reconstructs a VarOptItemsSketch from a byte slice using the provided ItemsSerDe implementation for deserialization.
 // Returns the reconstructed VarOptItemsSketch or an error if deserialization fails.
-func Decode[T any](buffer []byte, serde common.ItemSketchSerde[T]) (*VarOptItemsSketch[T], error) {
+func DecodeVarOptItemsSketch[T any](buffer []byte, serde common.ItemSketchSerde[T]) (*VarOptItemsSketch[T], error) {
 	if len(buffer) < 8 {
 		return nil, errors.New("data too short")
 	}

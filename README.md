@@ -52,7 +52,7 @@ If you are interested in making contributions to this site, please see our [Comm
 | 	            | CormodeDoublesSketch    | ❌      |
 | 	            | CormodeItemsSketch<T>   | ❌      |
 | 	            | KllDoublesSketch        | ✅      |
-| 	            | KllFloatsSketch         | ⚠️     |
+| 	            | KllFloatsSketch         | ✅     |
 | 	            | KllSketch<T>            | ✅      |
 | 	            | ReqFloatsSketch         | 🚧     |
 | 	            | TDigestDouble           | ✅      |
@@ -61,9 +61,10 @@ If you are interested in making contributions to this site, please see our [Comm
 |              | FreqItemsSketch<T>      | ✅      |
 |              | CountMinSketch          | ✅      |
 | Sampling     |                         |        |
-|              | ReservoirLongsSketch    | ✅*     |
-|              | ReserviorItemsSketch<T> | ✅*     |
-| 	            | VarOptItemsSketch<T>    | ✅*     |
+|              | ReservoirLongsSketch    | ✅     |
+|              | ReserviorItemsSketch<T> | ✅     |
+| 	            | VarOptItemsSketch<T>    | ✅     |
+| 	            | EbppsSketch<T>          | ❌     |
 | Membership   |                         |        |
 |              | BloomFilter             | ✅      |
 | Density      |                         |        |
@@ -77,15 +78,13 @@ If you are interested in making contributions to this site, please see our [Comm
 | Cardinality/Tuple	| | |
 | 	| FdtSketch | ❌ |
 | 	| ArrayOfDoublesSketch  | ✅ |
-| 	| DoubleSketch  | ❌ |
-| 	| IntegerSketch  | ❌ |
-|	| ArrayOfStringsSketch | ⚠️ |
+| 	| DoubleSketch  | ✅ |
+| 	| IntegerSketch  | ✅ |
+|	| ArrayOfStringsSketch | ✅ |
 | 	| EngagementTest3 | ❌ |
 
 
-✅ = Released in v0.1.0
-
-✅* = Released in v0.1.0, but partially implemented and unstable (API may change)
+✅ = Released in v0.2.0
 
 ❌ = Not yet implemented
 

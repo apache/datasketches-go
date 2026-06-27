@@ -22,8 +22,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 func TestGenerateGoFiles(t *testing.T) {
@@ -57,9 +58,8 @@ func TestJavaCompat(t *testing.T) {
 		flavorArr := []CpcFlavor{CpcFlavorEmpty, CpcFlavorSparse, CpcFlavorHybrid, CpcFlavorPinned, CpcFlavorSliding}
 		for flavorIdx, n := range nArr {
 			filename := fmt.Sprintf("%s/cpc_n%d_java.sk", internal.JavaPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("Java file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)

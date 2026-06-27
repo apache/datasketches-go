@@ -80,9 +80,8 @@ func TestDoubleJavaCompat(t *testing.T) {
 	ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	for _, n := range ns {
 		filename := fmt.Sprintf("%s/tdigest_double_n%d_java.sk", internal.JavaPath, n)
-		// Skip if file doesn't exist
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			t.Skipf("Java file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 			continue
 		}
 
@@ -129,9 +128,8 @@ func TestDoubleCPPCompat(t *testing.T) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/tdigest_double_n%d_cpp.sk", internal.CppPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("C++ file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				continue
 			}
 
@@ -177,9 +175,8 @@ func TestDoubleCPPCompat(t *testing.T) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/tdigest_double_buf_n%d_cpp.sk", internal.CppPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("C++ file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				continue
 			}
 

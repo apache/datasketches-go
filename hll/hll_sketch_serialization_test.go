@@ -22,8 +22,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 func TestGenerateGoFiles(t *testing.T) {
@@ -70,9 +71,8 @@ func TestJavaCompat(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/hll4_n%d_java.sk", internal.JavaPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("Java file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -93,9 +93,8 @@ func TestJavaCompat(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/hll6_n%d_java.sk", internal.JavaPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("Java file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -117,9 +116,8 @@ func TestJavaCompat(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/hll8_n%d_java.sk", internal.JavaPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("Java file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -142,9 +140,8 @@ func TestCppCompat(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/hll4_n%d_cpp.sk", internal.CppPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("C++ file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -165,9 +162,8 @@ func TestCppCompat(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/hll6_n%d_cpp.sk", internal.CppPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("C++ file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -189,9 +185,8 @@ func TestCppCompat(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/hll8_n%d_cpp.sk", internal.CppPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("C++ file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -229,9 +224,8 @@ func TestGoCompat(t *testing.T) {
 			sl4, err := hll4.ToCompactSlice()
 			assert.NoError(t, err)
 			filename := fmt.Sprintf("%s/hll4_n%d_java.sk", internal.JavaPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("Java file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -243,9 +237,8 @@ func TestGoCompat(t *testing.T) {
 			sl6, err := hll6.ToCompactSlice()
 			assert.NoError(t, err)
 			filename := fmt.Sprintf("%s/hll6_n%d_java.sk", internal.JavaPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("Java file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -257,9 +250,8 @@ func TestGoCompat(t *testing.T) {
 			sl8, err := hll8.ToCompactSlice()
 			assert.NoError(t, err)
 			filename := fmt.Sprintf("%s/hll8_n%d_java.sk", internal.JavaPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("Java file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -271,9 +263,8 @@ func TestGoCompat(t *testing.T) {
 			sl4, err := hll4.ToCompactSlice()
 			assert.NoError(t, err)
 			filename := fmt.Sprintf("%s/hll4_n%d_cpp.sk", internal.CppPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("C++ file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -285,9 +276,8 @@ func TestGoCompat(t *testing.T) {
 			sl6, err := hll6.ToCompactSlice()
 			assert.NoError(t, err)
 			filename := fmt.Sprintf("%s/hll6_n%d_cpp.sk", internal.CppPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("C++ file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -305,9 +295,8 @@ func TestGoCompat(t *testing.T) {
 			sl8, err := hll8.ToCompactSlice()
 			assert.NoError(t, err)
 			filename := fmt.Sprintf("%s/hll8_n%d_cpp.sk", internal.CppPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("C++ file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)

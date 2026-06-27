@@ -65,12 +65,12 @@ ASF releases are primarily source code releases.
 
 ```bash
 # 1. Export the source (avoids local uncommitted files)
-git archive --format=tar.gz \
+git archive --format=zip \
     --prefix="apache-${PROJECT}-${LANGUAGE}-${VERSION}/" \
-    "v${CANDIDATE_NAME}" > "apache-${PROJECT}-${LANGUAGE}-${VERSION}-src.tar.gz"
+    "v${CANDIDATE_NAME}" > "apache-${PROJECT}-${LANGUAGE}-${VERSION}-src.zip"
 
 # 2. Create a SHA512 checksum
-sha512sum "apache-${PROJECT}-${LANGUAGE}-${VERSION}-src.tar.gz" > "apache-${PROJECT}-${LANGUAGE}-${VERSION}-src.tar.gz.sha512"
+sha512sum "apache-${PROJECT}-${LANGUAGE}-${VERSION}-src.zip" > "apache-${PROJECT}-${LANGUAGE}-${VERSION}-src.zip.sha512"
 ```
 
 ## Step 3: Sign the Artifact
@@ -80,10 +80,10 @@ Use your GPG key to create an ASCII-armored signature (.asc) for the source pack
 ```bash
 # Sign the artifact
 # -b creates a detached signature, -a creates ASCII output
-gpg --armor --detach-sig "apache-${PROJECT}-${LANGUAGE}-${VERSION}-src.tar.gz"
+gpg --armor --detach-sig "apache-${PROJECT}-${LANGUAGE}-${VERSION}-src.zip"
 
 # Verify the signature (test it yourself first)
-gpg --verify "apache-${PROJECT}-${LANGUAGE}-${VERSION}-src.tar.gz.asc" "apache-${PROJECT}-${LANGUAGE}-${VERSION}-src.tar.gz"
+gpg --verify "apache-${PROJECT}-${LANGUAGE}-${VERSION}-src.zip.asc" "apache-${PROJECT}-${LANGUAGE}-${VERSION}-src.zip"
 ```
 
 ## Step 4: Upload to the Dev Repository
@@ -96,7 +96,7 @@ svn checkout "https://dist.apache.org/repos/dist/dev/${PROJECT}/" asf-dist-dev
 
 # 2. Create a folder for the new RC (format: VERSION-RC with uppercase RC)
 mkdir -p "asf-dist-dev/${LANGUAGE}/${VERSION}-RC${RC#rc}"
-cp "apache-${PROJECT}-${LANGUAGE}-${VERSION}-src.tar.gz"* "asf-dist-dev/${LANGUAGE}/${VERSION}-RC${RC#rc}/"
+cp "apache-${PROJECT}-${LANGUAGE}-${VERSION}-src.zip"* "asf-dist-dev/${LANGUAGE}/${VERSION}-RC${RC#rc}/"
 
 # 3. Add and commit
 cd asf-dist-dev
@@ -116,11 +116,15 @@ The email must include:
 
 ## Step 6: Finalize (After Approval)
 
-Once you receive at least three +1 binding votes from PMC members and no vetos:
+Once you receive at least three +1 binding votes from PMC members and no votes:
 
 1. **Move to Release**: Move the files from `dist/dev/${PROJECT}/${LANGUAGE}/${VERSION}-RC${RC#rc}` to `dist/release/${PROJECT}/${LANGUAGE}/${VERSION}` via SVN.
-2. **Delete Old RCs**: Remove the candidate files from the dev directory.
+```bash
+cd ..
+./asf-dist-dev/scripts/moveDevToRelease.sh "$(pwd)" datasketches-go ${VERSION}-RC${RC#rc}
+```
 
+2. **Delete Old RCs**: Remove the candidate files from the dev directory.
 ```bash
 cd asf-dist-dev
 
@@ -130,10 +134,20 @@ svn commit -m "Remove ${LANGUAGE} ${VERSION} release candidates from dev dist"
 ```
 
 3. **Promote Tag**: Create a final version tag `v${VERSION}` from the successful `v${CANDIDATE_NAME}` and push.
-4. **Create GitHub Release**: Create a new release on GitHub with the tag `v${VERSION}` and link to the release notes.
-5. **Announce**: Wait 24 hours for mirrors to sync, then email announce@apache.org.
-6. **Update Website**: Update the [Apache DataSketches website](https://github.com/apache/datasketches-website) to reflect the new released version for datasketches-go.
+```bash
+cd /path/to/datasketches-go
+git checkout v${VERSION}-${RC}
+git tag -a v${VERSION} -m "Release version ${VERSION}"
+git push origin v${VERSION}
+```
 
+4. **Create GitHub Release**: Create a new release on GitHub with the tag `v${VERSION}` and link to the release notes.
+
+5. **Announce**: Wait 24 hours for mirrors to sync, then send [ANNOUNCE] email
+   * To: dev@datasketches.apache.org and announce@apache.org
+   * Include: GitHub release, Apache dist and pkg.go.dev link
+
+6. **Update Website**: Update the [Apache DataSketches website](https://github.com/apache/datasketches-website) to reflect the new released version for datasketches-go.
 ```bash
 cd asf-dist-dev/scripts
 ./createDownloadsInclude.sh /path/to/datasketches-website

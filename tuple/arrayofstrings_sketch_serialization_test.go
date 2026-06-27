@@ -26,8 +26,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/internal"
 
 	"github.com/apache/datasketches-go/theta"
 )
@@ -210,7 +211,7 @@ func TestArrayOfStringsSketch_JavaCompat(t *testing.T) {
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/aos_1_n%d_java.sk", internal.JavaPath, n)
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("Java file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				continue
 			}
 
@@ -236,7 +237,7 @@ func TestArrayOfStringsSketch_JavaCompat(t *testing.T) {
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/aos_3_n%d_java.sk", internal.JavaPath, n)
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("Java file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				continue
 			}
 
@@ -266,7 +267,7 @@ func TestArrayOfStringsSketch_JavaCompat(t *testing.T) {
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/aos_multikey_n%d_java.sk", internal.JavaPath, n)
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("Java file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				continue
 			}
 
@@ -290,7 +291,7 @@ func TestArrayOfStringsSketch_JavaCompat(t *testing.T) {
 	t.Run("non empty no entries", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/aos_1_non_empty_no_entries_java.sk", internal.JavaPath)
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			t.Skipf("Java file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 			return
 		}
 
@@ -307,7 +308,7 @@ func TestArrayOfStringsSketch_JavaCompat(t *testing.T) {
 	t.Run("unicode strings", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/aos_unicode_java.sk", internal.JavaPath)
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			t.Skipf("Java file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 			return
 		}
 
@@ -337,7 +338,7 @@ func TestArrayOfStringsSketch_JavaCompat(t *testing.T) {
 	t.Run("empty strings", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/aos_empty_strings_java.sk", internal.JavaPath)
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			t.Skipf("Java file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 			return
 		}
 
@@ -371,7 +372,7 @@ func TestArrayOfStringsSketch_CPPCompat(t *testing.T) {
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/aos_1_n%d_cpp.sk", internal.CppPath, n)
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("CPP file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				continue
 			}
 
@@ -397,7 +398,7 @@ func TestArrayOfStringsSketch_CPPCompat(t *testing.T) {
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/aos_3_n%d_cpp.sk", internal.CppPath, n)
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("CPP file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				continue
 			}
 
@@ -427,7 +428,7 @@ func TestArrayOfStringsSketch_CPPCompat(t *testing.T) {
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/aos_multikey_n%d_cpp.sk", internal.CppPath, n)
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("CPP file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				continue
 			}
 
@@ -451,7 +452,7 @@ func TestArrayOfStringsSketch_CPPCompat(t *testing.T) {
 	t.Run("non empty no entries", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/aos_1_non_empty_no_entries_cpp.sk", internal.CppPath)
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			t.Skipf("CPP file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 			return
 		}
 
@@ -468,7 +469,7 @@ func TestArrayOfStringsSketch_CPPCompat(t *testing.T) {
 	t.Run("unicode strings", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/aos_unicode_cpp.sk", internal.CppPath)
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			t.Skipf("CPP file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 			return
 		}
 
@@ -498,7 +499,7 @@ func TestArrayOfStringsSketch_CPPCompat(t *testing.T) {
 	t.Run("empty strings", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/aos_empty_strings_cpp.sk", internal.CppPath)
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			t.Skipf("CPP file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 			return
 		}
 

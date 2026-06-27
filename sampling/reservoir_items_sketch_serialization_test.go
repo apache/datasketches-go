@@ -150,7 +150,7 @@ func TestGenerateGoSketchBinariesForCompatibilityTesting(t *testing.T) {
 func TestSerializationCompatibilityEmpty(t *testing.T) {
 	filename := filepath.Join(internal.GoPath, "reservoir_items_long_empty_k128_go.sk")
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		t.Skipf("Go file not found: %s", filename)
+		assert.FailNowf(t, "file %s does not exist", filename)
 		return
 	}
 	data, err := os.ReadFile(filename)
@@ -181,7 +181,7 @@ func TestSerializationCompatibilityExact(t *testing.T) {
 		t.Run(tc.filename, func(t *testing.T) {
 			filename := filepath.Join(internal.GoPath, tc.filename)
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("Go file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			data, err := os.ReadFile(filename)
@@ -212,7 +212,7 @@ func TestSerializationCompatibilityWithSampling(t *testing.T) {
 		t.Run(tc.filename, func(t *testing.T) {
 			filename := filepath.Join(internal.GoPath, tc.filename)
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("Go file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			data, err := os.ReadFile(filename)
@@ -314,9 +314,8 @@ func TestReservoirItemsSketch_JavaCompat(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			filepath := filepath.Join(internal.JavaPath, tc.filename)
 
-			// Skip if Java file not yet available
 			if _, err := os.Stat(filepath); os.IsNotExist(err) {
-				t.Skipf("Java file not found: %s (waiting for sync from datasketches-java)", tc.filename)
+				assert.FailNowf(t, "file %s does not exist", filepath)
 				return
 			}
 

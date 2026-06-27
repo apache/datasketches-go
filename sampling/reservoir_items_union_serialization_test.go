@@ -213,7 +213,7 @@ func TestReservoirItemsUnion_JavaCompat(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				path := filepath.Join(internal.JavaPath, tc.filename)
 				if _, err := os.Stat(path); os.IsNotExist(err) {
-					t.Skipf("Java file not found: %s", tc.filename)
+					assert.FailNowf(t, "file %s does not exist", path)
 					return
 				}
 				data, err := os.ReadFile(path)
@@ -265,7 +265,7 @@ func TestReservoirItemsUnion_JavaCompat(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				path := filepath.Join(internal.JavaPath, tc.filename)
 				if _, err := os.Stat(path); os.IsNotExist(err) {
-					t.Skipf("Java file not found: %s", tc.filename)
+					assert.FailNowf(t, "file %s does not exist", path)
 					return
 				}
 				data, err := os.ReadFile(path)
@@ -317,7 +317,7 @@ func TestReservoirItemsUnion_JavaCompat(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				path := filepath.Join(internal.JavaPath, tc.filename)
 				if _, err := os.Stat(path); os.IsNotExist(err) {
-					t.Skipf("Java file not found: %s", tc.filename)
+					assert.FailNowf(t, "file %s does not exist", path)
 					return
 				}
 				data, err := os.ReadFile(path)

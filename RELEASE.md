@@ -116,7 +116,7 @@ The email must include:
 
 ## Step 6: Finalize (After Approval)
 
-Once you receive at least three +1 binding votes from PMC members and no votes:
+Once you receive at least three +1 binding votes from PMC members and no -1 votes:
 
 1. **Move to Release**: Move the files from `dist/dev/${PROJECT}/${LANGUAGE}/${VERSION}-RC${RC#rc}` to `dist/release/${PROJECT}/${LANGUAGE}/${VERSION}` via SVN.
 ```bash

@@ -25,8 +25,9 @@ import (
 
 	"github.com/apache/datasketches-go/common"
 
-	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 func TestGenerateGoBinariesForCompatibilityTestingLongsSketch(t *testing.T) {
@@ -142,9 +143,8 @@ func TestJavaCompat(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/frequent_long_n%d_java.sk", internal.JavaPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("Java file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -172,9 +172,8 @@ func TestJavaCompat(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/frequent_string_n%d_java.sk", internal.JavaPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("Java file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -200,9 +199,8 @@ func TestJavaCompat(t *testing.T) {
 
 	t.Run("String utf8", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/frequent_string_utf8_java.sk", internal.JavaPath)
-		// Skip if file doesn't exist
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			t.Skipf("Java file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 			return
 		}
 		bytes, err := os.ReadFile(filename)
@@ -239,9 +237,8 @@ func TestJavaCompat(t *testing.T) {
 
 	t.Run("String ascii", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/frequent_string_ascii_java.sk", internal.JavaPath)
-		// Skip if file doesn't exist
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			t.Skipf("Java file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 			return
 		}
 		bytes, err := os.ReadFile(filename)
@@ -273,9 +270,8 @@ func TestCppCompat(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/frequent_long_n%d_cpp.sk", internal.CppPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("C++ file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -303,9 +299,8 @@ func TestCppCompat(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/frequent_string_n%d_cpp.sk", internal.CppPath, n)
-			// Skip if file doesn't exist
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				t.Skipf("C++ file not found: %s", filename)
+				assert.FailNowf(t, "file %s does not exist", filename)
 				return
 			}
 			bytes, err := os.ReadFile(filename)
@@ -331,9 +326,8 @@ func TestCppCompat(t *testing.T) {
 
 	t.Run("String utf8", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/frequent_string_utf8_cpp.sk", internal.CppPath)
-		// Skip if file doesn't exist
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			t.Skipf("C++ file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 			return
 		}
 		bytes, err := os.ReadFile(filename)
@@ -370,9 +364,8 @@ func TestCppCompat(t *testing.T) {
 
 	t.Run("String ascii", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/frequent_string_ascii_cpp.sk", internal.CppPath)
-		// Skip if file doesn't exist
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			t.Skipf("C++ file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 			return
 		}
 		bytes, err := os.ReadFile(filename)

@@ -77,7 +77,7 @@ func TestVarOptItemsUnionJavaCompat(t *testing.T) {
 		filename := filepath.Join(internal.JavaPath, "varopt_union_double_sampling_java.sk")
 		data, err := os.ReadFile(filename)
 		if os.IsNotExist(err) {
-			t.Skipf("Java file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 		}
 		require.NoError(t, err)
 
@@ -105,7 +105,7 @@ func TestVarOptItemsUnionCppCompat(t *testing.T) {
 		filename := filepath.Join(internal.CppPath, "varopt_union_double_sampling_cpp.sk")
 		data, err := os.ReadFile(filename)
 		if os.IsNotExist(err) {
-			t.Skipf("C++ file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 		}
 		require.NoError(t, err)
 

@@ -27,10 +27,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/apache/datasketches-go/common"
-	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal"
 )
 
 const varOptItemsSerializationEpsilon = 1e-13
@@ -98,7 +99,7 @@ func TestVarOptItemsSketchJavaCompat(t *testing.T) {
 				filename := filepath.Join(internal.JavaPath, fmt.Sprintf("varopt_sketch_long_n%d_java.sk", n))
 				data, err := os.ReadFile(filename)
 				if os.IsNotExist(err) {
-					t.Skipf("Java file not found: %s", filename)
+					assert.FailNowf(t, "file %s does not exist", filename)
 				}
 				require.NoError(t, err)
 
@@ -125,7 +126,7 @@ func TestVarOptItemsSketchJavaCompat(t *testing.T) {
 		filename := filepath.Join(internal.JavaPath, "varopt_sketch_string_exact_java.sk")
 		data, err := os.ReadFile(filename)
 		if os.IsNotExist(err) {
-			t.Skipf("Java file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 		}
 		require.NoError(t, err)
 
@@ -151,7 +152,7 @@ func TestVarOptItemsSketchJavaCompat(t *testing.T) {
 		filename := filepath.Join(internal.JavaPath, "varopt_sketch_long_sampling_java.sk")
 		data, err := os.ReadFile(filename)
 		if os.IsNotExist(err) {
-			t.Skipf("Java file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 		}
 		require.NoError(t, err)
 
@@ -185,7 +186,7 @@ func TestVarOptItemsSketchCppCompat(t *testing.T) {
 				filename := filepath.Join(internal.CppPath, fmt.Sprintf("varopt_sketch_long_n%d_cpp.sk", n))
 				data, err := os.ReadFile(filename)
 				if os.IsNotExist(err) {
-					t.Skipf("C++ file not found: %s", filename)
+					assert.FailNowf(t, "file %s does not exist", filename)
 				}
 				require.NoError(t, err)
 
@@ -212,7 +213,7 @@ func TestVarOptItemsSketchCppCompat(t *testing.T) {
 		filename := filepath.Join(internal.CppPath, "varopt_sketch_string_exact_cpp.sk")
 		data, err := os.ReadFile(filename)
 		if os.IsNotExist(err) {
-			t.Skipf("C++ file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 		}
 		require.NoError(t, err)
 
@@ -238,7 +239,7 @@ func TestVarOptItemsSketchCppCompat(t *testing.T) {
 		filename := filepath.Join(internal.CppPath, "varopt_sketch_long_sampling_cpp.sk")
 		data, err := os.ReadFile(filename)
 		if os.IsNotExist(err) {
-			t.Skipf("C++ file not found: %s", filename)
+			assert.FailNowf(t, "file %s does not exist", filename)
 		}
 		require.NoError(t, err)
 

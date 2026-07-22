@@ -147,9 +147,8 @@ func (bf *bloomFilterImpl) computeHashes(data []byte) (h0, h1 uint64) {
 	h.Write(data)
 	h0 = h.Sum64()
 
-	// Compute h1 using h0 as seed
-	h.Reset()
-	h = xxhash.NewWithSeed(h0)
+	// Compute h1 using h0 as seed, reusing the same digest.
+	h.ResetWithSeed(h0)
 	h.Write(data)
 	h1 = h.Sum64()
 	return

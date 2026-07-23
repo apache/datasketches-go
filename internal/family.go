@@ -36,6 +36,7 @@ type families struct {
 	VarOptItems      family
 	ReservoirUnion   family
 	VarOptItemsUnion family
+	REQ              family
 }
 
 var FamilyEnum = &families{
@@ -90,5 +91,9 @@ var FamilyEnum = &families{
 	VarOptItemsUnion: family{
 		Id:          14,
 		MaxPreLongs: 4,
+	},
+	REQ: family{
+		Id:          17,
+		MaxPreLongs: 2,
 	},
 }

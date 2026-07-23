@@ -614,8 +614,11 @@ func TestEmptySketch(t *testing.T) {
 	_, err = sk.QuantileUpperBound(0.5)
 	assert.ErrorIs(t, err, ErrEmpty)
 
-	items := sk.All()
-	assert.Nil(t, items)
+	cnt := 0
+	for range sk.All() {
+		cnt++
+	}
+	assert.Empty(t, cnt)
 
 	rUB, err := sk.RankUpperBound(0.5, WithNumStdDev(1))
 	assert.NoError(t, err)
@@ -846,7 +849,7 @@ func TestSketchIterator(t *testing.T) {
 		sk := loadSketch(t, 20, 1, 100, true, true)
 		items := sk.All()
 		assert.NotEmpty(t, items)
-		for _, item := range items {
+		for item := range items {
 			assert.Greater(t, item.Weight, int64(0))
 		}
 	})
@@ -855,7 +858,7 @@ func TestSketchIterator(t *testing.T) {
 		sk := loadSketch(t, 20, 1, 100, false, false)
 		items := sk.All()
 		assert.NotEmpty(t, items)
-		for _, item := range items {
+		for item := range items {
 			assert.Greater(t, item.Weight, int64(0))
 		}
 	})
@@ -864,7 +867,7 @@ func TestSketchIterator(t *testing.T) {
 		sk := loadSketch(t, 20, 1, 100, false, true)
 		items := sk.All()
 		assert.NotEmpty(t, items)
-		for _, item := range items {
+		for item := range items {
 			assert.Greater(t, item.Weight, int64(0))
 		}
 	})
@@ -873,7 +876,7 @@ func TestSketchIterator(t *testing.T) {
 		sk := loadSketch(t, 20, 1, 100, true, false)
 		items := sk.All()
 		assert.NotEmpty(t, items)
-		for _, item := range items {
+		for item := range items {
 			assert.Greater(t, item.Weight, int64(0))
 		}
 	})

@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"iter"
 	"math"
 	"strings"
 
@@ -505,41 +506,43 @@ func (s *Sketch) IsEstimationMode() bool {
 }
 
 // All returns all retained items of the sketch.
-func (s *Sketch) All() []Item {
-	if s.numRetained == 0 {
-		return nil
-	}
-
-	var (
-		itemIndex        = 0
-		compactorIndex   = 0
-		items            []Item
-		currentCompactor = s.compactors[0]
-	)
-	for compactorIndex < len(s.compactors) {
-		quantile := currentCompactor.Item(itemIndex)
-		weight := int64(1) << compactorIndex
-
-		items = append(items, Item{
-			Quantile: quantile,
-			Weight:   weight,
-		})
-
-		if itemIndex == currentCompactor.Count()-1 {
-			compactorIndex++
-			if compactorIndex >= len(s.compactors) {
-				break
-			}
-
-			currentCompactor = s.compactors[compactorIndex]
-			itemIndex = 0
-			continue
+func (s *Sketch) All() iter.Seq[Item] {
+	return func(yield func(Item) bool) {
+		if s.numRetained == 0 {
+			return
 		}
 
-		itemIndex++
-	}
+		var (
+			itemIndex        = 0
+			compactorIndex   = 0
+			currentCompactor = s.compactors[0]
+		)
+		for compactorIndex < len(s.compactors) {
+			quantile := currentCompactor.Item(itemIndex)
+			weight := int64(1) << compactorIndex
 
-	return items
+			item := Item{
+				Quantile: quantile,
+				Weight:   weight,
+			}
+			if !yield(item) {
+				return
+			}
+
+			if itemIndex == currentCompactor.Count()-1 {
+				compactorIndex++
+				if compactorIndex >= len(s.compactors) {
+					break
+				}
+
+				currentCompactor = s.compactors[compactorIndex]
+				itemIndex = 0
+				continue
+			}
+
+			itemIndex++
+		}
+	}
 }
 
 // Merge merges another sketch into this one. The other sketch is not modified.

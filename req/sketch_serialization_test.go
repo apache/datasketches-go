@@ -19,9 +19,13 @@ package req
 
 import (
 	"bytes"
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 func TestSketchSerializationDeserialization(t *testing.T) {
@@ -103,4 +107,129 @@ func assertSketchesEqual(t *testing.T, sk1, sk2 *Sketch) {
 	assert.Equal(t, sk1.maxNomSize, sk2.maxNomSize)
 	assert.Equal(t, sk1.numLevels(), sk2.numLevels())
 	assert.Equal(t, sk1.SerializedSizeBytes(), sk2.SerializedSizeBytes())
+}
+
+func TestGenerateGoFiles(t *testing.T) {
+	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
+		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
+	}
+	assert.NoError(t, os.MkdirAll(internal.GoPath, os.ModePerm))
+
+	t.Run("positive", func(t *testing.T) {
+		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+		for _, n := range nArr {
+			sk, err := NewSketch()
+			assert.NoError(t, err)
+			for i := 1; i <= n; i++ {
+				assert.NoError(t, sk.Update(float32(i)))
+			}
+			writeGoSketch(t, sk, fmt.Sprintf("req_float_n%d_go.sk", n))
+		}
+	})
+
+	t.Run("negative", func(t *testing.T) {
+		nArr := []int{1, 10}
+		for _, n := range nArr {
+			sk, err := NewSketch()
+			assert.NoError(t, err)
+			for i := 1; i <= n; i++ {
+				assert.NoError(t, sk.Update(float32(-i)))
+			}
+			writeGoSketch(t, sk, fmt.Sprintf("req_float_negative_n%d_go.sk", n))
+		}
+	})
+
+	t.Run("mixed", func(t *testing.T) {
+		nArr := []int{1, 10}
+		for _, n := range nArr {
+			sk, err := NewSketch()
+			assert.NoError(t, err)
+			for i := -n; i <= n; i++ {
+				assert.NoError(t, sk.Update(float32(i)))
+			}
+			writeGoSketch(t, sk, fmt.Sprintf("req_float_mixed_n%d_go.sk", n))
+		}
+	})
+}
+
+func writeGoSketch(t *testing.T, sk *Sketch, name string) {
+	t.Helper()
+	b, err := sk.MarshalBinary()
+	assert.NoError(t, err)
+	assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/%s", internal.GoPath, name), b, 0644))
+}
+
+func TestJavaCompat(t *testing.T) {
+	assertReqCompat(t, internal.JavaPath, "java")
+}
+
+func TestCPPCompat(t *testing.T) {
+	assertReqCompat(t, internal.CppPath, "cpp")
+}
+
+func assertReqCompat(t *testing.T, dir, lang string) {
+	t.Helper()
+
+	t.Run("positive", func(t *testing.T) {
+		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
+		for _, n := range nArr {
+			path := fmt.Sprintf("%s/req_float_n%d_%s.sk", dir, n, lang)
+			assertReqSketchFromFile(t, path, int64(n), n == 0, n > 10, 1, float32(n))
+		}
+	})
+
+	t.Run("negative", func(t *testing.T) {
+		nArr := []int{1, 10}
+		for _, n := range nArr {
+			path := fmt.Sprintf("%s/req_float_negative_n%d_%s.sk", dir, n, lang)
+			assertReqSketchFromFile(t, path, int64(n), false, false, float32(-n), -1)
+		}
+	})
+
+	t.Run("mixed", func(t *testing.T) {
+		nArr := []int{1, 10}
+		for _, n := range nArr {
+			path := fmt.Sprintf("%s/req_float_mixed_n%d_%s.sk", dir, n, lang)
+			assertReqSketchFromFile(t, path, int64(2*n+1), false, false, float32(-n), float32(n))
+		}
+	})
+}
+
+func assertReqSketchFromFile(t *testing.T, path string, expectN int64, expectEmpty, expectEstimation bool, expectMin, expectMax float32) {
+	t.Helper()
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		assert.FailNowf(t, "file does not exist", "file %s does not exist", path)
+		return
+	}
+
+	b, err := os.ReadFile(path)
+	assert.NoError(t, err)
+	sk, err := Decode(b)
+	if err != nil {
+		return
+	}
+
+	assert.True(t, sk.IsHighRankAccuracyMode())
+	assert.Equal(t, expectEmpty, sk.IsEmpty())
+	assert.Equal(t, expectEstimation, sk.IsEstimationMode())
+	assert.Equal(t, expectN, sk.N())
+	if expectEmpty {
+		return
+	}
+
+	minItem, err := sk.MinItem()
+	assert.NoError(t, err)
+	assert.Equal(t, expectMin, minItem)
+
+	maxItem, err := sk.MaxItem()
+	assert.NoError(t, err)
+	assert.Equal(t, expectMax, maxItem)
+
+	var totalWeight int64
+	for item := range sk.All() {
+		assert.GreaterOrEqual(t, item.Quantile, minItem)
+		assert.LessOrEqual(t, item.Quantile, maxItem)
+		totalWeight += item.Weight
+	}
+	assert.Equal(t, sk.N(), totalWeight)
 }

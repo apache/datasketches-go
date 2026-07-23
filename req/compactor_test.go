@@ -422,8 +422,6 @@ func TestCompactorGetters(t *testing.T) {
 	assert.Equal(t, int64(0), c.State())
 }
 
-// TestCompactorItemsSerDe tests marshalItems/decode round-trip with raw array
-// position checks, ported from Java ReqFloatBufferTest.checkSerDe.
 func TestCompactorItemsSerDe(t *testing.T) {
 	t.Run("HRA", func(t *testing.T) {
 		runCompactorItemsSerDe(t, true)
@@ -438,7 +436,6 @@ func runCompactorItemsSerDe(t *testing.T, hra bool) {
 	c := newCompactor(0, hra, minK)
 	initialCap := c.Capacity()
 
-	// Append more items than initial capacity to trigger growth.
 	numItems := initialCap + 1
 	for i := 0; i < numItems; i++ {
 		c.Append(float32(i))
@@ -449,7 +446,6 @@ func runCompactorItemsSerDe(t *testing.T, hra bool) {
 	count := c.Count()
 	sorted := c.sorted
 
-	// Verify raw item positions before serialization.
 	if hra {
 		assert.Equal(t, float32(numItems-1), c.items[capacity-count])
 		assert.Equal(t, float32(0), c.items[capacity-1])
@@ -458,7 +454,6 @@ func runCompactorItemsSerDe(t *testing.T, hra bool) {
 		assert.Equal(t, float32(numItems-1), c.items[count-1])
 	}
 
-	// Verify marshalItems byte output matches Item(i) order.
 	itemBytes := c.marshalItems()
 	assert.Equal(t, count*4, len(itemBytes))
 	for i := 0; i < count; i++ {
@@ -467,7 +462,6 @@ func runCompactorItemsSerDe(t *testing.T, hra bool) {
 		assert.Equal(t, c.Item(i), got, "serialized item mismatch at offset %d", i)
 	}
 
-	// Full round-trip via MarshalBinary + decodeCompactor.
 	fullBytes, err := c.MarshalBinary()
 	assert.NoError(t, err)
 	result, err := decodeCompactor(fullBytes, 0, sorted, hra)
@@ -478,7 +472,6 @@ func runCompactorItemsSerDe(t *testing.T, hra bool) {
 	assert.Equal(t, sorted, c2.sorted)
 	assert.Equal(t, hra, c2.isHighRankAccuracyMode)
 
-	// Verify raw positions in deserialized compactor.
 	if hra {
 		cap2 := c2.Capacity()
 		assert.Equal(t, float32(numItems-1), c2.items[cap2-c2.count])
@@ -488,7 +481,6 @@ func runCompactorItemsSerDe(t *testing.T, hra bool) {
 		assert.Equal(t, float32(numItems-1), c2.items[c2.count-1])
 	}
 
-	// Verify all items match by logical offset.
 	for i := 0; i < count; i++ {
 		assert.Equal(t, c.Item(i), c2.Item(i), "item mismatch at offset %d", i)
 	}
@@ -521,11 +513,9 @@ func runCompactorSerializationDeserialization(t *testing.T, k int, hra bool) {
 	lgWt := c1.lgWeight
 	sorted := c1.sorted
 
-	// serialize
 	c1ser, err := c1.MarshalBinary()
 	assert.NoError(t, err)
 
-	// deserialize via buffer
 	result, err := decodeCompactor(c1ser, 0, sorted, hra)
 	assert.NoError(t, err)
 	c2 := result.compactor
@@ -542,7 +532,6 @@ func runCompactorSerializationDeserialization(t *testing.T, k int, hra bool) {
 	if hra {
 		assert.Equal(t, expectedCap, c2.Capacity())
 	} else {
-		// LRA decoder keeps items at count-sized capacity (not expanded to nomCap).
 		assert.Equal(t, nomCap, c2.Capacity())
 	}
 	assert.Equal(t, expectedDelta, c2.delta)
@@ -551,7 +540,6 @@ func runCompactorSerializationDeserialization(t *testing.T, k int, hra bool) {
 		assert.Equal(t, c1.Item(i), c2.Item(i), "item mismatch at offset %d", i)
 	}
 
-	// deserialize via stream
 	decoder := newCompactorDecoder(sorted, hra)
 	result2, err := decoder.Decode(bytes.NewReader(c1ser))
 	assert.NoError(t, err)

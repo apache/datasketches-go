@@ -18,12 +18,15 @@
 package req
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"iter"
 	"math"
 	"strings"
 
 	quantilecommon "github.com/apache/datasketches-go/common/quantiles"
+	"github.com/apache/datasketches-go/internal"
 )
 
 const (
@@ -503,41 +506,43 @@ func (s *Sketch) IsEstimationMode() bool {
 }
 
 // All returns all retained items of the sketch.
-func (s *Sketch) All() []Item {
-	if s.numRetained == 0 {
-		return nil
-	}
-
-	var (
-		itemIndex        = 0
-		compactorIndex   = 0
-		items            []Item
-		currentCompactor = s.compactors[0]
-	)
-	for compactorIndex < len(s.compactors) {
-		quantile := currentCompactor.Item(itemIndex)
-		weight := int64(1) << compactorIndex
-
-		items = append(items, Item{
-			Quantile: quantile,
-			Weight:   weight,
-		})
-
-		if itemIndex == currentCompactor.Count()-1 {
-			compactorIndex++
-			if compactorIndex >= len(s.compactors) {
-				break
-			}
-
-			currentCompactor = s.compactors[compactorIndex]
-			itemIndex = 0
-			continue
+func (s *Sketch) All() iter.Seq[Item] {
+	return func(yield func(Item) bool) {
+		if s.numRetained == 0 {
+			return
 		}
 
-		itemIndex++
-	}
+		var (
+			itemIndex        = 0
+			compactorIndex   = 0
+			currentCompactor = s.compactors[0]
+		)
+		for compactorIndex < len(s.compactors) {
+			quantile := currentCompactor.Item(itemIndex)
+			weight := int64(1) << compactorIndex
 
-	return items
+			item := Item{
+				Quantile: quantile,
+				Weight:   weight,
+			}
+			if !yield(item) {
+				return
+			}
+
+			if itemIndex == currentCompactor.Count()-1 {
+				compactorIndex++
+				if compactorIndex >= len(s.compactors) {
+					break
+				}
+
+				currentCompactor = s.compactors[compactorIndex]
+				itemIndex = 0
+				continue
+			}
+
+			itemIndex++
+		}
+	}
 }
 
 // Merge merges another sketch into this one. The other sketch is not modified.
@@ -723,6 +728,148 @@ func (s *Sketch) compress() error {
 	s.sortedView = nil
 
 	return nil
+}
+
+// SerializedSizeBytes returns the current number of bytes this Sketch would require if serialized.
+func (s *Sketch) SerializedSizeBytes() int {
+	format := s.computeEncodingFormat()
+	return s.computeSerializedSizeBytes(format)
+}
+
+func (s *Sketch) computeSerializedSizeBytes(format encodingFormat) int {
+	switch format {
+	case encodingFormatEmpty:
+		return 8
+	case encodingFormatRawItems:
+		return s.compactors[0].Count()*4 + 8
+	case encodingFormatExact:
+		return s.compactors[0].SerializationBytes() + 8
+	default: // estimation.
+		sum := 0
+		for _, comp := range s.compactors {
+			sum += comp.SerializationBytes()
+		}
+		return sum + 24
+	}
+}
+
+func (s *Sketch) computeEncodingFormat() encodingFormat {
+	if s.IsEmpty() {
+		return encodingFormatEmpty
+	}
+	if s.N() <= minK {
+		return encodingFormatRawItems
+	}
+	if s.numLevels() == 1 {
+		return encodingFormatExact
+	}
+	return encodingFormatEstimation
+}
+
+// MarshalBinary serializes the sketch into a binary format.
+func (s *Sketch) MarshalBinary() ([]byte, error) {
+	format := s.computeEncodingFormat()
+	totalBytes := s.computeSerializedSizeBytes(format)
+
+	var (
+		buf   = make([]byte, totalBytes)
+		index = 0
+	)
+
+	preambleInts := 2
+	if format == encodingFormatEstimation {
+		preambleInts = 4
+	}
+	buf[index] = byte(preambleInts)
+	index++
+
+	buf[index] = byte(serialVersion)
+	index++
+
+	buf[index] = byte(internal.FamilyEnum.REQ.Id)
+	index++
+
+	flags := s.encodingFlags()
+	buf[index] = byte(flags)
+	index++
+
+	binary.LittleEndian.PutUint16(buf[index:], uint16(s.K()))
+	index += 2
+
+	numCompactors := 0
+	if !s.IsEmpty() {
+		numCompactors = s.numLevels()
+	}
+	buf[index] = byte(numCompactors)
+	index++
+
+	numRawItems := 0
+	if s.N() <= minK {
+		numRawItems = int(s.N())
+	}
+	buf[index] = byte(numRawItems)
+	index++
+
+	switch format {
+	case encodingFormatEmpty:
+		return buf, nil
+	case encodingFormatRawItems:
+		c0 := s.compactors[0]
+		for i := 0; i < numRawItems; i++ {
+			binary.LittleEndian.PutUint32(buf[index:], math.Float32bits(c0.Item(i)))
+			index += 4
+		}
+		return buf, nil
+	case encodingFormatExact:
+		c0 := s.compactors[0]
+		b, err := c0.MarshalBinary()
+		if err != nil {
+			return nil, err
+		}
+		copy(buf[index:], b)
+		return buf, nil
+	default: // Estimation.
+		binary.LittleEndian.PutUint64(buf[index:], uint64(s.N()))
+		index += 8
+
+		binary.LittleEndian.PutUint32(buf[index:], math.Float32bits(s.minItem))
+		index += 4
+
+		binary.LittleEndian.PutUint32(buf[index:], math.Float32bits(s.maxItem))
+		index += 4
+
+		for i := 0; i < numCompactors; i++ {
+			c := s.compactors[i]
+			b, err := c.MarshalBinary()
+			if err != nil {
+				return nil, err
+			}
+			copy(buf[index:], b)
+			index += len(b)
+		}
+
+		return buf, nil
+	}
+}
+
+func (s *Sketch) encodingFlags() int {
+	flags := 0
+	if s.IsEmpty() {
+		flags = 4
+	}
+
+	if s.IsHighRankAccuracyMode() {
+		flags |= 8
+	}
+
+	if s.N() <= minK { // raw items sketch.
+		flags |= 16
+	}
+
+	if s.compactors[0].sorted {
+		flags |= 32
+	}
+	return flags
 }
 
 func computeRankLowerBound(

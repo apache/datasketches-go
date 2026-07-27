@@ -54,7 +54,7 @@ If you are interested in making contributions to this site, please see our [Comm
 | 	            | KllDoublesSketch        | ✅      |
 | 	            | KllFloatsSketch         | ✅     |
 | 	            | KllSketch<T>            | ✅      |
-| 	            | ReqFloatsSketch         | 🚧     |
+| 	            | ReqFloatsSketch         | ⚠️     |
 | 	            | TDigestDouble           | ✅      |
 | Frequencies  |                         | ️      |
 |              | FreqLongsSketch         | ✅      |

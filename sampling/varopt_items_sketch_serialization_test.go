@@ -36,7 +36,7 @@ import (
 
 const varOptItemsSerializationEpsilon = 1e-13
 
-func TestGenerateGoBinariesForCompatibilityTestingVarOptItemsSketch(t *testing.T) {
+func TestGenerateGoSnapshots_VarOptItemsSketch(t *testing.T) {
 	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
 		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
 	}

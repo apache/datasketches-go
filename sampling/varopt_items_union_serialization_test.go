@@ -30,7 +30,7 @@ import (
 	"github.com/apache/datasketches-go/internal"
 )
 
-func TestGenerateGoBinariesForCompatibilityTestingVarOptItemsUnion(t *testing.T) {
+func TestGenerateGoSnapshots_VarOptItemsUnion(t *testing.T) {
 	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
 		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
 	}

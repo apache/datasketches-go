@@ -109,7 +109,7 @@ func assertSketchesEqual(t *testing.T, sk1, sk2 *Sketch) {
 	assert.Equal(t, sk1.SerializedSizeBytes(), sk2.SerializedSizeBytes())
 }
 
-func TestGenerateGoFiles(t *testing.T) {
+func TestGenerateGoSnapshots(t *testing.T) {
 	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
 		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
 	}

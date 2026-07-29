@@ -32,7 +32,7 @@ import (
 
 // Note: Go only has generic ReservoirItemsSketch[T], no separate ReservoirLongsSketch.
 // See https://github.com/apache/datasketches-go/issues/90 for context.
-func TestGenerateGoSketchBinariesForCompatibilityTesting(t *testing.T) {
+func TestGenerateGoSnapshots(t *testing.T) {
 	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
 		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
 	}

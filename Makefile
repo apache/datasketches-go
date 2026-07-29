@@ -18,6 +18,10 @@ test:
 	rm -rf coverage.out
 	go test ./... -coverprofile=coverage.out
 
+.PHONY: generate-go-snapshots
+generate-go-snapshots:
+	DSKETCH_TEST_GENERATE_GO=1 go test ./... -run '^TestGenerateGoSnapshots' -count=1
+
 .PHONY: lint
 lint:
 	gofmt -l .

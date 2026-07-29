@@ -33,7 +33,7 @@ import (
 	"github.com/apache/datasketches-go/internal"
 )
 
-func TestGenerateGoBinariesForCompatibilityTestingThetaSketch(t *testing.T) {
+func TestGenerateGoSnapshots_ThetaSketch(t *testing.T) {
 	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
 		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
 	}

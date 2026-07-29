@@ -29,7 +29,7 @@ import (
 	"github.com/apache/datasketches-go/theta"
 )
 
-func TestArrayOfNumbersSketch_GenerateGoBinariesForCompatibilityTesting(t *testing.T) {
+func TestGenerateGoSnapshots_ArrayOfNumbersSketch(t *testing.T) {
 	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
 		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
 	}

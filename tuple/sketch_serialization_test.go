@@ -45,7 +45,7 @@ func int32SummaryReader(r io.Reader) (*int32Summary, error) {
 	return s, nil
 }
 
-func TestGenerateGoBinariesForCompatibilityTesting(t *testing.T) {
+func TestGenerateGoSnapshots(t *testing.T) {
 	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
 		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
 	}

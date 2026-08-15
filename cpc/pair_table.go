@@ -263,7 +263,6 @@ func (p *pairTable) copy() (*pairTable, error) {
 	// copy the number of pairs.
 	newPT.numPairs = p.numPairs
 	// Deep copy the slots array.
-	newPT.slotsArr = make([]int, len(p.slotsArr))
 	copy(newPT.slotsArr, p.slotsArr)
 	return newPT, nil
 }

@@ -287,7 +287,7 @@ func (c *CpcSketch) updateWindowed(rowCol int) error {
 	}
 
 	isNovel := false //novel if new coupon
-	err := error(nil)
+	var err error
 	col := rowCol & 63
 
 	if col < c.windowOffset { // track the surprising 0's "before" the window

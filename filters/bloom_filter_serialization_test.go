@@ -48,6 +48,8 @@ func TestGenerateGoSnapshots(t *testing.T) {
 			{10000, 5},
 			{2000000, 3},
 			{2000000, 5},
+			{30000000, 3},
+			{30000000, 5},
 		}
 
 		for _, tc := range testCases {
@@ -194,6 +196,8 @@ func TestJavaCompat(t *testing.T) {
 			{10000, 5},
 			{2000000, 3},
 			{2000000, 5},
+			{30000000, 3},
+			{30000000, 5},
 		}
 
 		for _, tc := range testCases {
@@ -385,6 +389,8 @@ func TestCPPCompat(t *testing.T) {
 			{10000, 5},
 			{2000000, 3},
 			{2000000, 5},
+			{30000000, 3},
+			{30000000, 5},
 		}
 
 		for _, tc := range testCases {

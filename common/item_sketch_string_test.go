@@ -22,7 +22,40 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/twmb/murmur3"
 )
+
+func TestItemSketchStringComparator(t *testing.T) {
+	ascending := ItemSketchStringComparator(false)
+	assert.True(t, ascending("apple", "banana"))
+	assert.False(t, ascending("banana", "apple"))
+	assert.False(t, ascending("apple", "apple"))
+
+	descending := ItemSketchStringComparator(true)
+	assert.True(t, descending("banana", "apple"))
+	assert.False(t, descending("apple", "banana"))
+	assert.False(t, descending("apple", "apple"))
+}
+
+func TestItemSketchStringHasher_Hash(t *testing.T) {
+	hasher := ItemSketchStringHasher{}
+	tests := []struct {
+		name string
+		item string
+	}{
+		{name: "empty string", item: ""},
+		{name: "single character", item: "a"},
+		{name: "ASCII string", item: "hello"},
+		{name: "multi-byte UTF-8 string", item: "안녕하세요"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expected := murmur3.SeedSum64(defaultSerdeHashSeed, []byte(tt.item))
+			assert.Equal(t, expected, hasher.Hash(tt.item))
+		})
+	}
+}
 
 func TestItemSketchStringSerDe_SizeOf(t *testing.T) {
 	serde := ItemSketchStringSerDe{}

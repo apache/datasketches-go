@@ -498,6 +498,39 @@ func TestDeserializeInvalidData(t *testing.T) {
 	assert.Contains(t, err.Error(), "numHashes must be positive")
 }
 
+func TestDeserializeRejectsMismatchedNumBitsSet(t *testing.T) {
+	bf, err := NewBloomFilterBySize(256, 5, WithSeed(777))
+	assert.NoError(t, err)
+
+	for i := uint64(0); i < 50; i++ {
+		bf.UpdateUInt64(i)
+	}
+
+	serialized, err := bf.ToCompactSlice()
+	assert.NoError(t, err)
+	actualNumBitsSet := bf.BitsUsed()
+	assert.Greater(t, actualNumBitsSet, uint64(1))
+
+	testCases := []struct {
+		name             string
+		cachedNumBitsSet uint64
+	}{
+		{name: "zero count", cachedNumBitsSet: 0},
+		{name: "undercount", cachedNumBitsSet: actualNumBitsSet - 1},
+		{name: "overcount", cachedNumBitsSet: actualNumBitsSet + 1},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			corrupt := append([]byte(nil), serialized...)
+			insertNumBitsSet(corrupt, tc.cachedNumBitsSet)
+
+			_, err := NewBloomFilterFromSlice(corrupt)
+			assert.ErrorContains(t, err, "numBitsSet mismatch")
+		})
+	}
+}
+
 func TestDeserializeWithDirtyBits(t *testing.T) {
 	// Create and populate a filter
 	bf1, err := NewBloomFilterBySize(256, 5, WithSeed(777))
@@ -521,6 +554,9 @@ func TestDeserializeWithDirtyBits(t *testing.T) {
 	// Should have correct bit count (recalculated)
 	assert.Equal(t, bf1.BitsUsed(), bf2.BitsUsed())
 	assert.Greater(t, bf2.BitsUsed(), uint64(0))
+	for i := uint64(0); i < 50; i++ {
+		assert.True(t, bf2.QueryUInt64(i), "Item %d should be found after dirty-count deserialization", i)
+	}
 }
 
 func TestSerializeDeserializeConsistency(t *testing.T) {

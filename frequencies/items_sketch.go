@@ -471,14 +471,18 @@ func (i *ItemsSketch[C]) ToSlice() ([]byte, error) {
 		preArr := make([]int64, preLongs)
 		preArr[0] = pre0
 		preArr[1] = insertActiveItems(int64(activeItems), pre)
-		preArr[2] = int64(i.streamWeight)
-		preArr[3] = int64(i.offset)
+		preArr[2] = i.streamWeight
+		preArr[3] = i.offset
 		for j := 0; j < preLongs; j++ {
 			binary.LittleEndian.PutUint64(outArr[j<<3:], uint64(preArr[j]))
 		}
 		preBytes := preLongs << 3
-		for j := 0; j < activeItems; j++ {
-			binary.LittleEndian.PutUint64(outArr[preBytes+j<<3:], uint64(i.hashMap.getActiveValues()[j]))
+		activeIndex := 0
+		for slot, state := range i.hashMap.states {
+			if state > 0 {
+				binary.LittleEndian.PutUint64(outArr[preBytes+(activeIndex<<3):], uint64(i.hashMap.values[slot]))
+				activeIndex++
+			}
 		}
 		copy(outArr[preBytes+(activeItems<<3):], bytes)
 	}

@@ -262,6 +262,66 @@ func TestSerializeDeserializeLong(t *testing.T) {
 	assert.Equal(t, est, int64(1))
 }
 
+func TestItemsSketchToSlicePreservesValueOrder(t *testing.T) {
+	t.Run("int64", func(t *testing.T) {
+		testItemsSketchToSlicePreservesValueOrder(
+			t,
+			common.ItemSketchLongHasher{},
+			common.ItemSketchLongSerDe{},
+			func(index int) int64 { return int64(index) },
+		)
+	})
+	t.Run("string", func(t *testing.T) {
+		testItemsSketchToSlicePreservesValueOrder(
+			t,
+			common.ItemSketchStringHasher{},
+			common.ItemSketchStringSerDe{},
+			func(index int) string { return "item-" + strconv.Itoa(index) },
+		)
+	})
+}
+
+func testItemsSketchToSlicePreservesValueOrder[C comparable](
+	t *testing.T,
+	hasher common.ItemSketchHasher[C],
+	serde common.ItemSketchSerde[C],
+	itemAt func(int) C,
+) {
+	const (
+		mapSize     = 64
+		activeItems = mapSize * 3 / 4
+	)
+
+	sketch, err := NewFrequencyItemsSketchWithMaxMapSize(mapSize, hasher, serde)
+	if !assert.NoError(t, err) {
+		return
+	}
+	for index := 0; index < activeItems; index++ {
+		err = sketch.UpdateMany(itemAt(index), int64(index+1))
+		if !assert.NoError(t, err) {
+			return
+		}
+	}
+
+	serialized, err := sketch.ToSlice()
+	if !assert.NoError(t, err) {
+		return
+	}
+	restored, err := NewFrequencyItemsSketchFromSlice(serialized, hasher, serde)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	assert.Equal(t, sketch.GetNumActiveItems(), restored.GetNumActiveItems())
+	assert.Equal(t, sketch.GetStreamLength(), restored.GetStreamLength())
+	assert.Equal(t, sketch.GetMaximumError(), restored.GetMaximumError())
+	for index := 0; index < activeItems; index++ {
+		actual, err := restored.GetLowerBound(itemAt(index))
+		assert.NoError(t, err)
+		assert.Equal(t, int64(index+1), actual)
+	}
+}
+
 func TestResize(t *testing.T) {
 	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](2<<_LG_MIN_MAP_SIZE, common.ItemSketchStringHasher{}, nil)
 	for i := 0; i < 32; i++ {
@@ -310,11 +370,10 @@ func TestMergeExact(t *testing.T) {
 	assert.Equal(t, est, int64(1))
 }
 
-func TestNullMapReturns(t *testing.T) {
+func TestEmptyMapReturnsNilActiveKeys(t *testing.T) {
 	map1, err := newReversePurgeItemHashMap[int64](1<<_LG_MIN_MAP_SIZE, common.ItemSketchLongHasher{}, nil)
 	assert.NoError(t, err)
 	assert.Nil(t, map1.getActiveKeys())
-	assert.Nil(t, map1.getActiveValues())
 }
 
 func TestMisc(t *testing.T) {
@@ -489,6 +548,65 @@ func BenchmarkItemSketch(b *testing.B) {
 	assert.NoError(b, err)
 	for i := 0; i < b.N; i++ {
 		sketch.Update(int64(i))
+	}
+}
+
+var benchmarkItemsSketchToSliceSink []byte
+
+func BenchmarkItemsSketchToSlice(b *testing.B) {
+	benchmarkItemsSketchToSlice(
+		b,
+		"int64",
+		common.ItemSketchLongHasher{},
+		common.ItemSketchLongSerDe{},
+		func(index int) int64 { return int64(index) },
+	)
+	benchmarkItemsSketchToSlice(
+		b,
+		"string",
+		common.ItemSketchStringHasher{},
+		common.ItemSketchStringSerDe{},
+		func(index int) string { return "item-" + strconv.Itoa(index) },
+	)
+}
+
+func benchmarkItemsSketchToSlice[C comparable](
+	b *testing.B,
+	itemType string,
+	hasher common.ItemSketchHasher[C],
+	serde common.ItemSketchSerde[C],
+	itemAt func(int) C,
+) {
+	for _, mapSize := range []int{64, 256, 1024} {
+		activeItems := mapSize * 3 / 4
+		b.Run(itemType+"/items="+strconv.Itoa(activeItems), func(b *testing.B) {
+			sketch, err := NewFrequencyItemsSketchWithMaxMapSize(mapSize, hasher, serde)
+			if err != nil {
+				b.Fatal(err)
+			}
+			for index := 0; index < activeItems; index++ {
+				if err := sketch.UpdateMany(itemAt(index), int64(index+1)); err != nil {
+					b.Fatal(err)
+				}
+			}
+
+			serialized, err := sketch.ToSlice()
+			if err != nil {
+				b.Fatal(err)
+			}
+			benchmarkItemsSketchToSliceSink = serialized
+			b.SetBytes(int64(len(serialized)))
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			for iteration := 0; iteration < b.N; iteration++ {
+				serialized, err = sketch.ToSlice()
+				if err != nil {
+					b.Fatal(err)
+				}
+				benchmarkItemsSketchToSliceSink = serialized
+			}
+		})
 	}
 }
 

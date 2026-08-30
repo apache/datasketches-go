@@ -77,6 +77,8 @@ func NewSketch(options ...SketchOptionFunc) (*Sketch, error) {
 	sk := &Sketch{
 		k:                      defaultK,
 		isHighRankAccuracyMode: true,
+		minItem:                float32(math.NaN()),
+		maxItem:                float32(math.NaN()),
 	}
 	for _, option := range options {
 		option(sk)

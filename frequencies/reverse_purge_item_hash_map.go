@@ -249,19 +249,6 @@ func (r *reversePurgeItemHashMap[C]) hashDelete(deleteProbe int) {
 	}
 }
 
-func (r *reversePurgeItemHashMap[C]) getActiveValues() []int64 {
-	if r.numActive == 0 {
-		return nil
-	}
-	returnValues := make([]int64, 0, r.numActive)
-	for i := 0; i < len(r.values); i++ {
-		if r.states[i] > 0 { //isActive
-			returnValues = append(returnValues, r.values[i])
-		}
-	}
-	return returnValues
-}
-
 func (r *reversePurgeItemHashMap[C]) getActiveKeys() []C {
 	if r.numActive == 0 {
 		return nil

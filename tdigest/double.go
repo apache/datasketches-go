@@ -376,7 +376,7 @@ func (d *Double) Quantile(rank float64) (float64, error) {
 
 	lastWeight := float64(d.centroids[len(d.centroids)-1].weight)
 	if lastWeight > 1 && float64(d.centroidsWeight)-weight <= lastWeight/2.0 {
-		return d.max + (float64(d.centroidsWeight)-weight-1.0)/(lastWeight/2.0-1.0)*(d.max-d.centroids[len(d.centroids)-1].mean), nil
+		return d.max - (float64(d.centroidsWeight)-weight-1.0)/(lastWeight/2.0-1.0)*(d.max-d.centroids[len(d.centroids)-1].mean), nil
 	}
 
 	// interpolate between extremes
@@ -401,7 +401,7 @@ func (d *Double) Quantile(rank float64) (float64, error) {
 			}
 			w1 := weight - weightSoFar - leftWeight
 			w2 := weightSoFar + dw - weight - rightWeight
-			return weightedAverage(d.centroids[i].mean, w1, d.centroids[i+1].mean, w2), nil
+			return weightedAverage(d.centroids[i].mean, w2, d.centroids[i+1].mean, w1), nil
 		}
 		weightSoFar += dw
 	}

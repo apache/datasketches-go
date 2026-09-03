@@ -66,15 +66,16 @@ func TestGenerateGoSnapshots_ArrayOfNumbersSketch(t *testing.T) {
 			sketch, err := NewArrayOfNumbersUpdateSketch[float64](3)
 			assert.NoError(t, err)
 			for i := 0; i < n; i++ {
-				s := make([]float64, 0, 3)
-				for j := 0; j < 3; j++ {
-					s = append(s, float64(j))
-				}
+				s := []float64{float64(i), float64(i), float64(i)}
 				sketch.UpdateInt64(int64(i), s)
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
 			assert.InDelta(t, n, sketch.Estimate(), float64(n)*0.03)
+			for _, summary := range sketch.All() {
+				assert.Equal(t, summary.values[0], summary.values[1])
+				assert.Equal(t, summary.values[0], summary.values[2])
+			}
 
 			compactSketch, err := sketch.Compact(false)
 			assert.NoError(t, err)

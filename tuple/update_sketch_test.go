@@ -466,15 +466,10 @@ func TestUpdateSketch_UpdateArrayOfStringsSummary(t *testing.T) {
 	}, retained)
 }
 
-// TestUpdateSketch_ArrayOfStringsSummaryDoesNotAliasCaller guards the copy in
-// ArrayOfStringsSummary.Update. Java does stringArr = value.clone(); reusing one scratch buffer
-// across updates is an ordinary Go idiom, so without the copy every retained summary would end up
-// pointing at the same backing array and reporting whatever was written last.
 func TestUpdateSketch_ArrayOfStringsSummaryDoesNotAliasCaller(t *testing.T) {
 	sketch, err := NewUpdateSketch[*ArrayOfStringsSummary, []string](NewArrayOfStringsSummaryFunc)
 	assert.NoError(t, err)
 
-	// One scratch buffer, rewritten in place and handed to the sketch twice.
 	buf := make([]string, 1)
 
 	buf[0] = "first"
@@ -485,7 +480,6 @@ func TestUpdateSketch_ArrayOfStringsSummaryDoesNotAliasCaller(t *testing.T) {
 
 	assert.Equal(t, uint32(2), sketch.NumRetained())
 
-	// The slices as the sketch actually stores them - deliberately not copied out here.
 	var got [][]string
 	for _, summary := range sketch.All() {
 		got = append(got, summary.values)
@@ -494,8 +488,6 @@ func TestUpdateSketch_ArrayOfStringsSummaryDoesNotAliasCaller(t *testing.T) {
 	assert.ElementsMatch(t, [][]string{{"first"}, {"second"}}, got,
 		"each summary must own its values; sharing the caller's buffer would make both read %q", buf)
 
-	// got holds the live slices, so if a summary were aliasing buf, writing to buf now would
-	// be visible through it. This is the aliasing itself rather than a symptom of it.
 	buf[0] = "mutated"
 	assert.ElementsMatch(t, [][]string{{"first"}, {"second"}}, got,
 		"mutating the caller's slice after Update must not reach a retained summary")

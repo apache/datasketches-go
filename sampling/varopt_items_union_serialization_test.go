@@ -57,6 +57,7 @@ func TestGenerateGoSnapshots_VarOptItemsUnion(t *testing.T) {
 
 		union, err := NewVarOptItemsUnion[float64](kMax)
 		require.NoError(t, err)
+		require.NoError(t, union.Update(sketch))
 
 		// another one, but different n to get a different per-item weight.
 		sketch, err = NewVarOptItemsSketch[float64](kSmall)
@@ -66,7 +67,13 @@ func TestGenerateGoSnapshots_VarOptItemsUnion(t *testing.T) {
 		}
 		require.NoError(t, union.Update(sketch))
 
-		data := encodeVarOptItemsSketch(t, sketch, common.ItemSketchDoubleSerDe{})
+		serde := common.ItemSketchDoubleSerDe{}
+		data := encodeVarOptItemsUnion(t, union, serde)
+
+		rebuilt, err := DecodeVarOptItemsUnion[float64](data, serde)
+		require.NoError(t, err)
+		assertVarOptItemsUnionDoubleSampling(t, rebuilt)
+
 		filename := filepath.Join(internal.GoPath, "varopt_union_double_sampling_go.sk")
 		require.NoError(t, os.WriteFile(filename, data, 0644))
 	})
@@ -84,19 +91,7 @@ func TestVarOptItemsUnionJavaCompat(t *testing.T) {
 		union, err := DecodeVarOptItemsUnion[float64](data, common.ItemSketchDoubleSerDe{})
 		require.NoError(t, err)
 
-		// must reduce k in the process.
-		sketch, err := union.Result()
-		require.NoError(t, err)
-		assert.Less(t, sketch.K(), 128)
-		assert.Equal(t, int64(97), sketch.N())
-
-		// light items, ignoring the heavy one.
-		summary, err := sketch.EstimateSubsetSum(func(item float64) bool {
-			return item >= 0
-		})
-		require.NoError(t, err)
-		assert.InDelta(t, 96.0, summary.Estimate, varOptItemsSerializationEpsilon)
-		assert.InDelta(t, 96.0+1024.0, summary.TotalSketchWeight, varOptItemsSerializationEpsilon)
+		assertVarOptItemsUnionDoubleSampling(t, union)
 	})
 }
 
@@ -112,19 +107,7 @@ func TestVarOptItemsUnionCppCompat(t *testing.T) {
 		union, err := DecodeVarOptItemsUnion[float64](data, common.ItemSketchDoubleSerDe{})
 		require.NoError(t, err)
 
-		// must reduce k in the process.
-		sketch, err := union.Result()
-		require.NoError(t, err)
-		assert.Less(t, sketch.K(), 128)
-		assert.Equal(t, int64(97), sketch.N())
-
-		// light items, ignoring the heavy one.
-		summary, err := sketch.EstimateSubsetSum(func(item float64) bool {
-			return item >= 0
-		})
-		require.NoError(t, err)
-		assert.InDelta(t, 96.0, summary.Estimate, varOptItemsSerializationEpsilon)
-		assert.InDelta(t, 96.0+1024.0, summary.TotalSketchWeight, varOptItemsSerializationEpsilon)
+		assertVarOptItemsUnionDoubleSampling(t, union)
 	})
 }
 
@@ -285,4 +268,27 @@ func encodeVarOptItemsUnion[T any](t *testing.T, union *VarOptItemsUnion[T], ser
 	enc := NewVarOptItemsUnionEncoder[T](&buf, serde)
 	require.NoError(t, enc.Encode(union))
 	return buf.Bytes()
+}
+
+func assertVarOptItemsUnionDoubleSampling(t *testing.T, union *VarOptItemsUnion[float64]) {
+	t.Helper()
+
+	// header fields, as written to the wire: a union that decoded as a bare sketch, or one
+	// missing an input sketch, fails here rather than downstream of Result().
+	assert.Equal(t, 128, union.k)
+	assert.Equal(t, int64(97), union.n)
+
+	// must reduce k in the process.
+	sketch, err := union.Result()
+	require.NoError(t, err)
+	assert.Less(t, sketch.K(), 128)
+	assert.Equal(t, int64(97), sketch.N())
+
+	// light items, ignoring the heavy one.
+	summary, err := sketch.EstimateSubsetSum(func(item float64) bool {
+		return item >= 0
+	})
+	require.NoError(t, err)
+	assert.InDelta(t, 96.0, summary.Estimate, varOptItemsSerializationEpsilon)
+	assert.InDelta(t, 96.0+1024.0, summary.TotalSketchWeight, varOptItemsSerializationEpsilon)
 }

@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"slices"
 
 	"github.com/cespare/xxhash/v2"
 )
@@ -72,7 +73,7 @@ func (s *ArrayOfStringsSummary) Clone() Summary {
 
 // Update incorporates a new string value into the summary.
 func (s *ArrayOfStringsSummary) Update(values []string) {
-	s.values = values
+	s.values = slices.Clone(values)
 }
 
 // ArrayOfStringsSummaryWriter writes an ArrayOfStringsSummary to the provided io.Writer in binary format.

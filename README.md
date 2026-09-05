@@ -56,6 +56,7 @@ If you are interested in making contributions to this site, please see our [Comm
 | 	            | KllSketch<T>            | ✅      |
 | 	            | ReqFloatsSketch         | ⚠️     |
 | 	            | TDigestDouble           | ✅      |
+|               | TDigestFloat            | ❌      |
 | Frequencies  |                         | ️      |
 |              | FreqLongsSketch         | ✅      |
 |              | FreqItemsSketch<T>      | ✅      |

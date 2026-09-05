@@ -283,7 +283,7 @@ func (i *ItemsSketch[C]) frequencies(item C) (est, lower, upper int64, err error
 // threshold to include items in the result list
 // errorType determines whether no false positives or no false negatives are desired.
 // an array of frequent items
-func (i *ItemsSketch[C]) GetFrequentItemsWithThreshold(threshold int64, errorType errorType) ([]*RowItem[C], error) {
+func (i *ItemsSketch[C]) GetFrequentItemsWithThreshold(threshold int64, errorType errorType) ([]RowItem[C], error) {
 	finalThreshold := i.GetMaximumError()
 	if threshold > finalThreshold {
 		finalThreshold = threshold
@@ -291,12 +291,12 @@ func (i *ItemsSketch[C]) GetFrequentItemsWithThreshold(threshold int64, errorTyp
 	return i.sortItems(finalThreshold, errorType)
 }
 
-// GetFrequentItems returns an array of Row that include frequent items, estimates, upper and
+// GetFrequentItems returns an array of RowItem that include frequent items, estimates, upper and
 // lower bounds given an ErrorCondition and the default threshold.
 // This is the same as GetFrequentItemsWithThreshold(getMaximumError(), errorType)
 //
 // errorType determines whether no false positives or no false negatives are desired.
-func (i *ItemsSketch[C]) GetFrequentItems(errorType errorType) ([]*RowItem[C], error) {
+func (i *ItemsSketch[C]) GetFrequentItems(errorType errorType) ([]RowItem[C], error) {
 	return i.sortItems(i.GetMaximumError(), errorType)
 }
 
@@ -514,8 +514,8 @@ func (i *ItemsSketch[C]) String() string {
 	return sb.String()
 }
 
-func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*RowItem[C], error) {
-	rowList := make([]*RowItem[C], 0)
+func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]RowItem[C], error) {
+	rowList := make([]RowItem[C], 0, i.hashMap.numActive)
 	iter := i.hashMap.iterator()
 	if errorType == ErrorTypeEnum.NoFalseNegatives {
 		for iter.next() {
@@ -541,7 +541,7 @@ func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*Row
 		}
 	}
 
-	slices.SortFunc(rowList, func(a, b *RowItem[C]) int {
+	slices.SortFunc(rowList, func(a, b RowItem[C]) int {
 		if a.est > b.est {
 			return -1
 		}

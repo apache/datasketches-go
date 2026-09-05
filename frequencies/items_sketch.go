@@ -115,6 +115,9 @@ func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, hasher common.It
 	}
 
 	pre0, err := checkPreambleSize(slc) //make sure preamble will fit
+	if err != nil {
+		return nil, err
+	}
 	maxPreLongs := internal.FamilyEnum.Frequency.MaxPreLongs
 
 	preLongs := extractPreLongs(pre0)                     //Byte 0
@@ -143,30 +146,20 @@ func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, hasher common.It
 	if empty {
 		return NewFrequencyItemsSketchWithMaxMapSize[C](1<<_LG_MIN_MAP_SIZE, hasher, serde)
 	}
-	// Get full preamble
-	preArr := make([]int64, preLongs)
-	for j := 0; j < preLongs; j++ {
-		preArr[j] = int64(binary.LittleEndian.Uint64(slc[j<<3:]))
-	}
 
 	fis, err := NewFrequencyItemsSketch[C](lgMaxMapSize, lgCurMapSize, hasher, serde)
 	if err != nil {
 		return nil, err
 	}
 	fis.streamWeight = 0 // update after
-	fis.offset = preArr[3]
+	fis.offset = int64(binary.LittleEndian.Uint64(slc[24:]))
 
 	preBytes := preLongs << 3
-	activeItems := extractActiveItems(preArr[1])
+	activeItems := extractActiveItems(int64(binary.LittleEndian.Uint64(slc[8:])))
 
-	// Get countArray
-	countArray := make([]int64, activeItems)
 	reqBytes := preBytes + activeItems*8 // count Arr only
 	if len(slc) < reqBytes {
 		return nil, fmt.Errorf("possible Corruption: Insufficient bytes in array: %d, %d", len(slc), reqBytes)
-	}
-	for j := 0; j < activeItems; j++ {
-		countArray[j] = int64(binary.LittleEndian.Uint64(slc[preBytes+j<<3:]))
 	}
 	// Get itemArray
 	itemsOffset := preBytes + (8 * activeItems)
@@ -174,14 +167,15 @@ func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, hasher common.It
 	if err != nil {
 		return nil, err
 	}
-	// update the sketch
+	// update the sketch, decoding counts in place
+	counts := slc[preBytes:itemsOffset]
 	for j := 0; j < activeItems; j++ {
-		err := fis.UpdateMany(itemArray[j], countArray[j])
-		if err != nil {
+		count := int64(binary.LittleEndian.Uint64(counts[j<<3:]))
+		if err := fis.UpdateMany(itemArray[j], count); err != nil {
 			return nil, err
 		}
 	}
-	fis.streamWeight = preArr[2] // override streamWeight due to updating
+	fis.streamWeight = int64(binary.LittleEndian.Uint64(slc[16:])) // override streamWeight due to updating
 	return fis, nil
 }
 

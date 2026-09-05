@@ -130,46 +130,36 @@ func NewLongsSketchFromSlice(slc []byte) (*LongsSketch, error) {
 	if empty {
 		return NewLongsSketch(lgMaxMapSize, _LG_MIN_MAP_SIZE)
 	}
-	// get full preamble
-	preArr := make([]int64, preLongs)
-	for i := 0; i < preLongs; i++ {
-		preArr[i] = int64(binary.LittleEndian.Uint64(slc[i<<3:]))
-	}
+
 	fls, err := NewLongsSketch(lgMaxMapSize, lgCurMapSize)
 	if err != nil {
 		return nil, err
 	}
 	fls.streamWeight = 0 //update after
-	fls.offset = preArr[3]
+	fls.offset = int64(binary.LittleEndian.Uint64(slc[24:]))
 
 	preBytes := preLongs << 3
-	activeItems := extractActiveItems(preArr[1])
+	activeItems := extractActiveItems(int64(binary.LittleEndian.Uint64(slc[8:])))
 
-	// Get countArray
-	countArray := make([]int64, activeItems)
 	reqBytes := preBytes + 2*activeItems*8 //count Arr + Items Arr
 	if len(slc) < reqBytes {
 		return nil, fmt.Errorf("possible Corruption: Insufficient bytes in array: %d, %d", len(slc), reqBytes)
 	}
+
+	// UpdateMany the sketch, decoding counts and items straight out of slc.
+	// Counts occupy the activeItems longs starting at preBytes; items follow them.
+	itemsOffset := preBytes + (activeItems << 3)
+	counts := slc[preBytes:itemsOffset]
+	items := slc[itemsOffset:reqBytes]
 	for i := 0; i < activeItems; i++ {
-		countArray[i] = int64(binary.LittleEndian.Uint64(slc[preBytes+(i<<3):]))
+		count := int64(binary.LittleEndian.Uint64(counts[i<<3:]))
+		item := int64(binary.LittleEndian.Uint64(items[i<<3:]))
+		if err := fls.UpdateMany(item, count); err != nil {
+			return nil, err
+		}
 	}
 
-	// Get itemArray
-	itemsOffset := preBytes + (8 * activeItems)
-	itemArray := make([]int64, activeItems)
-	for i := 0; i < activeItems; i++ {
-		itemArray[i] = int64(binary.LittleEndian.Uint64(slc[itemsOffset+(i<<3):]))
-	}
-
-	// UpdateMany the sketch
-	for i := 0; i < activeItems && err == nil; i++ {
-		err = fls.UpdateMany(itemArray[i], countArray[i])
-	}
-	if err != nil {
-		return nil, err
-	}
-	fls.streamWeight = preArr[2] //override streamWeight due to updating
+	fls.streamWeight = int64(binary.LittleEndian.Uint64(slc[16:])) //override streamWeight due to updating
 	return fls, nil
 }
 

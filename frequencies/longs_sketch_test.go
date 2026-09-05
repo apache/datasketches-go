@@ -20,11 +20,13 @@ package frequencies
 import (
 	"encoding/binary"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 func TestFrequentItemsStringSerial(t *testing.T) {
@@ -642,5 +644,37 @@ func BenchmarkLongSketch(b *testing.B) {
 	assert.NoError(b, err)
 	for i := 0; i < b.N; i++ {
 		sketch.Update(int64(i))
+	}
+}
+
+var benchmarkLongsSketchFromSliceSink *LongsSketch
+
+func BenchmarkLongsSketchFromSlice(b *testing.B) {
+	for _, mapSize := range []int{64, 256, 1024} {
+		activeItems := mapSize * 3 / 4
+		b.Run("items="+strconv.Itoa(activeItems), func(b *testing.B) {
+			sketch, err := NewLongsSketchWithMaxMapSize(mapSize)
+			if err != nil {
+				b.Fatal(err)
+			}
+			for index := 0; index < activeItems; index++ {
+				if err := sketch.UpdateMany(int64(index), int64(index+1)); err != nil {
+					b.Fatal(err)
+				}
+			}
+
+			serialized := sketch.ToSlice()
+			b.SetBytes(int64(len(serialized)))
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			for iteration := 0; iteration < b.N; iteration++ {
+				restored, err := NewLongsSketchFromSlice(serialized)
+				if err != nil {
+					b.Fatal(err)
+				}
+				benchmarkLongsSketchFromSliceSink = restored
+			}
+		})
 	}
 }

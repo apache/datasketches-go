@@ -23,8 +23,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 func TestFrequentItemsStringSerial(t *testing.T) {
@@ -533,9 +534,8 @@ func printRows(t *testing.T, fls *LongsSketch, errorType errorType) {
 		s2 := row.String()
 		fmt.Println(s2)
 	}
-	if len(rows) > 0 { //check equals null case
-		var nullRow *Row
-		assert.NotEqual(t, rows[0], nullRow)
+	if len(rows) > 0 {
+		assert.NotEqual(t, Row{}, rows[0])
 	}
 }
 

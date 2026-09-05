@@ -399,8 +399,7 @@ func TestMisc(t *testing.T) {
 	assert.Equal(t, row.GetUpperBound(), int64(1))
 	s := row.String()
 	t.Log(s)
-	var nullRow *RowItem[int64]
-	assert.NotEqual(t, row, nullRow)
+	assert.NotEqual(t, RowItem[int64]{}, row)
 }
 
 func TestToString(t *testing.T) {
@@ -417,7 +416,7 @@ func TestFrequentItems1(t *testing.T) {
 	rows, err := fis.GetFrequentItems(ErrorTypeEnum.NoFalsePositives)
 	assert.NoError(t, err)
 	row := rows[0]
-	assert.NotNil(t, row)
+	assert.NotEqual(t, RowItem[int64]{}, row)
 	assert.Equal(t, row.GetItem(), int64(1))
 	assert.Equal(t, row.GetEstimate(), int64(1))
 	assert.Equal(t, row.GetUpperBound(), int64(1))
@@ -610,8 +609,8 @@ func benchmarkItemsSketchToSlice[C comparable](
 	}
 }
 
-func generateTestRowItems(n int) []*RowItem[string] {
-	items := make([]*RowItem[string], n)
+func generateTestRowItems(n int) []RowItem[string] {
+	items := make([]RowItem[string], n)
 	for i := 0; i < n; i++ {
 		est := rand.Int63n(10000)
 		items[i] = newRowItem(
@@ -634,7 +633,7 @@ func BenchmarkSortSliceRow(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				rowList := make([]*RowItem[string], len(original))
+				rowList := make([]RowItem[string], len(original))
 				copy(rowList, original)
 
 				sort.Slice(rowList, func(i, j int) bool {
@@ -655,10 +654,10 @@ func BenchmarkSlicesSortFuncRow(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				rowList := make([]*RowItem[string], len(original))
+				rowList := make([]RowItem[string], len(original))
 				copy(rowList, original)
 
-				slices.SortFunc(rowList, func(a, b *RowItem[string]) int {
+				slices.SortFunc(rowList, func(a, b RowItem[string]) int {
 					if a.est > b.est {
 						return -1
 					}

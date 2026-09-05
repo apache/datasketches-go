@@ -342,7 +342,7 @@ func (s *LongsSketch) GetUpperBound(item int64) (int64, error) {
 // threshold to include items in the result list
 // errorType determines whether no false positives or no false negatives are desired.
 // an array of frequent items
-func (s *LongsSketch) GetFrequentItemsWithThreshold(threshold int64, errorType errorType) ([]*Row, error) {
+func (s *LongsSketch) GetFrequentItemsWithThreshold(threshold int64, errorType errorType) ([]Row, error) {
 	finalThreshold := s.GetMaximumError()
 	if threshold > finalThreshold {
 		finalThreshold = threshold
@@ -355,7 +355,7 @@ func (s *LongsSketch) GetFrequentItemsWithThreshold(threshold int64, errorType e
 // This is the same as GetFrequentItemsWithThreshold(getMaximumError(), errorType)
 //
 // errorType determines whether no false positives or no false negatives are desired.
-func (s *LongsSketch) GetFrequentItems(errorType errorType) ([]*Row, error) {
+func (s *LongsSketch) GetFrequentItems(errorType errorType) ([]Row, error) {
 	return s.sortItems(s.GetMaximumError(), errorType)
 }
 
@@ -555,8 +555,8 @@ func (s *LongsSketch) String() string {
 	return sb.String()
 }
 
-func (s *LongsSketch) sortItems(threshold int64, errorType errorType) ([]*Row, error) {
-	rowList := make([]*Row, 0)
+func (s *LongsSketch) sortItems(threshold int64, errorType errorType) ([]Row, error) {
+	rowList := make([]Row, 0, s.hashMap.numActive)
 	iter := s.hashMap.iterator()
 	if errorType == ErrorTypeEnum.NoFalseNegatives {
 		for iter.next() {
@@ -582,7 +582,7 @@ func (s *LongsSketch) sortItems(threshold int64, errorType errorType) ([]*Row, e
 		}
 	}
 
-	slices.SortFunc(rowList, func(a, b *Row) int {
+	slices.SortFunc(rowList, func(a, b Row) int {
 		if a.est > b.est {
 			return -1
 		}

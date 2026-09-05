@@ -647,6 +647,39 @@ func BenchmarkLongSketch(b *testing.B) {
 	}
 }
 
+var toSliceSink []byte
+
+func BenchmarkLongsSketchToSlice(b *testing.B) {
+	cases := []struct {
+		lgMaxMapSize int
+		numItems     int
+	}{
+		{6, 48},
+		{10, 768},
+		{14, 12288},
+		{18, 196608},
+	}
+
+	for _, c := range cases {
+		sk, err := NewLongsSketch(c.lgMaxMapSize, _LG_MIN_MAP_SIZE)
+		if err != nil {
+			b.Fatal(err)
+		}
+		for i := 0; i < c.numItems; i++ {
+			if err := sk.UpdateMany(int64(i), int64(i+1)); err != nil {
+				b.Fatal(err)
+			}
+		}
+
+		b.Run(fmt.Sprintf("active=%d", sk.GetNumActiveItems()), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				toSliceSink = sk.ToSlice()
+			}
+		})
+	}
+}
+
 var benchmarkLongsSketchFromSliceSink *LongsSketch
 
 func BenchmarkLongsSketchFromSlice(b *testing.B) {

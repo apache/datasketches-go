@@ -510,15 +510,19 @@ func (s *LongsSketch) ToSlice() []byte {
 		binary.LittleEndian.PutUint64(outArr[i<<3:], uint64(preArr[i]))
 	}
 
+	// All active values are written first, then all active keys, both in table
+	// index order. The two regions are disjoint, so a single pass over the hash
+	// table fills both without any intermediate slices.
 	preBytes := preLongs << 3
-	activeValues := s.hashMap.getActiveValues()
-	for i := 0; i < activeItems; i++ {
-		binary.LittleEndian.PutUint64(outArr[preBytes+(i<<3):], uint64(activeValues[i]))
-	}
-
-	activeKeys := s.hashMap.getActiveKeys()
-	for i := 0; i < activeItems; i++ {
-		binary.LittleEndian.PutUint64(outArr[preBytes+((activeItems+i)<<3):], uint64(activeKeys[i]))
+	keysOffset := preBytes + (activeItems << 3)
+	hashMap := s.hashMap
+	j := 0
+	for i := 0; i < len(hashMap.states); i++ {
+		if hashMap.states[i] > 0 { //isActive
+			binary.LittleEndian.PutUint64(outArr[preBytes+(j<<3):], uint64(hashMap.values[i]))
+			binary.LittleEndian.PutUint64(outArr[keysOffset+(j<<3):], uint64(hashMap.keys[i]))
+			j++
+		}
 	}
 
 	return outArr

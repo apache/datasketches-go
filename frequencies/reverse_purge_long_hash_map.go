@@ -305,32 +305,6 @@ func deserializeFromStringArray(tokens []string) (*reversePurgeLongHashMap, erro
 	return hashMap, nil
 }
 
-func (r *reversePurgeLongHashMap) getActiveValues() []int64 {
-	if r.numActive == 0 {
-		return nil
-	}
-	returnValues := make([]int64, 0, r.numActive)
-	for i := 0; i < len(r.values); i++ {
-		if r.states[i] > 0 { //isActive
-			returnValues = append(returnValues, r.values[i])
-		}
-	}
-	return returnValues
-}
-
-func (r *reversePurgeLongHashMap) getActiveKeys() []int64 {
-	if r.numActive == 0 {
-		return nil
-	}
-	returnValues := make([]int64, 0, r.numActive)
-	for i := 0; i < len(r.keys); i++ {
-		if r.states[i] > 0 { //isActive
-			returnValues = append(returnValues, r.keys[i])
-		}
-	}
-	return returnValues
-}
-
 func (s *reversePurgeLongHashMap) iterator() *iteratorLongHashMap {
 	return newIteratorLong(s.keys, s.values, s.states, s.numActive)
 }

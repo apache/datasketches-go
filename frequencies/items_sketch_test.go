@@ -25,8 +25,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/apache/datasketches-go/common"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/common"
 )
 
 func TestEmpty(t *testing.T) {
@@ -667,6 +668,64 @@ func BenchmarkSlicesSortFuncRow(b *testing.B) {
 					}
 					return 0
 				})
+			}
+		})
+	}
+}
+
+var benchmarkItemsSketchFromSliceSink any
+
+func BenchmarkItemsSketchFromSlice(b *testing.B) {
+	benchmarkItemsSketchFromSlice(
+		b,
+		"int64",
+		common.ItemSketchLongHasher{},
+		common.ItemSketchLongSerDe{},
+		func(index int) int64 { return int64(index) },
+	)
+	benchmarkItemsSketchFromSlice(
+		b,
+		"string",
+		common.ItemSketchStringHasher{},
+		common.ItemSketchStringSerDe{},
+		func(index int) string { return "item-" + strconv.Itoa(index) },
+	)
+}
+
+func benchmarkItemsSketchFromSlice[C comparable](
+	b *testing.B,
+	itemType string,
+	hasher common.ItemSketchHasher[C],
+	serde common.ItemSketchSerde[C],
+	itemAt func(int) C,
+) {
+	for _, mapSize := range []int{64, 256, 1024} {
+		activeItems := mapSize * 3 / 4
+		b.Run(itemType+"/items="+strconv.Itoa(activeItems), func(b *testing.B) {
+			sketch, err := NewFrequencyItemsSketchWithMaxMapSize(mapSize, hasher, serde)
+			if err != nil {
+				b.Fatal(err)
+			}
+			for index := 0; index < activeItems; index++ {
+				if err := sketch.UpdateMany(itemAt(index), int64(index+1)); err != nil {
+					b.Fatal(err)
+				}
+			}
+
+			serialized, err := sketch.ToSlice()
+			if err != nil {
+				b.Fatal(err)
+			}
+			b.SetBytes(int64(len(serialized)))
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			for iteration := 0; iteration < b.N; iteration++ {
+				restored, err := NewFrequencyItemsSketchFromSlice(serialized, hasher, serde)
+				if err != nil {
+					b.Fatal(err)
+				}
+				benchmarkItemsSketchFromSliceSink = restored
 			}
 		})
 	}

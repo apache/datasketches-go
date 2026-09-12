@@ -20,7 +20,6 @@ package cpc
 var (
 	iconPolynomialDegree          = 19
 	iconPolynomialNumCoefficients = 1 + iconPolynomialDegree
-	iconTableSize                 = iconPolynomialNumCoefficients * ((1 + maxLgK) - minLgK)
 	iconPolynomialCoefficents     = []float64{
 		// log K = 4
 		0.9895027971889700513, 0.3319496644645180128, 0.1242818722715769986, -0.03324149686026930256, -0.2985637298081619817,

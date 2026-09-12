@@ -189,7 +189,6 @@ func DecodeVarOptItemsSketch[T any](buffer []byte, serde common.ItemSketchSerde[
 		if err != nil {
 			return nil, err
 		}
-		index += rBytes
 
 		copy(data[h+1:h+1+r], rData)
 	}

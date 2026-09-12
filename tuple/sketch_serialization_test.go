@@ -55,7 +55,7 @@ func TestGenerateGoSnapshots(t *testing.T) {
 		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
 		assert.NoError(t, err)
 		for i := 0; i < n; i++ {
-			sketch.UpdateInt64(int64(i), int32(i))
+			assert.NoError(t, sketch.UpdateInt64(int64(i), int32(i)))
 		}
 
 		assert.True(t, sketch.IsEmpty() == (n == 0))

@@ -172,10 +172,12 @@ func find(entries []uint64, lgSize uint8, key uint64) (int, error) {
 	loopIndex := index
 	for {
 		probe := entries[index]
-		if probe == 0 {
+		switch probe {
+		case 0:
 			return int(index), ErrKeyNotFound
-		} else if probe == key {
+		case key:
 			return int(index), nil
+		default:
 		}
 
 		index = (index + stride) & mask

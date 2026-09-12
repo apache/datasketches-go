@@ -144,11 +144,11 @@ func TestPackUnpackBlocks(t *testing.T) {
 
 			// Pack block
 			bytes := make([]byte, bits)
-			packBitsBlock8(input, bytes, bits)
+			assert.NoError(t, packBitsBlock8(input, bytes, bits))
 
 			// Unpack block
 			output := make([]uint64, 8)
-			unpackBitsBlock8(output, bytes, bits)
+			assert.NoError(t, unpackBitsBlock8(output, bytes, bits))
 
 			// Verify
 			for i := 0; i < 8; i++ {
@@ -182,7 +182,7 @@ func TestPackBitsUnpackBlocks(t *testing.T) {
 
 			// Unpack with block function
 			output := make([]uint64, 8)
-			unpackBitsBlock8(output, bytes, bits)
+			assert.NoError(t, unpackBitsBlock8(output, bytes, bits))
 
 			// Verify
 			for i := 0; i < 8; i++ {
@@ -208,7 +208,7 @@ func TestPackBlocksUnpackBits(t *testing.T) {
 
 			// Pack with block function
 			bytes := make([]byte, bits)
-			packBitsBlock8(input, bytes, bits)
+			assert.NoError(t, packBitsBlock8(input, bytes, bits))
 
 			// Unpack with individual bits
 			output := make([]uint64, 8)

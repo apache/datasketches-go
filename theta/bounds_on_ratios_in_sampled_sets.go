@@ -85,10 +85,10 @@ func hackyAdjuster(f float64) float64 {
 
 func validateInputs(a, b uint64, f float64) error {
 	if a < b {
-		return fmt.Errorf("a must be >= b: a = %d, b = %d", a, b)
+		return fmt.Errorf("a must be >= b: a = %d, b = %d", a, b) //nolint:staticcheck
 	}
 	if f > 1.0 || f <= 0.0 {
-		return fmt.Errorf("Required: ((f <= 1.0) && (f > 0.0)): %f", f)
+		return fmt.Errorf("Required: ((f <= 1.0) && (f > 0.0)): %f", f) //nolint:staticcheck
 	}
 	return nil
 }

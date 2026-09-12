@@ -144,12 +144,12 @@ func (bf *bloomFilterImpl) IsCompatible(other BloomFilter) bool {
 func (bf *bloomFilterImpl) computeHashes(data []byte) (h0, h1 uint64) {
 	// Compute h0 with the filter's seed
 	h := xxhash.NewWithSeed(bf.seed)
-	h.Write(data)
+	_, _ = h.Write(data)
 	h0 = h.Sum64()
 
 	// Compute h1 using h0 as seed, reusing the same digest.
 	h.ResetWithSeed(h0)
-	h.Write(data)
+	_, _ = h.Write(data)
 	h1 = h.Sum64()
 	return
 }

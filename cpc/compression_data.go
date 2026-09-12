@@ -6049,12 +6049,18 @@ var columnPermutationsForDecoding = make([][]byte, 16)
 func makeTheDecodingTables() {
 	// Build the unary decoding table for the 65-entry table.
 	lengthLimitedUnaryDecodingTable65 = makeDecodingTable(lengthLimitedUnaryEncodingTable65, 65)
-	validateDecodingTable(lengthLimitedUnaryDecodingTable65, lengthLimitedUnaryEncodingTable65)
+	err := validateDecodingTable(lengthLimitedUnaryDecodingTable65, lengthLimitedUnaryEncodingTable65)
+	if err != nil {
+		return
+	}
 
 	// For each of the 22 high-entropy tables, build the corresponding decoding table.
 	for i := 0; i < (16 + 6); i++ {
 		decodingTablesForHighEntropyByte[i] = makeDecodingTable(encodingTablesForHighEntropyByte[i], 256)
-		validateDecodingTable(decodingTablesForHighEntropyByte[i], encodingTablesForHighEntropyByte[i])
+		err := validateDecodingTable(decodingTablesForHighEntropyByte[i], encodingTablesForHighEntropyByte[i])
+		if err != nil {
+			return
+		}
 	}
 
 	// Build the column permutations for decoding by inverting the encoding permutations.

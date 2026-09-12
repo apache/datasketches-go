@@ -109,7 +109,7 @@ func TestIntersection(t *testing.T) {
 
 		exact, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		exact.UpdateInt64(3, 1)
+		assert.NoError(t, exact.UpdateInt64(3, 1))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
 		err = intersection.Update(empty)
@@ -131,7 +131,7 @@ func TestIntersection(t *testing.T) {
 
 		exact, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		exact.UpdateInt64(3, 1)
+		assert.NoError(t, exact.UpdateInt64(3, 1))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
 		emptyCompact, err := empty.Compact(false)
@@ -159,7 +159,7 @@ func TestIntersection(t *testing.T) {
 			newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6, 1)
+		assertUpdate(t, b.UpdateInt64(6, 1))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
 		err = intersection.Update(a)
@@ -183,7 +183,7 @@ func TestIntersection(t *testing.T) {
 			newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6, 1)
+		assertUpdate(t, b.UpdateInt64(6, 1))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
 		aCompact, err := a.Compact(false)
@@ -211,7 +211,7 @@ func TestIntersection(t *testing.T) {
 			newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(4, 1)
+		assert.NoError(t, b.UpdateInt64(4, 1))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
 		err = intersection.Update(a)
@@ -234,7 +234,7 @@ func TestIntersection(t *testing.T) {
 			newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(4, 1)
+		assert.NoError(t, b.UpdateInt64(4, 1))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
 		aCompact, err := a.Compact(false)
@@ -256,13 +256,13 @@ func TestIntersection(t *testing.T) {
 	t.Run("Exact, Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4, 1)
+		assert.NoError(t, a.UpdateInt64(4, 1))
 
 		b, err := NewUpdateSketch[*int32Summary, int32](
 			newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6, 1)
+		assertUpdate(t, b.UpdateInt64(6, 1))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
 		err = intersection.Update(a)
@@ -280,13 +280,13 @@ func TestIntersection(t *testing.T) {
 	t.Run("Exact Compact, Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4, 1)
+		assert.NoError(t, a.UpdateInt64(4, 1))
 
 		b, err := NewUpdateSketch[*int32Summary, int32](
 			newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6, 1)
+		assertUpdate(t, b.UpdateInt64(6, 1))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
 		aCompact, err := a.Compact(false)
@@ -308,11 +308,11 @@ func TestIntersection(t *testing.T) {
 	t.Run("Estimation Mode, Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4, 1)
+		assert.NoError(t, a.UpdateInt64(4, 1))
 
 		b, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(6, 1)
+		assertUpdate(t, b.UpdateInt64(6, 1))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
 		err = intersection.Update(a)
@@ -330,11 +330,11 @@ func TestIntersection(t *testing.T) {
 	t.Run("Estimation Mode Compact, Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4, 1)
+		assert.NoError(t, a.UpdateInt64(4, 1))
 
 		b, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(6, 1)
+		assertUpdate(t, b.UpdateInt64(6, 1))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
 		aCompact, _ := a.Compact(false)
@@ -356,7 +356,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch1.UpdateInt64(int64(value), 1)
+			assert.NoError(t, sketch1.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -364,7 +364,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value = 500
 		for i := 0; i < 1000; i++ {
-			sketch2.UpdateInt64(int64(value), 1)
+			assert.NoError(t, sketch2.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -388,7 +388,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch1.UpdateInt64(int64(value), 1)
+			assert.NoError(t, sketch1.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -396,7 +396,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value = 500
 		for i := 0; i < 1000; i++ {
-			sketch2.UpdateInt64(int64(value), 1)
+			assert.NoError(t, sketch2.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -424,7 +424,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch1.UpdateInt64(int64(value), 1)
+			assert.NoError(t, sketch1.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -432,7 +432,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value = 500
 		for i := 0; i < 1000; i++ {
-			sketch2.UpdateInt64(int64(value), 1)
+			assert.NoError(t, sketch2.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -460,14 +460,14 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch1.UpdateInt64(int64(value), 1)
+			assert.NoError(t, sketch1.UpdateInt64(int64(value), 1))
 			value++
 		}
 
 		sketch2, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
 		assert.NoError(t, err)
 		for i := 0; i < 1000; i++ {
-			sketch2.UpdateInt64(int64(value), 1)
+			assert.NoError(t, sketch2.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -491,14 +491,14 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch1.UpdateInt64(int64(value), 1)
+			assert.NoError(t, sketch1.UpdateInt64(int64(value), 1))
 			value++
 		}
 
 		sketch2, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
 		assert.NoError(t, err)
 		for i := 0; i < 1000; i++ {
-			sketch2.UpdateInt64(int64(value), 1)
+			assert.NoError(t, sketch2.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -526,7 +526,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch1.UpdateInt64(int64(value), 1)
+			assertUpdate(t, sketch1.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -534,7 +534,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value = 5000
 		for i := 0; i < 10000; i++ {
-			sketch2.UpdateInt64(int64(value), 1)
+			assertUpdate(t, sketch2.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -559,7 +559,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch1.UpdateInt64(int64(value), 1)
+			assertUpdate(t, sketch1.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -567,7 +567,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value = 5000
 		for i := 0; i < 10000; i++ {
-			sketch2.UpdateInt64(int64(value), 1)
+			assertUpdate(t, sketch2.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -596,14 +596,14 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch1.UpdateInt64(int64(value), 1)
+			assertUpdate(t, sketch1.UpdateInt64(int64(value), 1))
 			value++
 		}
 
 		sketch2, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
 		assert.NoError(t, err)
 		for i := 0; i < 10000; i++ {
-			sketch2.UpdateInt64(int64(value), 1)
+			assertUpdate(t, sketch2.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -627,14 +627,14 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch1.UpdateInt64(int64(value), 1)
+			assertUpdate(t, sketch1.UpdateInt64(int64(value), 1))
 			value++
 		}
 
 		sketch2, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
 		assert.NoError(t, err)
 		for i := 0; i < 10000; i++ {
-			sketch2.UpdateInt64(int64(value), 1)
+			assertUpdate(t, sketch2.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -660,11 +660,11 @@ func TestIntersection(t *testing.T) {
 	t.Run("Exact Mode, Estimation Mode Full Overlap", func(t *testing.T) {
 		a, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(4), 1)
+		assert.NoError(t, a.UpdateInt64(int64(4), 1))
 
 		b, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(4), 1)
+		assert.NoError(t, b.UpdateInt64(int64(4), 1))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
 		err = intersection.Update(a)
@@ -682,11 +682,11 @@ func TestIntersection(t *testing.T) {
 	t.Run("Exact Mode Compact, Estimation Mode Compact Full Overlap", func(t *testing.T) {
 		a, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(4), 1)
+		assert.NoError(t, a.UpdateInt64(int64(4), 1))
 
 		b, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(4), 1)
+		assert.NoError(t, b.UpdateInt64(int64(4), 1))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
 		aCompact, err := a.Compact(false)
@@ -708,11 +708,11 @@ func TestIntersection(t *testing.T) {
 	t.Run("Non Empty No Retained Keys, Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(3), 1)
+		assertUpdate(t, a.UpdateInt64(int64(3), 1))
 
 		b, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(6), 1)
+		assertUpdate(t, b.UpdateInt64(int64(6), 1))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
 		err = intersection.Update(a)
@@ -730,11 +730,11 @@ func TestIntersection(t *testing.T) {
 	t.Run("Non Empty No Retained Keys Compact, Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(3), 1)
+		assertUpdate(t, a.UpdateInt64(int64(3), 1))
 
 		b, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(6), 1)
+		assertUpdate(t, b.UpdateInt64(int64(6), 1))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
 		aCompact, err := a.Compact(false)
@@ -756,7 +756,7 @@ func TestIntersection(t *testing.T) {
 	t.Run("Seed Mismatch", func(t *testing.T) {
 		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
 		assert.NoError(t, err)
-		sketch.UpdateInt64(1, 1) // non-empty should not be ignored
+		assert.NoError(t, sketch.UpdateInt64(1, 1)) // non-empty should not be ignored
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{}, WithIntersectionSeed(123))
 		err = intersection.Update(sketch)
@@ -775,17 +775,17 @@ func TestIntersection(t *testing.T) {
 	t.Run("OrderedResult Method", func(t *testing.T) {
 		sketch1, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
 		for i := 0; i < 100; i++ {
-			sketch1.UpdateInt64(int64(i), 1)
+			assert.NoError(t, sketch1.UpdateInt64(int64(i), 1))
 		}
 
 		sketch2, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
 		for i := 50; i < 150; i++ {
-			sketch2.UpdateInt64(int64(i), 1)
+			assert.NoError(t, sketch2.UpdateInt64(int64(i), 1))
 		}
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
-		intersection.Update(sketch1)
-		intersection.Update(sketch2)
+		assert.NoError(t, intersection.Update(sketch1))
+		assert.NoError(t, intersection.Update(sketch2))
 
 		result, err := intersection.OrderedResult()
 		assert.NoError(t, err)
@@ -795,18 +795,18 @@ func TestIntersection(t *testing.T) {
 
 	t.Run("Summary Sum Policy Applied", func(t *testing.T) {
 		sketch1, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
-		sketch1.UpdateInt64(1, 10)
-		sketch1.UpdateInt64(2, 20)
-		sketch1.UpdateInt64(3, 30)
+		assert.NoError(t, sketch1.UpdateInt64(1, 10))
+		assert.NoError(t, sketch1.UpdateInt64(2, 20))
+		assert.NoError(t, sketch1.UpdateInt64(3, 30))
 
 		sketch2, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
-		sketch2.UpdateInt64(2, 5)
-		sketch2.UpdateInt64(3, 15)
-		sketch2.UpdateInt64(4, 25)
+		assert.NoError(t, sketch2.UpdateInt64(2, 5))
+		assert.NoError(t, sketch2.UpdateInt64(3, 15))
+		assert.NoError(t, sketch2.UpdateInt64(4, 25))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
-		intersection.Update(sketch1)
-		intersection.Update(sketch2)
+		assert.NoError(t, intersection.Update(sketch1))
+		assert.NoError(t, intersection.Update(sketch2))
 
 		result, err := intersection.Result(true)
 		assert.NoError(t, err)
@@ -827,12 +827,12 @@ func TestIntersection(t *testing.T) {
 
 		sketch1, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchSeed(customSeed))
 		for i := 0; i < 100; i++ {
-			sketch1.UpdateInt64(int64(i), 1)
+			assert.NoError(t, sketch1.UpdateInt64(int64(i), 1))
 		}
 
 		sketch2, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchSeed(customSeed))
 		for i := 50; i < 150; i++ {
-			sketch2.UpdateInt64(int64(i), 1)
+			assert.NoError(t, sketch2.UpdateInt64(int64(i), 1))
 		}
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{}, WithIntersectionSeed(customSeed))
@@ -856,16 +856,16 @@ func (p *keepFirstPolicy) Apply(internalSummary *int32Summary, incomingSummary *
 func TestIntersectionWithDifferentPolicies(t *testing.T) {
 	t.Run("Keep First Policy", func(t *testing.T) {
 		sketch1, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
-		sketch1.UpdateInt64(1, 100)
-		sketch1.UpdateInt64(2, 200)
+		assert.NoError(t, sketch1.UpdateInt64(1, 100))
+		assert.NoError(t, sketch1.UpdateInt64(2, 200))
 
 		sketch2, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
-		sketch2.UpdateInt64(1, 1)
-		sketch2.UpdateInt64(2, 2)
+		assert.NoError(t, sketch2.UpdateInt64(1, 1))
+		assert.NoError(t, sketch2.UpdateInt64(2, 2))
 
 		intersection := NewIntersection[*int32Summary](&keepFirstPolicy{})
-		intersection.Update(sketch1)
-		intersection.Update(sketch2)
+		assert.NoError(t, intersection.Update(sketch1))
+		assert.NoError(t, intersection.Update(sketch2))
 
 		result, err := intersection.Result(true)
 		assert.NoError(t, err)
@@ -879,16 +879,16 @@ func TestIntersectionWithDifferentPolicies(t *testing.T) {
 
 	t.Run("Sum Policy", func(t *testing.T) {
 		sketch1, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
-		sketch1.UpdateInt64(1, 100)
-		sketch1.UpdateInt64(2, 200)
+		assert.NoError(t, sketch1.UpdateInt64(1, 100))
+		assert.NoError(t, sketch1.UpdateInt64(2, 200))
 
 		sketch2, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
-		sketch2.UpdateInt64(1, 1)
-		sketch2.UpdateInt64(2, 2)
+		assert.NoError(t, sketch2.UpdateInt64(1, 1))
+		assert.NoError(t, sketch2.UpdateInt64(2, 2))
 
 		intersection := NewIntersection[*int32Summary](&sumPolicy{})
-		intersection.Update(sketch1)
-		intersection.Update(sketch2)
+		assert.NoError(t, intersection.Update(sketch1))
+		assert.NoError(t, intersection.Update(sketch2))
 
 		result, err := intersection.Result(true)
 		assert.NoError(t, err)
@@ -909,9 +909,9 @@ func TestIntersectionWithDifferentPolicies(t *testing.T) {
 			},
 		)
 		assert.NoError(t, err)
-		sketch1.UpdateInt64(1, 100)
-		sketch1.UpdateInt64(2, 200)
-		sketch1.UpdateInt64(3, 300)
+		assert.NoError(t, sketch1.UpdateInt64(1, 100))
+		assert.NoError(t, sketch1.UpdateInt64(2, 200))
+		assert.NoError(t, sketch1.UpdateInt64(3, 300))
 
 		sketch2, err := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
 			newInt32ValueSummary,
@@ -921,9 +921,9 @@ func TestIntersectionWithDifferentPolicies(t *testing.T) {
 			},
 		)
 		assert.NoError(t, err)
-		sketch2.UpdateInt64(2, 5)
-		sketch2.UpdateInt64(3, 15)
-		sketch2.UpdateInt64(4, 25)
+		assert.NoError(t, sketch2.UpdateInt64(2, 5))
+		assert.NoError(t, sketch2.UpdateInt64(3, 15))
+		assert.NoError(t, sketch2.UpdateInt64(4, 25))
 
 		intersection := NewIntersectionWithSummaryMergeFunc[int32ValueSummary](
 			func(internal, incoming int32ValueSummary) int32ValueSummary {
@@ -960,7 +960,7 @@ func TestIntersectionWithDifferentPolicies(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch1.UpdateInt64(int64(value), 1)
+			assert.NoError(t, sketch1.UpdateInt64(int64(value), 1))
 			value++
 		}
 
@@ -974,7 +974,7 @@ func TestIntersectionWithDifferentPolicies(t *testing.T) {
 		assert.NoError(t, err)
 		value = 500
 		for i := 0; i < 1000; i++ {
-			sketch2.UpdateInt64(int64(value), 1)
+			assert.NoError(t, sketch2.UpdateInt64(int64(value), 1))
 			value++
 		}
 

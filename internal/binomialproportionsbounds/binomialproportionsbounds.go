@@ -130,7 +130,7 @@ func NormalCDF(x float64) float64 {
 // validateInputs validates that k does not exceed n.
 func validateInputs(n, k uint64) error {
 	if k > n {
-		return fmt.Errorf("K cannot exceed N: n=%d, k=%d", n, k)
+		return fmt.Errorf("K cannot exceed N: n=%d, k=%d", n, k) //nolint:staticcheck
 	}
 	return nil
 }

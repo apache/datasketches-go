@@ -45,9 +45,9 @@ func TestReservoirItemsSketchWithStrings(t *testing.T) {
 	sketch, err := NewReservoirItemsSketch[string](5)
 	assert.NoError(t, err)
 
-	sketch.Update("apple")
-	sketch.Update("banana")
-	sketch.Update("cherry")
+	assert.NoError(t, sketch.Update("apple"))
+	assert.NoError(t, sketch.Update("banana"))
+	assert.NoError(t, sketch.Update("cherry"))
 
 	assert.Equal(t, int64(3), sketch.N())
 	assert.Equal(t, 3, sketch.NumSamples())
@@ -67,9 +67,9 @@ func TestReservoirItemsSketchWithStruct(t *testing.T) {
 	sketch, err := NewReservoirItemsSketch[Event](5)
 	assert.NoError(t, err)
 
-	sketch.Update(Event{1, "login"})
-	sketch.Update(Event{2, "logout"})
-	sketch.Update(Event{3, "click"})
+	assert.NoError(t, sketch.Update(Event{1, "login"}))
+	assert.NoError(t, sketch.Update(Event{2, "logout"}))
+	assert.NoError(t, sketch.Update(Event{3, "click"}))
 
 	assert.Equal(t, int64(3), sketch.N())
 	samples := sketch.Samples()
@@ -90,7 +90,7 @@ func TestReservoirItemsSketch_Update(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := int64(1); i <= 5; i++ {
-			sketch.Update(i)
+			assert.NoError(t, sketch.Update(i))
 		}
 
 		assert.Equal(t, int64(5), sketch.N())
@@ -108,7 +108,7 @@ func TestReservoirItemsSketch_Update(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := int64(1); i <= 8; i++ {
-			sketch.Update(i)
+			assert.NoError(t, sketch.Update(i))
 		}
 
 		assert.Equal(t, int64(8), sketch.N())
@@ -143,7 +143,8 @@ func TestReservoirItemsSketch_Update(t *testing.T) {
 		assert.Equal(t, int64(2), sketch.N())
 		assert.Equal(t, 2, sketch.NumSamples())
 
-		sketch.forceIncrementItemsSeen(maxItemsSeen - sketch.N())
+		err = sketch.forceIncrementItemsSeen(maxItemsSeen - sketch.N())
+		assert.NoError(t, err)
 
 		err = sketch.Update(3)
 		assert.ErrorIs(t, err, ErrSketchExceedsMaxCapacity)
@@ -165,7 +166,7 @@ func TestReservoirItemsSketch_Update(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 1; i <= total; i++ {
-			sketch.Update(int64(i))
+			assert.NoError(t, sketch.Update(int64(i)))
 		}
 
 		assert.Equal(t, int64(total), sketch.N())
@@ -193,7 +194,7 @@ func TestReservoirItemsSketchReset(t *testing.T) {
 		expectedInitialCap := expectedReservoirInitialCap(k, defaultResizeFactor)
 
 		for i := int64(1); i <= int64(expectedInitialCap)+1; i++ {
-			sketch.Update(i)
+			assert.NoError(t, sketch.Update(i))
 		}
 
 		assert.Greater(t, cap(sketch.data), expectedInitialCap)
@@ -216,7 +217,7 @@ func TestReservoirItemsSketchReset(t *testing.T) {
 		expectedInitialCap := expectedReservoirInitialCap(k, ResizeX2)
 
 		for i := int64(1); i <= int64(expectedInitialCap)+1; i++ {
-			sketch.Update(i)
+			assert.NoError(t, sketch.Update(i))
 		}
 
 		assert.Greater(t, cap(sketch.data), expectedInitialCap)
@@ -234,7 +235,7 @@ func TestReservoirItemsSketchReset(t *testing.T) {
 
 func TestReservoirItemsSketchGetSamplesIsCopy(t *testing.T) {
 	sketch, _ := NewReservoirItemsSketch[int64](10)
-	sketch.Update(42)
+	assert.NoError(t, sketch.Update(42))
 
 	samples1 := sketch.Samples()
 	samples2 := sketch.Samples()
@@ -294,7 +295,7 @@ func TestReservoirItemsSketchEstimateSubsetSum(t *testing.T) {
 		// exact mode
 		itemCount := 0.0
 		for i := 1; i < k; i++ {
-			sketch.Update(int64(i))
+			assert.NoError(t, sketch.Update(int64(i)))
 			itemCount += 1.0
 		}
 
@@ -309,7 +310,7 @@ func TestReservoirItemsSketchEstimateSubsetSum(t *testing.T) {
 
 		// estimation mode
 		for i := k; i < (k + 2); i++ {
-			sketch.Update(int64(i))
+			assert.NoError(t, sketch.Update(int64(i)))
 			itemCount += 1.0
 		}
 
@@ -334,7 +335,7 @@ func TestReservoirItemsSketchEstimateSubsetSum(t *testing.T) {
 		// finally, a non-degenerate predicate
 		// insert negative items with identical weights, filter for negative weights only
 		for i := 1; i <= (k + 1); i++ {
-			sketch.Update(int64(-i))
+			assert.NoError(t, sketch.Update(int64(-i)))
 			itemCount += 1.0
 		}
 

@@ -24,8 +24,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 func TestWrappedCompactSketch_IsEmpty(t *testing.T) {
@@ -69,6 +70,7 @@ func TestWrappedCompactSketch_IsOrdered(t *testing.T) {
 		var buf bytes.Buffer
 		encoder := NewEncoder(&buf, false)
 		err := encoder.Encode(orderedSketch)
+		assert.NoError(t, err)
 
 		wrapped, err := WrapCompactSketch(buf.Bytes(), seed)
 		assert.NoError(t, err)
@@ -83,6 +85,7 @@ func TestWrappedCompactSketch_IsOrdered(t *testing.T) {
 		var buf bytes.Buffer
 		encoder := NewEncoder(&buf, false)
 		err := encoder.Encode(unorderedSketch)
+		assert.NoError(t, err)
 
 		wrapped, err := WrapCompactSketch(buf.Bytes(), seed)
 		assert.NoError(t, err)
@@ -117,6 +120,7 @@ func TestWrappedCompactSketch_NumRetained(t *testing.T) {
 	var buf bytes.Buffer
 	encoder := NewEncoder(&buf, false)
 	err := encoder.Encode(sketch)
+	assert.NoError(t, err)
 
 	wrapped, err := WrapCompactSketch(buf.Bytes(), seed)
 	assert.NoError(t, err)
@@ -412,7 +416,7 @@ func TestWrappedCompactSketch_EncodingAndDecoding(t *testing.T) {
 		updateSketch, err := NewQuickSelectUpdateSketch()
 		assert.NoError(t, err)
 		for i := 0; i < 8192; i++ {
-			updateSketch.UpdateInt64(int64(i))
+			assertUpdate(t, updateSketch.UpdateInt64(int64(i)))
 		}
 
 		compactSketch := updateSketch.CompactOrdered()
@@ -526,9 +530,10 @@ func TestWrapCompactSketch_Compatibility(t *testing.T) {
 
 		// the same construction process in Java must have produced exactly the same sketch
 		updateSketch, err := NewQuickSelectUpdateSketch()
+		assert.NoError(t, err)
 		n := 8192
 		for i := 0; i < n; i++ {
-			updateSketch.UpdateInt64(int64(i))
+			assertUpdate(t, updateSketch.UpdateInt64(int64(i)))
 		}
 		assert.Equal(t, sketch.NumRetained(), updateSketch.NumRetained())
 		assert.InDelta(t, sketch.Theta(), updateSketch.Theta(), 1e-10)
@@ -605,9 +610,10 @@ func TestWrapCompactSketch_Compatibility(t *testing.T) {
 
 		// the same construction process in Java must have produced exactly the same sketch
 		updateSketch, err := NewQuickSelectUpdateSketch()
+		assert.NoError(t, err)
 		n := 8192
 		for i := 0; i < n; i++ {
-			updateSketch.UpdateInt64(int64(i))
+			assertUpdate(t, updateSketch.UpdateInt64(int64(i)))
 		}
 		assert.Equal(t, decoded.NumRetained(), updateSketch.NumRetained())
 		assert.InDelta(t, decoded.Theta(), updateSketch.Theta(), 1e-10)

@@ -98,7 +98,7 @@ func TestIntersection(t *testing.T) {
 
 		exact, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		exact.UpdateInt64(3)
+		assert.NoError(t, exact.UpdateInt64(3))
 
 		intersection := NewIntersection()
 		err = intersection.Update(empty)
@@ -120,7 +120,7 @@ func TestIntersection(t *testing.T) {
 
 		exact, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		exact.UpdateInt64(3)
+		assert.NoError(t, exact.UpdateInt64(3))
 
 		intersection := NewIntersection()
 		err = intersection.Update(empty.Compact(false))
@@ -144,7 +144,7 @@ func TestIntersection(t *testing.T) {
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		intersection := NewIntersection()
 		err = intersection.Update(a)
@@ -168,7 +168,7 @@ func TestIntersection(t *testing.T) {
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		intersection := NewIntersection()
 		err = intersection.Update(a.Compact(false))
@@ -192,7 +192,7 @@ func TestIntersection(t *testing.T) {
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(4)
+		assert.NoError(t, b.UpdateInt64(4))
 
 		intersection := NewIntersection()
 		err = intersection.Update(a)
@@ -215,7 +215,7 @@ func TestIntersection(t *testing.T) {
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(4)
+		assert.NoError(t, b.UpdateInt64(4))
 
 		intersection := NewIntersection()
 		err = intersection.Update(a.Compact(false))
@@ -233,13 +233,13 @@ func TestIntersection(t *testing.T) {
 	t.Run("Exact, Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4)
+		assert.NoError(t, a.UpdateInt64(4))
 
 		b, err := NewQuickSelectUpdateSketch(
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		intersection := NewIntersection()
 		err = intersection.Update(a)
@@ -257,13 +257,13 @@ func TestIntersection(t *testing.T) {
 	t.Run("Exact Compact, Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4)
+		assert.NoError(t, a.UpdateInt64(4))
 
 		b, err := NewQuickSelectUpdateSketch(
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		intersection := NewIntersection()
 		err = intersection.Update(a.Compact(false))
@@ -281,11 +281,11 @@ func TestIntersection(t *testing.T) {
 	t.Run("Estimation Mode, Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4)
+		assert.NoError(t, a.UpdateInt64(4))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		intersection := NewIntersection()
 		err = intersection.Update(a)
@@ -303,11 +303,11 @@ func TestIntersection(t *testing.T) {
 	t.Run("Estimation Mode Compact, Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4)
+		assert.NoError(t, a.UpdateInt64(4))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		intersection := NewIntersection()
 		err = intersection.Update(a.Compact(false))
@@ -327,7 +327,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assert.NoError(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -335,7 +335,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value = 500
 		for i := 0; i < 1000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assert.NoError(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -359,7 +359,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assert.NoError(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -367,7 +367,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value = 500
 		for i := 0; i < 1000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assert.NoError(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -391,7 +391,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assert.NoError(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -399,7 +399,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value = 500
 		for i := 0; i < 1000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assert.NoError(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -423,14 +423,14 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assert.NoError(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 
 		sketch2, err := NewQuickSelectUpdateSketch()
 		assert.NoError(t, err)
 		for i := 0; i < 1000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assert.NoError(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -454,14 +454,14 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assert.NoError(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 
 		sketch2, err := NewQuickSelectUpdateSketch()
 		assert.NoError(t, err)
 		for i := 0; i < 1000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assert.NoError(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -485,7 +485,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assertUpdate(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -493,7 +493,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value = 5000
 		for i := 0; i < 10000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assertUpdate(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -518,7 +518,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assertUpdate(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -526,7 +526,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value = 5000
 		for i := 0; i < 10000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assertUpdate(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -551,7 +551,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assertUpdate(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -562,7 +562,7 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value = 5000
 		for i := 0; i < 10000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assertUpdate(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 		bytes2, err := sketch2.Compact(true).MarshalBinary()
@@ -595,14 +595,14 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assertUpdate(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 
 		sketch2, err := NewQuickSelectUpdateSketch()
 		assert.NoError(t, err)
 		for i := 0; i < 10000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assertUpdate(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -626,14 +626,14 @@ func TestIntersection(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assertUpdate(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 
 		sketch2, err := NewQuickSelectUpdateSketch()
 		assert.NoError(t, err)
 		for i := 0; i < 10000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assertUpdate(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -655,11 +655,11 @@ func TestIntersection(t *testing.T) {
 	t.Run("Exact Mode, Estimation Mode Full Overlap", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(4))
+		assert.NoError(t, a.UpdateInt64(int64(4)))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(4))
+		assert.NoError(t, b.UpdateInt64(int64(4)))
 
 		intersection := NewIntersection()
 		err = intersection.Update(a)
@@ -677,11 +677,11 @@ func TestIntersection(t *testing.T) {
 	t.Run("Exact Mode Compact, Estimation Mode Compact Full Overlap", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(4))
+		assert.NoError(t, a.UpdateInt64(int64(4)))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(4))
+		assert.NoError(t, b.UpdateInt64(int64(4)))
 
 		intersection := NewIntersection()
 		err = intersection.Update(a.Compact(false))
@@ -699,11 +699,11 @@ func TestIntersection(t *testing.T) {
 	t.Run("Non Empty No Retained Keys, Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(3))
+		assertUpdate(t, a.UpdateInt64(int64(3)))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(6))
+		assertUpdate(t, b.UpdateInt64(int64(6)))
 
 		intersection := NewIntersection()
 		err = intersection.Update(a)
@@ -721,11 +721,11 @@ func TestIntersection(t *testing.T) {
 	t.Run("Non Empty No Retained Keys Compact, Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(3))
+		assertUpdate(t, a.UpdateInt64(int64(3)))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(6))
+		assertUpdate(t, b.UpdateInt64(int64(6)))
 
 		intersection := NewIntersection()
 		err = intersection.Update(a.Compact(false))
@@ -743,7 +743,7 @@ func TestIntersection(t *testing.T) {
 	t.Run("Seed Mismatch", func(t *testing.T) {
 		sketch, err := NewQuickSelectUpdateSketch()
 		assert.NoError(t, err)
-		sketch.UpdateInt64(1) // non-empty should not be ignored
+		assert.NoError(t, sketch.UpdateInt64(1)) // non-empty should not be ignored
 
 		intersection := NewIntersection(WithIntersectionSeed(123))
 		err = intersection.Update(sketch)
@@ -762,17 +762,17 @@ func TestIntersection(t *testing.T) {
 	t.Run("OrderedResult Method", func(t *testing.T) {
 		sketch1, _ := NewQuickSelectUpdateSketch()
 		for i := 0; i < 100; i++ {
-			sketch1.UpdateInt64(int64(i))
+			assert.NoError(t, sketch1.UpdateInt64(int64(i)))
 		}
 
 		sketch2, _ := NewQuickSelectUpdateSketch()
 		for i := 50; i < 150; i++ {
-			sketch2.UpdateInt64(int64(i))
+			assert.NoError(t, sketch2.UpdateInt64(int64(i)))
 		}
 
 		intersection := NewIntersection()
-		intersection.Update(sketch1)
-		intersection.Update(sketch2)
+		assert.NoError(t, intersection.Update(sketch1))
+		assert.NoError(t, intersection.Update(sketch2))
 
 		result, err := intersection.OrderedResult()
 		assert.NoError(t, err)

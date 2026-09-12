@@ -59,7 +59,7 @@ func TestNewQuickSelectUpdateSketch(t *testing.T) {
 	t.Run("Non Empty No Retained Keys", func(t *testing.T) {
 		updateSketch, err := NewQuickSelectUpdateSketch(WithUpdateSketchP(0.001))
 		assert.NoError(t, err)
-		updateSketch.UpdateInt64(1)
+		assertUpdate(t, updateSketch.UpdateInt64(1))
 
 		assert.Zero(t, updateSketch.NumRetained())
 		assert.False(t, updateSketch.IsEmpty())
@@ -501,7 +501,7 @@ func TestQuickSelectUpdateSketch_String(t *testing.T) {
 func TestQuickSelectUpdateSketch_SingleItem(t *testing.T) {
 	updateSketch, err := NewQuickSelectUpdateSketch()
 	assert.NoError(t, err)
-	updateSketch.UpdateInt64(1)
+	assert.NoError(t, updateSketch.UpdateInt64(1))
 
 	assert.False(t, updateSketch.IsEmpty())
 	assert.False(t, updateSketch.IsEstimationMode())
@@ -521,7 +521,7 @@ func TestQuickSelectUpdateSketch_ResizeExact(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i := 0; i < 2000; i++ {
-		updateSketch.UpdateInt64(int64(i))
+		assert.NoError(t, updateSketch.UpdateInt64(int64(i)))
 	}
 
 	assert.False(t, updateSketch.IsEmpty())
@@ -556,7 +556,7 @@ func TestQuickSelectUpdateSketch_Estimation(t *testing.T) {
 
 	n := 8000
 	for i := 0; i < n; i++ {
-		updateSketch.UpdateInt64(int64(i))
+		assertUpdate(t, updateSketch.UpdateInt64(int64(i)))
 	}
 
 	assert.False(t, updateSketch.IsEmpty())
@@ -601,7 +601,7 @@ func TestUpdateSketch_Compact(t *testing.T) {
 	t.Run("Non Empty No Retained Keys", func(t *testing.T) {
 		updateSketch, err := NewQuickSelectUpdateSketch(WithUpdateSketchP(0.001))
 		assert.NoError(t, err)
-		updateSketch.UpdateInt64(1)
+		assertUpdate(t, updateSketch.UpdateInt64(1))
 
 		compactSketch := updateSketch.Compact(true)
 		assert.Zero(t, compactSketch.NumRetained())
@@ -619,7 +619,7 @@ func TestUpdateSketch_Compact(t *testing.T) {
 	t.Run("Single Item", func(t *testing.T) {
 		updateSketch, err := NewQuickSelectUpdateSketch()
 		assert.NoError(t, err)
-		updateSketch.UpdateInt64(1)
+		assert.NoError(t, updateSketch.UpdateInt64(1))
 
 		compactSketch := updateSketch.Compact(true)
 		assert.False(t, compactSketch.IsEmpty())
@@ -643,7 +643,7 @@ func TestUpdateSketch_Compact(t *testing.T) {
 
 		n := 8000
 		for i := 0; i < n; i++ {
-			updateSketch.UpdateInt64(int64(i))
+			assertUpdate(t, updateSketch.UpdateInt64(int64(i)))
 		}
 		updateSketch.Trim()
 

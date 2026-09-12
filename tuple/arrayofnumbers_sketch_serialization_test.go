@@ -40,7 +40,7 @@ func TestGenerateGoSnapshots_ArrayOfNumbersSketch(t *testing.T) {
 			sketch, err := NewArrayOfNumbersUpdateSketch[float64](1)
 			assert.NoError(t, err)
 			for i := 0; i < n; i++ {
-				sketch.UpdateInt64(int64(i), []float64{float64(i)})
+				assert.NoError(t, sketch.UpdateInt64(int64(i), []float64{float64(i)}))
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
@@ -67,7 +67,7 @@ func TestGenerateGoSnapshots_ArrayOfNumbersSketch(t *testing.T) {
 			assert.NoError(t, err)
 			for i := 0; i < n; i++ {
 				s := []float64{float64(i), float64(i), float64(i)}
-				sketch.UpdateInt64(int64(i), s)
+				assert.NoError(t, sketch.UpdateInt64(int64(i), s))
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
@@ -94,7 +94,7 @@ func TestGenerateGoSnapshots_ArrayOfNumbersSketch(t *testing.T) {
 	t.Run("generate non empty no entries", func(t *testing.T) {
 		sketch, err := NewArrayOfNumbersUpdateSketch[float64](1, WithUpdateSketchP(0.01))
 		assert.NoError(t, err)
-		sketch.UpdateInt64(int64(1), []float64{1})
+		assert.NoError(t, sketch.UpdateInt64(int64(1), []float64{1}))
 
 		assert.False(t, sketch.IsEmpty())
 		assert.Equal(t, uint32(0), sketch.NumRetained())

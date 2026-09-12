@@ -17,6 +17,8 @@
 
 package kll
 
+import "errors"
+
 type sketchStructure struct {
 	preInts int
 	serVer  int
@@ -33,19 +35,23 @@ func (s sketchStructure) getPreInts() int { return s.preInts }
 
 func (s sketchStructure) getSerVer() int { return s.serVer }
 
-func getSketchStructure(preInts, serVer int) sketchStructure {
-	if preInts == _PREAMBLE_INTS_EMPTY_SINGLE {
-		if serVer == _SERIAL_VERSION_EMPTY_FULL {
-			return _COMPACT_EMPTY
-		} else if serVer == _SERIAL_VERSION_SINGLE {
-			return _COMPACT_SINGLE
+func getSketchStructure(preInts, serVer int) (sketchStructure, error) {
+	switch preInts {
+	case _PREAMBLE_INTS_EMPTY_SINGLE:
+		switch serVer {
+		case _SERIAL_VERSION_EMPTY_FULL:
+			return _COMPACT_EMPTY, nil
+		case _SERIAL_VERSION_SINGLE:
+			return _COMPACT_SINGLE, nil
 		}
-	} else if preInts == _PREAMBLE_INTS_FULL {
-		if serVer == _SERIAL_VERSION_EMPTY_FULL {
-			return _COMPACT_FULL
-		} else if serVer == _SERIAL_VERSION_UPDATABLE {
-			return _UPDATABLE
+	case _PREAMBLE_INTS_FULL:
+		switch serVer {
+		case _SERIAL_VERSION_EMPTY_FULL:
+			return _COMPACT_FULL, nil
+		case _SERIAL_VERSION_UPDATABLE:
+			return _UPDATABLE, nil
 		}
+	default:
+		return sketchStructure{}, errors.New("invalid preamble ints and serial version combo")
 	}
-	panic("Invalid preamble ints and serial version combo")
 }

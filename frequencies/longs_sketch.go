@@ -224,7 +224,7 @@ func NewLongsSketchFromString(str string) (*LongsSketch, error) {
 	}
 	empty := flags > 0
 	if !empty && (numActive == 0) {
-		return nil, fmt.Errorf("Possible Corruption: !Empty && NumActive=0;  strLen: %d", numActive)
+		return nil, fmt.Errorf("Possible Corruption: !Empty && NumActive=0;  strLen: %d", numActive) //nolint:staticcheck
 	}
 	numTokens := int64(len(tokens))
 	if (2 * numActive) != (numTokens - strPreambleTokens - 2) {

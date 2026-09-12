@@ -32,7 +32,7 @@ func TestReservoirSamplingWithIntegers(t *testing.T) {
 
 	// Add 1000 items to the stream
 	for i := int64(1); i <= 1000; i++ {
-		sketch.Update(i)
+		assert.NoError(t, sketch.Update(i))
 	}
 
 	// The sketch maintains exactly k samples
@@ -51,7 +51,7 @@ func TestReservoirSamplingWithStrings(t *testing.T) {
 
 	words := []string{"apple", "banana", "cherry", "date", "elderberry", "fig", "grape", "honeydew"}
 	for _, word := range words {
-		sketch.Update(word)
+		assert.NoError(t, sketch.Update(word))
 	}
 
 	assert.Equal(t, 5, sketch.NumSamples())
@@ -69,10 +69,10 @@ func TestReservoirSamplingWithStructs(t *testing.T) {
 
 	// Simulate streaming log entries
 	for i := int64(1); i <= 100; i++ {
-		sketch.Update(LogEntry{
+		assert.NoError(t, sketch.Update(LogEntry{
 			Timestamp: i,
 			Message:   fmt.Sprintf("Log message %d", i),
-		})
+		}))
 	}
 
 	assert.Equal(t, 3, sketch.NumSamples())
@@ -85,10 +85,10 @@ func TestReservoirUnion(t *testing.T) {
 	node2, _ := sampling.NewReservoirItemsSketch[int64](10)
 
 	for i := int64(1); i <= 500; i++ {
-		node1.Update(i)
+		assert.NoError(t, node1.Update(i))
 	}
 	for i := int64(501); i <= 1000; i++ {
-		node2.Update(i)
+		assert.NoError(t, node2.Update(i))
 	}
 
 	// Merge samples from both nodes

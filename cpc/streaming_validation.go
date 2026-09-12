@@ -43,9 +43,7 @@ type StreamingValidation struct {
 	hStrArr []string
 
 	// Internal state
-	vIn    uint64 // increments each update
-	sketch *CpcSketch
-	matrix *BitMatrix
+	vIn uint64 // increments each update
 }
 
 func NewStreamingValidation(
@@ -201,10 +199,10 @@ func (sv *StreamingValidation) assembleStrings() {
 // printf writes to both printStream and printWriter if non-nil.
 func (sv *StreamingValidation) printf(format string, args ...interface{}) {
 	if sv.printStream != nil {
-		fmt.Fprintf(sv.printStream, format, args...)
+		fmt.Fprintf(sv.printStream, format, args...) //nolint:errcheck
 	}
 	if sv.printWriter != nil {
-		fmt.Fprintf(sv.printWriter, format, args...)
+		fmt.Fprintf(sv.printWriter, format, args...) //nolint:errcheck
 	}
 }
 

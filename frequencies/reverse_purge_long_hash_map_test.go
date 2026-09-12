@@ -26,10 +26,14 @@ import (
 func TestHashMapSerial(t *testing.T) {
 	mp, err := newReversePurgeLongHashMap(8)
 	assert.NoError(t, err)
-	mp.adjustOrPutValue(10, 15)
-	mp.adjustOrPutValue(10, 5)
-	mp.adjustOrPutValue(1, 1)
-	mp.adjustOrPutValue(2, 3)
+	err = mp.adjustOrPutValue(10, 15)
+	assert.NoError(t, err)
+	err = mp.adjustOrPutValue(10, 5)
+	assert.NoError(t, err)
+	err = mp.adjustOrPutValue(1, 1)
+	assert.NoError(t, err)
+	err = mp.adjustOrPutValue(2, 3)
+	assert.NoError(t, err)
 	strMp := mp.serializeToString()
 
 	newMp, err := deserializeReversePurgeLongHashMapFromString(strMp)

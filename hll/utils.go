@@ -19,7 +19,6 @@ package hll
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/apache/datasketches-go/internal"
 )
@@ -42,15 +41,15 @@ const (
 	resizeDenom     = 4
 	couponRSEFactor = .409 //at transition point not the asymptote
 	couponRSE       = couponRSEFactor / (1 << 13)
-	hiNibbleMask    = 0xf0
-	loNibbleMask    = 0x0f
+
+	//Pinned to literals rather than computed from math.Log so the relative-error bounds are
+	//identical across platforms and across the Java and C++ implementations.
+	hllHipRSEFactor    = 0.8325546111576977 //sqrt(log(2.0))
+	hllNonHipRSEFactor = 1.0389617614136892 //sqrt((3.0 * log(2.0)) - 1.0)
+	hiNibbleMask       = 0xf0
+	loNibbleMask       = 0x0f
 
 	auxToken = 0xf
-)
-
-var (
-	hllNonHipRSEFactor = math.Sqrt((3.0 * math.Log(2.0)) - 1.0) //1.03896
-	hllHipRSEFActor    = math.Sqrt(math.Log(2.0))               //.8325546
 )
 
 type TgtHllType int

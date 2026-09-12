@@ -154,7 +154,7 @@ func getRelErrAllK(upperBound bool, oooFlag bool, lgConfigK int, numStdDev int) 
 		return 0, err
 	}
 	if lgK > 12 {
-		rseFactor := hllHipRSEFActor
+		rseFactor := hllHipRSEFactor
 		if oooFlag {
 			rseFactor = hllNonHipRSEFactor
 		}

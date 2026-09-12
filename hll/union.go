@@ -63,15 +63,19 @@ func (u *unionImpl) iterator() pairIterator {
 	return u.gadget.iterator()
 }
 
-//func (u *unionImpl) GetHipEstimate() (float64, error) {
-//	return u.gadget.GetHipEstimate()
-//}
-
 func (u *unionImpl) GetUpperBound(numStdDev int) (float64, error) {
+	err := checkRebuildCurMinNumKxQ(u.gadget)
+	if err != nil {
+		return 0, err
+	}
 	return u.gadget.GetUpperBound(numStdDev)
 }
 
 func (u *unionImpl) GetLowerBound(numStdDev int) (float64, error) {
+	err := checkRebuildCurMinNumKxQ(u.gadget)
+	if err != nil {
+		return 0, err
+	}
 	return u.gadget.GetLowerBound(numStdDev)
 }
 
@@ -125,10 +129,18 @@ func NewUnionFromSlice(byteArray []byte) (Union, error) {
 }
 
 func (u *unionImpl) GetCompositeEstimate() (float64, error) {
+	err := checkRebuildCurMinNumKxQ(u.gadget)
+	if err != nil {
+		return 0, err
+	}
 	return u.gadget.GetCompositeEstimate()
 }
 
 func (u *unionImpl) GetEstimate() (float64, error) {
+	err := checkRebuildCurMinNumKxQ(u.gadget)
+	if err != nil {
+		return 0, err
+	}
 	return u.gadget.GetEstimate()
 }
 
@@ -317,8 +329,7 @@ func checkRebuildCurMinNumKxQ(sketch HllSketch) error {
 	}
 
 	sketchArrImpl := sketchImpl.(*hll8ArrayImpl)
-	curMin := 64
-	numAtCurMin := 0
+	numZeros := 0
 	kxq0 := float64(uint64(1 << sketch.GetLgConfigK()))
 	kxq1 := 0.0
 	itr := sketchArrImpl.iterator()
@@ -328,35 +339,27 @@ func checkRebuildCurMinNumKxQ(sketch HllSketch) error {
 			return err
 		}
 		if v > 0 {
+			inv, err := internal.InvPow2(v)
+			if err != nil {
+				return err
+			}
 			if v < 32 {
-				inv, err := internal.InvPow2(v)
-				if err != nil {
-					return err
-				}
 				kxq0 += inv - 1.0
 			} else {
-				inv, err := internal.InvPow2(v)
-				if err != nil {
-					return err
-				}
 				kxq1 += inv - 1.0
 			}
-		}
-		if v > curMin {
-			continue
-		}
-		if v < curMin {
-			curMin = v
-			numAtCurMin = 1
 		} else {
-			numAtCurMin++
+			numZeros++
 		}
 	}
 
 	sketchArrImpl.putKxQ0(kxq0)
 	sketchArrImpl.putKxQ1(kxq1)
-	sketchArrImpl.putCurMin(curMin)
-	sketchArrImpl.putNumAtCurMin(numAtCurMin)
+	//HLL_8 convention: curMin is always 0 and numAtCurMin is the number of zero registers.
+	//This is what the incremental update path maintains, so the rebuilt state is
+	//indistinguishable from it and the timing of this rebuild is not observable.
+	sketchArrImpl.putCurMin(0)
+	sketchArrImpl.putNumAtCurMin(numZeros)
 	sketchArrImpl.putRebuildCurMinNumKxQFlag(false)
 	//HipAccum is not affected
 	return nil

@@ -266,8 +266,13 @@ func (a *hllArrayImpl) hipAndKxQIncrementalUpdate(oldValue int, newValue int) er
 	}
 	kxq0 := a.kxq0
 	kxq1 := a.kxq1
-	//update hipAccum BEFORE updating kxq0 and kxq1
-	a.addToHipAccum(float64(uint64(1<<a.lgConfigK)) / (kxq0 + kxq1))
+	//update hipAccum BEFORE updating kxq0 and kxq1.
+	//HIP is only meaningful while the sketch is in-order; once the out-of-order flag is set
+	//the HIP accumulator is dead and must not keep drifting, or the serialized image becomes
+	//dependent on the update history after the merge.
+	if !a.oooFrag {
+		a.addToHipAccum(float64(uint64(1<<a.lgConfigK)) / (kxq0 + kxq1))
+	}
 	return a.incrementalUpdateKxQ(oldValue, newValue, kxq0, kxq1)
 }
 

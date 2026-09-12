@@ -34,7 +34,8 @@ func TestGenerateGoSnapshots(t *testing.T) {
 		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
 	}
 
-	os.MkdirAll(internal.GoPath, 0755)
+	err := os.MkdirAll(internal.GoPath, 0755)
+	assert.NoError(t, err)
 
 	nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	comparatorString := common.ItemSketchStringComparator(false)

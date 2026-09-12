@@ -28,7 +28,7 @@ const (
 )
 
 func checkBounds(offset int, reqLen int, memCap int) bool {
-	return !((offset | reqLen | (offset + reqLen) | (memCap - (offset + reqLen))) < 0)
+	return !((offset | reqLen | (offset + reqLen) | (memCap - (offset + reqLen))) < 0) //nolint:staticcheck
 }
 
 func PowerSeriesNextDouble(ppb int, curPoint float64, roundToLong bool, logBase float64) float64 {

@@ -217,8 +217,6 @@ func (s *Sketch) mergeSortIn(
 			h--
 			j--
 			cumWeights[k] = weight
-		default:
-			break
 		}
 	}
 }
@@ -614,21 +612,21 @@ func (s *Sketch) String() string {
 	var result strings.Builder
 	result.WriteString("**********Relative Error Quantiles Sketch Summary**********")
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   K                    : %d", s.k))
+	fmt.Fprintf(&result, "   K                    : %d", s.k)
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   N                    : %d", s.n))
+	fmt.Fprintf(&result, "   N                    : %d", s.n)
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   Retained Items       : %d", s.numRetained))
+	fmt.Fprintf(&result, "   Retained Items       : %d", s.numRetained)
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   Min Item             : %f", s.minItem))
+	fmt.Fprintf(&result, "   Min Item             : %f", s.minItem)
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   Max Item             : %f", s.maxItem))
+	fmt.Fprintf(&result, "   Max Item             : %f", s.maxItem)
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   Estimation Mode      : %v", s.IsEstimationMode()))
+	fmt.Fprintf(&result, "   Estimation Mode      : %v", s.IsEstimationMode())
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   High Rank Acc        : %v", s.isHighRankAccuracyMode))
+	fmt.Fprintf(&result, "   High Rank Acc        : %v", s.isHighRankAccuracyMode)
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   Levels:              : %d", s.numLevels()))
+	fmt.Fprintf(&result, "   Levels:              : %d", s.numLevels())
 	result.WriteString("\n")
 	result.WriteString("************************End Summary************************")
 	result.WriteString("\n")
@@ -675,7 +673,7 @@ func (s *Sketch) CompactorDetailString(showAllData bool) string {
 	var result strings.Builder
 	result.WriteString("*********Relative Error Quantiles Compactor Detail*********")
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("Compactor Detail: Ret Items: %d  N: %d", s.numRetained, s.n))
+	fmt.Fprintf(&result, "Compactor Detail: Ret Items: %d  N: %d", s.numRetained, s.n)
 	result.WriteString("\n")
 	for _, comp := range s.compactors {
 		result.WriteString(comp.String())

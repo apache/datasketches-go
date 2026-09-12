@@ -46,7 +46,7 @@ func TestGenerateGoSnapshots_Union(t *testing.T) {
 		t.Run("empty_maxk128", func(t *testing.T) {
 			union, _ := NewReservoirItemsUnion[int64](128)
 			data, _ := union.ToSlice(common.ItemSketchLongSerDe{})
-			os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_long_empty_maxk128_go.sk", internal.GoPath), data, 0644)
+			assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_long_empty_maxk128_go.sk", internal.GoPath), data, 0644))
 		})
 		// Exact
 		for _, n := range exactNValues {
@@ -54,10 +54,11 @@ func TestGenerateGoSnapshots_Union(t *testing.T) {
 			t.Run(fmt.Sprintf("exact_n%d_maxk128", n), func(t *testing.T) {
 				union, _ := NewReservoirItemsUnion[int64](128)
 				for i := 0; i < n; i++ {
-					union.Update(int64(i))
+					err := union.Update(int64(i))
+					assert.NoError(t, err)
 				}
 				data, _ := union.ToSlice(common.ItemSketchLongSerDe{})
-				os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_long_exact_n%d_maxk128_go.sk", internal.GoPath, n), data, 0644)
+				assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_long_exact_n%d_maxk128_go.sk", internal.GoPath, n), data, 0644))
 			})
 		}
 		// Sampling
@@ -66,10 +67,11 @@ func TestGenerateGoSnapshots_Union(t *testing.T) {
 			t.Run(fmt.Sprintf("sampling_n1000_maxk%d", k), func(t *testing.T) {
 				union, _ := NewReservoirItemsUnion[int64](k)
 				for i := 0; i < 1000; i++ {
-					union.Update(int64(i))
+					err := union.Update(int64(i))
+					assert.NoError(t, err)
 				}
 				data, _ := union.ToSlice(common.ItemSketchLongSerDe{})
-				os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_long_sampling_n1000_maxk%d_go.sk", internal.GoPath, k), data, 0644)
+				assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_long_sampling_n1000_maxk%d_go.sk", internal.GoPath, k), data, 0644))
 			})
 		}
 	})
@@ -80,7 +82,7 @@ func TestGenerateGoSnapshots_Union(t *testing.T) {
 		t.Run("empty_maxk128", func(t *testing.T) {
 			union, _ := NewReservoirItemsUnion[float64](128)
 			data, _ := union.ToSlice(common.ItemSketchDoubleSerDe{})
-			os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_double_empty_maxk128_go.sk", internal.GoPath), data, 0644)
+			assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_double_empty_maxk128_go.sk", internal.GoPath), data, 0644))
 		})
 		// Exact
 		for _, n := range exactNValues {
@@ -88,10 +90,12 @@ func TestGenerateGoSnapshots_Union(t *testing.T) {
 			t.Run(fmt.Sprintf("exact_n%d_maxk128", n), func(t *testing.T) {
 				union, _ := NewReservoirItemsUnion[float64](128)
 				for i := 0; i < n; i++ {
-					union.Update(float64(i))
+					err := union.Update(float64(i))
+					assert.NoError(t, err)
 				}
 				data, _ := union.ToSlice(common.ItemSketchDoubleSerDe{})
-				os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_double_exact_n%d_maxk128_go.sk", internal.GoPath, n), data, 0644)
+				err := os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_double_exact_n%d_maxk128_go.sk", internal.GoPath, n), data, 0644)
+				assert.NoError(t, err)
 			})
 		}
 		// Sampling
@@ -100,10 +104,10 @@ func TestGenerateGoSnapshots_Union(t *testing.T) {
 			t.Run(fmt.Sprintf("sampling_n1000_maxk%d", k), func(t *testing.T) {
 				union, _ := NewReservoirItemsUnion[float64](k)
 				for i := 0; i < 1000; i++ {
-					union.Update(float64(i))
+					assert.NoError(t, union.Update(float64(i)))
 				}
 				data, _ := union.ToSlice(common.ItemSketchDoubleSerDe{})
-				os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_double_sampling_n1000_maxk%d_go.sk", internal.GoPath, k), data, 0644)
+				assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_double_sampling_n1000_maxk%d_go.sk", internal.GoPath, k), data, 0644))
 			})
 		}
 	})
@@ -114,7 +118,7 @@ func TestGenerateGoSnapshots_Union(t *testing.T) {
 		t.Run("empty_maxk128", func(t *testing.T) {
 			union, _ := NewReservoirItemsUnion[string](128)
 			data, _ := union.ToSlice(common.ItemSketchStringSerDe{})
-			os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_string_empty_maxk128_go.sk", internal.GoPath), data, 0644)
+			assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_string_empty_maxk128_go.sk", internal.GoPath), data, 0644))
 		})
 		// Exact
 		for _, n := range exactNValues {
@@ -122,10 +126,10 @@ func TestGenerateGoSnapshots_Union(t *testing.T) {
 			t.Run(fmt.Sprintf("exact_n%d_maxk128", n), func(t *testing.T) {
 				union, _ := NewReservoirItemsUnion[string](128)
 				for i := 0; i < n; i++ {
-					union.Update(fmt.Sprintf("item%d", i))
+					assert.NoError(t, union.Update(fmt.Sprintf("item%d", i)))
 				}
 				data, _ := union.ToSlice(common.ItemSketchStringSerDe{})
-				os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_string_exact_n%d_maxk128_go.sk", internal.GoPath, n), data, 0644)
+				assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_string_exact_n%d_maxk128_go.sk", internal.GoPath, n), data, 0644))
 			})
 		}
 		// Sampling
@@ -134,10 +138,10 @@ func TestGenerateGoSnapshots_Union(t *testing.T) {
 			t.Run(fmt.Sprintf("sampling_n1000_maxk%d", k), func(t *testing.T) {
 				union, _ := NewReservoirItemsUnion[string](k)
 				for i := 0; i < 1000; i++ {
-					union.Update(fmt.Sprintf("item%d", i))
+					assert.NoError(t, union.Update(fmt.Sprintf("item%d", i)))
 				}
 				data, _ := union.ToSlice(common.ItemSketchStringSerDe{})
-				os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_string_sampling_n1000_maxk%d_go.sk", internal.GoPath, k), data, 0644)
+				assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_union_string_sampling_n1000_maxk%d_go.sk", internal.GoPath, k), data, 0644))
 			})
 		}
 	})

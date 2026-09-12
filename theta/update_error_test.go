@@ -15,36 +15,17 @@
  * limitations under the License.
  */
 
-package tuple
+package theta
 
 import (
+	"errors"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func BenchmarkUpdateSketch_PointerSummary(b *testing.B) {
-	b.ReportAllocs()
-	for b.Loop() {
-		sketch, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
-		for i := 0; i < 10000; i++ {
-			assert.NoError(b, sketch.UpdateInt64(int64(i), 1))
-		}
-	}
-}
-
-func BenchmarkUpdateSketch_ValueSummary(b *testing.B) {
-	b.ReportAllocs()
-	for b.Loop() {
-		sketch, _ := NewUpdateSketchWithSummaryUpdateFunc[int32ValueSummary, int32](
-			newInt32ValueSummary,
-			func(s int32ValueSummary, v int32) int32ValueSummary {
-				s.value += v
-				return s
-			},
-		)
-		for i := 0; i < 10000; i++ {
-			assert.NoError(b, sketch.UpdateInt64(int64(i), 1))
-		}
+// assertUpdate fails the test unless err is nil or ErrHashExceedsTheta.
+func assertUpdate(t *testing.T, err error) {
+	t.Helper()
+	if err != nil && !errors.Is(err, ErrHashExceedsTheta) {
+		t.Fatalf("unexpected update error: %v", err)
 	}
 }

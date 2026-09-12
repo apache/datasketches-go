@@ -63,10 +63,12 @@ func hllCompositeEstimate(hllArray *hllArrayImpl) (float64, error) {
 	// The following constants comes from empirical measurements of the crossover point
 	// between the average error of the linear estimator and the adjusted HLL estimator
 	crossOver := 0.64
-	if lgConfigK == 4 {
+	switch lgConfigK {
+	case 4:
 		crossOver = 0.718
-	} else if lgConfigK == 5 {
+	case 5:
 		crossOver = 0.672
+	default:
 	}
 
 	if avgEst > (crossOver * float64(uint64(1<<lgConfigK))) {
@@ -99,13 +101,14 @@ func getHllRawEstimate(lgConfigK int, kxqSum float64) float64 {
 	configK := 1 << lgConfigK
 	correctionFactor := 0.0
 
-	if lgConfigK == 4 {
+	switch lgConfigK {
+	case 4:
 		correctionFactor = 0.673
-	} else if lgConfigK == 5 {
+	case 5:
 		correctionFactor = 0.697
-	} else if lgConfigK == 6 {
+	case 6:
 		correctionFactor = 0.709
-	} else {
+	default:
 		correctionFactor = 0.7213 / (1.0 + (1.079 / float64(configK)))
 	}
 

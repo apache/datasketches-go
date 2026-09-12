@@ -177,10 +177,10 @@ func (r *reversePurgeItemHashMap[C]) purge(sampleSize int) int64 {
 
 func (r *reversePurgeItemHashMap[C]) serializeToString() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("%d,%d,", r.numActive, len(r.keys)))
+	fmt.Fprintf(&sb, "%d,%d,", r.numActive, len(r.keys))
 	for i := 0; i < len(r.keys); i++ {
 		if r.states[i] != 0 {
-			sb.WriteString(fmt.Sprintf("%v,%d,", r.keys[i], r.values[i]))
+			fmt.Fprintf(&sb, "%v,%d,", r.keys[i], r.values[i])
 		}
 	}
 	return sb.String()
@@ -279,12 +279,12 @@ func (r *reversePurgeItemHashMap[C]) hashProbe(key C) int {
 func (s *reversePurgeItemHashMap[C]) String() string {
 	var sb strings.Builder
 	sb.WriteString("ReversePurgeItemHashMap:\n")
-	sb.WriteString(fmt.Sprintf("  %12s:%11s%20s %s\n", "Index", "States", "Values", "Keys"))
+	fmt.Fprintf(&sb, "  %12s:%11s%20s %s\n", "Index", "States", "Values", "Keys")
 	for i := 0; i < len(s.keys); i++ {
 		if s.states[i] <= 0 {
 			continue
 		}
-		sb.WriteString(fmt.Sprintf("  %12d:%11d%20d %v\n", i, s.states[i], s.values[i], s.keys[i]))
+		fmt.Fprintf(&sb, "  %12d:%11d%20d %v\n", i, s.states[i], s.values[i], s.keys[i])
 	}
 	return sb.String()
 }

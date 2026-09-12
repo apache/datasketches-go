@@ -22,9 +22,10 @@ import (
 	"math"
 	"testing"
 
-	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 func TestCPCCheckUpdatesEstimate(t *testing.T) {
@@ -94,7 +95,7 @@ func TestCPCCheckCornerCaseUpdates(t *testing.T) {
 	assert.NoError(t, err)
 	err = sk.UpdateFloat64(0.0)
 	assert.NoError(t, err)
-	err = sk.UpdateFloat64(-0.0)
+	err = sk.UpdateFloat64(math.Copysign(0, -1))
 	assert.NoError(t, err)
 	assert.Equal(t, sk.GetEstimate(), float64(1))
 	err = sk.UpdateString("")
@@ -139,14 +140,12 @@ func TestCPCCheckCopyWithWindow(t *testing.T) {
 	lgK := 4
 	sk, err := NewCpcSketch(lgK, internal.DEFAULT_UPDATE_SEED)
 	assert.NoError(t, err)
-	sk2, err := sk.Copy()
-	assert.NoError(t, err)
 	n := 1 << lgK
 	for i := 0; i < n; i++ {
 		err = sk.UpdateUint64(uint64(i))
 		assert.NoError(t, err)
 	}
-	sk2, err = sk.Copy()
+	sk2, err := sk.Copy()
 	assert.NoError(t, err)
 	bitMatrix, err := sk.bitMatrixOfSketch()
 	assert.NoError(t, err)

@@ -65,7 +65,7 @@ func TestNewArrayOfNumbersUpdateSketch(t *testing.T) {
 			2, WithUpdateSketchP(0.001),
 		)
 		assert.NoError(t, err)
-		sketch.UpdateInt64(1, []float64{1.0, 2.0})
+		assertUpdate(t, sketch.UpdateInt64(1, []float64{1.0, 2.0}))
 
 		assert.Zero(t, sketch.NumRetained())
 		assert.False(t, sketch.IsEmpty())
@@ -574,7 +574,7 @@ func TestArrayOfNumbersUpdateSketch_String(t *testing.T) {
 func TestArrayOfNumbersUpdateSketch_SingleItem(t *testing.T) {
 	sketch, err := NewArrayOfNumbersUpdateSketch[float64](2)
 	assert.NoError(t, err)
-	sketch.UpdateInt64(1, []float64{10.0, 20.0})
+	assert.NoError(t, sketch.UpdateInt64(1, []float64{10.0, 20.0}))
 
 	assert.False(t, sketch.IsEmpty())
 	assert.False(t, sketch.IsEstimationMode())
@@ -592,7 +592,7 @@ func TestArrayOfNumbersUpdateSketch_SingleItem(t *testing.T) {
 func TestArrayOfNumbersUpdateSketch_Reset(t *testing.T) {
 	sketch, err := NewArrayOfNumbersUpdateSketch[float64](1)
 	assert.NoError(t, err)
-	sketch.UpdateInt64(1, []float64{1.0})
+	assert.NoError(t, sketch.UpdateInt64(1, []float64{1.0}))
 
 	assert.False(t, sketch.IsEmpty())
 	assert.Equal(t, uint32(1), sketch.NumRetained())
@@ -608,7 +608,7 @@ func TestArrayOfNumbersUpdateSketch_ResizeExact(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i := 0; i < 2000; i++ {
-		sketch.UpdateInt64(int64(i), []float64{1.0, 2.0})
+		assert.NoError(t, sketch.UpdateInt64(int64(i), []float64{1.0, 2.0}))
 	}
 
 	assert.False(t, sketch.IsEmpty())
@@ -647,7 +647,8 @@ func TestArrayOfNumbersUpdateSketch_Estimation(t *testing.T) {
 
 	n := 200
 	for i := 0; i < n; i++ {
-		sketch.UpdateString(fmt.Sprintf("key%d", i), []float64{1.0, 2.0})
+		err := sketch.UpdateString(fmt.Sprintf("key%d", i), []float64{1.0, 2.0})
+		assertUpdate(t, err)
 	}
 
 	assert.False(t, sketch.IsEmpty())

@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -12,22 +13,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
 
-.PHONY: test
-test:
-	rm -rf coverage.out
-	go test ./... -coverprofile=coverage.out
+version: "2"
 
-.PHONY: generate-go-snapshots
-generate-go-snapshots:
-	DSKETCH_TEST_GENERATE_GO=1 go test ./... -run '^TestGenerateGoSnapshots' -count=1
+linters:
+  # The standard set: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
 
-.PHONY: lint
-lint:
-	golangci-lint run ./...
-
-.PHONY: format
-format:
-	gofmt -w .
-	go tool goimports -w .
-	golangci-lint run --fix
+formatters:
+  # Replaces the gofmt/goimports checks that `make lint-check` used to run.
+  # `golangci-lint run` reports formatting drift as issues; `golangci-lint fmt`
+  # (via `make format`) applies the fixes.
+  enable:
+    - gofmt
+    - goimports

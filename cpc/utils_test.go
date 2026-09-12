@@ -20,8 +20,9 @@ package cpc
 import (
 	"testing"
 
-	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 // checkFirst8 verifies that the first eight bytes of the preamble in mem match
@@ -91,7 +92,6 @@ func TestCheckNormalPutMemory(t *testing.T) {
 	mem := make([]byte, 4*maxInts)
 
 	// 1) EMPTY_MERGED
-	format := CpcFormatEmptyMerged
 	err = putEmptyMerged(mem, lgK, defaultSeedHash)
 	assert.NoError(t, err, "putEmptyMerged failed")
 
@@ -102,7 +102,7 @@ func TestCheckNormalPutMemory(t *testing.T) {
 	assert.False(t, hasHip(mem), "expected hasHip=false for empty merged")
 
 	// 2) SPARSE_HYBRID_MERGED
-	format = CpcFormatSparseHybridMerged
+	format := CpcFormatSparseHybridMerged
 	err = putSparseHybridMerged(mem, lgK, numCoupons, csvLength, defaultSeedHash, csvStream)
 	assert.NoError(t, err, "putSparseHybridMerged failed")
 

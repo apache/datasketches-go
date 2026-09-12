@@ -186,17 +186,19 @@ func NewHllSketchFromSlice(bytes []byte, checkRebuild bool) (HllSketch, error) {
 	if err != nil {
 		return nil, err
 	}
-	if curMode == curModeHll {
+	switch curMode {
+	case curModeHll:
 		tgtHllType := extractTgtHllType(bytes)
-		if tgtHllType == TgtHllTypeHll4 {
+		switch tgtHllType {
+		case TgtHllTypeHll4:
 			sk, err := deserializeHll4(bytes)
 			if err != nil {
 				return nil, err
 			}
 			return newHllSketchState(sk), nil
-		} else if tgtHllType == TgtHllTypeHll6 {
+		case TgtHllTypeHll6:
 			return newHllSketchState(deserializeHll6(bytes)), nil
-		} else {
+		default:
 			a := newHllSketchState(deserializeHll8(bytes))
 			if checkRebuild {
 				err := checkRebuildCurMinNumKxQ(a)
@@ -206,13 +208,13 @@ func NewHllSketchFromSlice(bytes []byte, checkRebuild bool) (HllSketch, error) {
 			}
 			return a, nil
 		}
-	} else if curMode == curModeList {
+	case curModeList:
 		cp, err := deserializeCouponList(bytes)
 		if err != nil {
 			return nil, err
 		}
 		return newHllSketchState(cp), nil
-	} else {
+	default:
 		chs, err := deserializeCouponHashSet(bytes)
 		if err != nil {
 			return nil, err

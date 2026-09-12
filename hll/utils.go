@@ -181,13 +181,14 @@ func checkPreamble(preamble []byte) (curMode, error) {
 
 func getMaxUpdatableSerializationBytes(lgConfigK int, tgtHllType TgtHllType) int {
 	var arrBytes int
-	if tgtHllType == TgtHllTypeHll4 {
+	switch tgtHllType {
+	case TgtHllTypeHll4:
 		auxBytes := 4 << lgAuxArrInts[lgConfigK]
 		arrBytes = (1 << (lgConfigK - 1)) + auxBytes
-	} else if tgtHllType == TgtHllTypeHll6 {
+	case TgtHllTypeHll6:
 		numSlots := 1 << lgConfigK
 		arrBytes = ((numSlots * 3) >> 2) + 1
-	} else {
+	default:
 		arrBytes = 1 << lgConfigK
 	}
 	return hllByteArrStart + arrBytes

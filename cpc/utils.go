@@ -878,26 +878,26 @@ func CpcSketchToString(mem []byte, detail bool) (string, error) {
 	sb := &strings.Builder{}
 	sb.WriteString(LS)
 	sb.WriteString("### CPC SKETCH IMAGE - PREAMBLE:" + LS)
-	sb.WriteString(fmt.Sprintf("Format                          : %s%s", format.String(), LS))
-	sb.WriteString(fmt.Sprintf("Byte 0: Preamble Ints           : %d%s", preInts, LS))
-	sb.WriteString(fmt.Sprintf("Byte 1: SerVer                  : %d%s", serVerVal, LS))
-	sb.WriteString(fmt.Sprintf("Byte 2: Family                  : %d%s", family, LS))
-	sb.WriteString(fmt.Sprintf("Byte 3: lgK                     : %d%s", lgK, LS))
-	sb.WriteString(fmt.Sprintf("Byte 4: First Interesting Col   : %d%s", fiCol, LS))
-	sb.WriteString(fmt.Sprintf("Byte 5: Flags                   : %s%s", flagsStr, LS))
-	sb.WriteString(fmt.Sprintf("  BIG_ENDIAN_STORAGE            : %t%s", bigEndian, LS))
-	sb.WriteString(fmt.Sprintf("  (Native Byte Order)           : %s%s", nativeOrderStr, LS))
-	sb.WriteString(fmt.Sprintf("  Compressed                    : %t%s", compressed, LS))
-	sb.WriteString(fmt.Sprintf("  Has HIP                       : %t%s", hasHipVal, LS))
-	sb.WriteString(fmt.Sprintf("  Has Surprising Values         : %t%s", hasSVVal, LS))
-	sb.WriteString(fmt.Sprintf("  Has Window Values             : %t%s", hasWindowVal, LS))
-	sb.WriteString(fmt.Sprintf("Byte 6, 7: Seed Hash            : %s%s", seedHashStr, LS))
+	fmt.Fprintf(sb, "Format                          : %s%s", format.String(), LS)
+	fmt.Fprintf(sb, "Byte 0: Preamble Ints           : %d%s", preInts, LS)
+	fmt.Fprintf(sb, "Byte 1: SerVer                  : %d%s", serVerVal, LS)
+	fmt.Fprintf(sb, "Byte 2: Family                  : %d%s", family, LS)
+	fmt.Fprintf(sb, "Byte 3: lgK                     : %d%s", lgK, LS)
+	fmt.Fprintf(sb, "Byte 4: First Interesting Col   : %d%s", fiCol, LS)
+	fmt.Fprintf(sb, "Byte 5: Flags                   : %s%s", flagsStr, LS)
+	fmt.Fprintf(sb, "  BIG_ENDIAN_STORAGE            : %t%s", bigEndian, LS)
+	fmt.Fprintf(sb, "  (Native Byte Order)           : %s%s", nativeOrderStr, LS)
+	fmt.Fprintf(sb, "  Compressed                    : %t%s", compressed, LS)
+	fmt.Fprintf(sb, "  Has HIP                       : %t%s", hasHipVal, LS)
+	fmt.Fprintf(sb, "  Has Surprising Values         : %t%s", hasSVVal, LS)
+	fmt.Fprintf(sb, "  Has Window Values             : %t%s", hasWindowVal, LS)
+	fmt.Fprintf(sb, "Byte 6, 7: Seed Hash            : %s%s", seedHashStr, LS)
 
 	var flavor string
 	switch format {
 	case CpcFormatEmptyMerged, CpcFormatEmptyHip:
 		flavor = determineFlavor(lgK, uint64(numCoupons)).String()
-		sb.WriteString(fmt.Sprintf("Flavor                          : %s%s", flavor, LS))
+		fmt.Fprintf(sb, "Flavor                          : %s%s", flavor, LS)
 	case CpcFormatSparseHybridMerged:
 		// NUM_COUPONS
 		offset, err := getHiFieldOffset(format, hiFieldNumCoupons)
@@ -922,11 +922,11 @@ func CpcSketchToString(mem []byte, detail bool) (string, error) {
 		svStreamStart = int64(offset)
 		reqBytes = svStreamStart + (svLengthInts << 2)
 		flavor = determineFlavor(lgK, uint64(numCoupons)).String()
-		sb.WriteString(fmt.Sprintf("Flavor                          : %s%s", flavor, LS))
-		sb.WriteString(fmt.Sprintf("Num Coupons                     : %d%s", numCoupons, LS))
-		sb.WriteString(fmt.Sprintf("Num SV                          : %d%s", numSv, LS))
-		sb.WriteString(fmt.Sprintf("SV Length Ints                  : %d%s", svLengthInts, LS))
-		sb.WriteString(fmt.Sprintf("SV Stream Start                 : %d%s", svStreamStart, LS))
+		fmt.Fprintf(sb, "Flavor                          : %s%s", flavor, LS)
+		fmt.Fprintf(sb, "Num Coupons                     : %d%s", numCoupons, LS)
+		fmt.Fprintf(sb, "Num SV                          : %d%s", numSv, LS)
+		fmt.Fprintf(sb, "SV Length Ints                  : %d%s", svLengthInts, LS)
+		fmt.Fprintf(sb, "SV Stream Start                 : %d%s", svStreamStart, LS)
 	case CpcFormatSparseHybridHip:
 		offset, err := getHiFieldOffset(format, hiFieldNumCoupons)
 		if err != nil {
@@ -961,13 +961,13 @@ func CpcSketchToString(mem []byte, detail bool) (string, error) {
 
 		reqBytes = svStreamStart + (svLengthInts << 2)
 		flavor = determineFlavor(lgK, uint64(numCoupons)).String()
-		sb.WriteString(fmt.Sprintf("Flavor                          : %s%s", flavor, LS))
-		sb.WriteString(fmt.Sprintf("Num Coupons                     : %d%s", numCoupons, LS))
-		sb.WriteString(fmt.Sprintf("Num SV                          : %d%s", numSv, LS))
-		sb.WriteString(fmt.Sprintf("SV Length Ints                  : %d%s", svLengthInts, LS))
-		sb.WriteString(fmt.Sprintf("SV Stream Start                 : %d%s", svStreamStart, LS))
-		sb.WriteString(fmt.Sprintf("KxP                             : %f%s", kxp, LS))
-		sb.WriteString(fmt.Sprintf("HipAccum                        : %f%s", hipAccum, LS))
+		fmt.Fprintf(sb, "Flavor                          : %s%s", flavor, LS)        //nolint:errcheck
+		fmt.Fprintf(sb, "Num Coupons                     : %d%s", numCoupons, LS)    //nolint:errcheck
+		fmt.Fprintf(sb, "Num SV                          : %d%s", numSv, LS)         //nolint:errcheck
+		fmt.Fprintf(sb, "SV Length Ints                  : %d%s", svLengthInts, LS)  //nolint:errcheck
+		fmt.Fprintf(sb, "SV Stream Start                 : %d%s", svStreamStart, LS) //nolint:errcheck
+		fmt.Fprintf(sb, "KxP                             : %f%s", kxp, LS)           //nolint:errcheck
+		fmt.Fprintf(sb, "HipAccum                        : %f%s", hipAccum, LS)      //nolint:errcheck
 	case CpcFormatPinnedSlidingMergedNosv:
 		offset, err := getHiFieldOffset(format, hiFieldNumCoupons)
 		if err != nil {
@@ -990,11 +990,11 @@ func CpcSketchToString(mem []byte, detail bool) (string, error) {
 
 		reqBytes = wStreamStart + (wLengthInts << 2)
 		flavor = determineFlavor(lgK, uint64(numCoupons)).String()
-		sb.WriteString(fmt.Sprintf("Flavor                          : %s%s", flavor, LS))
-		sb.WriteString(fmt.Sprintf("Num Coupons                     : %d%s", numCoupons, LS))
-		sb.WriteString(fmt.Sprintf("Window Offset                   : %d%s", winOffset, LS))
-		sb.WriteString(fmt.Sprintf("Window Length Ints              : %d%s", wLengthInts, LS))
-		sb.WriteString(fmt.Sprintf("Window Stream Start             : %d%s", wStreamStart, LS))
+		fmt.Fprintf(sb, "Flavor                          : %s%s", flavor, LS)       //nolint:errcheck
+		fmt.Fprintf(sb, "Num Coupons                     : %d%s", numCoupons, LS)   //nolint:errcheck
+		fmt.Fprintf(sb, "Window Offset                   : %d%s", winOffset, LS)    //nolint:errcheck
+		fmt.Fprintf(sb, "Window Length Ints              : %d%s", wLengthInts, LS)  //nolint:errcheck
+		fmt.Fprintf(sb, "Window Stream Start             : %d%s", wStreamStart, LS) //nolint:errcheck
 	case CpcFormatPinnedSlidingHipNosv:
 		offset, err := getHiFieldOffset(format, hiFieldNumCoupons)
 		if err != nil {
@@ -1029,13 +1029,13 @@ func CpcSketchToString(mem []byte, detail bool) (string, error) {
 
 		reqBytes = wStreamStart + (wLengthInts << 2)
 		flavor = determineFlavor(lgK, uint64(numCoupons)).String()
-		sb.WriteString(fmt.Sprintf("Flavor                          : %s%s", flavor, LS))
-		sb.WriteString(fmt.Sprintf("Num Coupons                     : %d%s", numCoupons, LS))
-		sb.WriteString(fmt.Sprintf("Window Offset                   : %d%s", winOffset, LS))
-		sb.WriteString(fmt.Sprintf("Window Length Ints              : %d%s", wLengthInts, LS))
-		sb.WriteString(fmt.Sprintf("Window Stream Start             : %d%s", wStreamStart, LS))
-		sb.WriteString(fmt.Sprintf("KxP                             : %f%s", kxp, LS))
-		sb.WriteString(fmt.Sprintf("HipAccum                        : %f%s", hipAccum, LS))
+		fmt.Fprintf(sb, "Flavor                          : %s%s", flavor, LS)       //nolint:errcheck
+		fmt.Fprintf(sb, "Num Coupons                     : %d%s", numCoupons, LS)   //nolint:errcheck
+		fmt.Fprintf(sb, "Window Offset                   : %d%s", winOffset, LS)    //nolint:errcheck
+		fmt.Fprintf(sb, "Window Length Ints              : %d%s", wLengthInts, LS)  //nolint:errcheck
+		fmt.Fprintf(sb, "Window Stream Start             : %d%s", wStreamStart, LS) //nolint:errcheck
+		fmt.Fprintf(sb, "KxP                             : %f%s", kxp, LS)          //nolint:errcheck
+		fmt.Fprintf(sb, "HipAccum                        : %f%s", hipAccum, LS)     //nolint:errcheck
 	case CpcFormatPinnedSlidingMerged:
 		offset, err := getHiFieldOffset(format, hiFieldNumCoupons)
 		if err != nil {
@@ -1076,14 +1076,14 @@ func CpcSketchToString(mem []byte, detail bool) (string, error) {
 
 		reqBytes = svStreamStart + (svLengthInts << 2)
 		flavor = determineFlavor(lgK, uint64(numCoupons)).String()
-		sb.WriteString(fmt.Sprintf("Flavor                          : %s%s", flavor, LS))
-		sb.WriteString(fmt.Sprintf("Num Coupons                     : %d%s", numCoupons, LS))
-		sb.WriteString(fmt.Sprintf("Num SV                          : %d%s", numSv, LS))
-		sb.WriteString(fmt.Sprintf("SV Length Ints                  : %d%s", svLengthInts, LS))
-		sb.WriteString(fmt.Sprintf("SV Stream Start                 : %d%s", svStreamStart, LS))
-		sb.WriteString(fmt.Sprintf("Window Offset                   : %d%s", winOffset, LS))
-		sb.WriteString(fmt.Sprintf("Window Length Ints              : %d%s", wLengthInts, LS))
-		sb.WriteString(fmt.Sprintf("Window Stream Start             : %d%s", wStreamStart, LS))
+		fmt.Fprintf(sb, "Flavor                          : %s%s", flavor, LS)
+		fmt.Fprintf(sb, "Num Coupons                     : %d%s", numCoupons, LS)
+		fmt.Fprintf(sb, "Num SV                          : %d%s", numSv, LS)
+		fmt.Fprintf(sb, "SV Length Ints                  : %d%s", svLengthInts, LS)
+		fmt.Fprintf(sb, "SV Stream Start                 : %d%s", svStreamStart, LS)
+		fmt.Fprintf(sb, "Window Offset                   : %d%s", winOffset, LS)
+		fmt.Fprintf(sb, "Window Length Ints              : %d%s", wLengthInts, LS)
+		fmt.Fprintf(sb, "Window Stream Start             : %d%s", wStreamStart, LS)
 	case CpcFormatPinnedSlidingHip:
 		offset, err := getHiFieldOffset(format, hiFieldNumCoupons)
 		if err != nil {
@@ -1135,20 +1135,20 @@ func CpcSketchToString(mem []byte, detail bool) (string, error) {
 		hipAccum = math.Float64frombits(binary.LittleEndian.Uint64(mem[offset:]))
 		reqBytes = svStreamStart + (svLengthInts << 2)
 		flavor = determineFlavor(lgK, uint64(numCoupons)).String()
-		sb.WriteString(fmt.Sprintf("Flavor                          : %s%s", flavor, LS))
-		sb.WriteString(fmt.Sprintf("Num Coupons                     : %d%s", numCoupons, LS))
-		sb.WriteString(fmt.Sprintf("Num SV                          : %d%s", numSv, LS))
-		sb.WriteString(fmt.Sprintf("SV Length Ints                  : %d%s", svLengthInts, LS))
-		sb.WriteString(fmt.Sprintf("SV Stream Start                 : %d%s", svStreamStart, LS))
-		sb.WriteString(fmt.Sprintf("Window Offset                   : %d%s", winOffset, LS))
-		sb.WriteString(fmt.Sprintf("Window Length Ints              : %d%s", wLengthInts, LS))
-		sb.WriteString(fmt.Sprintf("Window Stream Start             : %d%s", wStreamStart, LS))
-		sb.WriteString(fmt.Sprintf("KxP                             : %f%s", kxp, LS))
-		sb.WriteString(fmt.Sprintf("HipAccum                        : %f%s", hipAccum, LS))
+		fmt.Fprintf(sb, "Flavor                          : %s%s", flavor, LS)        //nolint:errcheck
+		fmt.Fprintf(sb, "Num Coupons                     : %d%s", numCoupons, LS)    //nolint:errcheck
+		fmt.Fprintf(sb, "Num SV                          : %d%s", numSv, LS)         //nolint:errcheck
+		fmt.Fprintf(sb, "SV Length Ints                  : %d%s", svLengthInts, LS)  //nolint:errcheck
+		fmt.Fprintf(sb, "SV Stream Start                 : %d%s", svStreamStart, LS) //nolint:errcheck
+		fmt.Fprintf(sb, "Window Offset                   : %d%s", winOffset, LS)     //nolint:errcheck
+		fmt.Fprintf(sb, "Window Length Ints              : %d%s", wLengthInts, LS)   //nolint:errcheck
+		fmt.Fprintf(sb, "Window Stream Start             : %d%s", wStreamStart, LS)  //nolint:errcheck
+		fmt.Fprintf(sb, "KxP                             : %f%s", kxp, LS)           //nolint:errcheck
+		fmt.Fprintf(sb, "HipAccum                        : %f%s", hipAccum, LS)      //nolint:errcheck
 	}
 
-	sb.WriteString(fmt.Sprintf("Actual Bytes                    : %d%s", capBytes, LS))
-	sb.WriteString(fmt.Sprintf("Required Bytes                  : %d%s", reqBytes, LS))
+	fmt.Fprintf(sb, "Actual Bytes                    : %d%s", capBytes, LS) //nolint:errcheck
+	fmt.Fprintf(sb, "Required Bytes                  : %d%s", reqBytes, LS) //nolint:errcheck
 
 	if detail {
 		sb.WriteString(LS + "### CPC SKETCH IMAGE - DATA" + LS)
@@ -1198,7 +1198,7 @@ func listData(mem []byte, offsetBytes, lengthInts int, sb *strings.Builder) {
 		start := offsetBytes + 4*i
 		// Read 4 bytes as an uint32 (assuming little-endian).
 		value := int(binary.LittleEndian.Uint32(mem[start : start+4]))
-		sb.WriteString(fmt.Sprintf(dataFmt, i, value))
+		fmt.Fprintf(sb, dataFmt, i, value)
 		sb.WriteString("\n")
 	}
 }

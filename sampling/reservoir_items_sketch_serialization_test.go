@@ -49,7 +49,7 @@ func TestGenerateGoSnapshots(t *testing.T) {
 		t.Run("empty_k128", func(t *testing.T) {
 			sketch, _ := NewReservoirItemsSketch[int64](128)
 			data, _ := sketch.ToSlice(common.ItemSketchLongSerDe{})
-			os.WriteFile(fmt.Sprintf("%s/reservoir_items_long_empty_k128_go.sk", internal.GoPath), data, 0644)
+			assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_long_empty_k128_go.sk", internal.GoPath), data, 0644))
 		})
 		// Exact
 		for _, n := range exactNValues {
@@ -57,10 +57,10 @@ func TestGenerateGoSnapshots(t *testing.T) {
 			t.Run(fmt.Sprintf("exact_n%d_k128", n), func(t *testing.T) {
 				sketch, _ := NewReservoirItemsSketch[int64](128)
 				for i := int64(0); i < int64(n); i++ {
-					sketch.Update(i)
+					assert.NoError(t, sketch.Update(i))
 				}
 				data, _ := sketch.ToSlice(common.ItemSketchLongSerDe{})
-				os.WriteFile(fmt.Sprintf("%s/reservoir_items_long_exact_n%d_k128_go.sk", internal.GoPath, n), data, 0644)
+				assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_long_exact_n%d_k128_go.sk", internal.GoPath, n), data, 0644))
 			})
 		}
 		// Sampling
@@ -69,10 +69,10 @@ func TestGenerateGoSnapshots(t *testing.T) {
 			t.Run(fmt.Sprintf("sampling_n1000_k%d", k), func(t *testing.T) {
 				sketch, _ := NewReservoirItemsSketch[int64](k)
 				for i := int64(0); i < 1000; i++ {
-					sketch.Update(i)
+					assert.NoError(t, sketch.Update(i))
 				}
 				data, _ := sketch.ToSlice(common.ItemSketchLongSerDe{})
-				os.WriteFile(fmt.Sprintf("%s/reservoir_items_long_sampling_n1000_k%d_go.sk", internal.GoPath, k), data, 0644)
+				assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_long_sampling_n1000_k%d_go.sk", internal.GoPath, k), data, 0644))
 			})
 		}
 	})
@@ -83,7 +83,7 @@ func TestGenerateGoSnapshots(t *testing.T) {
 		t.Run("empty_k128", func(t *testing.T) {
 			sketch, _ := NewReservoirItemsSketch[float64](128)
 			data, _ := sketch.ToSlice(common.ItemSketchDoubleSerDe{})
-			os.WriteFile(fmt.Sprintf("%s/reservoir_items_double_empty_k128_go.sk", internal.GoPath), data, 0644)
+			assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_double_empty_k128_go.sk", internal.GoPath), data, 0644))
 		})
 		// Exact
 		for _, n := range exactNValues {
@@ -91,10 +91,10 @@ func TestGenerateGoSnapshots(t *testing.T) {
 			t.Run(fmt.Sprintf("exact_n%d_k128", n), func(t *testing.T) {
 				sketch, _ := NewReservoirItemsSketch[float64](128)
 				for i := 0; i < n; i++ {
-					sketch.Update(float64(i))
+					assert.NoError(t, sketch.Update(float64(i)))
 				}
 				data, _ := sketch.ToSlice(common.ItemSketchDoubleSerDe{})
-				os.WriteFile(fmt.Sprintf("%s/reservoir_items_double_exact_n%d_k128_go.sk", internal.GoPath, n), data, 0644)
+				assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_double_exact_n%d_k128_go.sk", internal.GoPath, n), data, 0644))
 			})
 		}
 		// Sampling
@@ -103,10 +103,10 @@ func TestGenerateGoSnapshots(t *testing.T) {
 			t.Run(fmt.Sprintf("sampling_n1000_k%d", k), func(t *testing.T) {
 				sketch, _ := NewReservoirItemsSketch[float64](k)
 				for i := 0; i < 1000; i++ {
-					sketch.Update(float64(i))
+					assert.NoError(t, sketch.Update(float64(i)))
 				}
 				data, _ := sketch.ToSlice(common.ItemSketchDoubleSerDe{})
-				os.WriteFile(fmt.Sprintf("%s/reservoir_items_double_sampling_n1000_k%d_go.sk", internal.GoPath, k), data, 0644)
+				assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_double_sampling_n1000_k%d_go.sk", internal.GoPath, k), data, 0644))
 			})
 		}
 	})
@@ -117,7 +117,7 @@ func TestGenerateGoSnapshots(t *testing.T) {
 		t.Run("empty_k128", func(t *testing.T) {
 			sketch, _ := NewReservoirItemsSketch[string](128)
 			data, _ := sketch.ToSlice(common.ItemSketchStringSerDe{})
-			os.WriteFile(fmt.Sprintf("%s/reservoir_items_string_empty_k128_go.sk", internal.GoPath), data, 0644)
+			assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_string_empty_k128_go.sk", internal.GoPath), data, 0644))
 		})
 		// Exact
 		for _, n := range exactNValues {
@@ -125,10 +125,10 @@ func TestGenerateGoSnapshots(t *testing.T) {
 			t.Run(fmt.Sprintf("exact_n%d_k128", n), func(t *testing.T) {
 				sketch, _ := NewReservoirItemsSketch[string](128)
 				for i := 0; i < n; i++ {
-					sketch.Update(fmt.Sprintf("item%d", i))
+					assert.NoError(t, sketch.Update(fmt.Sprintf("item%d", i)))
 				}
 				data, _ := sketch.ToSlice(common.ItemSketchStringSerDe{})
-				os.WriteFile(fmt.Sprintf("%s/reservoir_items_string_exact_n%d_k128_go.sk", internal.GoPath, n), data, 0644)
+				assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_string_exact_n%d_k128_go.sk", internal.GoPath, n), data, 0644))
 			})
 		}
 		// Sampling
@@ -137,10 +137,10 @@ func TestGenerateGoSnapshots(t *testing.T) {
 			t.Run(fmt.Sprintf("sampling_n1000_k%d", k), func(t *testing.T) {
 				sketch, _ := NewReservoirItemsSketch[string](k)
 				for i := 0; i < 1000; i++ {
-					sketch.Update(fmt.Sprintf("item%d", i))
+					assert.NoError(t, sketch.Update(fmt.Sprintf("item%d", i)))
 				}
 				data, _ := sketch.ToSlice(common.ItemSketchStringSerDe{})
-				os.WriteFile(fmt.Sprintf("%s/reservoir_items_string_sampling_n1000_k%d_go.sk", internal.GoPath, k), data, 0644)
+				assert.NoError(t, os.WriteFile(fmt.Sprintf("%s/reservoir_items_string_sampling_n1000_k%d_go.sk", internal.GoPath, k), data, 0644))
 			})
 		}
 	})
@@ -232,7 +232,7 @@ func TestSerializationRoundTrip(t *testing.T) {
 	// Create sketch and add items
 	sketch, _ := NewReservoirItemsSketch[int64](10)
 	for i := int64(1); i <= 5; i++ {
-		sketch.Update(i)
+		assert.NoError(t, sketch.Update(i))
 	}
 
 	// Serialize

@@ -24,8 +24,9 @@ import (
 	"math/bits"
 	"unsafe"
 
-	"github.com/apache/datasketches-go/internal"
 	"github.com/twmb/murmur3"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 const (
@@ -248,7 +249,7 @@ func (c *CpcSketch) updateSparse(rowCol int) error {
 	c32pre := c.numCoupons << 5
 	if c32pre >= (3 * k) {
 		// C >= 3K/32, in other words, flavor == SPARSE
-		return fmt.Errorf("C >= 3K/32")
+		return fmt.Errorf("C >= 3K/32") //nolint:staticcheck
 	}
 	if c.pairTable == nil {
 		return fmt.Errorf("pairTable is nil")
@@ -278,12 +279,12 @@ func (c *CpcSketch) updateWindowed(rowCol int) error {
 	k := uint64(1) << c.lgK
 	c32pre := c.numCoupons << 5
 	if c32pre < (3 * k) {
-		return fmt.Errorf("C < 3K/32")
+		return fmt.Errorf("C < 3K/32") //nolint:staticcheck
 	}
 	c8pre := c.numCoupons << 3
 	w8pre := uint64(c.windowOffset << 3)
 	if c8pre >= ((uint64(27) + w8pre) * k) {
-		return fmt.Errorf("C >= (K * 27/8) + (K * windowOffset)")
+		return fmt.Errorf("C >= (K * 27/8) + (K * windowOffset)") //nolint:staticcheck
 	}
 
 	isNovel := false //novel if new coupon
@@ -323,7 +324,7 @@ func (c *CpcSketch) updateWindowed(rowCol int) error {
 			}
 			w8post := uint64(c.windowOffset << 3)
 			if c8post >= ((uint64(27) + w8post) * k) {
-				return fmt.Errorf("C < (K * 27/8) + (K * windowOffset)")
+				return fmt.Errorf("C < (K * 27/8) + (K * windowOffset)") //nolint:staticcheck
 			}
 		}
 
@@ -559,21 +560,6 @@ func (c *CpcSketch) getFamily() int {
 // GetLgK returns the log-base-2 of K.
 func (c *CpcSketch) GetLgK() int {
 	return c.lgK
-}
-
-// isEmpty returns true if no coupons have been collected.
-func (c *CpcSketch) isEmpty() bool {
-	return c.numCoupons == 0
-}
-
-// validate recomputes the coupon count from the bit matrix and returns true if it matches the sketch's numCoupons.
-func (c *CpcSketch) validate() (bool, error) {
-	bitMatrix, err := c.bitMatrixOfSketch()
-	if err != nil {
-		return false, err
-	}
-	matrixCoupons := countBitsSetInMatrix(bitMatrix)
-	return matrixCoupons == c.numCoupons, nil
 }
 
 // Copy creates and returns a deep copy of the CpcSketch.

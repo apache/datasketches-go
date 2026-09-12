@@ -141,8 +141,3 @@ func isEmptyFlag(flags uint8) bool {
 func setEmptyFlag(flags uint8) uint8 {
 	return flags | emptyFlagMask
 }
-
-// clearEmptyFlag clears the empty flag in the flags byte.
-func clearEmptyFlag(flags uint8) uint8 {
-	return flags &^ emptyFlagMask
-}

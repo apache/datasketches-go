@@ -169,10 +169,10 @@ func (r *reversePurgeLongHashMap) purge(sampleSize int) int64 {
 
 func (r *reversePurgeLongHashMap) serializeToString() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("%d,%d,", r.numActive, len(r.keys)))
+	fmt.Fprintf(&sb, "%d,%d,", r.numActive, len(r.keys))
 	for i := 0; i < len(r.keys); i++ {
 		if r.states[i] != 0 {
-			sb.WriteString(fmt.Sprintf("%d,%d,", r.keys[i], r.values[i]))
+			fmt.Fprintf(&sb, "%d,%d,", r.keys[i], r.values[i])
 		}
 	}
 	return sb.String()
@@ -199,7 +199,8 @@ func (r *reversePurgeLongHashMap) keepOnlyPositiveCounts() {
 		// When we find the next non-empty cell, we know we are at the high end of a cluster,
 		//  which is tracked by firstProbe.
 		if r.states[probe] > 0 && r.values[probe] <= 0 {
-			r.hashDelete(probe) //does the work of deletion and moving higher items towards the front.
+			//does the work of deletion and moving higher items towards the front.
+			r.hashDelete(probe) //nolint:errcheck
 			r.numActive--
 		}
 	}
@@ -207,7 +208,7 @@ func (r *reversePurgeLongHashMap) keepOnlyPositiveCounts() {
 	for probe := len(r.keys); probe-1 > firstProbe; {
 		probe--
 		if r.states[probe] > 0 && r.values[probe] <= 0 {
-			r.hashDelete(probe)
+			r.hashDelete(probe) //nolint:errcheck
 			r.numActive--
 		}
 	}
@@ -321,12 +322,12 @@ func (s *reversePurgeLongHashMap) hashProbe(key int64) int {
 func (s *reversePurgeLongHashMap) String() string {
 	var sb strings.Builder
 	sb.WriteString("ReversePurgeLongHashMap:\n")
-	sb.WriteString(fmt.Sprintf("  %12s:%11s%20s %s\n", "Index", "States", "Values", "Keys"))
+	fmt.Fprintf(&sb, "  %12s:%11s%20s %s\n", "Index", "States", "Values", "Keys")
 	for i := 0; i < len(s.keys); i++ {
 		if s.states[i] <= 0 {
 			continue
 		}
-		sb.WriteString(fmt.Sprintf("  %12d:%11d%20d %d\n", i, s.states[i], s.values[i], s.keys[i]))
+		fmt.Fprintf(&sb, "  %12d:%11d%20d %d\n", i, s.states[i], s.values[i], s.keys[i])
 	}
 	return sb.String()
 }

@@ -44,7 +44,7 @@ func TestGenerateGoSnapshots_ThetaSketch(t *testing.T) {
 			sketch, err := NewQuickSelectUpdateSketch()
 			assert.NoError(t, err)
 			for i := 0; i < n; i++ {
-				sketch.UpdateInt64(int64(i))
+				assert.NoError(t, sketch.UpdateInt64(int64(i)))
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
@@ -69,7 +69,7 @@ func TestGenerateGoSnapshots_ThetaSketch(t *testing.T) {
 			sketch, err := NewQuickSelectUpdateSketch()
 			assert.NoError(t, err)
 			for i := 0; i < n; i++ {
-				sketch.UpdateInt64(int64(i))
+				assert.NoError(t, sketch.UpdateInt64(int64(i)))
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
@@ -92,7 +92,7 @@ func TestGenerateGoSnapshots_ThetaSketch(t *testing.T) {
 		sketch, err := NewQuickSelectUpdateSketch(WithUpdateSketchP(0.01))
 		assert.NoError(t, err)
 
-		sketch.UpdateInt64(int64(1))
+		assert.NoError(t, sketch.UpdateInt64(int64(1)))
 		assert.False(t, sketch.IsEmpty())
 		assert.Zero(t, sketch.NumRetained())
 
@@ -257,9 +257,11 @@ func TestJavaCompat(t *testing.T) {
 
 		// the same construction process in Java must have produced exactly the same sketch
 		updateSketch, err := NewQuickSelectUpdateSketch()
+		assert.NoError(t, err)
 		n := 8192
 		for i := 0; i < n; i++ {
-			updateSketch.UpdateInt64(int64(i))
+			err := updateSketch.UpdateInt64(int64(i))
+			assertUpdate(t, err)
 		}
 		assert.Equal(t, decoded.NumRetained(), updateSketch.NumRetained())
 		assert.InDelta(t, decoded.Theta(), updateSketch.Theta(), 1e-10)
@@ -336,9 +338,11 @@ func TestJavaCompat(t *testing.T) {
 
 		// the same construction process in Java must have produced exactly the same sketch
 		updateSketch, err := NewQuickSelectUpdateSketch()
+		assert.NoError(t, err)
 		n := 8192
 		for i := 0; i < n; i++ {
-			updateSketch.UpdateInt64(int64(i))
+			err := updateSketch.UpdateInt64(int64(i))
+			assertUpdate(t, err)
 		}
 		assert.Equal(t, decoded.NumRetained(), updateSketch.NumRetained())
 		assert.InDelta(t, decoded.Theta(), updateSketch.Theta(), 1e-10)
@@ -470,7 +474,8 @@ func TestEncodingAndDecoding(t *testing.T) {
 		updateSketch, err := NewQuickSelectUpdateSketch()
 		assert.NoError(t, err)
 		for i := 0; i < 8192; i++ {
-			updateSketch.UpdateInt64(int64(i))
+			err := updateSketch.UpdateInt64(int64(i))
+			assertUpdate(t, err)
 		}
 
 		compactSketch := updateSketch.CompactOrdered()
@@ -517,7 +522,7 @@ func TestEncodingAndDecoding(t *testing.T) {
 		updateSketch, err := NewQuickSelectUpdateSketch()
 		assert.NoError(t, err)
 		for i := 0; i < 8192; i++ {
-			updateSketch.UpdateInt64(int64(i))
+			assertUpdate(t, updateSketch.UpdateInt64(int64(i)))
 		}
 
 		compactSketch := updateSketch.CompactOrdered()
@@ -566,14 +571,14 @@ func TestEncodingAndDecoding(t *testing.T) {
 
 		sketch1, _ := NewQuickSelectUpdateSketch()
 		for i := 0; i < 10; i++ {
-			sketch1.UpdateInt64(int64(i))
+			assert.NoError(t, sketch1.UpdateInt64(int64(i)))
 		}
 		compact1 := sketch1.CompactOrdered()
 		data1, _ := compact1.MarshalBinary()
 
 		sketch2, _ := NewQuickSelectUpdateSketch()
 		for i := 100; i < 200; i++ {
-			sketch2.UpdateInt64(int64(i))
+			assert.NoError(t, sketch2.UpdateInt64(int64(i)))
 		}
 		compact2 := sketch2.CompactOrdered()
 		data2, _ := compact2.MarshalBinary()
@@ -596,7 +601,7 @@ func TestEncodingAndDecoding(t *testing.T) {
 		sketch, err := NewQuickSelectUpdateSketch(WithUpdateSketchSeed(customSeed))
 		assert.NoError(t, err)
 		for i := 0; i < 100; i++ {
-			sketch.UpdateInt64(int64(i))
+			assert.NoError(t, sketch.UpdateInt64(int64(i)))
 		}
 
 		compact := sketch.CompactOrdered()
@@ -611,7 +616,7 @@ func TestEncodingAndDecoding(t *testing.T) {
 	t.Run("Serialize unordered compact sketch", func(t *testing.T) {
 		sketch, _ := NewQuickSelectUpdateSketch()
 		for i := 0; i < 100; i++ {
-			sketch.UpdateInt64(int64(i))
+			assert.NoError(t, sketch.UpdateInt64(int64(i)))
 		}
 
 		unordered := sketch.Compact(false)
@@ -629,7 +634,7 @@ func TestEncodingAndDecoding(t *testing.T) {
 	t.Run("Unordered sketch with estimation mode", func(t *testing.T) {
 		sketch, _ := NewQuickSelectUpdateSketch()
 		for i := 0; i < 10000; i++ {
-			sketch.UpdateInt64(int64(i))
+			assertUpdate(t, sketch.UpdateInt64(int64(i)))
 		}
 
 		assert.True(t, sketch.IsEstimationMode())
@@ -645,7 +650,7 @@ func TestEncodingAndDecoding(t *testing.T) {
 	t.Run("Decode compressed sketch produces correct results", func(t *testing.T) {
 		sketch, _ := NewQuickSelectUpdateSketch()
 		for i := 0; i < 8192; i++ {
-			sketch.UpdateInt64(int64(i))
+			assertUpdate(t, sketch.UpdateInt64(int64(i)))
 		}
 
 		compact := sketch.CompactOrdered()
@@ -696,7 +701,7 @@ func TestEncodingAndDecoding(t *testing.T) {
 		customSeed := uint64(9999)
 		sketch, _ := NewQuickSelectUpdateSketch(WithUpdateSketchSeed(customSeed))
 		for i := 0; i < 5000; i++ {
-			sketch.UpdateInt64(int64(i))
+			assert.NoError(t, sketch.UpdateInt64(int64(i)))
 		}
 
 		compact := sketch.CompactOrdered()
@@ -757,7 +762,7 @@ func TestEncoderErrors(t *testing.T) {
 	sketch, err := NewQuickSelectUpdateSketch()
 	assert.NoError(t, err)
 	for i := 0; i < 100; i++ {
-		sketch.UpdateInt64(int64(i))
+		assert.NoError(t, sketch.UpdateInt64(int64(i)))
 	}
 	compact := sketch.CompactOrdered()
 

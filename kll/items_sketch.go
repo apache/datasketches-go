@@ -499,9 +499,10 @@ func (s *ItemsSketch[C]) ToSlice() ([]byte, error) {
 
 	srcN := s.n
 	var tgtStructure = _COMPACT_FULL
-	if srcN == 0 {
+	switch srcN {
+	case 0:
 		tgtStructure = _COMPACT_EMPTY
-	} else if srcN == 1 {
+	case 1:
 		tgtStructure = _COMPACT_SINGLE
 	}
 	totalBytes, err := s.currentSerializedSizeBytes()
@@ -593,24 +594,27 @@ func (s *ItemsSketch[C]) GetIterator() *ItemsSketchIterator[C] {
 func (s *ItemsSketch[C]) currentSerializedSizeBytes() (int, error) {
 	srcN := s.n
 	var tgtStructure = _COMPACT_FULL
-	if srcN == 0 {
+	switch srcN {
+	case 0:
 		tgtStructure = _COMPACT_EMPTY
-	} else if srcN == 1 {
+	case 1:
 		tgtStructure = _COMPACT_SINGLE
+	default:
 	}
 
 	totalBytes := 0
-	if tgtStructure == _COMPACT_EMPTY {
+	switch tgtStructure {
+	case _COMPACT_EMPTY:
 		totalBytes = _N_LONG_ADR
-	} else if tgtStructure == _COMPACT_SINGLE {
+	case _COMPACT_SINGLE:
 		v, err := s.getSingleItemSizeBytes()
 		if err != nil {
 			return 0, err
 		}
 		totalBytes = _DATA_START_ADR_SINGLE_ITEM + v
-	} else if tgtStructure == _COMPACT_FULL {
+	case _COMPACT_FULL:
 		totalBytes = _DATA_START_ADR + s.getLevelsArrSizeBytes(tgtStructure) + s.getMinMaxSizeBytes() + s.getRetainedItemsSizeBytes()
-	} else { //structure = UPDATABLE
+	default: //structure = UPDATABLE
 		return 0, fmt.Errorf("updatable serialization not implemented")
 	}
 	return totalBytes, nil
@@ -627,11 +631,12 @@ func (s *ItemsSketch[C]) getLevelsArray() []uint32 {
 }
 
 func (s *ItemsSketch[C]) getLevelsArrSizeBytes(structure sketchStructure) int {
-	if structure == _UPDATABLE {
+	switch structure {
+	case _UPDATABLE:
 		return len(s.levels) * 4 // * Integer.BYTES
-	} else if structure == _COMPACT_FULL {
+	case _COMPACT_FULL:
 		return (len(s.levels) - 1) * 4 // // * Integer.BYTES
-	} else {
+	default:
 		return 0
 	}
 }
@@ -755,10 +760,7 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 	// buffers that are referenced multiple times
 	otherNumLevels := other.numLevels
 	otherLevelsArr := other.levels
-	var otherItemsArr []C
-
-	// MERGE: update this sketch with level0 items from the other sketch
-	otherItemsArr = other.GetTotalItemsArray()
+	var otherItemsArr = other.GetTotalItemsArray()
 	for i := otherLevelsArr[0]; i < otherLevelsArr[1]; i++ {
 		s.updateItem(otherItemsArr[i], s.compareFn)
 	}
@@ -806,10 +808,10 @@ func (s *ItemsSketch[C]) mergeItemsSketch(other *ItemsSketch[C]) {
 		freeSpaceAtBottom := targetItemCount - curItemCount
 
 		//shift the new items array create space at bottom
-		for i := uint32(0); i < uint32(curItemCount); i++ {
-			myNewItemsArr[uint32(freeSpaceAtBottom)+i] = workbuf[outlevels[0]+i]
+		for i := uint32(0); i < curItemCount; i++ {
+			myNewItemsArr[freeSpaceAtBottom+i] = workbuf[outlevels[0]+i]
 		}
-		theShift := uint32(freeSpaceAtBottom) - outlevels[0]
+		theShift := freeSpaceAtBottom - outlevels[0]
 
 		//calculate the new levels array length
 		var finalLevelsArrLen uint32

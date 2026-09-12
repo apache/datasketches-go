@@ -448,17 +448,17 @@ func (d *Double) CDF(splitPoints []float64) ([]float64, error) {
 func (d *Double) String(shouldPrintCentroids bool) string {
 	var sb strings.Builder
 	sb.WriteString("### t-Digest summary:\n")
-	sb.WriteString(fmt.Sprintf("   Nominal k          : %d\n", d.k))
-	sb.WriteString(fmt.Sprintf("   Centroids          : %d\n", len(d.centroids)))
-	sb.WriteString(fmt.Sprintf("   Buffered           : %d\n", len(d.buffer)))
-	sb.WriteString(fmt.Sprintf("   Centroids capacity : %d\n", d.centroidsCapacity))
-	sb.WriteString(fmt.Sprintf("   Buffer capacity    : %d\n", d.centroidsCapacity*bufferMultiplier))
-	sb.WriteString(fmt.Sprintf("   Centroids Weight   : %d\n", d.centroidsWeight))
-	sb.WriteString(fmt.Sprintf("   Total Weight       : %d\n", d.TotalWeight()))
-	sb.WriteString(fmt.Sprintf("   Reverse Merge      : %v\n", d.reverseMerge))
+	fmt.Fprintf(&sb, "   Nominal k          : %d\n", d.k)
+	fmt.Fprintf(&sb, "   Centroids          : %d\n", len(d.centroids))
+	fmt.Fprintf(&sb, "   Buffered           : %d\n", len(d.buffer))
+	fmt.Fprintf(&sb, "   Centroids capacity : %d\n", d.centroidsCapacity)
+	fmt.Fprintf(&sb, "   Buffer capacity    : %d\n", d.centroidsCapacity*bufferMultiplier)
+	fmt.Fprintf(&sb, "   Centroids Weight   : %d\n", d.centroidsWeight)
+	fmt.Fprintf(&sb, "   Total Weight       : %d\n", d.TotalWeight())
+	fmt.Fprintf(&sb, "   Reverse Merge      : %v\n", d.reverseMerge)
 	if !d.IsEmpty() {
-		sb.WriteString(fmt.Sprintf("   Min                : %v\n", d.min))
-		sb.WriteString(fmt.Sprintf("   Max                : %v\n", d.max))
+		fmt.Fprintf(&sb, "   Min                : %v\n", d.min)
+		fmt.Fprintf(&sb, "   Max                : %v\n", d.max)
 	}
 	sb.WriteString("### End t-Digest summary\n")
 
@@ -466,13 +466,13 @@ func (d *Double) String(shouldPrintCentroids bool) string {
 		if len(d.centroids) > 0 {
 			sb.WriteString("Centroids:\n")
 			for i, c := range d.centroids {
-				sb.WriteString(fmt.Sprintf("%d: %v, %d\n", i, c.mean, c.weight))
+				fmt.Fprintf(&sb, "%d: %v, %d\n", i, c.mean, c.weight)
 			}
 		}
 		if len(d.buffer) > 0 {
 			sb.WriteString("Buffer:\n")
 			for i, v := range d.buffer {
-				sb.WriteString(fmt.Sprintf("%d: %v\n", i, v))
+				fmt.Fprintf(&sb, "%d: %v\n", i, v)
 			}
 		}
 	}

@@ -18,7 +18,7 @@
 -->
 
 [![Go](https://github.com/apache/datasketches-go/actions/workflows/test.yml/badge.svg)](https://github.com/apache/datasketches-go/actions/workflows/test.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/apache/datasketches-go)](https://goreportcard.com/report/github.com/apache/datasketches-go)
+[![Lint](https://github.com/apache/datasketches-go/actions/workflows/lint.yml/badge.svg)](https://github.com/apache/datasketches-go/actions/workflows/lint.yml)
 [![Release](https://img.shields.io/github/release/apache/datasketches-go.svg)](https://github.com/apache/datasketches-go/releases)
 [![GoDoc](https://godoc.org/github.com/apache/datasketches-go?status.svg)](https://godoc.org/github.com/apache/datasketches-go)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/apache/datasketches-go/blob/master/LICENSE)
@@ -109,4 +109,30 @@ A Dockerfile is also provided with the necessary env to build and test the proje
 ```
 ./build/Dockerfile
 ./build/run-docker-test.sh
+```
+
+# Linting
+
+Lint runs in CI via the [Lint workflow](.github/workflows/lint.yml), which uses
+[golangci-lint](https://golangci-lint.run) **v2.13.2** with the configuration in
+[`.golangci.yml`](.golangci.yml).
+
+Install that same version locally. The upstream project recommends the binary
+install and discourages `go install` and `tool` directives, because a source build
+compiles against your local Go version and can report different findings than CI:
+
+```
+curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.13.2
+```
+
+Prebuilt binaries are also available on the
+[releases page](https://github.com/golangci/golangci-lint/releases/tag/v2.13.2), and
+package managers such as Homebrew work as well. Pin v2.13.2 either way, so local
+results match CI.
+
+Then:
+
+```
+make lint     # report findings
+make format   # gofmt, goimports, and golangci-lint --fix
 ```

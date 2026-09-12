@@ -52,6 +52,6 @@ func getSketchStructure(preInts, serVer int) (sketchStructure, error) {
 			return _UPDATABLE, nil
 		}
 	default:
-		return sketchStructure{}, errors.New("invalid preamble ints and serial version combo")
 	}
+	return sketchStructure{}, errors.New("invalid preamble ints and serial version combo")
 }

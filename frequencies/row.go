@@ -35,8 +35,8 @@ type RowItem[C comparable] struct {
 	lb   int64
 }
 
-func newRow(item int64, estimate int64, ub int64, lb int64) *Row {
-	return &Row{
+func newRow(item int64, estimate int64, ub int64, lb int64) Row {
+	return Row{
 		item: item,
 		est:  estimate,
 		ub:   ub,
@@ -44,8 +44,8 @@ func newRow(item int64, estimate int64, ub int64, lb int64) *Row {
 	}
 }
 
-func newRowItem[C comparable](item C, estimate int64, ub int64, lb int64) *RowItem[C] {
-	return &RowItem[C]{
+func newRowItem[C comparable](item C, estimate int64, ub int64, lb int64) RowItem[C] {
+	return RowItem[C]{
 		item: item,
 		est:  estimate,
 		ub:   ub,

@@ -19,6 +19,8 @@ package theta
 
 import (
 	"fmt"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 func checkEqual[T comparable](actual, expected T, description string) error {
@@ -67,4 +69,15 @@ func startingSubMultiple(lgTgt, lgMin, lgRf uint8) uint8 {
 		return lgTgt
 	}
 	return ((lgTgt - lgMin) % lgRf) + lgMin
+}
+
+func trimToNominal(entries []uint64, nominalSize uint32, theta uint64) ([]uint64, uint64) {
+	if uint32(len(entries)) <= nominalSize {
+		return entries, theta
+	}
+
+	internal.QuickSelect(entries, 0, len(entries)-1, int(nominalSize))
+	trimmed := make([]uint64, nominalSize)
+	copy(trimmed, entries[:nominalSize])
+	return trimmed, entries[nominalSize]
 }

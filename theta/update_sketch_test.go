@@ -18,6 +18,8 @@
 package theta
 
 import (
+	"bytes"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -660,5 +662,178 @@ func TestUpdateSketch_Compact(t *testing.T) {
 		ub, err := compactSketch.UpperBound(1)
 		assert.NoError(t, err)
 		assert.GreaterOrEqual(t, ub, float64(n))
+	})
+}
+
+func TestQuickSelectUpdateSketch_CompactTrimmed(t *testing.T) {
+	const k = uint32(1) << DefaultLgK
+
+	newSketch := func(t *testing.T, n int) *QuickSelectUpdateSketch {
+		t.Helper()
+		sketch, err := NewQuickSelectUpdateSketch()
+		assert.NoError(t, err)
+		for i := 0; i < n; i++ {
+			assertUpdate(t, sketch.UpdateInt64(int64(i)))
+		}
+		return sketch
+	}
+
+	sortedEntries := func(s *CompactSketch) []uint64 {
+		entries := slices.Collect(s.All())
+		slices.Sort(entries)
+		return entries
+	}
+
+	t.Run("Ordered And Trimmed Combinations", func(t *testing.T) {
+		n := 40000
+		sketch := newSketch(t, n)
+		retainedBefore := sketch.NumRetained()
+		thetaBefore := sketch.Theta64()
+		assert.True(t, sketch.IsEstimationMode())
+		assert.Greater(t, retainedBefore, k)
+
+		reference := newSketch(t, n)
+		reference.Trim()
+		expected := reference.CompactOrdered()
+		expectedEntries := sortedEntries(expected)
+		assert.Equal(t, k, expected.NumRetained())
+
+		// case 1: ordered, not trimmed
+		c1 := sketch.Compact(true)
+		assert.True(t, c1.IsOrdered())
+		assert.Equal(t, retainedBefore, c1.NumRetained())
+		assert.Equal(t, thetaBefore, c1.Theta64())
+
+		// case 2: unordered, not trimmed
+		c2 := sketch.Compact(false)
+		assert.False(t, c2.IsOrdered())
+		assert.Equal(t, retainedBefore, c2.NumRetained())
+		assert.Equal(t, thetaBefore, c2.Theta64())
+
+		// case 3: ordered and trimmed
+		c3 := sketch.CompactTrimmed(true)
+		assert.True(t, c3.IsOrdered())
+		assert.Equal(t, k, c3.NumRetained())
+		assert.Less(t, c3.Theta64(), thetaBefore)
+		assert.Equal(t, expected.Theta64(), c3.Theta64())
+		c3Entries := slices.Collect(c3.All())
+		assert.True(t, slices.IsSorted(c3Entries))
+		assert.Equal(t, expectedEntries, c3Entries)
+		for _, entry := range c3Entries {
+			assert.Less(t, entry, c3.Theta64())
+		}
+
+		// case 4: unordered and trimmed: same set and theta, no sort
+		c4 := sketch.CompactTrimmed(false)
+		assert.False(t, c4.IsOrdered())
+		assert.Equal(t, k, c4.NumRetained())
+		assert.Equal(t, expected.Theta64(), c4.Theta64())
+		assert.Equal(t, expectedEntries, sortedEntries(c4))
+
+		// the source sketch must be untouched by any of the four
+		assert.Equal(t, retainedBefore, sketch.NumRetained())
+		assert.Equal(t, thetaBefore, sketch.Theta64())
+	})
+
+	t.Run("Serialization Matches Trim Then Compact", func(t *testing.T) {
+		n := 40000
+		sketch := newSketch(t, n)
+		reference := newSketch(t, n)
+		reference.Trim()
+
+		for _, compressed := range []bool{false, true} {
+			var trimmedBuf, referenceBuf bytes.Buffer
+			trimmedEncoder := NewEncoder(&trimmedBuf, compressed)
+			assert.NoError(t, trimmedEncoder.Encode(sketch.CompactTrimmed(true)))
+			referenceEncoder := NewEncoder(&referenceBuf, compressed)
+			assert.NoError(t, referenceEncoder.Encode(reference.CompactOrdered()))
+
+			assert.Equal(t, referenceBuf.Bytes(), trimmedBuf.Bytes(), "compressed=%v", compressed)
+		}
+	})
+
+	t.Run("Exact Mode Converts To Estimation", func(t *testing.T) {
+		n := 5000
+		sketch := newSketch(t, n)
+		assert.Greater(t, sketch.NumRetained(), k)
+		assert.False(t, sketch.IsEstimationMode())
+		assert.Equal(t, 1.0, sketch.Theta())
+
+		exact := sketch.Compact(true)
+		assert.False(t, exact.IsEstimationMode())
+		assert.Equal(t, uint32(n), exact.NumRetained())
+		assert.Equal(t, float64(n), exact.Estimate())
+
+		trimmed := sketch.CompactTrimmed(true)
+		assert.True(t, trimmed.IsEstimationMode())
+		assert.Equal(t, k, trimmed.NumRetained())
+		assert.Less(t, trimmed.Theta(), 1.0)
+		assert.NotEqual(t, float64(n), trimmed.Estimate())
+
+		lb, err := trimmed.LowerBound(3)
+		assert.NoError(t, err)
+		assert.LessOrEqual(t, lb, float64(n))
+		ub, err := trimmed.UpperBound(3)
+		assert.NoError(t, err)
+		assert.GreaterOrEqual(t, ub, float64(n))
+	})
+
+	t.Run("Bounds Widen In Estimation Mode", func(t *testing.T) {
+		sketch := newSketch(t, 40000)
+		assert.True(t, sketch.IsEstimationMode())
+		assert.Greater(t, sketch.NumRetained(), k)
+
+		plain := sketch.Compact(true)
+		trimmed := sketch.CompactTrimmed(true)
+		assert.Equal(t, k, trimmed.NumRetained())
+		assert.Greater(t, plain.NumRetained(), trimmed.NumRetained())
+
+		width := func(s *CompactSketch) float64 {
+			lb, err := s.LowerBound(2)
+			assert.NoError(t, err)
+			ub, err := s.UpperBound(2)
+			assert.NoError(t, err)
+			return ub - lb
+		}
+		assert.Greater(t, width(trimmed), width(plain))
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		sketch := newSketch(t, 0)
+
+		result := sketch.CompactTrimmed(true)
+		assert.True(t, result.IsEmpty())
+		assert.Zero(t, result.NumRetained())
+		assert.Equal(t, 1.0, result.Theta())
+		assert.True(t, result.IsOrdered())
+		assert.True(t, sketch.CompactTrimmed(false).IsOrdered())
+	})
+
+	t.Run("Non Empty No Retained Keys", func(t *testing.T) {
+		sketch, err := NewQuickSelectUpdateSketch(WithUpdateSketchP(0.001))
+		assert.NoError(t, err)
+		assertUpdate(t, sketch.UpdateInt64(1))
+
+		result := sketch.CompactTrimmed(true)
+		assert.False(t, result.IsEmpty())
+		assert.Zero(t, result.NumRetained())
+		assert.Equal(t, sketch.Theta64(), result.Theta64())
+		assert.True(t, result.IsEstimationMode())
+	})
+
+	t.Run("Below K", func(t *testing.T) {
+		sketch := newSketch(t, 100)
+		assert.False(t, sketch.IsEstimationMode())
+
+		result := sketch.CompactTrimmed(true)
+		assert.False(t, result.IsEstimationMode())
+		assert.Equal(t, uint32(100), result.NumRetained())
+		assert.Equal(t, sketch.Theta64(), result.Theta64())
+		assert.Equal(t, 100.0, result.Estimate())
+		assert.True(t, slices.IsSorted(slices.Collect(result.All())))
+		assert.False(t, sketch.CompactTrimmed(false).IsOrdered())
+
+		single := newSketch(t, 1)
+		assert.True(t, single.CompactTrimmed(false).IsOrdered())
 	})
 }

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"iter"
 	"math"
+	"slices"
 	"strings"
 
 	"github.com/apache/datasketches-go/internal"
@@ -415,10 +416,40 @@ func (s *QuickSelectUpdateSketch) All() iter.Seq[uint64] {
 	}
 }
 
+// Compact converts this sketch to a compact sketch (ordered or unordered).
 func (s *QuickSelectUpdateSketch) Compact(ordered bool) *CompactSketch {
 	return NewCompactSketch(s, ordered)
 }
 
+// CompactOrdered converts this sketch to an ordered compact sketch.
 func (s *QuickSelectUpdateSketch) CompactOrdered() *CompactSketch {
 	return s.Compact(true)
+}
+
+// CompactTrimmed converts this sketch to a compact sketch (ordered or unordered)
+// reduced to at most the nominal size k. This sketch is not modified.
+//
+// If this sketch retains more than k entries, theta is lowered to the (k+1)th
+// smallest retained hash and only the k entries below it are kept. Otherwise the
+// result is the same as Compact. This is equivalent to Trim followed by Compact,
+// without mutating this sketch or rebuilding its hash table.
+func (s *QuickSelectUpdateSketch) CompactTrimmed(ordered bool) *CompactSketch {
+	if s.IsEmpty() {
+		return s.Compact(ordered)
+	}
+
+	entries := make([]uint64, 0, s.table.numEntries)
+	for _, entry := range s.table.entries {
+		if entry != 0 {
+			entries = append(entries, entry)
+		}
+	}
+
+	entries, theta := trimToNominal(entries, uint32(1)<<s.table.lgNomSize, s.table.theta)
+	if ordered {
+		slices.Sort(entries)
+	}
+
+	seedHash, _ := s.SeedHash()
+	return newCompactSketchFromEntries(false, ordered, seedHash, theta, entries)
 }

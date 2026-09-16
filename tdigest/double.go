@@ -204,6 +204,10 @@ func (d *Double) Merge(other *Double) error {
 		return ErrEmpty
 	}
 
+	// Extreme centroid means are not the true min/max when those centroids have weight > 1.
+	d.min = min(d.min, other.min)
+	d.max = max(d.max, other.max)
+
 	tmp := make([]doublePrecisionCentroid, 0, len(d.buffer)+len(d.centroids)+len(other.buffer)+len(other.centroids))
 	for _, v := range d.buffer {
 		tmp = append(tmp, doublePrecisionCentroid{mean: v, weight: 1})

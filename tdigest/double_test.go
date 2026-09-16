@@ -246,6 +246,35 @@ func TestDouble_Merge(t *testing.T) {
 		assert.Equal(t, 1.0, rank)
 	})
 
+	t.Run("Merge preserves deserialized min max with weighted tails", func(t *testing.T) {
+		other, err := newDoubleFromInternalStates(false, DefaultK, -1, 21,
+			[]doublePrecisionCentroid{{mean: 0, weight: 4}, {mean: 10, weight: 4}, {mean: 20, weight: 4}},
+			12, nil)
+		assert.NoError(t, err)
+
+		empty, err := NewDouble(DefaultK)
+		assert.NoError(t, err)
+		assert.NoError(t, empty.Merge(other))
+		minVal, err := empty.MinValue()
+		assert.NoError(t, err)
+		assert.Equal(t, -1.0, minVal)
+		maxVal, err := empty.MaxValue()
+		assert.NoError(t, err)
+		assert.Equal(t, 21.0, maxVal)
+
+		left, err := newDoubleFromInternalStates(false, DefaultK, 5, 15,
+			[]doublePrecisionCentroid{{mean: 6, weight: 4}, {mean: 10, weight: 4}, {mean: 14, weight: 4}},
+			12, nil)
+		assert.NoError(t, err)
+		assert.NoError(t, left.Merge(other))
+		minVal, err = left.MinValue()
+		assert.NoError(t, err)
+		assert.Equal(t, -1.0, minVal)
+		maxVal, err = left.MaxValue()
+		assert.NoError(t, err)
+		assert.Equal(t, 21.0, maxVal)
+	})
+
 	t.Run("Merge Large", func(t *testing.T) {
 		sk1, err := NewDouble(DefaultK)
 		assert.NoError(t, err)

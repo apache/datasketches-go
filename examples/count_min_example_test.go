@@ -78,7 +78,7 @@ func TestCountMinSketch(t *testing.T) {
 	err = sketch.Serialize(&buf)
 	assert.NoError(t, err)
 
-	restored, err := sketch.Deserialize(buf.Bytes(), seed)
+	restored, err := count.NewCountMinSketchFromSlice(buf.Bytes(), seed)
 	assert.NoError(t, err)
 	assert.Equal(t, sketch.GetTotalWeight(), restored.GetTotalWeight())
 }

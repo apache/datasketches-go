@@ -261,7 +261,8 @@ func (c *CountMinSketch) Serialize(w io.Writer) error {
 	return nil
 }
 
-func (c *CountMinSketch) Deserialize(b []byte, seed int64) (*CountMinSketch, error) {
+// NewCountMinSketchFromSlice deserializes a Count-Min sketch from a byte slice.
+func NewCountMinSketchFromSlice(b []byte, seed int64) (*CountMinSketch, error) {
 	r := bytes.NewReader(b)
 	var err error
 
@@ -353,4 +354,11 @@ func (c *CountMinSketch) Deserialize(b []byte, seed int64) (*CountMinSketch, err
 	}
 
 	return cms, nil
+}
+
+// Deserialize deserializes a Count-Min sketch from a byte slice.
+//
+// Deprecated: use NewCountMinSketchFromSlice instead.
+func (c *CountMinSketch) Deserialize(b []byte, seed int64) (*CountMinSketch, error) {
+	return NewCountMinSketchFromSlice(b, seed)
 }

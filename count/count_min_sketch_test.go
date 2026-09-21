@@ -275,7 +275,7 @@ func Test_CountMinSketch(t *testing.T) {
 		err = c.Serialize(b)
 		assert.NoError(t, err)
 
-		d, err := c.Deserialize(b.Bytes(), seed)
+		d, err := NewCountMinSketchFromSlice(b.Bytes(), seed)
 		assert.NoError(t, err)
 		assert.Equal(t, c, d)
 		assert.NotEqual(t, &c, d)
@@ -290,7 +290,7 @@ func Test_CountMinSketch(t *testing.T) {
 		err = c.Serialize(b)
 		assert.NoError(t, err)
 
-		d, err = c.Deserialize(b.Bytes(), seed)
+		d, err = NewCountMinSketchFromSlice(b.Bytes(), seed)
 		assert.NoError(t, err)
 		assert.Equal(t, c, d)
 		assert.NotEqual(t, &c, d)

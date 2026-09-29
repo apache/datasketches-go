@@ -49,7 +49,8 @@ func ANotB(a, b Sketch, seed uint64, ordered bool) (*CompactSketch, error) {
 	if aSeedHash != uint16(seedHash) {
 		return nil, fmt.Errorf("sketch A seed hash mismatch: expected %d, got %d", seedHash, aSeedHash)
 	}
-	if bSeedHash != uint16(seedHash) {
+	// an empty sketch does not carry a seed hash in its serialized form
+	if !b.IsEmpty() && bSeedHash != uint16(seedHash) {
 		return nil, fmt.Errorf("sketch B seed hash mismatch: expected %d, got %d", seedHash, bSeedHash)
 	}
 

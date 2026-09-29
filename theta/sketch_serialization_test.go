@@ -44,7 +44,7 @@ func TestGenerateGoSnapshots_ThetaSketch(t *testing.T) {
 			sketch, err := NewQuickSelectUpdateSketch()
 			assert.NoError(t, err)
 			for i := 0; i < n; i++ {
-				assert.NoError(t, sketch.UpdateInt64(int64(i)))
+				assertUpdate(t, sketch.UpdateInt64(int64(i)))
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
@@ -69,7 +69,7 @@ func TestGenerateGoSnapshots_ThetaSketch(t *testing.T) {
 			sketch, err := NewQuickSelectUpdateSketch()
 			assert.NoError(t, err)
 			for i := 0; i < n; i++ {
-				assert.NoError(t, sketch.UpdateInt64(int64(i)))
+				assertUpdate(t, sketch.UpdateInt64(int64(i)))
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
@@ -92,7 +92,7 @@ func TestGenerateGoSnapshots_ThetaSketch(t *testing.T) {
 		sketch, err := NewQuickSelectUpdateSketch(WithUpdateSketchP(0.01))
 		assert.NoError(t, err)
 
-		assert.NoError(t, sketch.UpdateInt64(int64(1)))
+		assertUpdate(t, sketch.UpdateInt64(int64(1)))
 		assert.False(t, sketch.IsEmpty())
 		assert.Zero(t, sketch.NumRetained())
 
@@ -695,6 +695,24 @@ func TestEncodingAndDecoding(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, uncompressedBuf.Len(), compressedBuf.Len())
+	})
+
+	t.Run("Empty sketch without seed hash", func(t *testing.T) {
+		sketch, _ := NewQuickSelectUpdateSketch()
+		compact := sketch.CompactOrdered()
+
+		data, err := compact.MarshalBinary()
+		assert.NoError(t, err)
+
+		// same image as C++ and Java: preLongs, serVer, family, 2 unused, flags
+		// (read only, empty, compact, ordered) and a zero seed hash
+		assert.Equal(t, []byte{1, 3, 3, 0, 0, 0x1e, 0, 0}, data)
+
+		// the seed hash of an empty sketch is not checked on read
+		decoded, err := Decode(data, 9999)
+		assert.NoError(t, err)
+		assert.True(t, decoded.IsEmpty())
+		assert.Equal(t, uint32(0), decoded.NumRetained())
 	})
 
 	t.Run("Compressed sketch with custom seed", func(t *testing.T) {

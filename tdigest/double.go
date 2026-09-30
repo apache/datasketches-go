@@ -365,7 +365,10 @@ func (d *Double) Quantile(rank float64) (float64, error) {
 	}
 
 	// at least 2 centroids
-	weight := rank * float64(d.centroidsWeight)
+	// float64() forces the multiply to round before it is subtracted. On arm64 the
+	// compiler otherwise fuses those into one operation, and the rank that should
+	// land on the last unit of weight misses the right tail.
+	weight := float64(rank * float64(d.centroidsWeight))
 	if weight < 1 {
 		return d.min, nil
 	}
@@ -379,8 +382,13 @@ func (d *Double) Quantile(rank float64) (float64, error) {
 	}
 
 	lastWeight := float64(d.centroids[len(d.centroids)-1].weight)
-	if lastWeight > 1 && float64(d.centroidsWeight)-weight <= lastWeight/2.0 {
-		return d.max - (float64(d.centroidsWeight)-weight-1.0)/(lastWeight/2.0-1.0)*(d.max-d.centroids[len(d.centroids)-1].mean), nil
+	if lastWeight > 1 && float64(d.centroidsWeight)-float64(weight) <= lastWeight/2.0 {
+		// A last centroid of weight 2 makes the denominator zero. The only rank that
+		// reaches this branch is the one that returns the stored maximum.
+		if lastWeight == 2 {
+			return d.max, nil
+		}
+		return d.max - (float64(d.centroidsWeight)-float64(weight)-1.0)/(lastWeight/2.0-1.0)*(d.max-d.centroids[len(d.centroids)-1].mean), nil
 	}
 
 	// interpolate between extremes

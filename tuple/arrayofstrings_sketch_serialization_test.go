@@ -47,7 +47,7 @@ func TestGenerateGoSnapshots_ArrayOfStringsSketch(t *testing.T) {
 				s := []string{strconv.Itoa(i)}
 				values := []string{"value" + strconv.Itoa(i)}
 				err := sketch.UpdateUint64(GenerateHashKeyFromStrings(s), values)
-				assert.NoError(t, err)
+				assertUpdate(t, err)
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
@@ -76,7 +76,7 @@ func TestGenerateGoSnapshots_ArrayOfStringsSketch(t *testing.T) {
 				s := []string{strconv.Itoa(i)}
 				values := []string{"a" + strconv.Itoa(i), "b" + strconv.Itoa(i), "c" + strconv.Itoa(i)}
 				err := sketch.UpdateUint64(GenerateHashKeyFromStrings(s), values)
-				assert.NoError(t, err)
+				assertUpdate(t, err)
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
@@ -100,7 +100,7 @@ func TestGenerateGoSnapshots_ArrayOfStringsSketch(t *testing.T) {
 		sketch, err := NewUpdateSketch[*ArrayOfStringsSummary, []string](NewArrayOfStringsSummaryFunc, WithUpdateSketchP(0.01))
 		assert.NoError(t, err)
 		err = sketch.UpdateUint64(GenerateHashKeyFromStrings([]string{"key"}), []string{"value"})
-		assert.NoError(t, err)
+		assertUpdate(t, err)
 
 		assert.False(t, sketch.IsEmpty())
 		assert.Equal(t, uint32(0), sketch.NumRetained())
@@ -126,7 +126,7 @@ func TestGenerateGoSnapshots_ArrayOfStringsSketch(t *testing.T) {
 			for i := 0; i < n; i++ {
 				s := []string{"key" + strconv.Itoa(i), "subkey" + strconv.Itoa(i%10)}
 				values := []string{"value" + strconv.Itoa(i)}
-				assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(s), values))
+				assertUpdate(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(s), values))
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
@@ -152,15 +152,15 @@ func TestGenerateGoSnapshots_ArrayOfStringsSketch(t *testing.T) {
 
 		key := []string{"키", "열쇠"}
 		value := []string{"밸류", "값"}
-		assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
+		assertUpdate(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
 
 		key = []string{"🔑", "🗝️"}
 		value = []string{"📦", "🎁"}
-		assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
+		assertUpdate(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
 
 		key = []string{"ключ1", "ключ2"}
 		value = []string{"ценить1", "ценить2"}
-		assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
+		assertUpdate(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
 
 		assert.False(t, sketch.IsEmpty())
 		assert.Equal(t, uint32(3), sketch.NumRetained())
@@ -184,15 +184,15 @@ func TestGenerateGoSnapshots_ArrayOfStringsSketch(t *testing.T) {
 
 		key := []string{""}
 		value := []string{"empty_key_value"}
-		assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
+		assertUpdate(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
 
 		key = []string{"empty_value_key"}
 		value = []string{""}
-		assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
+		assertUpdate(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
 
 		key = []string{"", ""}
 		value = []string{"", ""}
-		assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
+		assertUpdate(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
 
 		assert.False(t, sketch.IsEmpty())
 		assert.Equal(t, uint32(3), sketch.NumRetained())

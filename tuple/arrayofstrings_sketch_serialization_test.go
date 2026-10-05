@@ -47,7 +47,7 @@ func TestGenerateGoSnapshots_ArrayOfStringsSketch(t *testing.T) {
 				s := []string{strconv.Itoa(i)}
 				values := []string{"value" + strconv.Itoa(i)}
 				err := sketch.UpdateUint64(GenerateHashKeyFromStrings(s), values)
-				assert.NoError(t, err)
+				assertUpdate(t, err)
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
@@ -76,7 +76,7 @@ func TestGenerateGoSnapshots_ArrayOfStringsSketch(t *testing.T) {
 				s := []string{strconv.Itoa(i)}
 				values := []string{"a" + strconv.Itoa(i), "b" + strconv.Itoa(i), "c" + strconv.Itoa(i)}
 				err := sketch.UpdateUint64(GenerateHashKeyFromStrings(s), values)
-				assert.NoError(t, err)
+				assertUpdate(t, err)
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
@@ -100,7 +100,7 @@ func TestGenerateGoSnapshots_ArrayOfStringsSketch(t *testing.T) {
 		sketch, err := NewUpdateSketch[*ArrayOfStringsSummary, []string](NewArrayOfStringsSummaryFunc, WithUpdateSketchP(0.01))
 		assert.NoError(t, err)
 		err = sketch.UpdateUint64(GenerateHashKeyFromStrings([]string{"key"}), []string{"value"})
-		assert.NoError(t, err)
+		assertUpdate(t, err)
 
 		assert.False(t, sketch.IsEmpty())
 		assert.Equal(t, uint32(0), sketch.NumRetained())
@@ -126,7 +126,7 @@ func TestGenerateGoSnapshots_ArrayOfStringsSketch(t *testing.T) {
 			for i := 0; i < n; i++ {
 				s := []string{"key" + strconv.Itoa(i), "subkey" + strconv.Itoa(i%10)}
 				values := []string{"value" + strconv.Itoa(i)}
-				assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(s), values))
+				assertUpdate(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(s), values))
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))

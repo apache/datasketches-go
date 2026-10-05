@@ -44,7 +44,7 @@ func TestGenerateGoSnapshots_ThetaSketch(t *testing.T) {
 			sketch, err := NewQuickSelectUpdateSketch()
 			assert.NoError(t, err)
 			for i := 0; i < n; i++ {
-				assert.NoError(t, sketch.UpdateInt64(int64(i)))
+				assertUpdate(t, sketch.UpdateInt64(int64(i)))
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
@@ -69,7 +69,7 @@ func TestGenerateGoSnapshots_ThetaSketch(t *testing.T) {
 			sketch, err := NewQuickSelectUpdateSketch()
 			assert.NoError(t, err)
 			for i := 0; i < n; i++ {
-				assert.NoError(t, sketch.UpdateInt64(int64(i)))
+				assertUpdate(t, sketch.UpdateInt64(int64(i)))
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
@@ -92,7 +92,7 @@ func TestGenerateGoSnapshots_ThetaSketch(t *testing.T) {
 		sketch, err := NewQuickSelectUpdateSketch(WithUpdateSketchP(0.01))
 		assert.NoError(t, err)
 
-		assert.NoError(t, sketch.UpdateInt64(int64(1)))
+		assertUpdate(t, sketch.UpdateInt64(int64(1)))
 		assert.False(t, sketch.IsEmpty())
 		assert.Zero(t, sketch.NumRetained())
 

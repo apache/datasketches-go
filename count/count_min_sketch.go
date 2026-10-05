@@ -28,6 +28,10 @@ import (
 	"github.com/apache/datasketches-go/internal"
 )
 
+const (
+	DefaultSeed = 9001
+)
+
 // Implementation of the CountMin sketch data structure of Cormode and Muthukrishnan.
 // [1] - http://dimacs.rutgers.edu/~graham/pubs/papers/cm-full.pdf
 type CountMinSketch struct {

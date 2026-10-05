@@ -19,6 +19,7 @@ package common
 
 import (
 	"encoding/binary"
+	"errors"
 	"math"
 
 	"github.com/twmb/murmur3"
@@ -71,8 +72,11 @@ func (f ItemSketchDoubleSerDe) SerializeManyToSlice(item []float64) []byte {
 }
 
 func (f ItemSketchDoubleSerDe) DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]float64, error) {
-	if numItems == 0 {
+	if numItems <= 0 {
 		return []float64{}, nil
+	}
+	if !checkBounds(offsetBytes, 0, len(mem)) || numItems > (len(mem)-offsetBytes)/8 {
+		return nil, errors.New("offset out of bounds")
 	}
 	array := make([]float64, 0, numItems)
 	for i := 0; i < numItems; i++ {

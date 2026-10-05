@@ -151,3 +151,27 @@ func TestItemSketchLongSerDe_DeserializeManyFromSlice(t *testing.T) {
 		})
 	}
 }
+
+func TestItemSketchLongSerDe_DeserializeManyFromSliceRejectsInvalidRange(t *testing.T) {
+	serde := ItemSketchLongSerDe{}
+	tests := []struct {
+		name        string
+		mem         []byte
+		offsetBytes int
+		numItems    int
+	}{
+		{name: "truncated item", mem: make([]byte, 7), numItems: 1},
+		{name: "truncated second item", mem: make([]byte, 15), numItems: 2},
+		{name: "negative offset", mem: make([]byte, 8), offsetBytes: -1, numItems: 1},
+		{name: "offset past end", mem: make([]byte, 8), offsetBytes: 9, numItems: 1},
+		{name: "item count overflow", mem: make([]byte, 8), numItems: math.MaxInt},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual, err := serde.DeserializeManyFromSlice(tt.mem, tt.offsetBytes, tt.numItems)
+			assert.EqualError(t, err, "offset out of bounds")
+			assert.Nil(t, actual)
+		})
+	}
+}

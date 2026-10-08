@@ -18,9 +18,12 @@
 package tuple
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/theta"
 )
 
 func BenchmarkUpdateSketch_PointerSummary(b *testing.B) {
@@ -45,6 +48,50 @@ func BenchmarkUpdateSketch_ValueSummary(b *testing.B) {
 		)
 		for i := 0; i < 10000; i++ {
 			assert.NoError(b, sketch.UpdateInt64(int64(i), 1))
+		}
+	}
+}
+
+func BenchmarkDecode(b *testing.B) {
+	sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
+	assert.NoError(b, err)
+	for i := 0; i < 10000; i++ {
+		assertUpdate(b, sketch.UpdateInt64(int64(i), 1))
+	}
+	compact, err := sketch.Compact(true)
+	assert.NoError(b, err)
+	var buf bytes.Buffer
+	encoder := NewEncoder[*int32Summary](&buf, int32SummaryWriter)
+	assert.NoError(b, encoder.Encode(compact))
+	data := buf.Bytes()
+
+	b.ReportAllocs()
+	b.SetBytes(int64(len(data)))
+	for b.Loop() {
+		if _, err := Decode(data, theta.DefaultSeed, int32SummaryReader); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkDecodeArrayOfNumbers(b *testing.B) {
+	source, err := NewArrayOfNumbersUpdateSketch[float64](2)
+	assert.NoError(b, err)
+	for i := 0; i < 10000; i++ {
+		assertUpdate(b, source.UpdateInt64(int64(i), []float64{1, 2}))
+	}
+	compact, err := source.Compact(true)
+	assert.NoError(b, err)
+	var buf bytes.Buffer
+	encoder := NewArrayOfNumbersSketchEncoder[float64](&buf)
+	assert.NoError(b, encoder.Encode(compact))
+	data := buf.Bytes()
+
+	b.ReportAllocs()
+	b.SetBytes(int64(len(data)))
+	for b.Loop() {
+		if _, err := DecodeArrayOfNumbersCompactSketch[float64](data, theta.DefaultSeed); err != nil {
+			b.Fatal(err)
 		}
 	}
 }

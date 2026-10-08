@@ -25,7 +25,7 @@ import (
 )
 
 // assertUpdate fails the test unless err is nil or reports a hash above theta.
-func assertUpdate(t *testing.T, err error) {
+func assertUpdate(t testing.TB, err error) {
 	t.Helper()
 	if err == nil {
 		return

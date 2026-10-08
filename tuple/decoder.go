@@ -133,11 +133,12 @@ func (dec *Decoder[S]) Decode(r io.Reader) (*CompactSketch[S], error) {
 	}
 
 	entries := make([]entry[S], numEntries)
+	var hashBuf [8]byte
 	for i := uint32(0); i < numEntries; i++ {
-		var hash uint64
-		if err := binary.Read(r, binary.LittleEndian, &hash); err != nil {
+		if _, err := io.ReadFull(r, hashBuf[:]); err != nil {
 			return nil, err
 		}
+		hash := binary.LittleEndian.Uint64(hashBuf[:])
 
 		summary, err := dec.read(r)
 		if err != nil {

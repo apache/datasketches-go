@@ -130,13 +130,13 @@ func (dec *ArrayOfNumbersSketchDecoder[V]) Decode(r io.Reader) (*ArrayOfNumbersC
 		}
 
 		hashes := make([]uint64, 0, numEntries)
+		var hashBuf [8]byte
 		for i := uint32(0); i < numEntries; i++ {
-			var hash uint64
-			if err := binary.Read(r, binary.LittleEndian, &hash); err != nil {
+			if _, err := io.ReadFull(r, hashBuf[:]); err != nil {
 				return nil, err
 			}
 
-			hashes = append(hashes, hash)
+			hashes = append(hashes, binary.LittleEndian.Uint64(hashBuf[:]))
 		}
 
 		entries = make([]entry[*ArrayOfNumbersSummary[V]], 0, numEntries)

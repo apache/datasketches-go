@@ -20,6 +20,7 @@ package tuple
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 
@@ -603,5 +604,36 @@ func TestArrayOfNumbersSketchDecoderErrors(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "sketch type mismatch")
+	})
+
+	t.Run("Truncated hash", func(t *testing.T) {
+		source, err := NewArrayOfNumbersUpdateSketch[float64](2)
+		assert.NoError(t, err)
+		for i := 0; i < 10; i++ {
+			assert.NoError(t, source.UpdateInt64(int64(i), []float64{1, 2}))
+		}
+		compact, err := source.Compact(true)
+		assert.NoError(t, err)
+
+		var buf bytes.Buffer
+		encoder := NewArrayOfNumbersSketchEncoder[float64](&buf)
+		assert.NoError(t, encoder.Encode(compact))
+
+		// All hashes come first, then all summaries.
+		numEntries := int(compact.NumRetained())
+		data := buf.Bytes()
+		hashesStart := len(data) - numEntries*(8+2*8)
+		decoder := NewArrayOfNumbersSketchDecoderDecoder[float64](theta.DefaultSeed)
+		for i := 0; i < numEntries; i++ {
+			hashStart := hashesStart + i*8
+
+			_, err := decoder.Decode(bytes.NewReader(data[:hashStart]))
+			assert.ErrorIs(t, err, io.EOF, "entry %d: no hash bytes", i)
+
+			for n := 1; n < 8; n++ {
+				_, err := decoder.Decode(bytes.NewReader(data[:hashStart+n]))
+				assert.ErrorIs(t, err, io.ErrUnexpectedEOF, "entry %d: %d hash bytes", i, n)
+			}
+		}
 	})
 }

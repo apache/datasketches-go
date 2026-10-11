@@ -1139,3 +1139,16 @@ func TestDouble_QuantileIsWithinMinAndMax(t *testing.T) {
 		}
 	})
 }
+
+func TestDouble_QuantileLastWeightTwoReturnsMax(t *testing.T) {
+	// weight == centroidsWeight-1 and lastWeight == 2 is 0/0 without the guard.
+	sketch, err := newDoubleFromInternalStates(false, DefaultK, 0, 20,
+		[]doublePrecisionCentroid{{mean: 0, weight: 10}, {mean: 10, weight: 2}},
+		12, nil)
+	assert.NoError(t, err)
+
+	quantile, err := sketch.Quantile(11.0 / 12.0)
+	assert.NoError(t, err)
+	assert.False(t, math.IsNaN(quantile))
+	assert.Equal(t, 20.0, quantile)
+}

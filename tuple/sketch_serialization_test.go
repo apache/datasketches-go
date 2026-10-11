@@ -440,4 +440,34 @@ func TestDecoderErrors(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "sketch type mismatch")
 	})
+
+	t.Run("Truncated hash", func(t *testing.T) {
+		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
+		assert.NoError(t, err)
+		for i := 0; i < 10; i++ {
+			assert.NoError(t, sketch.UpdateInt64(int64(i), int32(i)))
+		}
+		compact, err := sketch.Compact(true)
+		assert.NoError(t, err)
+
+		var buf bytes.Buffer
+		encoder := NewEncoder[*int32Summary](&buf, int32SummaryWriter)
+		assert.NoError(t, encoder.Encode(compact))
+
+		const entrySize = 8 + 4 // hash + int32 summary
+		data := buf.Bytes()
+		entriesStart := len(data) - int(compact.NumRetained())*entrySize
+		decoder := NewDecoder[*int32Summary](theta.DefaultSeed, int32SummaryReader)
+		for i := 0; i < int(compact.NumRetained()); i++ {
+			hashStart := entriesStart + i*entrySize
+
+			_, err := decoder.Decode(bytes.NewReader(data[:hashStart]))
+			assert.ErrorIs(t, err, io.EOF, "entry %d: no hash bytes", i)
+
+			for n := 1; n < 8; n++ {
+				_, err := decoder.Decode(bytes.NewReader(data[:hashStart+n]))
+				assert.ErrorIs(t, err, io.ErrUnexpectedEOF, "entry %d: %d hash bytes", i, n)
+			}
+		}
+	})
 }

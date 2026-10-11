@@ -697,6 +697,24 @@ func TestEncodingAndDecoding(t *testing.T) {
 		assert.Equal(t, uncompressedBuf.Len(), compressedBuf.Len())
 	})
 
+	t.Run("Empty sketch without seed hash", func(t *testing.T) {
+		sketch, _ := NewQuickSelectUpdateSketch()
+		compact := sketch.CompactOrdered()
+
+		data, err := compact.MarshalBinary()
+		assert.NoError(t, err)
+
+		// same image as C++ and Java: preLongs, serVer, family, 2 unused, flags
+		// (read only, empty, compact, ordered) and a zero seed hash
+		assert.Equal(t, []byte{1, 3, 3, 0, 0, 0x1e, 0, 0}, data)
+
+		// the seed hash of an empty sketch is not checked on read
+		decoded, err := Decode(data, 9999)
+		assert.NoError(t, err)
+		assert.True(t, decoded.IsEmpty())
+		assert.Equal(t, uint32(0), decoded.NumRetained())
+	})
+
 	t.Run("Compressed sketch with custom seed", func(t *testing.T) {
 		customSeed := uint64(9999)
 		sketch, _ := NewQuickSelectUpdateSketch(WithUpdateSketchSeed(customSeed))

@@ -184,6 +184,28 @@ func TestANotB(t *testing.T) {
 		assert.False(t, result.IsEmpty())
 	})
 
+	t.Run("A Non Empty No Retained Keys, B Empty Decoded", func(t *testing.T) {
+		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
+		assert.NoError(t, err)
+		err = a.UpdateInt64(6)
+		assertUpdate(t, err)
+
+		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
+		assert.NoError(t, err)
+		// the serialized image of an empty sketch has a zero seed hash
+		data, err := b.CompactOrdered().MarshalBinary()
+		assert.NoError(t, err)
+		decodedB, err := Decode(data, DefaultSeed)
+		assert.NoError(t, err)
+
+		result, err := ANotB(a, decodedB, DefaultSeed, true)
+		assert.NoError(t, err)
+
+		assert.InDelta(t, 0.1, result.Theta(), 1e-8)
+		assert.Equal(t, uint32(0), result.NumRetained())
+		assert.False(t, result.IsEmpty())
+	})
+
 	t.Run("A Empty, B Estimation Mode", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)

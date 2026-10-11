@@ -19,6 +19,7 @@ package common
 
 import (
 	"encoding/binary"
+	"errors"
 	"math"
 )
 
@@ -63,8 +64,11 @@ func (s ItemSketchFloatSerDe) SerializeManyToSlice(items []float32) []byte {
 }
 
 func (s ItemSketchFloatSerDe) DeserializeManyFromSlice(mem []byte, offsetBytes int, numItems int) ([]float32, error) {
-	if numItems == 0 {
+	if numItems <= 0 {
 		return []float32{}, nil
+	}
+	if !checkBounds(offsetBytes, 0, len(mem)) || numItems > (len(mem)-offsetBytes)/4 {
+		return nil, errors.New("offset out of bounds")
 	}
 
 	array := make([]float32, 0, numItems)

@@ -33,39 +33,53 @@ func TestGenerateGoSnapshots(t *testing.T) {
 	}
 
 	t.Run("empty", func(t *testing.T) {
-		sketch, err := NewCountMinSketch(1, 5, DefaultSeed)
-		assert.NoError(t, err)
+		sketch, err := NewCountMinSketchWithDefaultSeed(1, 5)
+		if !assert.NoError(t, err) {
+			return
+		}
 
 		var buf bytes.Buffer
 		err = sketch.Serialize(&buf)
-		assert.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 
 		err = os.MkdirAll(internal.GoPath, os.ModePerm)
-		assert.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		err = os.WriteFile(fmt.Sprintf("%s/count_min_empty_go.sk", internal.GoPath), buf.Bytes(), 0644)
 		assert.NoError(t, err)
 	})
 
 	t.Run("non empty", func(t *testing.T) {
-		sketch, err := NewCountMinSketch(3, 1024, DefaultSeed)
-		assert.NoError(t, err)
+		sketch, err := NewCountMinSketchWithDefaultSeed(3, 1024)
+		if !assert.NoError(t, err) {
+			return
+		}
 		for i := 0; i < 10; i++ {
 			err := sketch.UpdateUint64(uint64(i), int64(10*i*i))
-			assert.NoError(t, err)
+			if !assert.NoError(t, err) {
+				return
+			}
 		}
 
 		var buf bytes.Buffer
 		err = sketch.Serialize(&buf)
-		assert.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 
 		err = os.MkdirAll(internal.GoPath, os.ModePerm)
-		assert.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		err = os.WriteFile(fmt.Sprintf("%s/count_min_non_empty_go.sk", internal.GoPath), buf.Bytes(), 0644)
 		assert.NoError(t, err)
 	})
 }
 
-func TestCPPCompact(t *testing.T) {
+func TestCPPCompat(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/count_min_empty_cpp.sk", internal.CppPath)
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
@@ -74,13 +88,19 @@ func TestCPPCompact(t *testing.T) {
 		}
 
 		b, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 
-		sketch, err := NewCountMinSketch(1, 5, DefaultSeed)
-		assert.NoError(t, err)
+		sketch, err := NewCountMinSketchWithDefaultSeed(1, 5)
+		if !assert.NoError(t, err) {
+			return
+		}
 
-		result, err := sketch.Deserialize(b, DefaultSeed)
-		assert.NoError(t, err)
+		result, err := NewCountMinSketchFromSliceWithDefaultSeed(b)
+		if !assert.NoError(t, err) {
+			return
+		}
 
 		assert.Equal(t, sketch.GetNumHashes(), result.GetNumHashes())
 		assert.Equal(t, sketch.GetNumBuckets(), result.GetNumBuckets())
@@ -97,21 +117,58 @@ func TestCPPCompact(t *testing.T) {
 		}
 
 		b, err := os.ReadFile(filename)
-		assert.NoError(t, err)
-
-		sketch, err := NewCountMinSketch(3, 1024, DefaultSeed)
-		assert.NoError(t, err)
-		for i := 0; i < 10; i++ {
-			err := sketch.UpdateUint64(uint64(i), int64(10*i*i))
-			assert.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
 		}
 
-		result, err := sketch.Deserialize(b, DefaultSeed)
-		assert.NoError(t, err)
+		sketch, err := NewCountMinSketchWithDefaultSeed(3, 1024)
+		if !assert.NoError(t, err) {
+			return
+		}
+		for i := 0; i < 10; i++ {
+			err := sketch.UpdateUint64(uint64(i), int64(10*i*i))
+			if !assert.NoError(t, err) {
+				return
+			}
+		}
+
+		result, err := NewCountMinSketchFromSliceWithDefaultSeed(b)
+		if !assert.NoError(t, err) {
+			return
+		}
 
 		assert.Equal(t, sketch.GetNumHashes(), result.GetNumHashes())
 		assert.Equal(t, sketch.GetNumBuckets(), result.GetNumBuckets())
 		assert.Equal(t, sketch.GetSeed(), result.GetSeed())
 		assert.Equal(t, sketch.GetTotalWeight(), result.GetTotalWeight())
+
+		// C++ and Go derive different per-row hash seeds, so counters land in
+		// different buckets. Each update still adds its weight to exactly one
+		// bucket per row, so every row must sum to the total weight. This relies
+		// on all weights being non-negative, since totalWeight accumulates |weight|.
+		numBuckets := int(result.GetNumBuckets())
+		for i := range int(result.GetNumHashes()) {
+			var rowSum int64
+			for _, c := range result.sketchSlice[i*numBuckets : (i+1)*numBuckets] {
+				rowSum += c
+			}
+			assert.Equal(t, result.GetTotalWeight(), rowSum, "row %d", i)
+		}
+	})
+
+	t.Run("seed mismatch", func(t *testing.T) {
+		filename := fmt.Sprintf("%s/count_min_non_empty_cpp.sk", internal.CppPath)
+		if _, err := os.Stat(filename); os.IsNotExist(err) {
+			assert.FailNowf(t, "file %s does not exist", filename)
+			return
+		}
+
+		b, err := os.ReadFile(filename)
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		_, err = NewCountMinSketchFromSlice(b, int64(internal.DEFAULT_UPDATE_SEED)+1)
+		assert.Error(t, err)
 	})
 }

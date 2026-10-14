@@ -99,10 +99,19 @@ This code requires Go 1.24
 
 # Compilation and Test 
 
-Test can be run using go test command 
+The cross-language compatibility tests read serialization snapshots that are not
+committed to this repository. Download the C++ and Java snapshots from
+[datasketches-tck](https://github.com/apache/datasketches-tck) once, then run the tests:
 ```
-go test ./...
+make download-snapshots
+make test
 ```
+
+`make download-snapshots` fetches the TCK revision pinned in
+`scripts/download_serialization_test_data.sh` into `serialization_test_data/`.
+`make test` generates the Go snapshots (`make generate-go-snapshots`) before running
+`go test ./...`. If a snapshot is missing, the test that needs it fails and says which
+command to run.
 
 A Dockerfile is also provided with the necessary env to build and test the project.
 

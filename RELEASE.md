@@ -63,6 +63,10 @@ git push origin "v${CANDIDATE_NAME}"
 
 ASF releases are primarily source code releases.
 
+The source release does not include the cross-language serialization snapshots, since they
+are not committed to the repository. To run the full test suite from the source release,
+verifiers run `make download-snapshots` (requires network access) before `make test`.
+
 ```bash
 # 1. Export the source (avoids local uncommitted files)
 git archive --format=zip \

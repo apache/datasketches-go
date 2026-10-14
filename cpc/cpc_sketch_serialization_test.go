@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/testutil"
 )
 
 func TestGenerateGoSnapshots(t *testing.T) {
@@ -58,12 +59,7 @@ func TestJavaCompat(t *testing.T) {
 		flavorArr := []CpcFlavor{CpcFlavorEmpty, CpcFlavorSparse, CpcFlavorHybrid, CpcFlavorPinned, CpcFlavorSliding}
 		for flavorIdx, n := range nArr {
 			filename := fmt.Sprintf("%s/cpc_n%d_java.sk", internal.JavaPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			bytes, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewCpcSketchFromSliceWithDefault(bytes)
 			assert.NoError(t, err)
 			assert.Equal(t, sketch.getFlavor(), flavorArr[flavorIdx])

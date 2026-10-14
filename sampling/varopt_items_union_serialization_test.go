@@ -28,6 +28,7 @@ import (
 
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/testutil"
 )
 
 func TestGenerateGoSnapshots_VarOptItemsUnion(t *testing.T) {
@@ -82,11 +83,7 @@ func TestGenerateGoSnapshots_VarOptItemsUnion(t *testing.T) {
 func TestVarOptItemsUnionJavaCompat(t *testing.T) {
 	t.Run("double sampling", func(t *testing.T) {
 		filename := filepath.Join(internal.JavaPath, "varopt_union_double_sampling_java.sk")
-		data, err := os.ReadFile(filename)
-		if os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-		}
-		require.NoError(t, err)
+		data := testutil.ReadSnapshot(t, filename)
 
 		union, err := DecodeVarOptItemsUnion[float64](data, common.ItemSketchDoubleSerDe{})
 		require.NoError(t, err)
@@ -98,11 +95,7 @@ func TestVarOptItemsUnionJavaCompat(t *testing.T) {
 func TestVarOptItemsUnionCppCompat(t *testing.T) {
 	t.Run("double sampling", func(t *testing.T) {
 		filename := filepath.Join(internal.CppPath, "varopt_union_double_sampling_cpp.sk")
-		data, err := os.ReadFile(filename)
-		if os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-		}
-		require.NoError(t, err)
+		data := testutil.ReadSnapshot(t, filename)
 
 		union, err := DecodeVarOptItemsUnion[float64](data, common.ItemSketchDoubleSerDe{})
 		require.NoError(t, err)

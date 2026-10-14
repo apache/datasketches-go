@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/apache/datasketches-go/common"
+	"github.com/apache/datasketches-go/internal/testutil"
 
 	"github.com/stretchr/testify/assert"
 
@@ -146,12 +147,7 @@ func TestJavaCompat(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/frequent_long_n%d_java.sk", internal.JavaPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			bytes, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewLongsSketchFromSlice(bytes)
 			if err != nil {
 				return
@@ -175,12 +171,7 @@ func TestJavaCompat(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/frequent_string_n%d_java.sk", internal.JavaPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			bytes, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
 			if err != nil {
 				return
@@ -202,12 +193,7 @@ func TestJavaCompat(t *testing.T) {
 
 	t.Run("String utf8", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/frequent_string_utf8_java.sk", internal.JavaPath)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-			return
-		}
-		bytes, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		bytes := testutil.ReadSnapshot(t, filename)
 		sketch, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
 		if err != nil {
 			return
@@ -240,12 +226,7 @@ func TestJavaCompat(t *testing.T) {
 
 	t.Run("String ascii", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/frequent_string_ascii_java.sk", internal.JavaPath)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-			return
-		}
-		bytes, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		bytes := testutil.ReadSnapshot(t, filename)
 		sketch, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
 		if err != nil {
 			return
@@ -273,12 +254,7 @@ func TestCppCompat(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/frequent_long_n%d_cpp.sk", internal.CppPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			bytes, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewLongsSketchFromSlice(bytes)
 			if err != nil {
 				return
@@ -302,12 +278,7 @@ func TestCppCompat(t *testing.T) {
 		nArr := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/frequent_string_n%d_cpp.sk", internal.CppPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			bytes, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
 			if err != nil {
 				return
@@ -329,12 +300,7 @@ func TestCppCompat(t *testing.T) {
 
 	t.Run("String utf8", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/frequent_string_utf8_cpp.sk", internal.CppPath)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-			return
-		}
-		bytes, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		bytes := testutil.ReadSnapshot(t, filename)
 		sketch, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
 		if err != nil {
 			return
@@ -367,12 +333,7 @@ func TestCppCompat(t *testing.T) {
 
 	t.Run("String ascii", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/frequent_string_ascii_cpp.sk", internal.CppPath)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-			return
-		}
-		bytes, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		bytes := testutil.ReadSnapshot(t, filename)
 		sketch, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
 		if err != nil {
 			return

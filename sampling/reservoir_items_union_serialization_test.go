@@ -27,6 +27,7 @@ import (
 
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/testutil"
 )
 
 func TestGenerateGoSnapshots_Union(t *testing.T) {
@@ -216,12 +217,7 @@ func TestReservoirItemsUnion_JavaCompat(t *testing.T) {
 			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				path := filepath.Join(internal.JavaPath, tc.filename)
-				if _, err := os.Stat(path); os.IsNotExist(err) {
-					assert.FailNowf(t, "file %s does not exist", path)
-					return
-				}
-				data, err := os.ReadFile(path)
-				assert.NoError(t, err)
+				data := testutil.ReadSnapshot(t, path)
 
 				union, err := NewReservoirItemsUnionFromSlice[int64](data, common.ItemSketchLongSerDe{})
 				assert.NoError(t, err)
@@ -268,12 +264,7 @@ func TestReservoirItemsUnion_JavaCompat(t *testing.T) {
 			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				path := filepath.Join(internal.JavaPath, tc.filename)
-				if _, err := os.Stat(path); os.IsNotExist(err) {
-					assert.FailNowf(t, "file %s does not exist", path)
-					return
-				}
-				data, err := os.ReadFile(path)
-				assert.NoError(t, err)
+				data := testutil.ReadSnapshot(t, path)
 
 				union, err := NewReservoirItemsUnionFromSlice[float64](data, common.ItemSketchDoubleSerDe{})
 				assert.NoError(t, err)
@@ -320,12 +311,7 @@ func TestReservoirItemsUnion_JavaCompat(t *testing.T) {
 			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				path := filepath.Join(internal.JavaPath, tc.filename)
-				if _, err := os.Stat(path); os.IsNotExist(err) {
-					assert.FailNowf(t, "file %s does not exist", path)
-					return
-				}
-				data, err := os.ReadFile(path)
-				assert.NoError(t, err)
+				data := testutil.ReadSnapshot(t, path)
 
 				union, err := NewReservoirItemsUnionFromSlice[string](data, common.ItemSketchStringSerDe{})
 				assert.NoError(t, err)

@@ -43,8 +43,8 @@ jobs:
     - name: Build
       run: go build -v ./...
 
+    - name: Download C++ and Java snapshots
+      run: make download-snapshots
+
     - name: Run Test With coverage
       run: make test
-
-    - name: Generate Go snapshots
-      run: make generate-go-snapshots

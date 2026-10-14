@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/testutil"
 )
 
 func TestGenerateGoSnapshots_ThetaSketch(t *testing.T) {
@@ -114,12 +115,7 @@ func TestJavaCompat(t *testing.T) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/theta_n%d_java.sk", internal.JavaPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			sketch, err := Decode(b, DefaultSeed)
 			assert.NoError(t, err)
@@ -143,12 +139,7 @@ func TestJavaCompat(t *testing.T) {
 		ns := []int{10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/theta_compressed_n%d_java.sk", internal.JavaPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			sketch, err := Decode(b, DefaultSeed)
 			assert.NoError(t, err)
@@ -169,12 +160,7 @@ func TestJavaCompat(t *testing.T) {
 
 	t.Run("theta sketch non-empty no entries", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/theta_non_empty_no_entries_java.sk", internal.JavaPath)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-			return
-		}
-		b, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		b := testutil.ReadSnapshot(t, filename)
 
 		sketch, err := Decode(b, DefaultSeed)
 		assert.NoError(t, err)
@@ -399,12 +385,7 @@ func TestCPPCompat(t *testing.T) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/theta_n%d_cpp.sk", internal.CppPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file does not exist", filename)
-				return
-			}
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			sketch, err := Decode(b, DefaultSeed)
 			assert.NoError(t, err)
@@ -428,12 +409,7 @@ func TestCPPCompat(t *testing.T) {
 		ns := []int{10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/theta_compressed_n%d_cpp.sk", internal.CppPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			sketch, err := Decode(b, DefaultSeed)
 			assert.NoError(t, err)
@@ -454,12 +430,7 @@ func TestCPPCompat(t *testing.T) {
 
 	t.Run("theta sketch non-empty no entries", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/theta_non_empty_no_entries_cpp.sk", internal.CppPath)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-			return
-		}
-		b, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		b := testutil.ReadSnapshot(t, filename)
 
 		sketch, err := Decode(b, DefaultSeed)
 		assert.NoError(t, err)

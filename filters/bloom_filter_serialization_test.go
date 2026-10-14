@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/testutil"
 )
 
 func TestGenerateGoSnapshots(t *testing.T) {
@@ -211,12 +212,7 @@ func TestJavaCompat(t *testing.T) {
 
 		for _, tc := range testCases {
 			filename := fmt.Sprintf("%s/bf_n%d_h%d_java.sk", internal.JavaPath, tc.n, tc.numHashes)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			bf, err := NewBloomFilterFromSlice(b)
 			assert.NoError(t, err)
@@ -360,14 +356,8 @@ func TestJavaCompat(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				filepath := fmt.Sprintf("%s/%s", internal.JavaPath, tc.filename)
 
-				if _, err := os.Stat(filepath); os.IsNotExist(err) {
-					assert.FailNowf(t, "file %s does not exist", filepath)
-					return
-				}
-
 				// Read Java file
-				data, err := os.ReadFile(filepath)
-				assert.NoError(t, err)
+				data := testutil.ReadSnapshot(t, filepath)
 
 				// Deserialize
 				bf, err := NewBloomFilterFromSlice(data)
@@ -405,13 +395,7 @@ func TestCPPCompat(t *testing.T) {
 		for _, tc := range testCases {
 			filename := fmt.Sprintf("%s/bf_n%d_h%d_cpp.sk", internal.CppPath, tc.n, tc.numHashes)
 
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			bf, err := NewBloomFilterFromSlice(b)
 			assert.NoError(t, err)
@@ -524,14 +508,8 @@ func TestCPPCompat(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				filepath := fmt.Sprintf("%s/%s", internal.CppPath, tc.filename)
 
-				if _, err := os.Stat(filepath); os.IsNotExist(err) {
-					assert.FailNowf(t, "file %s does not exist", filepath)
-					return
-				}
-
 				// Read C++ file
-				data, err := os.ReadFile(filepath)
-				assert.NoError(t, err)
+				data := testutil.ReadSnapshot(t, filepath)
 
 				// Deserialize
 				bf, err := NewBloomFilterFromSlice(data)

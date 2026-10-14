@@ -88,7 +88,7 @@ func validateInputs(a, b uint64, f float64) error {
 		return fmt.Errorf("a must be >= b: a = %d, b = %d", a, b)
 	}
 	if f > 1.0 || f <= 0.0 {
-		return fmt.Errorf("Required: ((f <= 1.0) && (f > 0.0)): %f", f)
+		return fmt.Errorf("Required: ((f <= 1.0) && (f > 0.0)): %f", f) //nolint:staticcheck
 	}
 	return nil
 }

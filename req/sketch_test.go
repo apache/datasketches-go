@@ -1002,3 +1002,141 @@ func TestSketchQuantileBounds(t *testing.T) {
 		assert.LessOrEqual(t, qlb, qub)
 	})
 }
+
+func TestSketchMergeIntoEmptyMinMax(t *testing.T) {
+	newLoaded := func(t *testing.T, from, to int) *Sketch {
+		t.Helper()
+		sk, err := NewSketch()
+		assert.NoError(t, err)
+		for i := from; i <= to; i++ {
+			assert.NoError(t, sk.Update(float32(i)))
+		}
+		return sk
+	}
+
+	t.Run("all items above zero", func(t *testing.T) {
+		src := newLoaded(t, 10, 30)
+		dst, err := NewSketch()
+		assert.NoError(t, err)
+		assert.NoError(t, dst.Merge(src))
+
+		minV, err := dst.MinItem()
+		assert.NoError(t, err)
+		assert.Equal(t, float32(10), minV)
+
+		maxV, err := dst.MaxItem()
+		assert.NoError(t, err)
+		assert.Equal(t, float32(30), maxV)
+	})
+
+	t.Run("all items below zero", func(t *testing.T) {
+		src := newLoaded(t, -30, -10)
+		dst, err := NewSketch()
+		assert.NoError(t, err)
+		assert.NoError(t, dst.Merge(src))
+
+		minV, err := dst.MinItem()
+		assert.NoError(t, err)
+		assert.Equal(t, float32(-30), minV)
+
+		maxV, err := dst.MaxItem()
+		assert.NoError(t, err)
+		assert.Equal(t, float32(-10), maxV)
+	})
+
+	t.Run("single item", func(t *testing.T) {
+		src := newLoaded(t, 42, 42)
+		dst, err := NewSketch()
+		assert.NoError(t, err)
+		assert.NoError(t, dst.Merge(src))
+
+		minV, err := dst.MinItem()
+		assert.NoError(t, err)
+		assert.Equal(t, float32(42), minV)
+
+		maxV, err := dst.MaxItem()
+		assert.NoError(t, err)
+		assert.Equal(t, float32(42), maxV)
+	})
+
+	t.Run("new sketch matches reset sketch", func(t *testing.T) {
+		src := newLoaded(t, 10, 30)
+
+		fresh, err := NewSketch()
+		assert.NoError(t, err)
+		assert.NoError(t, fresh.Merge(src))
+
+		reset, err := NewSketch()
+		assert.NoError(t, err)
+		reset.Reset()
+		assert.NoError(t, reset.Merge(src))
+
+		freshMin, err := fresh.MinItem()
+		assert.NoError(t, err)
+		resetMin, err := reset.MinItem()
+		assert.NoError(t, err)
+		assert.Equal(t, resetMin, freshMin)
+
+		freshMax, err := fresh.MaxItem()
+		assert.NoError(t, err)
+		resetMax, err := reset.MaxItem()
+		assert.NoError(t, err)
+		assert.Equal(t, resetMax, freshMax)
+	})
+
+	t.Run("chained merges", func(t *testing.T) {
+		dst, err := NewSketch()
+		assert.NoError(t, err)
+		for i := 0; i < 4; i++ {
+			assert.NoError(t, dst.Merge(newLoaded(t, 1000+i*500, 1000+i*500+499)))
+		}
+		assert.Equal(t, int64(2000), dst.N())
+
+		minV, err := dst.MinItem()
+		assert.NoError(t, err)
+		assert.Equal(t, float32(1000), minV)
+
+		maxV, err := dst.MaxItem()
+		assert.NoError(t, err)
+		assert.Equal(t, float32(2999), maxV)
+	})
+
+	t.Run("estimates", func(t *testing.T) {
+		src := newLoaded(t, 1001, 1100)
+		dst, err := NewSketch()
+		assert.NoError(t, err)
+		assert.NoError(t, dst.Merge(src))
+
+		q, err := dst.Quantile(0)
+		assert.NoError(t, err)
+		assert.Equal(t, float32(1001), q)
+
+		r, err := dst.Rank(500)
+		assert.NoError(t, err)
+		assert.Equal(t, float64(0), r)
+
+		sv, err := dst.SortedView()
+		assert.NoError(t, err)
+		assert.Equal(t, float32(1001), sv.Quantiles()[0])
+	})
+
+	t.Run("survives serialization", func(t *testing.T) {
+		src := newLoaded(t, 1001, 6000)
+		dst, err := NewSketch()
+		assert.NoError(t, err)
+		assert.NoError(t, dst.Merge(src))
+
+		b, err := dst.MarshalBinary()
+		assert.NoError(t, err)
+		decoded, err := Decode(b)
+		assert.NoError(t, err)
+
+		minV, err := decoded.MinItem()
+		assert.NoError(t, err)
+		assert.Equal(t, float32(1001), minV)
+
+		maxV, err := decoded.MaxItem()
+		assert.NoError(t, err)
+		assert.Equal(t, float32(6000), maxV)
+	})
+}

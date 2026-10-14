@@ -48,6 +48,8 @@ func TestGenerateGoSnapshots(t *testing.T) {
 			{10000, 5},
 			{2000000, 3},
 			{2000000, 5},
+			{30000000, 3},
+			{30000000, 5},
 		}
 
 		for _, tc := range testCases {
@@ -107,12 +109,14 @@ func TestGenerateGoSnapshots(t *testing.T) {
 			bf, _ := NewBloomFilterBySize(configBits, numHashes, WithSeed(seed))
 
 			for i := 0; i < numInserts; i++ {
-				bf.UpdateString(fmt.Sprintf("%d", i))
+				err := bf.UpdateString(fmt.Sprintf("%d", i))
+				assert.NoError(t, err)
 			}
 
 			data, _ := bf.ToCompactSlice()
 			filename := fmt.Sprintf("%s/bf_string_n%d_h%d_go.sk", internal.GoPath, n, numHashes)
-			os.WriteFile(filename, data, 0644)
+			err := os.WriteFile(filename, data, 0644)
+			assert.NoError(t, err)
 			t.Logf("Generated: %s", filename)
 		})
 
@@ -122,12 +126,14 @@ func TestGenerateGoSnapshots(t *testing.T) {
 			bf, _ := NewBloomFilterBySize(configBits, numHashes, WithSeed(seed))
 
 			for i := 0; i < numInserts; i++ {
-				bf.UpdateFloat64(float64(i))
+				err := bf.UpdateFloat64(float64(i))
+				assert.NoError(t, err)
 			}
 
 			data, _ := bf.ToCompactSlice()
 			filename := fmt.Sprintf("%s/bf_double_n%d_h%d_go.sk", internal.GoPath, n, numHashes)
-			os.WriteFile(filename, data, 0644)
+			err := os.WriteFile(filename, data, 0644)
+			assert.NoError(t, err)
 			t.Logf("Generated: %s", filename)
 		})
 
@@ -138,12 +144,14 @@ func TestGenerateGoSnapshots(t *testing.T) {
 
 			for i := 0; i < numInserts; i++ {
 				arr := []int64{int64(i), int64(i)}
-				bf.UpdateInt64Array(arr)
+				err := bf.UpdateInt64Array(arr)
+				assert.NoError(t, err)
 			}
 
 			data, _ := bf.ToCompactSlice()
 			filename := fmt.Sprintf("%s/bf_long_array_n%d_h%d_go.sk", internal.GoPath, n, numHashes)
-			os.WriteFile(filename, data, 0644)
+			err := os.WriteFile(filename, data, 0644)
+			assert.NoError(t, err)
 			t.Logf("Generated: %s", filename)
 		})
 
@@ -154,12 +162,14 @@ func TestGenerateGoSnapshots(t *testing.T) {
 
 			for i := 0; i < numInserts; i++ {
 				arr := []float64{float64(i), float64(i)}
-				bf.UpdateFloat64Array(arr)
+				err := bf.UpdateFloat64Array(arr)
+				assert.NoError(t, err)
 			}
 
 			data, _ := bf.ToCompactSlice()
 			filename := fmt.Sprintf("%s/bf_double_array_n%d_h%d_go.sk", internal.GoPath, n, numHashes)
-			os.WriteFile(filename, data, 0644)
+			err = os.WriteFile(filename, data, 0644)
+			assert.NoError(t, err)
 			t.Logf("Generated: %s", filename)
 		})
 
@@ -171,12 +181,13 @@ func TestGenerateGoSnapshots(t *testing.T) {
 			for i := 0; i < numInserts; i++ {
 				b := byte(i % 256)
 				arr := []byte{b, b, b, b}
-				bf.UpdateSlice(arr)
+				err := bf.UpdateSlice(arr)
+				assert.NoError(t, err)
 			}
 
 			data, _ := bf.ToCompactSlice()
 			filename := fmt.Sprintf("%s/bf_byte_array_n%d_h%d_go.sk", internal.GoPath, n, numHashes)
-			os.WriteFile(filename, data, 0644)
+			assert.NoError(t, os.WriteFile(filename, data, 0644))
 			t.Logf("Generated: %s", filename)
 		})
 	})
@@ -194,6 +205,8 @@ func TestJavaCompat(t *testing.T) {
 			{10000, 5},
 			{2000000, 3},
 			{2000000, 5},
+			{30000000, 3},
+			{30000000, 5},
 		}
 
 		for _, tc := range testCases {
@@ -385,6 +398,8 @@ func TestCPPCompat(t *testing.T) {
 			{10000, 5},
 			{2000000, 3},
 			{2000000, 5},
+			{30000000, 3},
+			{30000000, 5},
 		}
 
 		for _, tc := range testCases {

@@ -400,7 +400,7 @@ func TestHashTable_Find(t *testing.T) {
 	}
 	sketch.numEntries = uint32(size)
 
-	index, err = sketch.Find(e.Hash)
+	_, err = sketch.Find(e.Hash)
 	assert.ErrorIs(t, err, ErrKeyNotFoundAndNoEmptySlots)
 }
 

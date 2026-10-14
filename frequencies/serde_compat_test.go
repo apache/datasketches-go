@@ -20,25 +20,33 @@ package frequencies
 import (
 	"testing"
 
-	"github.com/apache/datasketches-go/common"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/common"
 )
 
 func TestItemsToLongs(t *testing.T) {
 	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[int64](8, common.ItemSketchLongHasher{}, common.ItemSketchLongSerDe{})
 	assert.NoError(t, err)
-	sketch1.Update(1)
-	sketch1.Update(2)
-	sketch1.Update(3)
-	sketch1.Update(4)
+	err = sketch1.Update(1)
+	assert.NoError(t, err)
+	err = sketch1.Update(2)
+	assert.NoError(t, err)
+	err = sketch1.Update(3)
+	assert.NoError(t, err)
+	err = sketch1.Update(4)
+	assert.NoError(t, err)
 
 	bytes, err := sketch1.ToSlice()
 	assert.NoError(t, err)
 	sketch2, err := NewLongsSketchFromSlice(bytes)
 	assert.NoError(t, err)
-	sketch2.Update(2)
-	sketch2.Update(3)
-	sketch2.Update(2)
+	err = sketch2.Update(2)
+	assert.NoError(t, err)
+	err = sketch2.Update(3)
+	assert.NoError(t, err)
+	err = sketch2.Update(2)
+	assert.NoError(t, err)
 
 	assert.False(t, sketch2.IsEmpty())
 	assert.Equal(t, sketch2.GetNumActiveItems(), 4)
@@ -60,17 +68,17 @@ func TestItemsToLongs(t *testing.T) {
 func TestLongToItems(t *testing.T) {
 	sketch1, err := NewLongsSketchWithMaxMapSize(8)
 	assert.NoError(t, err)
-	sketch1.Update(1)
-	sketch1.Update(2)
-	sketch1.Update(3)
-	sketch1.Update(4)
+	assert.NoError(t, sketch1.Update(1))
+	assert.NoError(t, sketch1.Update(2))
+	assert.NoError(t, sketch1.Update(3))
+	assert.NoError(t, sketch1.Update(4))
 
 	bytes := sketch1.ToSlice()
 	sketch2, err := NewFrequencyItemsSketchFromSlice[int64](bytes, common.ItemSketchLongHasher{}, common.ItemSketchLongSerDe{})
 	assert.NoError(t, err)
-	sketch2.Update(2)
-	sketch2.Update(3)
-	sketch2.Update(2)
+	assert.NoError(t, sketch2.Update(2))
+	assert.NoError(t, sketch2.Update(3))
+	assert.NoError(t, sketch2.Update(2))
 
 	assert.False(t, sketch2.IsEmpty())
 	assert.Equal(t, sketch2.GetNumActiveItems(), 4)

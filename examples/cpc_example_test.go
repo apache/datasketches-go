@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/apache/datasketches-go/cpc"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/cpc"
 )
 
 func TestCpcItemsSketch(t *testing.T) {
@@ -58,9 +59,9 @@ func TestCpcItemsSketch(t *testing.T) {
 	assert.NoError(t, err, "Failed to create CPC union")
 
 	// Add both sketches to the union
-	err = union.Update(&(*sketch)) // pass pointer to first sketch
+	err = union.Update(sketch)
 	assert.NoError(t, err, "Union update with first sketch failed")
-	err = union.Update(&(*sketch2)) // pass pointer to second
+	err = union.Update(sketch2)
 	assert.NoError(t, err, "Union update with second sketch failed")
 
 	// Get the merged result

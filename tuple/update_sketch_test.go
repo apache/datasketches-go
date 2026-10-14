@@ -65,7 +65,7 @@ func TestNewUpdateSketch(t *testing.T) {
 			newInt32Summary, WithUpdateSketchP(0.001),
 		)
 		assert.NoError(t, err)
-		sketch.UpdateInt64(1, 1)
+		assertUpdate(t, sketch.UpdateInt64(1, 1))
 
 		assert.Zero(t, sketch.NumRetained())
 		assert.False(t, sketch.IsEmpty())
@@ -466,6 +466,33 @@ func TestUpdateSketch_UpdateArrayOfStringsSummary(t *testing.T) {
 	}, retained)
 }
 
+func TestUpdateSketch_ArrayOfStringsSummaryDoesNotAliasCaller(t *testing.T) {
+	sketch, err := NewUpdateSketch[*ArrayOfStringsSummary, []string](NewArrayOfStringsSummaryFunc)
+	assert.NoError(t, err)
+
+	buf := make([]string, 1)
+
+	buf[0] = "first"
+	assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings([]string{"key1"}), buf))
+
+	buf[0] = "second"
+	assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings([]string{"key2"}), buf))
+
+	assert.Equal(t, uint32(2), sketch.NumRetained())
+
+	var got [][]string
+	for _, summary := range sketch.All() {
+		got = append(got, summary.values)
+	}
+
+	assert.ElementsMatch(t, [][]string{{"first"}, {"second"}}, got,
+		"each summary must own its values; sharing the caller's buffer would make both read %q", buf)
+
+	buf[0] = "mutated"
+	assert.ElementsMatch(t, [][]string{{"first"}, {"second"}}, got,
+		"mutating the caller's slice after Update must not reach a retained summary")
+}
+
 func TestUpdateSketch_UpdateFloat64(t *testing.T) {
 	t.Run("Without SummaryUpdateFunc", func(t *testing.T) {
 		sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
@@ -840,7 +867,7 @@ func TestUpdateSketch_String(t *testing.T) {
 func TestUpdateSketch_SingleItem(t *testing.T) {
 	sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
 	assert.NoError(t, err)
-	sketch.UpdateInt64(1, 10)
+	assert.NoError(t, sketch.UpdateInt64(1, 10))
 
 	assert.False(t, sketch.IsEmpty())
 	assert.False(t, sketch.IsEstimationMode())
@@ -860,7 +887,7 @@ func TestUpdateSketch_ResizeExact(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i := 0; i < 2000; i++ {
-		sketch.UpdateInt64(int64(i), 1)
+		assert.NoError(t, sketch.UpdateInt64(int64(i), 1))
 	}
 
 	assert.False(t, sketch.IsEmpty())
@@ -899,7 +926,7 @@ func TestUpdateSketch_Estimation(t *testing.T) {
 
 	n := 200
 	for i := 0; i < n; i++ {
-		sketch.UpdateString(fmt.Sprintf("key%d", i), 1)
+		assertUpdate(t, sketch.UpdateString(fmt.Sprintf("key%d", i), 1))
 	}
 
 	assert.False(t, sketch.IsEmpty())

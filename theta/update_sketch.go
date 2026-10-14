@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"iter"
 	"math"
+	"slices"
 	"strings"
 
 	"github.com/apache/datasketches-go/internal"
@@ -195,31 +196,31 @@ func (s *QuickSelectUpdateSketch) String(shouldPrintItems bool) string {
 	var result strings.Builder
 	result.WriteString("### Theta sketch summary:")
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   num retained entries : %d", s.NumRetained()))
+	fmt.Fprintf(&result, "   num retained entries : %d", s.NumRetained())
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   seed hash            : %d", seedHash))
+	fmt.Fprintf(&result, "   seed hash            : %d", seedHash)
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   empty?               : %t", s.IsEmpty()))
+	fmt.Fprintf(&result, "   empty?               : %t", s.IsEmpty())
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   ordered?             : %t", s.IsOrdered()))
+	fmt.Fprintf(&result, "   ordered?             : %t", s.IsOrdered())
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   estimation mode?     : %t", s.IsEstimationMode()))
+	fmt.Fprintf(&result, "   estimation mode?     : %t", s.IsEstimationMode())
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   theta (fraction)     : %f", s.Theta()))
+	fmt.Fprintf(&result, "   theta (fraction)     : %f", s.Theta())
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   theta (raw 64-bit)   : %d", s.Theta64()))
+	fmt.Fprintf(&result, "   theta (raw 64-bit)   : %d", s.Theta64())
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   estimate             : %f", s.Estimate()))
+	fmt.Fprintf(&result, "   estimate             : %f", s.Estimate())
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   lower bound 95%% conf : %f", lb))
+	fmt.Fprintf(&result, "   lower bound 95%% conf : %f", lb)
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   upper bound 95%% conf : %f", ub))
+	fmt.Fprintf(&result, "   upper bound 95%% conf : %f", ub)
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   lg nominal size      : %d", s.LgK()))
+	fmt.Fprintf(&result, "   lg nominal size      : %d", s.LgK())
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   lg current size      : %d", s.table.lgCurSize))
+	fmt.Fprintf(&result, "   lg current size      : %d", s.table.lgCurSize)
 	result.WriteString("\n")
-	result.WriteString(fmt.Sprintf("   resize factor        : %d", 1<<s.ResizeFactor()))
+	fmt.Fprintf(&result, "   resize factor        : %d", 1<<s.ResizeFactor())
 	result.WriteString("\n")
 	result.WriteString("### End sketch summary")
 	result.WriteString("\n")
@@ -229,7 +230,7 @@ func (s *QuickSelectUpdateSketch) String(shouldPrintItems bool) string {
 		result.WriteString("\n")
 
 		for hash := range s.All() {
-			result.WriteString(fmt.Sprintf("%d", hash))
+			fmt.Fprintf(&result, "%d", hash)
 			result.WriteString("\n")
 		}
 
@@ -415,10 +416,40 @@ func (s *QuickSelectUpdateSketch) All() iter.Seq[uint64] {
 	}
 }
 
+// Compact converts this sketch to a compact sketch (ordered or unordered).
 func (s *QuickSelectUpdateSketch) Compact(ordered bool) *CompactSketch {
 	return NewCompactSketch(s, ordered)
 }
 
+// CompactOrdered converts this sketch to an ordered compact sketch.
 func (s *QuickSelectUpdateSketch) CompactOrdered() *CompactSketch {
 	return s.Compact(true)
+}
+
+// CompactTrimmed converts this sketch to a compact sketch (ordered or unordered)
+// reduced to at most the nominal size k. This sketch is not modified.
+//
+// If this sketch retains more than k entries, theta is lowered to the (k+1)th
+// smallest retained hash and only the k entries below it are kept. Otherwise the
+// result is the same as Compact. This is equivalent to Trim followed by Compact,
+// without mutating this sketch or rebuilding its hash table.
+func (s *QuickSelectUpdateSketch) CompactTrimmed(ordered bool) *CompactSketch {
+	if s.IsEmpty() {
+		return s.Compact(ordered)
+	}
+
+	entries := make([]uint64, 0, s.table.numEntries)
+	for _, entry := range s.table.entries {
+		if entry != 0 {
+			entries = append(entries, entry)
+		}
+	}
+
+	entries, theta := trimToNominal(entries, uint32(1)<<s.table.lgNomSize, s.table.theta)
+	if ordered {
+		slices.Sort(entries)
+	}
+
+	seedHash, _ := s.SeedHash()
+	return newCompactSketchFromEntries(false, ordered, seedHash, theta, entries)
 }

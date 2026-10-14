@@ -120,7 +120,8 @@ func TestANotB(t *testing.T) {
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		err = b.UpdateInt64(6)
+		assertUpdate(t, err)
 
 		result, err := ANotB(a, b, DefaultSeed, true)
 		assert.NoError(t, err)
@@ -138,7 +139,8 @@ func TestANotB(t *testing.T) {
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		err = b.UpdateInt64(6)
+		assertUpdate(t, err)
 
 		result, err := ANotB(a.Compact(false), b.Compact(false), DefaultSeed, false)
 		assert.NoError(t, err)
@@ -151,7 +153,8 @@ func TestANotB(t *testing.T) {
 	t.Run("A Non Empty No Retained Keys, B Empty", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		a.UpdateInt64(6)
+		err = a.UpdateInt64(6)
+		assertUpdate(t, err)
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
@@ -167,12 +170,35 @@ func TestANotB(t *testing.T) {
 	t.Run("A Non Empty No Retained Keys Compact, B Empty Compact", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		a.UpdateInt64(6)
+		err = a.UpdateInt64(6)
+		assertUpdate(t, err)
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
 
 		result, err := ANotB(a, b, DefaultSeed, true)
+		assert.NoError(t, err)
+
+		assert.InDelta(t, 0.1, result.Theta(), 1e-8)
+		assert.Equal(t, uint32(0), result.NumRetained())
+		assert.False(t, result.IsEmpty())
+	})
+
+	t.Run("A Non Empty No Retained Keys, B Empty Decoded", func(t *testing.T) {
+		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
+		assert.NoError(t, err)
+		err = a.UpdateInt64(6)
+		assertUpdate(t, err)
+
+		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
+		assert.NoError(t, err)
+		// the serialized image of an empty sketch has a zero seed hash
+		data, err := b.CompactOrdered().MarshalBinary()
+		assert.NoError(t, err)
+		decodedB, err := Decode(data, DefaultSeed)
+		assert.NoError(t, err)
+
+		result, err := ANotB(a, decodedB, DefaultSeed, true)
 		assert.NoError(t, err)
 
 		assert.InDelta(t, 0.1, result.Theta(), 1e-8)
@@ -188,7 +214,7 @@ func TestANotB(t *testing.T) {
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(4)
+		assert.NoError(t, b.UpdateInt64(4))
 
 		result, err := ANotB(a, b, DefaultSeed, true)
 		assert.NoError(t, err)
@@ -206,7 +232,7 @@ func TestANotB(t *testing.T) {
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(4)
+		assert.NoError(t, b.UpdateInt64(4))
 
 		result, err := ANotB(a.Compact(false), b.Compact(false), DefaultSeed, false)
 		assert.NoError(t, err)
@@ -219,7 +245,7 @@ func TestANotB(t *testing.T) {
 	t.Run("A Estimation Mode, B Empty", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		a.UpdateInt64(4)
+		assert.NoError(t, a.UpdateInt64(4))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
@@ -235,7 +261,7 @@ func TestANotB(t *testing.T) {
 	t.Run("A Estimation Mode Compact, B Empty Compact", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		a.UpdateInt64(4)
+		assert.NoError(t, a.UpdateInt64(4))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
@@ -251,13 +277,13 @@ func TestANotB(t *testing.T) {
 	t.Run("A Exact, B Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4)
+		assert.NoError(t, a.UpdateInt64(4))
 
 		b, err := NewQuickSelectUpdateSketch(
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		result, err := ANotB(a, b, DefaultSeed, true)
 		assert.NoError(t, err)
@@ -270,13 +296,13 @@ func TestANotB(t *testing.T) {
 	t.Run("A Exact Compact, B Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4)
+		assert.NoError(t, a.UpdateInt64(4))
 
 		b, err := NewQuickSelectUpdateSketch(
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		result, err := ANotB(a.Compact(false), b.Compact(false), DefaultSeed, false)
 		assert.NoError(t, err)
@@ -291,11 +317,11 @@ func TestANotB(t *testing.T) {
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		a.UpdateInt64(6)
+		assertUpdate(t, a.UpdateInt64(6))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		b.UpdateInt64(4)
+		assert.NoError(t, b.UpdateInt64(4))
 
 		result, err := ANotB(a, b, DefaultSeed, true)
 		assert.NoError(t, err)
@@ -310,11 +336,11 @@ func TestANotB(t *testing.T) {
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		a.UpdateInt64(6)
+		assertUpdate(t, a.UpdateInt64(6))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		b.UpdateInt64(4)
+		assert.NoError(t, b.UpdateInt64(4))
 
 		result, err := ANotB(a.Compact(false), b.Compact(false), DefaultSeed, false)
 		assert.NoError(t, err)
@@ -327,11 +353,11 @@ func TestANotB(t *testing.T) {
 	t.Run("A Estimation Mode, B Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4)
+		assert.NoError(t, a.UpdateInt64(4))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		result, err := ANotB(a, b, DefaultSeed, true)
 		assert.NoError(t, err)
@@ -344,11 +370,11 @@ func TestANotB(t *testing.T) {
 	t.Run("A Estimation Mode Compact, B Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4)
+		assert.NoError(t, a.UpdateInt64(4))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		result, err := ANotB(a.Compact(false), b.Compact(false), DefaultSeed, false)
 		assert.NoError(t, err)
@@ -361,11 +387,11 @@ func TestANotB(t *testing.T) {
 	t.Run("A Non Empty No Retained Keys, B Estimation Mode", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(6)
+		assert.NoError(t, a.UpdateInt64(6))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(4)
+		assert.NoError(t, b.UpdateInt64(4))
 
 		result, err := ANotB(a, b, DefaultSeed, true)
 		assert.NoError(t, err)
@@ -378,11 +404,11 @@ func TestANotB(t *testing.T) {
 	t.Run("A Non Empty No Retained Keys Compact, B Estimation Mode Compact", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(6)
+		assert.NoError(t, a.UpdateInt64(6))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(4)
+		assert.NoError(t, b.UpdateInt64(4))
 
 		result, err := ANotB(a.Compact(false), b.Compact(false), DefaultSeed, false)
 		assert.NoError(t, err)
@@ -398,7 +424,7 @@ func TestANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 1000; i++ {
-			a.UpdateInt64(int64(value))
+			assert.NoError(t, a.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -406,7 +432,7 @@ func TestANotB(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 0; i < 1000; i++ {
-			b.UpdateInt64(int64(value))
+			assert.NoError(t, b.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -424,7 +450,7 @@ func TestANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 1000; i++ {
-			a.UpdateInt64(int64(value))
+			assert.NoError(t, a.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -432,7 +458,7 @@ func TestANotB(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 0; i < 1000; i++ {
-			b.UpdateInt64(int64(value))
+			assert.NoError(t, b.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -450,7 +476,7 @@ func TestANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 1000; i++ {
-			a.UpdateInt64(int64(value))
+			assert.NoError(t, a.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -459,7 +485,7 @@ func TestANotB(t *testing.T) {
 
 		value = 500
 		for i := 0; i < 1000; i++ {
-			b.UpdateInt64(int64(value))
+			assert.NoError(t, b.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -478,7 +504,7 @@ func TestANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 1000; i++ {
-			a.UpdateInt64(int64(value))
+			assert.NoError(t, a.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -487,7 +513,7 @@ func TestANotB(t *testing.T) {
 
 		value = 500
 		for i := 0; i < 1000; i++ {
-			b.UpdateInt64(int64(value))
+			assert.NoError(t, b.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -506,7 +532,7 @@ func TestANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch.UpdateInt64(int64(value))
+			assert.NoError(t, sketch.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -524,7 +550,7 @@ func TestANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch.UpdateInt64(int64(value))
+			assert.NoError(t, sketch.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -543,7 +569,7 @@ func TestANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 10000; i++ {
-			a.UpdateInt64(int64(value))
+			assertUpdate(t, a.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -551,7 +577,7 @@ func TestANotB(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
-			b.UpdateInt64(int64(value))
+			assertUpdate(t, b.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -571,7 +597,7 @@ func TestANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 10000; i++ {
-			a.UpdateInt64(int64(value))
+			assertUpdate(t, a.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -579,7 +605,7 @@ func TestANotB(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
-			b.UpdateInt64(int64(value))
+			assertUpdate(t, b.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -598,7 +624,7 @@ func TestANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 10000; i++ {
-			a.UpdateInt64(int64(value))
+			assertUpdate(t, a.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -607,7 +633,7 @@ func TestANotB(t *testing.T) {
 
 		value = 5000
 		for i := 0; i < 10000; i++ {
-			b.UpdateInt64(int64(value))
+			assertUpdate(t, b.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -627,7 +653,7 @@ func TestANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 10000; i++ {
-			a.UpdateInt64(int64(value))
+			assertUpdate(t, a.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -636,7 +662,7 @@ func TestANotB(t *testing.T) {
 
 		value = 5000
 		for i := 0; i < 10000; i++ {
-			b.UpdateInt64(int64(value))
+			assertUpdate(t, b.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -655,7 +681,7 @@ func TestANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 10000; i++ {
-			a.UpdateInt64(int64(value))
+			assertUpdate(t, a.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -669,7 +695,7 @@ func TestANotB(t *testing.T) {
 
 		value = 5000
 		for i := 0; i < 10000; i++ {
-			b.UpdateInt64(int64(value))
+			assertUpdate(t, b.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -700,7 +726,7 @@ func TestANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch.UpdateInt64(int64(value))
+			assertUpdate(t, sketch.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -718,7 +744,7 @@ func TestANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch.UpdateInt64(int64(value))
+			assertUpdate(t, sketch.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -734,11 +760,11 @@ func TestANotB(t *testing.T) {
 	t.Run("A Exact Mode, B Estimation Mode Full Overlap", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(4))
+		assert.NoError(t, a.UpdateInt64(int64(4)))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(4))
+		assert.NoError(t, b.UpdateInt64(int64(4)))
 
 		result, err := ANotB(a, b, DefaultSeed, true)
 		assert.NoError(t, err)
@@ -751,11 +777,11 @@ func TestANotB(t *testing.T) {
 	t.Run("A Exact Mode Compact, B Estimation Mode Compact Full Overlap", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(4))
+		assert.NoError(t, a.UpdateInt64(int64(4)))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(4))
+		assert.NoError(t, b.UpdateInt64(int64(4)))
 
 		result, err := ANotB(a.Compact(false), b.Compact(false), DefaultSeed, false)
 		assert.NoError(t, err)
@@ -768,11 +794,11 @@ func TestANotB(t *testing.T) {
 	t.Run("A Non Empty No Retained Keys, B Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(3))
+		assertUpdate(t, a.UpdateInt64(int64(3)))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(6))
+		assertUpdate(t, b.UpdateInt64(int64(6)))
 
 		result, err := ANotB(a, b, DefaultSeed, true)
 		assert.NoError(t, err)
@@ -785,11 +811,11 @@ func TestANotB(t *testing.T) {
 	t.Run("A Non Empty No Retained Keys Compact, B Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(3))
+		assertUpdate(t, a.UpdateInt64(int64(3)))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(6))
+		assertUpdate(t, b.UpdateInt64(int64(6)))
 
 		result, err := ANotB(a.Compact(false), b.Compact(false), DefaultSeed, false)
 		assert.NoError(t, err)
@@ -833,7 +859,7 @@ func TestANotB(t *testing.T) {
 		sketch, err := NewQuickSelectUpdateSketch()
 		assert.NoError(t, err)
 
-		sketch.UpdateInt64(1) // non-empty should not be ignored
+		assert.NoError(t, sketch.UpdateInt64(1)) // non-empty should not be ignored
 
 		_, err = ANotB(sketch, sketch, 123, true)
 		assert.Error(t, err)

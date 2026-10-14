@@ -64,7 +64,8 @@ func TestJaccard(t *testing.T) {
 
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		for i := 0; i < 100; i++ {
-			skB.UpdateInt64(int64(i), 1)
+			err := skB.UpdateInt64(int64(i), 1)
+			assert.NoError(t, err)
 		}
 
 		jc, err := Jaccard(skA, skB, policy, theta.DefaultSeed)
@@ -82,7 +83,8 @@ func TestJaccard(t *testing.T) {
 	t.Run("Only SketchB Empty", func(t *testing.T) {
 		skA, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		for i := 0; i < 100; i++ {
-			skA.UpdateInt64(int64(i), 1)
+			err := skA.UpdateInt64(int64(i), 1)
+			assert.NoError(t, err)
 		}
 
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
@@ -103,7 +105,8 @@ func TestJaccard(t *testing.T) {
 		sk, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		assert.NoError(t, err)
 		for i := 0; i < 1000; i++ {
-			sk.UpdateInt64(int64(i), 1)
+			err := sk.UpdateInt64(int64(i), 1)
+			assert.NoError(t, err)
 		}
 
 		expected := JaccardSimilarityResult{
@@ -133,8 +136,10 @@ func TestJaccard(t *testing.T) {
 		skB, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		assert.NoError(t, err)
 		for i := 0; i < 1000; i++ {
-			skA.UpdateInt64(int64(i), 1)
-			skB.UpdateInt64(int64(i), 1)
+			err := skA.UpdateInt64(int64(i), 1)
+			assert.NoError(t, err)
+			err = skB.UpdateInt64(int64(i), 1)
+			assert.NoError(t, err)
 		}
 
 		expected := JaccardSimilarityResult{
@@ -166,8 +171,10 @@ func TestJaccard(t *testing.T) {
 		skB, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		assert.NoError(t, err)
 		for i := 0; i < 1000; i++ {
-			skA.UpdateInt64(int64(i), 1)
-			skB.UpdateInt64(int64(i+1000), 1)
+			err := skA.UpdateInt64(int64(i), 1)
+			assert.NoError(t, err)
+			err = skB.UpdateInt64(int64(i+1000), 1)
+			assert.NoError(t, err)
 		}
 
 		expected := JaccardSimilarityResult{
@@ -199,8 +206,8 @@ func TestJaccard(t *testing.T) {
 		skB, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		assert.NoError(t, err)
 		for i := 0; i < 10000; i++ {
-			skA.UpdateInt64(int64(i), 1)
-			skB.UpdateInt64(int64(i+5000), 1)
+			assertUpdate(t, skA.UpdateInt64(int64(i), 1))
+			assertUpdate(t, skB.UpdateInt64(int64(i+5000), 1))
 		}
 
 		expectedValue := 0.33
@@ -234,8 +241,8 @@ func TestJaccard(t *testing.T) {
 		skB, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12), WithUpdateSketchSeed(seed))
 		assert.NoError(t, err)
 		for i := 0; i < 10000; i++ {
-			skA.UpdateInt64(int64(i), 1)
-			skB.UpdateInt64(int64(i+5000), 1)
+			assertUpdate(t, skA.UpdateInt64(int64(i), 1))
+			assertUpdate(t, skB.UpdateInt64(int64(i+5000), 1))
 		}
 
 		expectedValue := 0.33
@@ -266,8 +273,8 @@ func TestJaccard(t *testing.T) {
 		skA, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		for i := 0; i < 1000; i++ {
-			skA.UpdateInt64(int64(i), 1)
-			skB.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skA.UpdateInt64(int64(i), 1))
+			assert.NoError(t, skB.UpdateInt64(int64(i), 1))
 		}
 
 		jc, err := Jaccard(skA, skB, policy, theta.DefaultSeed)
@@ -284,10 +291,10 @@ func TestJaccard(t *testing.T) {
 
 	t.Run("Single Element Same", func(t *testing.T) {
 		skA, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skA.UpdateInt64(42, 1)
+		assert.NoError(t, skA.UpdateInt64(42, 1))
 
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skB.UpdateInt64(42, 1)
+		assert.NoError(t, skB.UpdateInt64(42, 1))
 
 		jc, err := Jaccard(skA, skB, policy, theta.DefaultSeed)
 		assert.NoError(t, err)
@@ -303,10 +310,10 @@ func TestJaccard(t *testing.T) {
 
 	t.Run("Single Element Different", func(t *testing.T) {
 		skA, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skA.UpdateInt64(42, 1)
+		assert.NoError(t, skA.UpdateInt64(42, 1))
 
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skB.UpdateInt64(99, 1)
+		assert.NoError(t, skB.UpdateInt64(99, 1))
 
 		jc, err := Jaccard(skA, skB, policy, theta.DefaultSeed)
 		assert.NoError(t, err)
@@ -322,12 +329,12 @@ func TestJaccard(t *testing.T) {
 
 	t.Run("Two Elements One Overlap", func(t *testing.T) {
 		skA, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skA.UpdateInt64(1, 1)
-		skA.UpdateInt64(2, 1)
+		assert.NoError(t, skA.UpdateInt64(1, 1))
+		assert.NoError(t, skA.UpdateInt64(2, 1))
 
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skB.UpdateInt64(2, 1)
-		skB.UpdateInt64(3, 1)
+		assert.NoError(t, skB.UpdateInt64(2, 1))
+		assert.NoError(t, skB.UpdateInt64(3, 1))
 
 		jc, err := Jaccard(skA, skB, policy, theta.DefaultSeed)
 		assert.NoError(t, err)
@@ -341,12 +348,12 @@ func TestJaccard(t *testing.T) {
 
 	t.Run("Two Elements No Overlap", func(t *testing.T) {
 		skA, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skA.UpdateInt64(1, 1)
-		skA.UpdateInt64(2, 1)
+		assert.NoError(t, skA.UpdateInt64(1, 1))
+		assert.NoError(t, skA.UpdateInt64(2, 1))
 
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skB.UpdateInt64(3, 1)
-		skB.UpdateInt64(4, 1)
+		assert.NoError(t, skB.UpdateInt64(3, 1))
+		assert.NoError(t, skB.UpdateInt64(4, 1))
 
 		jc, err := Jaccard(skA, skB, policy, theta.DefaultSeed)
 		assert.NoError(t, err)
@@ -362,12 +369,12 @@ func TestJaccard(t *testing.T) {
 
 	t.Run("Two Elements Full Overlap", func(t *testing.T) {
 		skA, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skA.UpdateInt64(1, 1)
-		skA.UpdateInt64(2, 1)
+		assert.NoError(t, skA.UpdateInt64(1, 1))
+		assert.NoError(t, skA.UpdateInt64(2, 1))
 
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skB.UpdateInt64(1, 1)
-		skB.UpdateInt64(2, 1)
+		assert.NoError(t, skB.UpdateInt64(1, 1))
+		assert.NoError(t, skB.UpdateInt64(2, 1))
 
 		jc, err := Jaccard(skA, skB, policy, theta.DefaultSeed)
 		assert.NoError(t, err)
@@ -386,10 +393,10 @@ func TestJaccard(t *testing.T) {
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 
 		for i := 0; i < 100; i++ {
-			skA.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skA.UpdateInt64(int64(i), 1))
 		}
 		for i := 0; i < 1000; i++ {
-			skB.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skB.UpdateInt64(int64(i), 1))
 		}
 
 		jc, err := Jaccard(skA, skB, policy, theta.DefaultSeed)
@@ -405,10 +412,10 @@ func TestJaccard(t *testing.T) {
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 
 		for i := 0; i < 5000; i++ {
-			skA.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skA.UpdateInt64(int64(i), 1))
 		}
 		for i := 0; i < 10000; i++ {
-			skB.UpdateInt64(int64(i), 1)
+			assertUpdate(t, skB.UpdateInt64(int64(i), 1))
 		}
 
 		jc, err := Jaccard(skA, skB, policy, theta.DefaultSeed)
@@ -424,10 +431,10 @@ func TestJaccard(t *testing.T) {
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 
 		for i := 0; i < 1000; i++ {
-			skA.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skA.UpdateInt64(int64(i), 1))
 		}
 		for i := 0; i < 100; i++ {
-			skB.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skB.UpdateInt64(int64(i), 1))
 		}
 
 		jc, err := Jaccard(skA, skB, policy, theta.DefaultSeed)
@@ -443,10 +450,10 @@ func TestJaccard(t *testing.T) {
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 
 		for i := 0; i < 1000; i++ {
-			skA.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skA.UpdateInt64(int64(i), 1))
 		}
 		for i := 0; i < 900; i++ {
-			skB.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skB.UpdateInt64(int64(i), 1))
 		}
 
 		jc, err := Jaccard(skA, skB, policy, theta.DefaultSeed)
@@ -467,8 +474,8 @@ func TestJaccard(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 0; i < 1000; i++ {
-			skA.UpdateInt64(int64(i), 1)
-			skB.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skA.UpdateInt64(int64(i), 1))
+			assert.NoError(t, skB.UpdateInt64(int64(i), 1))
 		}
 
 		jc, err := Jaccard(skA, skB, policy, seedA)
@@ -487,8 +494,8 @@ func TestJaccard(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 0; i < 1000; i++ {
-			skA.UpdateInt64(int64(i), 1)
-			skB.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skA.UpdateInt64(int64(i), 1))
+			assert.NoError(t, skB.UpdateInt64(int64(i), 1))
 		}
 
 		jc, err := Jaccard(skA, skB, policy, seed)
@@ -513,8 +520,8 @@ func TestJaccard(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 0; i < 1000; i++ {
-			skA.UpdateInt64(int64(i), 1)
-			skB.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skA.UpdateInt64(int64(i), 1))
+			assert.NoError(t, skB.UpdateInt64(int64(i), 1))
 		}
 
 		jc, err := Jaccard(skA, skB, policy, jaccardSeed)
@@ -544,7 +551,7 @@ func TestIsExactlyEqual(t *testing.T) {
 
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		for i := 0; i < 100; i++ {
-			skB.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skB.UpdateInt64(int64(i), 1))
 		}
 
 		result, err := IsExactlyEqual(skA, skB, policy, theta.DefaultSeed)
@@ -555,7 +562,7 @@ func TestIsExactlyEqual(t *testing.T) {
 	t.Run("Only SketchB Empty", func(t *testing.T) {
 		skA, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		for i := 0; i < 100; i++ {
-			skA.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skA.UpdateInt64(int64(i), 1))
 		}
 
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
@@ -569,7 +576,8 @@ func TestIsExactlyEqual(t *testing.T) {
 		sk, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		assert.NoError(t, err)
 		for i := 0; i < 1000; i++ {
-			sk.UpdateInt64(int64(i), 1)
+			err := sk.UpdateInt64(int64(i), 1)
+			assert.NoError(t, err)
 		}
 
 		// update sketch
@@ -591,8 +599,8 @@ func TestIsExactlyEqual(t *testing.T) {
 		skB, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		assert.NoError(t, err)
 		for i := 0; i < 1000; i++ {
-			skA.UpdateInt64(int64(i), 1)
-			skB.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skA.UpdateInt64(int64(i), 1))
+			assert.NoError(t, skB.UpdateInt64(int64(i), 1))
 		}
 
 		// update sketches
@@ -616,8 +624,8 @@ func TestIsExactlyEqual(t *testing.T) {
 		skB, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		assert.NoError(t, err)
 		for i := 0; i < 1000; i++ {
-			skA.UpdateInt64(int64(i), 1)
-			skB.UpdateInt64(int64(i+1000), 1)
+			assert.NoError(t, skA.UpdateInt64(int64(i), 1))
+			assert.NoError(t, skB.UpdateInt64(int64(i+1000), 1))
 		}
 
 		// update sketches
@@ -641,8 +649,8 @@ func TestIsExactlyEqual(t *testing.T) {
 		skB, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		assert.NoError(t, err)
 		for i := 0; i < 10000; i++ {
-			skA.UpdateInt64(int64(i), 1)
-			skB.UpdateInt64(int64(i+5000), 1)
+			assertUpdate(t, skA.UpdateInt64(int64(i), 1))
+			assertUpdate(t, skB.UpdateInt64(int64(i+5000), 1))
 		}
 
 		// update sketches
@@ -664,8 +672,8 @@ func TestIsExactlyEqual(t *testing.T) {
 		skA, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
 		for i := 0; i < 1000; i++ {
-			skA.UpdateInt64(int64(i), 1)
-			skB.UpdateInt64(int64(i), 1)
+			assert.NoError(t, skA.UpdateInt64(int64(i), 1))
+			assert.NoError(t, skB.UpdateInt64(int64(i), 1))
 		}
 
 		result, err := IsExactlyEqual(skA, skB, policy, theta.DefaultSeed)
@@ -675,10 +683,10 @@ func TestIsExactlyEqual(t *testing.T) {
 
 	t.Run("Single Element Same", func(t *testing.T) {
 		skA, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skA.UpdateInt64(42, 1)
+		assert.NoError(t, skA.UpdateInt64(42, 1))
 
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skB.UpdateInt64(42, 1)
+		assert.NoError(t, skB.UpdateInt64(42, 1))
 
 		result, err := IsExactlyEqual(skA, skB, policy, theta.DefaultSeed)
 		assert.NoError(t, err)
@@ -687,10 +695,10 @@ func TestIsExactlyEqual(t *testing.T) {
 
 	t.Run("Single Element Different", func(t *testing.T) {
 		skA, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skA.UpdateInt64(42, 1)
+		assert.NoError(t, skA.UpdateInt64(42, 1))
 
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skB.UpdateInt64(99, 1)
+		assert.NoError(t, skB.UpdateInt64(99, 1))
 
 		result, err := IsExactlyEqual(skA, skB, policy, theta.DefaultSeed)
 		assert.NoError(t, err)
@@ -699,12 +707,12 @@ func TestIsExactlyEqual(t *testing.T) {
 
 	t.Run("Two Elements One Overlap", func(t *testing.T) {
 		skA, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skA.UpdateInt64(1, 1)
-		skA.UpdateInt64(2, 1)
+		assert.NoError(t, skA.UpdateInt64(1, 1))
+		assert.NoError(t, skA.UpdateInt64(2, 1))
 
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skB.UpdateInt64(2, 1)
-		skB.UpdateInt64(3, 1)
+		assert.NoError(t, skB.UpdateInt64(2, 1))
+		assert.NoError(t, skB.UpdateInt64(3, 1))
 
 		result, err := IsExactlyEqual(skA, skB, policy, theta.DefaultSeed)
 		assert.NoError(t, err)
@@ -713,12 +721,12 @@ func TestIsExactlyEqual(t *testing.T) {
 
 	t.Run("Two Elements No Overlap", func(t *testing.T) {
 		skA, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skA.UpdateInt64(1, 1)
-		skA.UpdateInt64(2, 1)
+		assert.NoError(t, skA.UpdateInt64(1, 1))
+		assert.NoError(t, skA.UpdateInt64(2, 1))
 
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skB.UpdateInt64(3, 1)
-		skB.UpdateInt64(4, 1)
+		assert.NoError(t, skB.UpdateInt64(3, 1))
+		assert.NoError(t, skB.UpdateInt64(4, 1))
 
 		result, err := IsExactlyEqual(skA, skB, policy, theta.DefaultSeed)
 		assert.NoError(t, err)
@@ -727,12 +735,12 @@ func TestIsExactlyEqual(t *testing.T) {
 
 	t.Run("Two Elements Full Overlap", func(t *testing.T) {
 		skA, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skA.UpdateInt64(1, 1)
-		skA.UpdateInt64(2, 1)
+		assert.NoError(t, skA.UpdateInt64(1, 1))
+		assert.NoError(t, skA.UpdateInt64(2, 1))
 
 		skB, _ := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12))
-		skB.UpdateInt64(1, 1)
-		skB.UpdateInt64(2, 1)
+		assert.NoError(t, skB.UpdateInt64(1, 1))
+		assert.NoError(t, skB.UpdateInt64(2, 1))
 
 		result, err := IsExactlyEqual(skA, skB, policy, theta.DefaultSeed)
 		assert.NoError(t, err)
@@ -746,8 +754,8 @@ func TestIsExactlyEqual(t *testing.T) {
 		skB, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(12), WithUpdateSketchSeed(seed))
 		assert.NoError(t, err)
 		for i := 0; i < 10000; i++ {
-			skA.UpdateInt64(int64(i), 1)
-			skB.UpdateInt64(int64(i), 1)
+			assertUpdate(t, skA.UpdateInt64(int64(i), 1))
+			assertUpdate(t, skB.UpdateInt64(int64(i), 1))
 		}
 
 		result, err := IsExactlyEqual(skA, skB, policy, seed)
@@ -770,13 +778,15 @@ func TestIsSimilarity(t *testing.T) {
 		expected, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(minLgK))
 		assert.NoError(t, err)
 		for i := 0; i < u1; i++ {
-			expected.UpdateInt64(int64(i), 1)
+			err := expected.UpdateInt64(int64(i), 1)
+			assertUpdate(t, err)
 		}
 
 		actual, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(minLgK))
 		assert.NoError(t, err)
 		for i := 0; i < u2; i++ {
-			actual.UpdateInt64(int64(i), 1)
+			err := actual.UpdateInt64(int64(i), 1)
+			assertUpdate(t, err)
 		}
 
 		result, err := IsSimilar(actual, expected, policy, threshold, theta.DefaultSeed)
@@ -798,13 +808,15 @@ func TestIsSimilarity(t *testing.T) {
 		expected, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(minLgK), WithUpdateSketchSeed(seed))
 		assert.NoError(t, err)
 		for i := 0; i < u1; i++ {
-			expected.UpdateInt64(int64(i), 1)
+			err := expected.UpdateInt64(int64(i), 1)
+			assertUpdate(t, err)
 		}
 
 		actual, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(minLgK), WithUpdateSketchSeed(seed))
 		assert.NoError(t, err)
 		for i := 0; i < u2; i++ {
-			actual.UpdateInt64(int64(i), 1)
+			err := actual.UpdateInt64(int64(i), 1)
+			assertUpdate(t, err)
 		}
 
 		result, err := IsSimilar(actual, expected, policy, threshold, seed)
@@ -831,13 +843,15 @@ func TestIsDissimilar(t *testing.T) {
 		expected, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(minLgK))
 		assert.NoError(t, err)
 		for i := 0; i < u1; i++ {
-			expected.UpdateInt64(int64(i), 1)
+			err := expected.UpdateInt64(int64(i), 1)
+			assertUpdate(t, err)
 		}
 
 		actual, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(minLgK))
 		assert.NoError(t, err)
 		for i := 0; i < u2; i++ {
-			actual.UpdateInt64(int64(i), 1)
+			err := actual.UpdateInt64(int64(i), 1)
+			assertUpdate(t, err)
 		}
 
 		result, err := IsDissimilar(actual, expected, policy, threshold, theta.DefaultSeed)
@@ -859,13 +873,13 @@ func TestIsDissimilar(t *testing.T) {
 		expected, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(minLgK), WithUpdateSketchSeed(seed))
 		assert.NoError(t, err)
 		for i := 0; i < u1; i++ {
-			expected.UpdateInt64(int64(i), 1)
+			assertUpdate(t, expected.UpdateInt64(int64(i), 1))
 		}
 
 		actual, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(minLgK), WithUpdateSketchSeed(seed))
 		assert.NoError(t, err)
 		for i := 0; i < u2; i++ {
-			actual.UpdateInt64(int64(i), 1)
+			assertUpdate(t, actual.UpdateInt64(int64(i), 1))
 		}
 
 		result, err := IsDissimilar(actual, expected, policy, threshold, seed)

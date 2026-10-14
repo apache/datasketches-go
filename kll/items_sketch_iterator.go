@@ -17,8 +17,6 @@
 
 package kll
 
-import "github.com/apache/datasketches-go/common"
-
 type ItemsSketchIterator[C comparable] struct {
 	quantiles     []C
 	levelsArr     []uint32
@@ -27,7 +25,6 @@ type ItemsSketchIterator[C comparable] struct {
 	level         int
 	weight        int64
 	isInitialized bool
-	itemsSketchOp common.ItemSketchSerde[C]
 }
 
 func newItemsSketchIterator[C comparable](

@@ -115,6 +115,9 @@ func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, hasher common.It
 	}
 
 	pre0, err := checkPreambleSize(slc) //make sure preamble will fit
+	if err != nil {
+		return nil, err
+	}
 	maxPreLongs := internal.FamilyEnum.Frequency.MaxPreLongs
 
 	preLongs := extractPreLongs(pre0)                     //Byte 0
@@ -143,30 +146,20 @@ func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, hasher common.It
 	if empty {
 		return NewFrequencyItemsSketchWithMaxMapSize[C](1<<_LG_MIN_MAP_SIZE, hasher, serde)
 	}
-	// Get full preamble
-	preArr := make([]int64, preLongs)
-	for j := 0; j < preLongs; j++ {
-		preArr[j] = int64(binary.LittleEndian.Uint64(slc[j<<3:]))
-	}
 
 	fis, err := NewFrequencyItemsSketch[C](lgMaxMapSize, lgCurMapSize, hasher, serde)
 	if err != nil {
 		return nil, err
 	}
 	fis.streamWeight = 0 // update after
-	fis.offset = preArr[3]
+	fis.offset = int64(binary.LittleEndian.Uint64(slc[24:]))
 
 	preBytes := preLongs << 3
-	activeItems := extractActiveItems(preArr[1])
+	activeItems := extractActiveItems(int64(binary.LittleEndian.Uint64(slc[8:])))
 
-	// Get countArray
-	countArray := make([]int64, activeItems)
 	reqBytes := preBytes + activeItems*8 // count Arr only
 	if len(slc) < reqBytes {
 		return nil, fmt.Errorf("possible Corruption: Insufficient bytes in array: %d, %d", len(slc), reqBytes)
-	}
-	for j := 0; j < activeItems; j++ {
-		countArray[j] = int64(binary.LittleEndian.Uint64(slc[preBytes+j<<3:]))
 	}
 	// Get itemArray
 	itemsOffset := preBytes + (8 * activeItems)
@@ -174,14 +167,15 @@ func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, hasher common.It
 	if err != nil {
 		return nil, err
 	}
-	// update the sketch
+	// update the sketch, decoding counts in place
+	counts := slc[preBytes:itemsOffset]
 	for j := 0; j < activeItems; j++ {
-		err := fis.UpdateMany(itemArray[j], countArray[j])
-		if err != nil {
+		count := int64(binary.LittleEndian.Uint64(counts[j<<3:]))
+		if err := fis.UpdateMany(itemArray[j], count); err != nil {
 			return nil, err
 		}
 	}
-	fis.streamWeight = preArr[2] // override streamWeight due to updating
+	fis.streamWeight = int64(binary.LittleEndian.Uint64(slc[16:])) // override streamWeight due to updating
 	return fis, nil
 }
 
@@ -283,7 +277,7 @@ func (i *ItemsSketch[C]) frequencies(item C) (est, lower, upper int64, err error
 // threshold to include items in the result list
 // errorType determines whether no false positives or no false negatives are desired.
 // an array of frequent items
-func (i *ItemsSketch[C]) GetFrequentItemsWithThreshold(threshold int64, errorType errorType) ([]*RowItem[C], error) {
+func (i *ItemsSketch[C]) GetFrequentItemsWithThreshold(threshold int64, errorType errorType) ([]RowItem[C], error) {
 	finalThreshold := i.GetMaximumError()
 	if threshold > finalThreshold {
 		finalThreshold = threshold
@@ -291,12 +285,12 @@ func (i *ItemsSketch[C]) GetFrequentItemsWithThreshold(threshold int64, errorTyp
 	return i.sortItems(finalThreshold, errorType)
 }
 
-// GetFrequentItems returns an array of Row that include frequent items, estimates, upper and
+// GetFrequentItems returns an array of RowItem that include frequent items, estimates, upper and
 // lower bounds given an ErrorCondition and the default threshold.
 // This is the same as GetFrequentItemsWithThreshold(getMaximumError(), errorType)
 //
 // errorType determines whether no false positives or no false negatives are desired.
-func (i *ItemsSketch[C]) GetFrequentItems(errorType errorType) ([]*RowItem[C], error) {
+func (i *ItemsSketch[C]) GetFrequentItems(errorType errorType) ([]RowItem[C], error) {
 	return i.sortItems(i.GetMaximumError(), errorType)
 }
 
@@ -471,14 +465,18 @@ func (i *ItemsSketch[C]) ToSlice() ([]byte, error) {
 		preArr := make([]int64, preLongs)
 		preArr[0] = pre0
 		preArr[1] = insertActiveItems(int64(activeItems), pre)
-		preArr[2] = int64(i.streamWeight)
-		preArr[3] = int64(i.offset)
+		preArr[2] = i.streamWeight
+		preArr[3] = i.offset
 		for j := 0; j < preLongs; j++ {
 			binary.LittleEndian.PutUint64(outArr[j<<3:], uint64(preArr[j]))
 		}
 		preBytes := preLongs << 3
-		for j := 0; j < activeItems; j++ {
-			binary.LittleEndian.PutUint64(outArr[preBytes+j<<3:], uint64(i.hashMap.getActiveValues()[j]))
+		activeIndex := 0
+		for slot, state := range i.hashMap.states {
+			if state > 0 {
+				binary.LittleEndian.PutUint64(outArr[preBytes+(activeIndex<<3):], uint64(i.hashMap.values[slot]))
+				activeIndex++
+			}
 		}
 		copy(outArr[preBytes+(activeItems<<3):], bytes)
 	}
@@ -510,8 +508,8 @@ func (i *ItemsSketch[C]) String() string {
 	return sb.String()
 }
 
-func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*RowItem[C], error) {
-	rowList := make([]*RowItem[C], 0)
+func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]RowItem[C], error) {
+	rowList := make([]RowItem[C], 0, i.hashMap.numActive)
 	iter := i.hashMap.iterator()
 	if errorType == ErrorTypeEnum.NoFalseNegatives {
 		for iter.next() {
@@ -537,7 +535,7 @@ func (i *ItemsSketch[C]) sortItems(threshold int64, errorType errorType) ([]*Row
 		}
 	}
 
-	slices.SortFunc(rowList, func(a, b *RowItem[C]) int {
+	slices.SortFunc(rowList, func(a, b RowItem[C]) int {
 		if a.est > b.est {
 			return -1
 		}

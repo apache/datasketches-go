@@ -22,6 +22,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"math/bits"
 
 	"github.com/apache/datasketches-go/internal"
 )
@@ -245,26 +246,23 @@ func NewBloomFilterFromSlice(bytes []byte) (BloomFilter, error) {
 		return nil, fmt.Errorf("non-empty filter size mismatch: got %d bytes, expected %d", len(bytes), expectedSize)
 	}
 
-	// Extract num bits set
-	numBitsSet := extractNumBitsSet(bytes)
-	if numBitsSet == dirtyBitsValue {
-		// Need to recount
-		bf.isDirty = true
-	} else {
-		bf.numBitsSet = numBitsSet
-	}
-
-	// Read bit array
+	// Read the bit array and compute its population count so the cached count in
+	// the serialized image can be validated.
+	actualNumBitsSet := uint64(0)
 	for i := 0; i < int(bitArrayLength); i++ {
 		offset := bitArrayOffset + i*8
-		bf.bitArray[i] = binary.LittleEndian.Uint64(bytes[offset:])
+		word := binary.LittleEndian.Uint64(bytes[offset:])
+		bf.bitArray[i] = word
+		actualNumBitsSet += uint64(bits.OnesCount64(word))
 	}
 
-	// Recount if dirty
-	if bf.isDirty {
-		bf.numBitsSet = countBitsSet(bf.bitArray)
-		bf.isDirty = false
+	// A dirty count is a request to recompute it. Any other cached count must
+	// agree with the decoded bit array.
+	numBitsSet := extractNumBitsSet(bytes)
+	if numBitsSet != dirtyBitsValue && numBitsSet != actualNumBitsSet {
+		return nil, fmt.Errorf("numBitsSet mismatch: serialized count %d, actual count %d", numBitsSet, actualNumBitsSet)
 	}
+	bf.numBitsSet = actualNumBitsSet
 
 	return bf, nil
 }

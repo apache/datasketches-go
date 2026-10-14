@@ -144,7 +144,8 @@ func TestInversion(t *testing.T) {
 
 	// Insert some items
 	for i := uint64(0); i < 100; i++ {
-		bf.UpdateUInt64(i)
+		err := bf.UpdateUInt64(i)
+		assert.NoError(t, err)
 	}
 
 	bitsUsedBefore := bf.BitsUsed()
@@ -204,12 +205,14 @@ func TestBasicUnion(t *testing.T) {
 
 	// bf1: items 0 to n-1
 	for i := uint64(0); i < n; i++ {
-		bf1.UpdateUInt64(i)
+		err := bf1.UpdateUInt64(i)
+		assert.NoError(t, err)
 	}
 
 	// bf2: items n/2 to 3n/2-1 (overlap in middle)
 	for i := n / 2; i < 3*n/2; i++ {
-		bf2.UpdateUInt64(i)
+		err := bf2.UpdateUInt64(i)
+		assert.NoError(t, err)
 	}
 
 	// Union bf2 into bf1
@@ -241,12 +244,14 @@ func TestBasicIntersection(t *testing.T) {
 
 	// bf1: items 0 to n-1
 	for i := uint64(0); i < n; i++ {
-		bf1.UpdateUInt64(i)
+		err := bf1.UpdateUInt64(i)
+		assert.NoError(t, err)
 	}
 
 	// bf2: items n/2 to 3n/2-1
 	for i := n / 2; i < 3*n/2; i++ {
-		bf2.UpdateUInt64(i)
+		err := bf2.UpdateUInt64(i)
+		assert.NoError(t, err)
 	}
 
 	// Intersect
@@ -288,33 +293,39 @@ func TestMultipleDataTypes(t *testing.T) {
 	bf, _ := NewBloomFilterBySize(512, 7)
 
 	// Test int64
-	bf.UpdateInt64(-123)
+	err := bf.UpdateInt64(-123)
+	assert.NoError(t, err)
 	assert.True(t, bf.QueryInt64(-123))
 	assert.False(t, bf.QueryInt64(-124))
 
 	// Test string
-	bf.UpdateString("hello world")
+	err = bf.UpdateString("hello world")
+	assert.NoError(t, err)
 	assert.True(t, bf.QueryString("hello world"))
 	assert.False(t, bf.QueryString("hello"))
 
 	// Test byte slice
 	data := []byte{1, 2, 3, 4, 5}
-	bf.UpdateSlice(data)
+	err = bf.UpdateSlice(data)
+	assert.NoError(t, err)
 	assert.True(t, bf.QuerySlice(data))
 	assert.False(t, bf.QuerySlice([]byte{1, 2, 3}))
 
 	// Test float64
-	bf.UpdateFloat64(3.14159)
+	err = bf.UpdateFloat64(3.14159)
+	assert.NoError(t, err)
 	assert.True(t, bf.QueryFloat64(3.14159))
 	assert.False(t, bf.QueryFloat64(2.71828))
 
 	// Test NaN handling (NaN should be canonicalized)
-	bf.UpdateFloat64(math.NaN())
+	err = bf.UpdateFloat64(math.NaN())
+	assert.NoError(t, err)
 	assert.True(t, bf.QueryFloat64(math.NaN()))
 
 	// Test -0.0 and 0.0 are treated the same
-	bf.UpdateFloat64(0.0)
-	assert.True(t, bf.QueryFloat64(-0.0))
+	err = bf.UpdateFloat64(0.0)
+	assert.NoError(t, err)
+	assert.True(t, bf.QueryFloat64(math.Copysign(0, -1)))
 	assert.True(t, bf.QueryFloat64(0.0))
 }
 
@@ -323,7 +334,8 @@ func TestSerializationRoundtrip(t *testing.T) {
 
 	// Insert some items
 	for i := uint64(0); i < 50; i++ {
-		bf.UpdateUInt64(i)
+		err := bf.UpdateUInt64(i)
+		assert.NoError(t, err)
 	}
 
 	// Serialize
@@ -408,7 +420,8 @@ func TestDeserializationRoundtrip(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i := uint64(0); i < 100; i++ {
-		bf1.UpdateUInt64(i)
+		err = bf1.UpdateUInt64(i)
+		assert.NoError(t, err)
 	}
 
 	// Serialize
@@ -498,13 +511,48 @@ func TestDeserializeInvalidData(t *testing.T) {
 	assert.Contains(t, err.Error(), "numHashes must be positive")
 }
 
+func TestDeserializeRejectsMismatchedNumBitsSet(t *testing.T) {
+	bf, err := NewBloomFilterBySize(256, 5, WithSeed(777))
+	assert.NoError(t, err)
+
+	for i := uint64(0); i < 50; i++ {
+		err = bf.UpdateUInt64(i)
+		assert.NoError(t, err)
+	}
+
+	serialized, err := bf.ToCompactSlice()
+	assert.NoError(t, err)
+	actualNumBitsSet := bf.BitsUsed()
+	assert.Greater(t, actualNumBitsSet, uint64(1))
+
+	testCases := []struct {
+		name             string
+		cachedNumBitsSet uint64
+	}{
+		{name: "zero count", cachedNumBitsSet: 0},
+		{name: "undercount", cachedNumBitsSet: actualNumBitsSet - 1},
+		{name: "overcount", cachedNumBitsSet: actualNumBitsSet + 1},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			corrupt := append([]byte(nil), serialized...)
+			insertNumBitsSet(corrupt, tc.cachedNumBitsSet)
+
+			_, err := NewBloomFilterFromSlice(corrupt)
+			assert.ErrorContains(t, err, "numBitsSet mismatch")
+		})
+	}
+}
+
 func TestDeserializeWithDirtyBits(t *testing.T) {
 	// Create and populate a filter
 	bf1, err := NewBloomFilterBySize(256, 5, WithSeed(777))
 	assert.NoError(t, err)
 
 	for i := uint64(0); i < 50; i++ {
-		bf1.UpdateUInt64(i)
+		err := bf1.UpdateUInt64(i)
+		assert.NoError(t, err)
 	}
 
 	// Serialize
@@ -521,6 +569,9 @@ func TestDeserializeWithDirtyBits(t *testing.T) {
 	// Should have correct bit count (recalculated)
 	assert.Equal(t, bf1.BitsUsed(), bf2.BitsUsed())
 	assert.Greater(t, bf2.BitsUsed(), uint64(0))
+	for i := uint64(0); i < 50; i++ {
+		assert.True(t, bf2.QueryUInt64(i), "Item %d should be found after dirty-count deserialization", i)
+	}
 }
 
 func TestSerializeDeserializeConsistency(t *testing.T) {
@@ -529,7 +580,8 @@ func TestSerializeDeserializeConsistency(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i := uint64(0); i < 100; i++ {
-		bf.UpdateUInt64(i)
+		err := bf.UpdateUInt64(i)
+		assert.NoError(t, err)
 	}
 
 	// First cycle
@@ -583,7 +635,8 @@ func TestHashFunctionConsistency(t *testing.T) {
 	// Create a new filter with the same seed
 	bf3, err := NewBloomFilterBySize(1024, 5, WithSeed(seed))
 	assert.NoError(t, err)
-	bf3.UpdateInt64(42)
+	err = bf3.UpdateInt64(42)
+	assert.NoError(t, err)
 
 	// Should produce identical serialization
 	bytes3, err := bf3.ToCompactSlice()
@@ -757,8 +810,10 @@ func TestArrayUpdateMethods(t *testing.T) {
 	}
 
 	// Manually create a filter by intersecting
-	bf.Union(bfDoubles)
-	bf.Intersect(bfBytes)
+	err = bf.Union(bfDoubles)
+	assert.NoError(t, err)
+	err = bf.Intersect(bfBytes)
+	assert.NoError(t, err)
 
 	// After intersecting with itself (same data), should have same bit count
 	assert.Equal(t, numBitsSet, bf.BitsUsed(),

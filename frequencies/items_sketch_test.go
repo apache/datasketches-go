@@ -25,8 +25,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/apache/datasketches-go/common"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/apache/datasketches-go/common"
 )
 
 func TestEmpty(t *testing.T) {
@@ -233,17 +234,26 @@ func TestSerializeDeserializeUtf8Strings(t *testing.T) {
 
 func TestSerializeDeserializeLong(t *testing.T) {
 	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ItemSketchLongHasher{}, common.ItemSketchLongSerDe{})
-	sketch1.Update(1)
-	sketch1.Update(2)
-	sketch1.Update(3)
-	sketch1.Update(4)
+	assert.NoError(t, err)
+	err = sketch1.Update(1)
+	assert.NoError(t, err)
+	err = sketch1.Update(2)
+	assert.NoError(t, err)
+	err = sketch1.Update(3)
+	assert.NoError(t, err)
+	err = sketch1.Update(4)
+	assert.NoError(t, err)
 
 	bytes, err := sketch1.ToSlice()
 	assert.NoError(t, err)
 	sketch2, err := NewFrequencyItemsSketchFromSlice[int64](bytes, common.ItemSketchLongHasher{}, common.ItemSketchLongSerDe{})
-	sketch2.Update(2)
-	sketch2.Update(3)
-	sketch2.Update(2)
+	assert.NoError(t, err)
+	err = sketch2.Update(2)
+	assert.NoError(t, err)
+	err = sketch2.Update(3)
+	assert.NoError(t, err)
+	err = sketch2.Update(2)
+	assert.NoError(t, err)
 
 	assert.False(t, sketch2.IsEmpty())
 	assert.Equal(t, sketch2.GetNumActiveItems(), 4)
@@ -262,8 +272,69 @@ func TestSerializeDeserializeLong(t *testing.T) {
 	assert.Equal(t, est, int64(1))
 }
 
+func TestItemsSketchToSlicePreservesValueOrder(t *testing.T) {
+	t.Run("int64", func(t *testing.T) {
+		testItemsSketchToSlicePreservesValueOrder(
+			t,
+			common.ItemSketchLongHasher{},
+			common.ItemSketchLongSerDe{},
+			func(index int) int64 { return int64(index) },
+		)
+	})
+	t.Run("string", func(t *testing.T) {
+		testItemsSketchToSlicePreservesValueOrder(
+			t,
+			common.ItemSketchStringHasher{},
+			common.ItemSketchStringSerDe{},
+			func(index int) string { return "item-" + strconv.Itoa(index) },
+		)
+	})
+}
+
+func testItemsSketchToSlicePreservesValueOrder[C comparable](
+	t *testing.T,
+	hasher common.ItemSketchHasher[C],
+	serde common.ItemSketchSerde[C],
+	itemAt func(int) C,
+) {
+	const (
+		mapSize     = 64
+		activeItems = mapSize * 3 / 4
+	)
+
+	sketch, err := NewFrequencyItemsSketchWithMaxMapSize(mapSize, hasher, serde)
+	if !assert.NoError(t, err) {
+		return
+	}
+	for index := 0; index < activeItems; index++ {
+		err = sketch.UpdateMany(itemAt(index), int64(index+1))
+		if !assert.NoError(t, err) {
+			return
+		}
+	}
+
+	serialized, err := sketch.ToSlice()
+	if !assert.NoError(t, err) {
+		return
+	}
+	restored, err := NewFrequencyItemsSketchFromSlice(serialized, hasher, serde)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	assert.Equal(t, sketch.GetNumActiveItems(), restored.GetNumActiveItems())
+	assert.Equal(t, sketch.GetStreamLength(), restored.GetStreamLength())
+	assert.Equal(t, sketch.GetMaximumError(), restored.GetMaximumError())
+	for index := 0; index < activeItems; index++ {
+		actual, err := restored.GetLowerBound(itemAt(index))
+		assert.NoError(t, err)
+		assert.Equal(t, int64(index+1), actual)
+	}
+}
+
 func TestResize(t *testing.T) {
 	sketch1, err := NewFrequencyItemsSketchWithMaxMapSize[string](2<<_LG_MIN_MAP_SIZE, common.ItemSketchStringHasher{}, nil)
+	assert.NoError(t, err)
 	for i := 0; i < 32; i++ {
 		err = sketch1.UpdateMany(strconv.Itoa(i), int64(i*i))
 		assert.NoError(t, err)
@@ -310,11 +381,10 @@ func TestMergeExact(t *testing.T) {
 	assert.Equal(t, est, int64(1))
 }
 
-func TestNullMapReturns(t *testing.T) {
+func TestEmptyMapReturnsNilActiveKeys(t *testing.T) {
 	map1, err := newReversePurgeItemHashMap[int64](1<<_LG_MIN_MAP_SIZE, common.ItemSketchLongHasher{}, nil)
 	assert.NoError(t, err)
 	assert.Nil(t, map1.getActiveKeys())
-	assert.Nil(t, map1.getActiveValues())
 }
 
 func TestMisc(t *testing.T) {
@@ -340,25 +410,26 @@ func TestMisc(t *testing.T) {
 	assert.Equal(t, row.GetUpperBound(), int64(1))
 	s := row.String()
 	t.Log(s)
-	var nullRow *RowItem[int64]
-	assert.NotEqual(t, row, nullRow)
+	assert.NotEqual(t, RowItem[int64]{}, row)
 }
 
 func TestToString(t *testing.T) {
 	sk, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ItemSketchLongHasher{}, nil)
 	assert.NoError(t, err)
 	err = sk.Update(1)
+	assert.NoError(t, err)
 	t.Log(sk.ToString())
 }
 
 func TestFrequentItems1(t *testing.T) {
 	fis, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ItemSketchLongHasher{}, nil)
 	assert.NoError(t, err)
-	fis.Update(1)
+	err = fis.Update(1)
+	assert.NoError(t, err)
 	rows, err := fis.GetFrequentItems(ErrorTypeEnum.NoFalsePositives)
 	assert.NoError(t, err)
 	row := rows[0]
-	assert.NotNil(t, row)
+	assert.NotEqual(t, RowItem[int64]{}, row)
 	assert.Equal(t, row.GetItem(), int64(1))
 	assert.Equal(t, row.GetEstimate(), int64(1))
 	assert.Equal(t, row.GetUpperBound(), int64(1))
@@ -378,7 +449,8 @@ func TestUpdateExceptions(t *testing.T) {
 func TestMemExceptions(t *testing.T) {
 	sk1, err := NewFrequencyItemsSketchWithMaxMapSize[int64](1<<_LG_MIN_MAP_SIZE, common.ItemSketchLongHasher{}, common.ItemSketchLongSerDe{})
 	assert.NoError(t, err)
-	sk1.Update(1)
+	err = sk1.Update(1)
+	assert.NoError(t, err)
 	bytes, err := sk1.ToSlice()
 	assert.NoError(t, err)
 	pre0 := binary.LittleEndian.Uint64(bytes)
@@ -488,12 +560,72 @@ func BenchmarkItemSketch(b *testing.B) {
 	sketch, err := NewFrequencyItemsSketch[int64](128, 8, common.ItemSketchLongHasher{}, nil)
 	assert.NoError(b, err)
 	for i := 0; i < b.N; i++ {
-		sketch.Update(int64(i))
+		err := sketch.Update(int64(i))
+		assert.NoError(b, err)
 	}
 }
 
-func generateTestRowItems(n int) []*RowItem[string] {
-	items := make([]*RowItem[string], n)
+var benchmarkItemsSketchToSliceSink []byte
+
+func BenchmarkItemsSketchToSlice(b *testing.B) {
+	benchmarkItemsSketchToSlice(
+		b,
+		"int64",
+		common.ItemSketchLongHasher{},
+		common.ItemSketchLongSerDe{},
+		func(index int) int64 { return int64(index) },
+	)
+	benchmarkItemsSketchToSlice(
+		b,
+		"string",
+		common.ItemSketchStringHasher{},
+		common.ItemSketchStringSerDe{},
+		func(index int) string { return "item-" + strconv.Itoa(index) },
+	)
+}
+
+func benchmarkItemsSketchToSlice[C comparable](
+	b *testing.B,
+	itemType string,
+	hasher common.ItemSketchHasher[C],
+	serde common.ItemSketchSerde[C],
+	itemAt func(int) C,
+) {
+	for _, mapSize := range []int{64, 256, 1024} {
+		activeItems := mapSize * 3 / 4
+		b.Run(itemType+"/items="+strconv.Itoa(activeItems), func(b *testing.B) {
+			sketch, err := NewFrequencyItemsSketchWithMaxMapSize(mapSize, hasher, serde)
+			if err != nil {
+				b.Fatal(err)
+			}
+			for index := 0; index < activeItems; index++ {
+				if err := sketch.UpdateMany(itemAt(index), int64(index+1)); err != nil {
+					b.Fatal(err)
+				}
+			}
+
+			serialized, err := sketch.ToSlice()
+			if err != nil {
+				b.Fatal(err)
+			}
+			benchmarkItemsSketchToSliceSink = serialized
+			b.SetBytes(int64(len(serialized)))
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			for iteration := 0; iteration < b.N; iteration++ {
+				serialized, err = sketch.ToSlice()
+				if err != nil {
+					b.Fatal(err)
+				}
+				benchmarkItemsSketchToSliceSink = serialized
+			}
+		})
+	}
+}
+
+func generateTestRowItems(n int) []RowItem[string] {
+	items := make([]RowItem[string], n)
 	for i := 0; i < n; i++ {
 		est := rand.Int63n(10000)
 		items[i] = newRowItem(
@@ -516,7 +648,7 @@ func BenchmarkSortSliceRow(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				rowList := make([]*RowItem[string], len(original))
+				rowList := make([]RowItem[string], len(original))
 				copy(rowList, original)
 
 				sort.Slice(rowList, func(i, j int) bool {
@@ -537,10 +669,10 @@ func BenchmarkSlicesSortFuncRow(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				rowList := make([]*RowItem[string], len(original))
+				rowList := make([]RowItem[string], len(original))
 				copy(rowList, original)
 
-				slices.SortFunc(rowList, func(a, b *RowItem[string]) int {
+				slices.SortFunc(rowList, func(a, b RowItem[string]) int {
 					if a.est > b.est {
 						return -1
 					}
@@ -549,6 +681,64 @@ func BenchmarkSlicesSortFuncRow(b *testing.B) {
 					}
 					return 0
 				})
+			}
+		})
+	}
+}
+
+var benchmarkItemsSketchFromSliceSink any
+
+func BenchmarkItemsSketchFromSlice(b *testing.B) {
+	benchmarkItemsSketchFromSlice(
+		b,
+		"int64",
+		common.ItemSketchLongHasher{},
+		common.ItemSketchLongSerDe{},
+		func(index int) int64 { return int64(index) },
+	)
+	benchmarkItemsSketchFromSlice(
+		b,
+		"string",
+		common.ItemSketchStringHasher{},
+		common.ItemSketchStringSerDe{},
+		func(index int) string { return "item-" + strconv.Itoa(index) },
+	)
+}
+
+func benchmarkItemsSketchFromSlice[C comparable](
+	b *testing.B,
+	itemType string,
+	hasher common.ItemSketchHasher[C],
+	serde common.ItemSketchSerde[C],
+	itemAt func(int) C,
+) {
+	for _, mapSize := range []int{64, 256, 1024} {
+		activeItems := mapSize * 3 / 4
+		b.Run(itemType+"/items="+strconv.Itoa(activeItems), func(b *testing.B) {
+			sketch, err := NewFrequencyItemsSketchWithMaxMapSize(mapSize, hasher, serde)
+			if err != nil {
+				b.Fatal(err)
+			}
+			for index := 0; index < activeItems; index++ {
+				if err := sketch.UpdateMany(itemAt(index), int64(index+1)); err != nil {
+					b.Fatal(err)
+				}
+			}
+
+			serialized, err := sketch.ToSlice()
+			if err != nil {
+				b.Fatal(err)
+			}
+			b.SetBytes(int64(len(serialized)))
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			for iteration := 0; iteration < b.N; iteration++ {
+				restored, err := NewFrequencyItemsSketchFromSlice(serialized, hasher, serde)
+				if err != nil {
+					b.Fatal(err)
+				}
+				benchmarkItemsSketchFromSliceSink = restored
 			}
 		})
 	}

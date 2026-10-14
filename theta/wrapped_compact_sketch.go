@@ -175,22 +175,22 @@ func (s *WrappedCompactSketch) String(shouldPrintItems bool) string {
 	ub, _ := s.UpperBound(2)
 
 	sb.WriteString("### Theta sketch summary:\n")
-	sb.WriteString(fmt.Sprintf("   num retained entries : %d\n", s.NumRetained()))
-	sb.WriteString(fmt.Sprintf("   seed hash            : %d\n", seedHash))
-	sb.WriteString(fmt.Sprintf("   empty?               : %t\n", s.IsEmpty()))
-	sb.WriteString(fmt.Sprintf("   ordered?             : %t\n", s.IsOrdered()))
-	sb.WriteString(fmt.Sprintf("   estimation mode?     : %t\n", s.IsEstimationMode()))
-	sb.WriteString(fmt.Sprintf("   theta (fraction)     : %g\n", s.Theta()))
-	sb.WriteString(fmt.Sprintf("   theta (raw 64-bit)   : %d\n", s.Theta64()))
-	sb.WriteString(fmt.Sprintf("   estimate             : %g\n", s.Estimate()))
-	sb.WriteString(fmt.Sprintf("   lower bound 95%% conf : %g\n", lb))
-	sb.WriteString(fmt.Sprintf("   upper bound 95%% conf : %g\n", ub))
+	fmt.Fprintf(&sb, "   num retained entries : %d\n", s.NumRetained())
+	fmt.Fprintf(&sb, "   seed hash            : %d\n", seedHash)
+	fmt.Fprintf(&sb, "   empty?               : %t\n", s.IsEmpty())
+	fmt.Fprintf(&sb, "   ordered?             : %t\n", s.IsOrdered())
+	fmt.Fprintf(&sb, "   estimation mode?     : %t\n", s.IsEstimationMode())
+	fmt.Fprintf(&sb, "   theta (fraction)     : %g\n", s.Theta())
+	fmt.Fprintf(&sb, "   theta (raw 64-bit)   : %d\n", s.Theta64())
+	fmt.Fprintf(&sb, "   estimate             : %g\n", s.Estimate())
+	fmt.Fprintf(&sb, "   lower bound 95%% conf : %g\n", lb)
+	fmt.Fprintf(&sb, "   upper bound 95%% conf : %g\n", ub)
 	sb.WriteString("### End sketch summary\n")
 
 	if shouldPrintItems {
 		sb.WriteString("### Retained entries\n")
 		for entry := range s.All() {
-			sb.WriteString(fmt.Sprintf("%d\n", entry))
+			fmt.Fprintf(&sb, "%d\n", entry)
 		}
 		sb.WriteString("### End retained entries\n")
 	}

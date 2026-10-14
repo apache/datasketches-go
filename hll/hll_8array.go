@@ -55,8 +55,9 @@ func (h *hll8ArrayImpl) copy() (hllSketchStateI, error) {
 	}, nil
 }
 
+// ToCompactSlice serializes the sketch in compact form.
 func (h *hll8ArrayImpl) ToCompactSlice() ([]byte, error) {
-	return h.ToUpdatableSlice()
+	return toHllByteArr(h, true)
 }
 
 func (h *hll8ArrayImpl) ToUpdatableSlice() ([]byte, error) {

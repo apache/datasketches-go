@@ -248,7 +248,6 @@ func (cc *CompressionCharacterization) doTrialsAtLgKAtN(lgK int, n int64, totalT
 		}
 		nanoEnd = time.Now().UnixNano()
 		sumEquNS += nanoEnd - nanoStart
-		nanoStart = nanoEnd
 	}
 
 	totalSeconds := time.Since(startTime).Seconds()
@@ -366,10 +365,10 @@ func (cc *CompressionCharacterization) assembleFormats() {
 // printf writes to both outputs if they exist
 func (cc *CompressionCharacterization) printf(format string, args ...interface{}) {
 	if cc.printStr != nil {
-		fmt.Fprintf(cc.printStr, format, args...)
+		_, _ = fmt.Fprintf(cc.printStr, format, args...)
 	}
 	if cc.printWtr != nil {
-		fmt.Fprintf(cc.printWtr, format, args...)
+		_, _ = fmt.Fprintf(cc.printWtr, format, args...)
 	}
 }
 

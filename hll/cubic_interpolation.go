@@ -22,7 +22,7 @@ import "fmt"
 // UsingXAndYTables returns the cubic interpolation using the X and Y tables.
 func usingXAndYTables(xArr []float64, yArr []float64, x float64) (float64, error) {
 	if len(xArr) < 4 || len(xArr) != len(yArr) {
-		return 0, fmt.Errorf("X value out of range: %f", x)
+		return 0, fmt.Errorf("X value out of range: %f", x) //nolint:staticcheck
 	}
 
 	if x == xArr[len(xArr)-1] {
@@ -61,7 +61,7 @@ func usingXArrAndYStride(xArr []float64, yStride float64, x float64) (float64, e
 	xArrLenM1 := xArrLen - 1
 
 	if xArrLen < 4 || x < xArr[0] || x > xArr[xArrLenM1] {
-		return 0, fmt.Errorf("X value out of range: %f", x)
+		return 0, fmt.Errorf("X value out of range: %f", x) //nolint:staticcheck
 	}
 	if x == xArr[xArrLenM1] {
 		return yStride * float64(xArrLenM1), nil // corner case
@@ -115,7 +115,7 @@ func cubicInterpolate(x0 float64, y0 float64, x1 float64, y1 float64, x2 float64
 // findStraddle returns the index of the largest value in the array that is less than or equal to the given value.
 func findStraddle(xArr []float64, x float64) (int, error) {
 	if len(xArr) < 2 || x < xArr[0] || x > xArr[len(xArr)-1] {
-		return 0, fmt.Errorf("X value out of range: %f", x)
+		return 0, fmt.Errorf("X value out of range: %f", x) //nolint:staticcheck
 	}
 	return recursiveFindStraddle(xArr, 0, len(xArr)-1, x)
 }
@@ -127,7 +127,7 @@ func recursiveFindStraddle(xArr []float64, left int, right int, x float64) (int,
 	}
 
 	if xArr[left] > x || x >= xArr[right] {
-		return 0, fmt.Errorf("X value out of range: %f", x)
+		return 0, fmt.Errorf("X value out of range: %f", x) //nolint:staticcheck
 	}
 
 	if left+1 == right {

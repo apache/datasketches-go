@@ -181,9 +181,11 @@ func (enc *Encoder) encodeSketch(sketch *CompactSketch, bytes []byte, offset int
 	bytes[offset] = flags
 	offset++
 
-	// Seed hash
-	seedHash, _ := sketch.SeedHash()
-	binary.LittleEndian.PutUint16(bytes[offset:offset+2], seedHash)
+	// Seed hash, left as zero for an empty sketch as in C++ and Java
+	if !sketch.IsEmpty() {
+		seedHash, _ := sketch.SeedHash()
+		binary.LittleEndian.PutUint16(bytes[offset:offset+2], seedHash)
+	}
 	offset += 2
 
 	if preambleLongs > 1 {

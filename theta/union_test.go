@@ -42,6 +42,7 @@ func TestUnion(t *testing.T) {
 		sketch2, err := NewQuickSelectUpdateSketch()
 		assert.NoError(t, err)
 		err = union.Update(sketch2)
+		assert.NoError(t, err)
 
 		result, err = union.Result(true)
 		assert.NoError(t, err)
@@ -84,7 +85,8 @@ func TestUnion(t *testing.T) {
 		assert.NoError(t, err)
 		exact, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		exact.UpdateInt64(3)
+		err = exact.UpdateInt64(3)
+		assert.NoError(t, err)
 
 		union, err := NewUnion()
 		assert.NoError(t, err)
@@ -106,7 +108,7 @@ func TestUnion(t *testing.T) {
 		assert.NoError(t, err)
 		exact, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		exact.UpdateInt64(3)
+		assert.NoError(t, exact.UpdateInt64(3))
 
 		union, err := NewUnion()
 		assert.NoError(t, err)
@@ -131,7 +133,7 @@ func TestUnion(t *testing.T) {
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		union, err := NewUnion()
 		assert.NoError(t, err)
@@ -156,7 +158,7 @@ func TestUnion(t *testing.T) {
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		union, err := NewUnion()
 		assert.NoError(t, err)
@@ -181,7 +183,7 @@ func TestUnion(t *testing.T) {
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(4)
+		assert.NoError(t, b.UpdateInt64(4))
 
 		union, err := NewUnion()
 		assert.NoError(t, err)
@@ -205,7 +207,7 @@ func TestUnion(t *testing.T) {
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(4)
+		assert.NoError(t, b.UpdateInt64(4))
 
 		union, err := NewUnion()
 		assert.NoError(t, err)
@@ -224,13 +226,13 @@ func TestUnion(t *testing.T) {
 	t.Run("Exact, Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4)
+		assert.NoError(t, a.UpdateInt64(4))
 
 		b, err := NewQuickSelectUpdateSketch(
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		union, err := NewUnion()
 		assert.NoError(t, err)
@@ -249,13 +251,13 @@ func TestUnion(t *testing.T) {
 	t.Run("Exact Compact, Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4)
+		assert.NoError(t, a.UpdateInt64(4))
 
 		b, err := NewQuickSelectUpdateSketch(
 			WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		union, err := NewUnion()
 		assert.NoError(t, err)
@@ -274,11 +276,11 @@ func TestUnion(t *testing.T) {
 	t.Run("A Estimation Mode, B Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4)
+		assert.NoError(t, a.UpdateInt64(4))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		union, err := NewUnion()
 		assert.NoError(t, err)
@@ -297,11 +299,11 @@ func TestUnion(t *testing.T) {
 	t.Run("A Estimation Mode Compact, B Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4)
+		assert.NoError(t, a.UpdateInt64(4))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(6)
+		assertUpdate(t, b.UpdateInt64(6))
 
 		union, err := NewUnion()
 		assert.NoError(t, err)
@@ -322,7 +324,7 @@ func TestUnion(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assert.NoError(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -330,7 +332,7 @@ func TestUnion(t *testing.T) {
 		assert.NoError(t, err)
 		value = 500
 		for i := 0; i < 1000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assert.NoError(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -364,7 +366,7 @@ func TestUnion(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assert.NoError(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -372,7 +374,7 @@ func TestUnion(t *testing.T) {
 		assert.NoError(t, err)
 		value = 500
 		for i := 0; i < 1000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assert.NoError(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -397,7 +399,7 @@ func TestUnion(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assert.NoError(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 		bytes1, err := sketch1.Compact(true).MarshalBinary()
@@ -407,7 +409,7 @@ func TestUnion(t *testing.T) {
 		assert.NoError(t, err)
 		value = 500
 		for i := 0; i < 1000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assert.NoError(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 		bytes2, err := sketch2.Compact(true).MarshalBinary()
@@ -439,7 +441,7 @@ func TestUnion(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assertUpdate(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -447,7 +449,7 @@ func TestUnion(t *testing.T) {
 		assert.NoError(t, err)
 		value = 5000
 		for i := 0; i < 10000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assertUpdate(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -482,7 +484,7 @@ func TestUnion(t *testing.T) {
 		assert.NoError(t, err)
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch1.UpdateInt64(int64(value))
+			assertUpdate(t, sketch1.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -490,7 +492,7 @@ func TestUnion(t *testing.T) {
 		assert.NoError(t, err)
 		value = 5000
 		for i := 0; i < 10000; i++ {
-			sketch2.UpdateInt64(int64(value))
+			assertUpdate(t, sketch2.UpdateInt64(int64(value)))
 			value++
 		}
 
@@ -514,11 +516,11 @@ func TestUnion(t *testing.T) {
 	t.Run("Exact Mode, Estimation Mode Full Overlap", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(4))
+		assert.NoError(t, a.UpdateInt64(int64(4)))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(4))
+		assert.NoError(t, b.UpdateInt64(int64(4)))
 
 		union, err := NewUnion()
 		assert.NoError(t, err)
@@ -537,11 +539,11 @@ func TestUnion(t *testing.T) {
 	t.Run("Exact Mode Compact, Estimation Mode Compact Full Overlap", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(4))
+		assert.NoError(t, a.UpdateInt64(int64(4)))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(4))
+		assert.NoError(t, b.UpdateInt64(int64(4)))
 
 		union, err := NewUnion()
 		assert.NoError(t, err)
@@ -560,11 +562,11 @@ func TestUnion(t *testing.T) {
 	t.Run("Non Empty No Retained Keys, Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(3))
+		assertUpdate(t, a.UpdateInt64(int64(3)))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(6))
+		assertUpdate(t, b.UpdateInt64(int64(6)))
 
 		union, err := NewUnion()
 		assert.NoError(t, err)
@@ -583,11 +585,11 @@ func TestUnion(t *testing.T) {
 	t.Run("Non Empty No Retained Keys Compact, Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(3))
+		assertUpdate(t, a.UpdateInt64(int64(3)))
 
 		b, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(6))
+		assertUpdate(t, b.UpdateInt64(int64(6)))
 
 		union, err := NewUnion()
 		assert.NoError(t, err)
@@ -606,7 +608,7 @@ func TestUnion(t *testing.T) {
 	t.Run("Seed Mismatch", func(t *testing.T) {
 		sketch, err := NewQuickSelectUpdateSketch()
 		assert.NoError(t, err)
-		sketch.UpdateInt64(1) // non-empty should not be ignored
+		assert.NoError(t, sketch.UpdateInt64(1)) // non-empty should not be ignored
 
 		union, err := NewUnion(WithUnionSeed(123))
 		assert.NoError(t, err)
@@ -618,19 +620,22 @@ func TestUnion(t *testing.T) {
 		updateSketch1, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(14))
 		assert.NoError(t, err)
 		for i := 0; i < 16384; i++ {
-			updateSketch1.UpdateInt64(int64(i))
+			err := updateSketch1.UpdateInt64(int64(i))
+			assert.NoError(t, err)
 		}
 
 		updateSketch2, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(14))
 		assert.NoError(t, err)
 		for i := 0; i < 26384; i++ {
-			updateSketch2.UpdateInt64(int64(i))
+			err := updateSketch2.UpdateInt64(int64(i))
+			assert.NoError(t, err)
 		}
 
 		updateSketch3, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(14))
 		assert.NoError(t, err)
 		for i := 0; i < 86384; i++ {
-			updateSketch3.UpdateInt64(int64(i))
+			err := updateSketch3.UpdateInt64(int64(i))
+			assertUpdate(t, err)
 		}
 
 		// First union
@@ -712,10 +717,12 @@ func TestUnion(t *testing.T) {
 
 		sketch, _ := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(10))
 		for i := 0; i < 2000; i++ {
-			sketch.UpdateInt64(int64(i))
+			err := sketch.UpdateInt64(int64(i))
+			assertUpdate(t, err)
 		}
 
-		union.Update(sketch)
+		err := union.Update(sketch)
+		assert.NoError(t, err)
 		result, err := union.Result(true)
 
 		assert.NoError(t, err)
@@ -734,17 +741,20 @@ func TestUnion(t *testing.T) {
 	t.Run("OrderedResult Method", func(t *testing.T) {
 		sketch1, _ := NewQuickSelectUpdateSketch()
 		for i := 0; i < 100; i++ {
-			sketch1.UpdateInt64(int64(i))
+			assert.NoError(t, sketch1.UpdateInt64(int64(i)))
 		}
 
 		sketch2, _ := NewQuickSelectUpdateSketch()
 		for i := 50; i < 150; i++ {
-			sketch2.UpdateInt64(int64(i))
+			assert.NoError(t, sketch2.UpdateInt64(int64(i)))
 		}
 
-		union, _ := NewUnion()
-		union.Update(sketch1)
-		union.Update(sketch2)
+		union, err := NewUnion()
+		assert.NoError(t, err)
+		err = union.Update(sketch1)
+		assert.NoError(t, err)
+		err = union.Update(sketch2)
+		assert.NoError(t, err)
 
 		result, err := union.OrderedResult()
 		assert.NoError(t, err)

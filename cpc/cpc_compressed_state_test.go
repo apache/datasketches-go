@@ -240,7 +240,6 @@ func updateStateUnion(t *testing.T, sk *CpcSketch, vIn *uint64, lgK int) {
 	if cs.getFormat() != skFmt {
 		t.Errorf("Union compressed state format %v != union sketch format %v", cs.getFormat(), skFmt)
 	}
-	c = cs.NumCoupons
 	mem, err = cs.exportToMemory()
 	if err != nil {
 		t.Fatalf("Failed to export union state to memory: %v", err)

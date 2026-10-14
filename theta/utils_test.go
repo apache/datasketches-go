@@ -18,6 +18,8 @@
 package theta
 
 import (
+	"math/rand/v2"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -139,4 +141,73 @@ func TestStartingSubMultiple(t *testing.T) {
 			assert.Equal(t, tc.expected, result)
 		})
 	}
+}
+
+func TestTrimToNominal(t *testing.T) {
+	shuffledRange := func(n int) []uint64 {
+		r := rand.New(rand.NewPCG(1, 2))
+		entries := make([]uint64, n)
+		for i, v := range r.Perm(n) {
+			entries[i] = uint64(v + 1)
+		}
+		return entries
+	}
+
+	t.Run("Below Nominal", func(t *testing.T) {
+		entries := shuffledRange(5)
+		expected := slices.Clone(entries)
+
+		trimmed, theta := trimToNominal(entries, 8, MaxTheta)
+		assert.Equal(t, expected, trimmed)
+		assert.Equal(t, MaxTheta, theta)
+	})
+
+	t.Run("At Nominal", func(t *testing.T) {
+		entries := shuffledRange(8)
+		expected := slices.Clone(entries)
+
+		trimmed, theta := trimToNominal(entries, 8, MaxTheta)
+		assert.Equal(t, expected, trimmed)
+		assert.Equal(t, MaxTheta, theta)
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		trimmed, theta := trimToNominal(nil, 8, MaxTheta)
+		assert.Empty(t, trimmed)
+		assert.Equal(t, MaxTheta, theta)
+	})
+
+	t.Run("Above Nominal", func(t *testing.T) {
+		const nominal = 13
+		entries := make([]uint64, 0, 64)
+		entries = append(entries, shuffledRange(40)...)
+
+		trimmed, theta := trimToNominal(entries, nominal, MaxTheta)
+
+		// values are 1..40, so the (nominal+1)th smallest is nominal+1
+		assert.Equal(t, uint64(nominal+1), theta)
+		assert.Len(t, trimmed, nominal)
+		assert.Equal(t, nominal, cap(trimmed), "trimmed result must not keep the untrimmed allocation")
+		for _, entry := range trimmed {
+			assert.Less(t, entry, theta)
+		}
+		slices.Sort(trimmed)
+		expected := make([]uint64, nominal)
+		for i := range expected {
+			expected[i] = uint64(i + 1)
+		}
+		assert.Equal(t, expected, trimmed)
+	})
+
+	t.Run("One Above Nominal", func(t *testing.T) {
+		const nominal = 8
+		entries := shuffledRange(nominal + 1)
+
+		trimmed, theta := trimToNominal(entries, nominal, MaxTheta)
+		assert.Equal(t, uint64(nominal+1), theta)
+		assert.Len(t, trimmed, nominal)
+		for _, entry := range trimmed {
+			assert.Less(t, entry, theta)
+		}
+	})
 }

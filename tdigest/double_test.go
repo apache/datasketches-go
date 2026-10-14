@@ -19,6 +19,7 @@ package tdigest
 
 import (
 	"math"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -243,6 +244,35 @@ func TestDouble_Merge(t *testing.T) {
 		rank, err = sk1.Rank(3.01)
 		assert.NoError(t, err)
 		assert.Equal(t, 1.0, rank)
+	})
+
+	t.Run("Merge preserves deserialized min max with weighted tails", func(t *testing.T) {
+		other, err := newDoubleFromInternalStates(false, DefaultK, -1, 21,
+			[]doublePrecisionCentroid{{mean: 0, weight: 4}, {mean: 10, weight: 4}, {mean: 20, weight: 4}},
+			12, nil)
+		assert.NoError(t, err)
+
+		empty, err := NewDouble(DefaultK)
+		assert.NoError(t, err)
+		assert.NoError(t, empty.Merge(other))
+		minVal, err := empty.MinValue()
+		assert.NoError(t, err)
+		assert.Equal(t, -1.0, minVal)
+		maxVal, err := empty.MaxValue()
+		assert.NoError(t, err)
+		assert.Equal(t, 21.0, maxVal)
+
+		left, err := newDoubleFromInternalStates(false, DefaultK, 5, 15,
+			[]doublePrecisionCentroid{{mean: 6, weight: 4}, {mean: 10, weight: 4}, {mean: 14, weight: 4}},
+			12, nil)
+		assert.NoError(t, err)
+		assert.NoError(t, left.Merge(other))
+		minVal, err = left.MinValue()
+		assert.NoError(t, err)
+		assert.Equal(t, -1.0, minVal)
+		maxVal, err = left.MaxValue()
+		assert.NoError(t, err)
+		assert.Equal(t, 21.0, maxVal)
 	})
 
 	t.Run("Merge Large", func(t *testing.T) {
@@ -1022,4 +1052,103 @@ func TestDouble_SerializedSizeBytes(t *testing.T) {
 		sizeWithoutBuffer := sk.SerializedSizeBytes(false)
 		assert.Equal(t, 1632, sizeWithoutBuffer)
 	})
+}
+
+func TestDouble_QuantileIsMonotonic(t *testing.T) {
+	distributions := map[string]func(r *rand.Rand) float64{
+		"gaussian":  func(r *rand.Rand) float64 { return r.NormFloat64() },
+		"uniform":   func(r *rand.Rand) float64 { return r.Float64() * 1000 },
+		"lognormal": func(r *rand.Rand) float64 { return math.Exp(r.NormFloat64()) },
+	}
+
+	for name, next := range distributions {
+		t.Run(name, func(t *testing.T) {
+			r := rand.New(rand.NewSource(1))
+			for _, k := range []uint16{10, 20, 50, 100, 200} {
+				for trial := 0; trial < 40; trial++ {
+					sketch, err := NewDouble(k)
+					assert.NoError(t, err)
+					n := 100 + r.Intn(50000)
+					for i := 0; i < n; i++ {
+						assert.NoError(t, sketch.Update(next(r)))
+					}
+
+					previousRank := 0.0
+					previousQuantile, err := sketch.Quantile(0)
+					assert.NoError(t, err)
+					for i := 1; i <= 1000; i++ {
+						rank := float64(i) / 1000.0
+						quantile, err := sketch.Quantile(rank)
+						assert.NoError(t, err)
+						assert.GreaterOrEqualf(t, quantile, previousQuantile,
+							"k=%d n=%d: Quantile(%v)=%v is below Quantile(%v)=%v",
+							k, n, rank, quantile, previousRank, previousQuantile)
+						previousRank = rank
+						previousQuantile = quantile
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestDouble_QuantileIsWithinMinAndMax(t *testing.T) {
+	t.Run("From updates", func(t *testing.T) {
+		r := rand.New(rand.NewSource(2))
+		for trial := 0; trial < 100; trial++ {
+			sketch, err := NewDouble(DefaultK)
+			assert.NoError(t, err)
+			n := 10 + r.Intn(20000)
+			for i := 0; i < n; i++ {
+				assert.NoError(t, sketch.Update(r.NormFloat64()))
+			}
+			minValue, err := sketch.MinValue()
+			assert.NoError(t, err)
+			maxValue, err := sketch.MaxValue()
+			assert.NoError(t, err)
+			for i := 0; i <= 1000; i++ {
+				quantile, err := sketch.Quantile(float64(i) / 1000.0)
+				assert.NoError(t, err)
+				assert.GreaterOrEqual(t, quantile, minValue)
+				assert.LessOrEqual(t, quantile, maxValue)
+			}
+		}
+	})
+
+	// Update and Merge always leave both tail centroids as singletons, so the
+	// tail branches of Quantile are only reachable through deserialization.
+	t.Run("Decoded with heavy tail centroids", func(t *testing.T) {
+		sketch, err := newDoubleFromInternalStates(false, DefaultK, 0, 40,
+			[]doublePrecisionCentroid{{mean: 10, weight: 100}, {mean: 20, weight: 100}, {mean: 30, weight: 100}},
+			300, nil)
+		assert.NoError(t, err)
+		bytes, err := EncodeDouble(sketch, false)
+		assert.NoError(t, err)
+		decoded, err := DecodeDouble(bytes)
+		assert.NoError(t, err)
+
+		quantile, err := decoded.Quantile(0.9)
+		assert.NoError(t, err)
+		assert.InDelta(t, 34.081632653061224, quantile, 1e-12)
+
+		for i := 0; i <= 1000; i++ {
+			quantile, err := decoded.Quantile(float64(i) / 1000.0)
+			assert.NoError(t, err)
+			assert.GreaterOrEqual(t, quantile, 0.0)
+			assert.LessOrEqual(t, quantile, 40.0)
+		}
+	})
+}
+
+func TestDouble_QuantileLastWeightTwoReturnsMax(t *testing.T) {
+	// weight == centroidsWeight-1 and lastWeight == 2 is 0/0 without the guard.
+	sketch, err := newDoubleFromInternalStates(false, DefaultK, 0, 20,
+		[]doublePrecisionCentroid{{mean: 0, weight: 10}, {mean: 10, weight: 2}},
+		12, nil)
+	assert.NoError(t, err)
+
+	quantile, err := sketch.Quantile(11.0 / 12.0)
+	assert.NoError(t, err)
+	assert.False(t, math.IsNaN(quantile))
+	assert.Equal(t, 20.0, quantile)
 }

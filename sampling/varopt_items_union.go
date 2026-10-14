@@ -191,9 +191,9 @@ func (u *VarOptItemsUnion[T]) String() string {
 	var sb strings.Builder
 	sb.WriteString("### VarOptItemsUnion Summary: ")
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("   Max k: %d", u.k))
+	fmt.Fprintf(&sb, "   Max k: %d", u.k)
 	sb.WriteString("\n")
-	sb.WriteString(fmt.Sprintf("   Gadget summary: %s", u.gadget.String()))
+	fmt.Fprintf(&sb, "   Gadget summary: %s", u.gadget.String())
 	sb.WriteString("### END UNION SUMMARY")
 	sb.WriteString("\n")
 	return sb.String()
@@ -218,7 +218,7 @@ func (u *VarOptItemsUnion[T]) Result() (*VarOptItemsSketch[T], error) {
 	// from the bookkeeping logic of mergeInto() that all estimation mode input sketches must
 	// have had the same tau, so we can throw all of the marked items into a common reservoir.
 	allMarkedSamplesAtOuterTau := int64(u.gadget.numMarksInH) == u.outerTauDenom
-	if !(isGadgetExactMode && isGadgetPseudoExactMode && allMarkedSamplesAtOuterTau) {
+	if !isGadgetExactMode || !isGadgetPseudoExactMode || !allMarkedSamplesAtOuterTau {
 		return u.migrateMarkedItemsByDecreasingK()
 	}
 
@@ -233,7 +233,7 @@ func (u *VarOptItemsUnion[T]) Result() (*VarOptItemsSketch[T], error) {
 }
 
 func (u *VarOptItemsUnion[T]) simpleGadgetCoercer() (*VarOptItemsSketch[T], error) {
-	if !((u.gadget.r == 0 && len(u.gadget.data) == u.gadget.h) || (u.gadget.r > 0 && len(u.gadget.data) == u.gadget.k+1)) {
+	if !((u.gadget.r == 0 && len(u.gadget.data) == u.gadget.h) || (u.gadget.r > 0 && len(u.gadget.data) == u.gadget.k+1)) { //nolint:staticcheck
 		return nil, fmt.Errorf(
 			"invalid gadget data length: got %d, h=%d, r=%d, k=%d",
 			len(u.gadget.data), u.gadget.h, u.gadget.r, u.gadget.k,
@@ -269,7 +269,7 @@ func (u *VarOptItemsUnion[T]) migrateMarkedItemsByDecreasingK() (*VarOptItemsSke
 	if u.gadget.k < 2 {
 		return nil, errors.New("k must be greater than 2")
 	}
-	if !((u.gadget.r == 0 && len(u.gadget.data) == u.gadget.h) || (u.gadget.r > 0 && len(u.gadget.data) == u.gadget.k+1)) {
+	if !((u.gadget.r == 0 && len(u.gadget.data) == u.gadget.h) || (u.gadget.r > 0 && len(u.gadget.data) == u.gadget.k+1)) { //nolint:staticcheck
 		return nil, fmt.Errorf(
 			"invalid gadget data length: got %d, h=%d, r=%d, k=%d",
 			len(u.gadget.data), u.gadget.h, u.gadget.r, u.gadget.k,
@@ -281,7 +281,7 @@ func (u *VarOptItemsUnion[T]) migrateMarkedItemsByDecreasingK() (*VarOptItemsSke
 			cap(u.gadget.data), len(u.gadget.data),
 		)
 	}
-	if !(u.gadget.r == 0 || u.gadget.k == (u.gadget.h+u.gadget.r)) {
+	if !(u.gadget.r == 0 || u.gadget.k == (u.gadget.h+u.gadget.r)) { //nolint:staticcheck
 		return nil, fmt.Errorf(
 			"full or in pseudo-exact mode: got r=%d, k=%d, h=%d",
 			u.gadget.r, u.gadget.k, u.gadget.h,

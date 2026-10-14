@@ -20,6 +20,7 @@ package tuple
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 
@@ -40,7 +41,7 @@ func TestGenerateGoSnapshots_ArrayOfNumbersSketch(t *testing.T) {
 			sketch, err := NewArrayOfNumbersUpdateSketch[float64](1)
 			assert.NoError(t, err)
 			for i := 0; i < n; i++ {
-				sketch.UpdateInt64(int64(i), []float64{float64(i)})
+				assertUpdate(t, sketch.UpdateInt64(int64(i), []float64{float64(i)}))
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
@@ -66,15 +67,16 @@ func TestGenerateGoSnapshots_ArrayOfNumbersSketch(t *testing.T) {
 			sketch, err := NewArrayOfNumbersUpdateSketch[float64](3)
 			assert.NoError(t, err)
 			for i := 0; i < n; i++ {
-				s := make([]float64, 0, 3)
-				for j := 0; j < 3; j++ {
-					s = append(s, float64(j))
-				}
-				sketch.UpdateInt64(int64(i), s)
+				s := []float64{float64(i), float64(i), float64(i)}
+				assertUpdate(t, sketch.UpdateInt64(int64(i), s))
 			}
 
 			assert.True(t, sketch.IsEmpty() == (n == 0))
 			assert.InDelta(t, n, sketch.Estimate(), float64(n)*0.03)
+			for _, summary := range sketch.All() {
+				assert.Equal(t, summary.values[0], summary.values[1])
+				assert.Equal(t, summary.values[0], summary.values[2])
+			}
 
 			compactSketch, err := sketch.Compact(false)
 			assert.NoError(t, err)
@@ -93,7 +95,7 @@ func TestGenerateGoSnapshots_ArrayOfNumbersSketch(t *testing.T) {
 	t.Run("generate non empty no entries", func(t *testing.T) {
 		sketch, err := NewArrayOfNumbersUpdateSketch[float64](1, WithUpdateSketchP(0.01))
 		assert.NoError(t, err)
-		sketch.UpdateInt64(int64(1), []float64{1})
+		assertUpdate(t, sketch.UpdateInt64(int64(1), []float64{1}))
 
 		assert.False(t, sketch.IsEmpty())
 		assert.Equal(t, uint32(0), sketch.NumRetained())
@@ -602,5 +604,36 @@ func TestArrayOfNumbersSketchDecoderErrors(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "sketch type mismatch")
+	})
+
+	t.Run("Truncated hash", func(t *testing.T) {
+		source, err := NewArrayOfNumbersUpdateSketch[float64](2)
+		assert.NoError(t, err)
+		for i := 0; i < 10; i++ {
+			assert.NoError(t, source.UpdateInt64(int64(i), []float64{1, 2}))
+		}
+		compact, err := source.Compact(true)
+		assert.NoError(t, err)
+
+		var buf bytes.Buffer
+		encoder := NewArrayOfNumbersSketchEncoder[float64](&buf)
+		assert.NoError(t, encoder.Encode(compact))
+
+		// All hashes come first, then all summaries.
+		numEntries := int(compact.NumRetained())
+		data := buf.Bytes()
+		hashesStart := len(data) - numEntries*(8+2*8)
+		decoder := NewArrayOfNumbersSketchDecoderDecoder[float64](theta.DefaultSeed)
+		for i := 0; i < numEntries; i++ {
+			hashStart := hashesStart + i*8
+
+			_, err := decoder.Decode(bytes.NewReader(data[:hashStart]))
+			assert.ErrorIs(t, err, io.EOF, "entry %d: no hash bytes", i)
+
+			for n := 1; n < 8; n++ {
+				_, err := decoder.Decode(bytes.NewReader(data[:hashStart+n]))
+				assert.ErrorIs(t, err, io.ErrUnexpectedEOF, "entry %d: %d hash bytes", i, n)
+			}
+		}
 	})
 }

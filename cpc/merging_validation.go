@@ -132,13 +132,6 @@ func (mv *MergingValidation) multiTestMerging(lgKm, lgKa, lgKb int) error {
 // and returns an error if any discrepancy is found.
 func (mv *MergingValidation) testMerging(lgKm, lgKa, lgKb int, nA, nB int64) error {
 	// Create the union with the minimum lgK among lgKm, lgKa, and lgKb.
-	minLg := lgKm
-	if lgKa < minLg {
-		minLg = lgKa
-	}
-	if lgKb < minLg {
-		minLg = lgKb
-	}
 	ugM, err := NewCpcUnionSketchWithDefault(lgKm)
 	if err != nil {
 		return fmt.Errorf("failed to create CpcUnion: %v", err)
@@ -315,16 +308,16 @@ func (mv *MergingValidation) assembleFormats() {
 // printf writes to both printStream and printWriter if they are not nil.
 func (mv *MergingValidation) printf(format string, args ...interface{}) {
 	if mv.printStream != nil {
-		fmt.Fprintf(mv.printStream, format, args...)
+		fmt.Fprintf(mv.printStream, format, args...) //nolint:errcheck
 	}
 	if mv.printWriter != nil {
-		fmt.Fprintf(mv.printWriter, format, args...)
+		fmt.Fprintf(mv.printWriter, format, args...) //nolint:errcheck
 	}
 }
 
 // toInterfaceSlice helps pass a slice of strings to fmt.Fprintf for the header.
-func (mv *MergingValidation) toInterfaceSlice(ss []string) []interface{} {
-	out := make([]interface{}, len(ss))
+func (mv *MergingValidation) toInterfaceSlice(ss []string) []any {
+	out := make([]any, len(ss))
 	for i := range ss {
 		out[i] = ss[i]
 	}

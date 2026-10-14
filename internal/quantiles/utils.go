@@ -39,7 +39,7 @@ func ValidateSplitPoints[N Number](values []N) error {
 		if math.IsNaN(float64(v)) {
 			return ErrNanInSplitPoints
 		}
-		if i < len(values)-1 && !(v < values[i+1]) {
+		if i < len(values)-1 && (v >= values[i+1]) {
 			return ErrInvalidSplitPoints
 		}
 	}

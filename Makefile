@@ -24,17 +24,10 @@ generate-go-snapshots:
 
 .PHONY: lint
 lint:
-	gofmt -l .
-	go tool goimports -l .
-	go vet ./...
+	golangci-lint run ./...
 
 .PHONY: format
 format:
 	gofmt -w .
 	go tool goimports -w .
-
-.PHONY: lint-check
-lint-check:
-	test -z "$$(gofmt -l .)"
-	test -z "$$(go tool goimports -l .)"
-	go vet ./...
+	golangci-lint run --fix

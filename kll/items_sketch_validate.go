@@ -59,19 +59,23 @@ type itemsSketchMemoryValidate[C comparable] struct {
 func newItemsSketchMemoryValidate[C comparable](srcMem []byte, serde common.ItemSketchSerde[C]) (*itemsSketchMemoryValidate[C], error) {
 	capa := cap(srcMem)
 	if capa < 8 {
-		return nil, fmt.Errorf("Memory too small: %d", capa)
+		return nil, fmt.Errorf("Memory too small: %d", capa) //nolint:staticcheck
 	}
 	preInts := getPreInts(srcMem)
 	serVer := getSerVer(srcMem)
-	sketchStructure := getSketchStructure(preInts, serVer)
+	sketchStructure, err := getSketchStructure(preInts, serVer)
+	if err != nil {
+		return nil, err
+	}
+
 	familyID := getFamilyID(srcMem)
 	if familyID != internal.FamilyEnum.Kll.Id {
-		return nil, fmt.Errorf("Source not KLL: %d", familyID)
+		return nil, fmt.Errorf("Source not KLL: %d", familyID) //nolint:staticcheck
 	}
 	flags := getFlags(srcMem)
 	k := getK(srcMem)
 	m := getM(srcMem)
-	err := checkM(m)
+	err = checkM(m)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +109,7 @@ func (vlid *itemsSketchMemoryValidate[C]) validate() error {
 	switch vlid.sketchStructure {
 	case _COMPACT_FULL:
 		if vlid.emptyFlag {
-			return fmt.Errorf("Empty flag and compact full")
+			return fmt.Errorf("Empty flag and compact full") //nolint:staticcheck
 		}
 		vlid.n = getN(vlid.srcMem)
 		vlid.minK = getMinK(vlid.srcMem)
@@ -125,7 +129,7 @@ func (vlid *itemsSketchMemoryValidate[C]) validate() error {
 
 	case _COMPACT_EMPTY:
 		if !vlid.emptyFlag {
-			return fmt.Errorf("Empty flag and compact empty")
+			return fmt.Errorf("Empty flag and compact empty") //nolint:staticcheck
 		}
 		vlid.n = 0 //assumed
 		vlid.minK = uint16(vlid.k)
@@ -134,7 +138,7 @@ func (vlid *itemsSketchMemoryValidate[C]) validate() error {
 		vlid.sketchBytes = _DATA_START_ADR_SINGLE_ITEM
 	case _COMPACT_SINGLE:
 		if vlid.emptyFlag {
-			return fmt.Errorf("Empty flag and compact single")
+			return fmt.Errorf("Empty flag and compact single") //nolint:staticcheck
 		}
 		vlid.n = 1 //assumed
 		vlid.minK = uint16(vlid.k)
@@ -146,7 +150,7 @@ func (vlid *itemsSketchMemoryValidate[C]) validate() error {
 		}
 		vlid.sketchBytes = _DATA_START_ADR_SINGLE_ITEM + v
 	default:
-		return fmt.Errorf("Invalid preamble ints and serial version combo")
+		return fmt.Errorf("Invalid preamble ints and serial version combo") //nolint:staticcheck
 	}
 	return nil
 }

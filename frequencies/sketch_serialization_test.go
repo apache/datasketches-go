@@ -88,6 +88,7 @@ func TestGenerateGoSnapshots_LongsSketch(t *testing.T) {
 			assert.NoError(t, err)
 
 			slc, err := sk.ToSlice()
+			assert.NoError(t, err)
 			err = os.WriteFile(fmt.Sprintf("%s/frequent_string_n%d_go.sk", internal.GoPath, n), slc, 0644)
 			if err != nil {
 				t.Errorf("err != nil")
@@ -111,6 +112,7 @@ func TestGenerateGoSnapshots_LongsSketch(t *testing.T) {
 		assert.NoError(t, err)
 
 		slc, err := sk.ToSlice()
+		assert.NoError(t, err)
 		err = os.WriteFile(fmt.Sprintf("%s/frequent_string_utf8_go.sk", internal.GoPath), slc, 0644)
 		if err != nil {
 			t.Errorf("err != nil")
@@ -130,6 +132,7 @@ func TestGenerateGoSnapshots_LongsSketch(t *testing.T) {
 		assert.NoError(t, err)
 
 		slc, err := sk.ToSlice()
+		assert.NoError(t, err)
 		err = os.WriteFile(fmt.Sprintf("%s/frequent_string_ascii_go.sk", internal.GoPath), slc, 0644)
 		if err != nil {
 			t.Errorf("err != nil")

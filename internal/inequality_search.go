@@ -57,11 +57,12 @@ func FindWithInequality[C comparable](arr []C, low int, high int, v C, crit Ineq
 			return 0, err
 		}
 
-		if ret == -1 {
+		switch ret {
+		case -1:
 			hi = mid
-		} else if ret == 1 {
+		case 1:
 			lo = mid + 1
-		} else {
+		default:
 			return getIndex(arr, mid, mid+1, v, crit, comparator)
 		}
 	}
@@ -73,15 +74,15 @@ func resolve[C comparable](arr []C, lo int, hi int, v C, crit Inequality, compar
 	switch crit {
 	case InequalityLT:
 		if lo == hi {
-			if compareFn(v, arr[hi]) == false && v != arr[hi] {
+			if !compareFn(v, arr[hi]) && v != arr[hi] {
 				result = lo
 			} else {
 				result = -1
 			}
 		} else {
-			if compareFn(v, arr[hi]) == false && v != arr[hi] {
+			if !compareFn(v, arr[hi]) && v != arr[hi] {
 				result = hi
-			} else if compareFn(v, arr[lo]) == false && v != arr[lo] {
+			} else if !compareFn(v, arr[lo]) && v != arr[lo] {
 				result = lo
 			} else {
 				result = -1
@@ -89,15 +90,15 @@ func resolve[C comparable](arr []C, lo int, hi int, v C, crit Inequality, compar
 		}
 	case InequalityLE:
 		if lo == hi {
-			if compareFn(v, arr[lo]) == false {
+			if !compareFn(v, arr[lo]) {
 				result = lo
 			} else {
 				result = -1
 			}
 		} else {
-			if compareFn(v, arr[hi]) == false {
+			if !compareFn(v, arr[hi]) {
 				result = hi
-			} else if compareFn(v, arr[lo]) == false {
+			} else if !compareFn(v, arr[lo]) {
 				result = lo
 			} else {
 				result = -1

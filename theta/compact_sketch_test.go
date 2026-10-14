@@ -182,7 +182,7 @@ func TestCompactSketch_MarshalBinary(t *testing.T) {
 
 	t.Run("Single entry sketch", func(t *testing.T) {
 		sketch, _ := NewQuickSelectUpdateSketch()
-		sketch.UpdateInt64(42)
+		assert.NoError(t, sketch.UpdateInt64(42))
 		compact := sketch.CompactOrdered()
 
 		data, err := compact.MarshalBinary()
@@ -200,7 +200,7 @@ func TestCompactSketch_MarshalBinary(t *testing.T) {
 	t.Run("Multiple entries exact mode", func(t *testing.T) {
 		sketch, _ := NewQuickSelectUpdateSketch()
 		for i := 0; i < 10; i++ {
-			sketch.UpdateInt64(int64(i))
+			assert.NoError(t, sketch.UpdateInt64(int64(i)))
 		}
 		compact := sketch.CompactOrdered()
 
@@ -220,7 +220,7 @@ func TestCompactSketch_MarshalBinary(t *testing.T) {
 	t.Run("Large sketch estimation mode", func(t *testing.T) {
 		sketch, _ := NewQuickSelectUpdateSketch()
 		for i := 0; i < 10000; i++ {
-			sketch.UpdateInt64(int64(i))
+			assertUpdate(t, sketch.UpdateInt64(int64(i)))
 		}
 		compact := sketch.CompactOrdered()
 

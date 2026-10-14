@@ -44,14 +44,15 @@ func TestGenerateGoSnapshots(t *testing.T) {
 			assert.NoError(t, err)
 
 			for i := 1; i <= n; i++ {
-				sketch.Update(float64(i))
+				assert.NoError(t, sketch.Update(float64(i)))
 			}
 
 			b, err := EncodeDouble(sketch, false)
 			assert.NoError(t, err)
 
 			filename := fmt.Sprintf("%s/tdigest_double_n%d_go.sk", internal.GoPath, n)
-			os.WriteFile(filename, b, 0644)
+			err = os.WriteFile(filename, b, 0644)
+			assert.NoError(t, err)
 			t.Logf("Generated: %s", filename)
 		}
 	})
@@ -63,14 +64,16 @@ func TestGenerateGoSnapshots(t *testing.T) {
 			assert.NoError(t, err)
 
 			for i := 1; i <= n; i++ {
-				sketch.Update(float64(i))
+				err := sketch.Update(float64(i))
+				assert.NoError(t, err)
 			}
 
 			b, err := EncodeDouble(sketch, true)
 			assert.NoError(t, err)
 
 			filename := fmt.Sprintf("%s/tdigest_double_buf_n%d_go.sk", internal.GoPath, n)
-			os.WriteFile(filename, b, 0644)
+			err = os.WriteFile(filename, b, 0644)
+			assert.NoError(t, err)
 			t.Logf("Generated: %s", filename)
 		}
 	})
@@ -241,7 +244,8 @@ func TestDoubleEncoderAndDoubleDecoder(t *testing.T) {
 	t.Run("Single Value", func(t *testing.T) {
 		sk, err := NewDouble(DefaultK)
 		assert.NoError(t, err)
-		sk.Update(123)
+		err = sk.Update(123)
+		assert.NoError(t, err)
 
 		var buf bytes.Buffer
 		enc := NewDoubleEncoder(&buf, false)
@@ -268,7 +272,8 @@ func TestDoubleEncoderAndDoubleDecoder(t *testing.T) {
 	t.Run("Single Value With Buffer", func(t *testing.T) {
 		sk, err := NewDouble(DefaultK)
 		assert.NoError(t, err)
-		sk.Update(123)
+		err = sk.Update(123)
+		assert.NoError(t, err)
 
 		var buf bytes.Buffer
 		enc := NewDoubleEncoder(&buf, true)
@@ -296,7 +301,8 @@ func TestDoubleEncoderAndDoubleDecoder(t *testing.T) {
 		sk, err := NewDouble(100)
 		assert.NoError(t, err)
 		for i := 0; i < 1000; i++ {
-			sk.Update(float64(i))
+			err := sk.Update(float64(i))
+			assert.NoError(t, err)
 		}
 
 		var buf bytes.Buffer
@@ -342,7 +348,7 @@ func TestDoubleEncoderAndDoubleDecoder(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
-			sk.Update(float64(i))
+			assert.NoError(t, sk.Update(float64(i)))
 		}
 
 		var buf bytes.Buffer
@@ -493,7 +499,7 @@ func TestEncodeDoubleAndDecodeDouble(t *testing.T) {
 	t.Run("Single Value", func(t *testing.T) {
 		sk, err := NewDouble(DefaultK)
 		assert.NoError(t, err)
-		sk.Update(123)
+		assert.NoError(t, sk.Update(123))
 
 		b, err := EncodeDouble(sk, false)
 		assert.NoError(t, err)
@@ -517,7 +523,7 @@ func TestEncodeDoubleAndDecodeDouble(t *testing.T) {
 	t.Run("Single Value With Buffer", func(t *testing.T) {
 		sk, err := NewDouble(DefaultK)
 		assert.NoError(t, err)
-		sk.Update(123)
+		assert.NoError(t, sk.Update(123))
 
 		b, err := EncodeDouble(sk, true)
 		assert.NoError(t, err)
@@ -542,7 +548,7 @@ func TestEncodeDoubleAndDecodeDouble(t *testing.T) {
 		sk, err := NewDouble(100)
 		assert.NoError(t, err)
 		for i := 0; i < 1000; i++ {
-			sk.Update(float64(i))
+			assert.NoError(t, sk.Update(float64(i)))
 		}
 
 		b, err := EncodeDouble(sk, false)
@@ -585,7 +591,7 @@ func TestEncodeDoubleAndDecodeDouble(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
-			sk.Update(float64(i))
+			assert.NoError(t, sk.Update(float64(i)))
 		}
 
 		b, err := EncodeDouble(sk, true)
@@ -740,7 +746,7 @@ func TestEncodeDoubleEquivalence(t *testing.T) {
 	t.Run("Single Value", func(t *testing.T) {
 		sk, err := NewDouble(DefaultK)
 		assert.NoError(t, err)
-		sk.Update(123)
+		assert.NoError(t, sk.Update(123))
 
 		var buf bytes.Buffer
 		enc := NewDoubleEncoder(&buf, false)
@@ -779,7 +785,7 @@ func TestEncodeDoubleEquivalence(t *testing.T) {
 	t.Run("Single Value With Buffer", func(t *testing.T) {
 		sk, err := NewDouble(DefaultK)
 		assert.NoError(t, err)
-		sk.Update(123)
+		assert.NoError(t, sk.Update(123))
 
 		var buf bytes.Buffer
 		enc := NewDoubleEncoder(&buf, true)
@@ -819,7 +825,7 @@ func TestEncodeDoubleEquivalence(t *testing.T) {
 		sk, err := NewDouble(100)
 		assert.NoError(t, err)
 		for i := 0; i < 1000; i++ {
-			sk.Update(float64(i))
+			assert.NoError(t, sk.Update(float64(i)))
 		}
 
 		var buf bytes.Buffer
@@ -872,7 +878,7 @@ func TestEncodeDoubleEquivalence(t *testing.T) {
 		sk, err := NewDouble(100)
 		assert.NoError(t, err)
 		for i := 0; i < 10000; i++ {
-			sk.Update(float64(i))
+			assert.NoError(t, sk.Update(float64(i)))
 		}
 
 		var buf bytes.Buffer
@@ -945,7 +951,7 @@ func TestDecodeDoubleEquivalence(t *testing.T) {
 	t.Run("Single Value", func(t *testing.T) {
 		sk, err := NewDouble(DefaultK)
 		assert.NoError(t, err)
-		sk.Update(123)
+		assert.NoError(t, sk.Update(123))
 
 		b, err := EncodeDouble(sk, false)
 		assert.NoError(t, err)
@@ -977,7 +983,7 @@ func TestDecodeDoubleEquivalence(t *testing.T) {
 	t.Run("Single Value With Buffer", func(t *testing.T) {
 		sk, err := NewDouble(DefaultK)
 		assert.NoError(t, err)
-		sk.Update(123)
+		assert.NoError(t, sk.Update(123))
 
 		b, err := EncodeDouble(sk, true)
 		assert.NoError(t, err)
@@ -1010,7 +1016,7 @@ func TestDecodeDoubleEquivalence(t *testing.T) {
 		sk, err := NewDouble(100)
 		assert.NoError(t, err)
 		for i := 0; i < 1000; i++ {
-			sk.Update(float64(i))
+			assert.NoError(t, sk.Update(float64(i)))
 		}
 
 		b, err := EncodeDouble(sk, false)
@@ -1056,7 +1062,7 @@ func TestDecodeDoubleEquivalence(t *testing.T) {
 		sk, err := NewDouble(100)
 		assert.NoError(t, err)
 		for i := 0; i < 10000; i++ {
-			sk.Update(float64(i))
+			assert.NoError(t, sk.Update(float64(i)))
 		}
 
 		b, err := EncodeDouble(sk, true)

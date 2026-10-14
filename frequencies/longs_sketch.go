@@ -130,46 +130,36 @@ func NewLongsSketchFromSlice(slc []byte) (*LongsSketch, error) {
 	if empty {
 		return NewLongsSketch(lgMaxMapSize, _LG_MIN_MAP_SIZE)
 	}
-	// get full preamble
-	preArr := make([]int64, preLongs)
-	for i := 0; i < preLongs; i++ {
-		preArr[i] = int64(binary.LittleEndian.Uint64(slc[i<<3:]))
-	}
+
 	fls, err := NewLongsSketch(lgMaxMapSize, lgCurMapSize)
 	if err != nil {
 		return nil, err
 	}
 	fls.streamWeight = 0 //update after
-	fls.offset = preArr[3]
+	fls.offset = int64(binary.LittleEndian.Uint64(slc[24:]))
 
 	preBytes := preLongs << 3
-	activeItems := extractActiveItems(preArr[1])
+	activeItems := extractActiveItems(int64(binary.LittleEndian.Uint64(slc[8:])))
 
-	// Get countArray
-	countArray := make([]int64, activeItems)
 	reqBytes := preBytes + 2*activeItems*8 //count Arr + Items Arr
 	if len(slc) < reqBytes {
 		return nil, fmt.Errorf("possible Corruption: Insufficient bytes in array: %d, %d", len(slc), reqBytes)
 	}
+
+	// UpdateMany the sketch, decoding counts and items straight out of slc.
+	// Counts occupy the activeItems longs starting at preBytes; items follow them.
+	itemsOffset := preBytes + (activeItems << 3)
+	counts := slc[preBytes:itemsOffset]
+	items := slc[itemsOffset:reqBytes]
 	for i := 0; i < activeItems; i++ {
-		countArray[i] = int64(binary.LittleEndian.Uint64(slc[preBytes+(i<<3):]))
+		count := int64(binary.LittleEndian.Uint64(counts[i<<3:]))
+		item := int64(binary.LittleEndian.Uint64(items[i<<3:]))
+		if err := fls.UpdateMany(item, count); err != nil {
+			return nil, err
+		}
 	}
 
-	// Get itemArray
-	itemsOffset := preBytes + (8 * activeItems)
-	itemArray := make([]int64, activeItems)
-	for i := 0; i < activeItems; i++ {
-		itemArray[i] = int64(binary.LittleEndian.Uint64(slc[itemsOffset+(i<<3):]))
-	}
-
-	// UpdateMany the sketch
-	for i := 0; i < activeItems && err == nil; i++ {
-		err = fls.UpdateMany(itemArray[i], countArray[i])
-	}
-	if err != nil {
-		return nil, err
-	}
-	fls.streamWeight = preArr[2] //override streamWeight due to updating
+	fls.streamWeight = int64(binary.LittleEndian.Uint64(slc[16:])) //override streamWeight due to updating
 	return fls, nil
 }
 
@@ -234,7 +224,7 @@ func NewLongsSketchFromString(str string) (*LongsSketch, error) {
 	}
 	empty := flags > 0
 	if !empty && (numActive == 0) {
-		return nil, fmt.Errorf("Possible Corruption: !Empty && NumActive=0;  strLen: %d", numActive)
+		return nil, fmt.Errorf("Possible Corruption: !Empty && NumActive=0;  strLen: %d", numActive) //nolint:staticcheck
 	}
 	numTokens := int64(len(tokens))
 	if (2 * numActive) != (numTokens - strPreambleTokens - 2) {
@@ -342,7 +332,7 @@ func (s *LongsSketch) GetUpperBound(item int64) (int64, error) {
 // threshold to include items in the result list
 // errorType determines whether no false positives or no false negatives are desired.
 // an array of frequent items
-func (s *LongsSketch) GetFrequentItemsWithThreshold(threshold int64, errorType errorType) ([]*Row, error) {
+func (s *LongsSketch) GetFrequentItemsWithThreshold(threshold int64, errorType errorType) ([]Row, error) {
 	finalThreshold := s.GetMaximumError()
 	if threshold > finalThreshold {
 		finalThreshold = threshold
@@ -355,7 +345,7 @@ func (s *LongsSketch) GetFrequentItemsWithThreshold(threshold int64, errorType e
 // This is the same as GetFrequentItemsWithThreshold(getMaximumError(), errorType)
 //
 // errorType determines whether no false positives or no false negatives are desired.
-func (s *LongsSketch) GetFrequentItems(errorType errorType) ([]*Row, error) {
+func (s *LongsSketch) GetFrequentItems(errorType errorType) ([]Row, error) {
 	return s.sortItems(s.GetMaximumError(), errorType)
 }
 
@@ -520,15 +510,19 @@ func (s *LongsSketch) ToSlice() []byte {
 		binary.LittleEndian.PutUint64(outArr[i<<3:], uint64(preArr[i]))
 	}
 
+	// All active values are written first, then all active keys, both in table
+	// index order. The two regions are disjoint, so a single pass over the hash
+	// table fills both without any intermediate slices.
 	preBytes := preLongs << 3
-	activeValues := s.hashMap.getActiveValues()
-	for i := 0; i < activeItems; i++ {
-		binary.LittleEndian.PutUint64(outArr[preBytes+(i<<3):], uint64(activeValues[i]))
-	}
-
-	activeKeys := s.hashMap.getActiveKeys()
-	for i := 0; i < activeItems; i++ {
-		binary.LittleEndian.PutUint64(outArr[preBytes+((activeItems+i)<<3):], uint64(activeKeys[i]))
+	keysOffset := preBytes + (activeItems << 3)
+	hashMap := s.hashMap
+	j := 0
+	for i := 0; i < len(hashMap.states); i++ {
+		if hashMap.states[i] > 0 { //isActive
+			binary.LittleEndian.PutUint64(outArr[preBytes+(j<<3):], uint64(hashMap.values[i]))
+			binary.LittleEndian.PutUint64(outArr[keysOffset+(j<<3):], uint64(hashMap.keys[i]))
+			j++
+		}
 	}
 
 	return outArr
@@ -555,8 +549,8 @@ func (s *LongsSketch) String() string {
 	return sb.String()
 }
 
-func (s *LongsSketch) sortItems(threshold int64, errorType errorType) ([]*Row, error) {
-	rowList := make([]*Row, 0)
+func (s *LongsSketch) sortItems(threshold int64, errorType errorType) ([]Row, error) {
+	rowList := make([]Row, 0, s.hashMap.numActive)
 	iter := s.hashMap.iterator()
 	if errorType == ErrorTypeEnum.NoFalseNegatives {
 		for iter.next() {
@@ -582,7 +576,7 @@ func (s *LongsSketch) sortItems(threshold int64, errorType errorType) ([]*Row, e
 		}
 	}
 
-	slices.SortFunc(rowList, func(a, b *Row) int {
+	slices.SortFunc(rowList, func(a, b Row) int {
 		if a.est > b.est {
 			return -1
 		}

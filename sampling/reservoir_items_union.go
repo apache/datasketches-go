@@ -239,7 +239,7 @@ func (u *ReservoirItemsUnion[T]) twoWayMergeInternalWeighted(source *ReservoirIt
 				return err
 			}
 
-			u.gadget.insertValueAtPosition(v, slotNo)
+			u.gadget.insertValueAtPosition(v, slotNo) //nolint:errcheck
 		}
 	}
 
@@ -272,13 +272,13 @@ func (u *ReservoirItemsUnion[T]) Reset() {
 func (u *ReservoirItemsUnion[T]) String() string {
 	var sb strings.Builder
 	sb.WriteString("### ReservoirItemsUnion SUMMARY:\n")
-	sb.WriteString(fmt.Sprintf("   Max k: %d\n", u.maxK))
+	fmt.Fprintf(&sb, "   Max k: %d\n", u.maxK)
 	if u.gadget == nil {
 		sb.WriteString("   Gadget is nil\n")
 	} else {
-		sb.WriteString(fmt.Sprintf("   Gadget N: %d\n", u.gadget.N()))
-		sb.WriteString(fmt.Sprintf("   Gadget K: %d\n", u.gadget.K()))
-		sb.WriteString(fmt.Sprintf("   Gadget NumSamples: %d\n", u.gadget.NumSamples()))
+		fmt.Fprintf(&sb, "   Gadget N: %d\n", u.gadget.N())
+		fmt.Fprintf(&sb, "   Gadget K: %d\n", u.gadget.K())
+		fmt.Fprintf(&sb, "   Gadget NumSamples: %d\n", u.gadget.NumSamples())
 	}
 	sb.WriteString("### END UNION SUMMARY\n")
 	return sb.String()

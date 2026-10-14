@@ -243,6 +243,10 @@ func TestGoCompat(t *testing.T) {
 			}
 			bytes, err := os.ReadFile(filename)
 			assert.NoError(t, err)
+
+			if extractCurMode(bytes) == curModeHll {
+				bytes[5] = setCompactFlag(bytes[5])
+			}
 			assert.Equal(t, bytes, sl6)
 		}
 
@@ -256,6 +260,10 @@ func TestGoCompat(t *testing.T) {
 			}
 			bytes, err := os.ReadFile(filename)
 			assert.NoError(t, err)
+
+			if extractCurMode(bytes) == curModeHll {
+				bytes[5] = setCompactFlag(bytes[5])
+			}
 			assert.Equal(t, bytes, sl8)
 		}
 
@@ -282,12 +290,6 @@ func TestGoCompat(t *testing.T) {
 			}
 			bytes, err := os.ReadFile(filename)
 			assert.NoError(t, err)
-
-			// clear compact flag for C++ sketches when in HLL mode tgt6
-			// as that flag is irrelevant but set in this case
-			if extractCurMode(bytes) == curModeHll {
-				bytes[5] = clearCompactFlag(bytes[5])
-			}
 			assert.Equal(t, bytes, sl6, "n: %d", n)
 		}
 
@@ -301,17 +303,11 @@ func TestGoCompat(t *testing.T) {
 			}
 			bytes, err := os.ReadFile(filename)
 			assert.NoError(t, err)
-
-			// clear compact flag for C++ sketches when in HLL mode tgt8
-			// as that flag is irrelevant but set in this case
-			if extractCurMode(bytes) == curModeHll {
-				bytes[5] = clearCompactFlag(bytes[5])
-			}
 			assert.Equal(t, bytes, sl8)
 		}
 	}
 }
 
-func clearCompactFlag(flags byte) byte {
-	return flags & ^(uint8(1) << 3)
+func setCompactFlag(flags byte) byte {
+	return flags | compactFlagMask
 }

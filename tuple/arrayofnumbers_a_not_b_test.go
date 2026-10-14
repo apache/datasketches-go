@@ -140,7 +140,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 			2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6, []float64{1.0, 2.0})
+		assertUpdate(t, b.UpdateInt64(6, []float64{1.0, 2.0}))
 
 		result, err := ArrayOfNumbersSketchANotB[float64](a, b, theta.DefaultSeed, true)
 		assert.NoError(t, err)
@@ -158,7 +158,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 			2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6, []float64{1.0, 2.0})
+		assertUpdate(t, b.UpdateInt64(6, []float64{1.0, 2.0}))
 
 		aCompact, _ := a.Compact(false)
 		bCompact, _ := b.Compact(false)
@@ -174,7 +174,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 	t.Run("A Non Empty No Retained Keys, B Empty", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		a.UpdateInt64(6, []float64{1.0, 2.0})
+		assertUpdate(t, a.UpdateInt64(6, []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
@@ -190,7 +190,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 	t.Run("A Non Empty No Retained Keys Compact, B Empty Compact", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		a.UpdateInt64(6, []float64{1.0, 2.0})
+		assertUpdate(t, a.UpdateInt64(6, []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
@@ -214,7 +214,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 			2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(4, []float64{1.0, 2.0})
+		assert.NoError(t, b.UpdateInt64(4, []float64{1.0, 2.0}))
 
 		result, err := ArrayOfNumbersSketchANotB[float64](a, b, theta.DefaultSeed, true)
 		assert.NoError(t, err)
@@ -232,7 +232,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 			2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(4, []float64{1.0, 2.0})
+		assert.NoError(t, b.UpdateInt64(4, []float64{1.0, 2.0}))
 
 		aCompact, _ := a.Compact(false)
 		bCompact, _ := b.Compact(false)
@@ -248,7 +248,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 	t.Run("A Estimation Mode, B Empty", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		a.UpdateInt64(4, []float64{1.0, 2.0})
+		assert.NoError(t, a.UpdateInt64(4, []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
@@ -264,7 +264,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 	t.Run("A Estimation Mode Compact, B Empty Compact", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		a.UpdateInt64(4, []float64{1.0, 2.0})
+		assert.NoError(t, a.UpdateInt64(4, []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
@@ -283,13 +283,13 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 	t.Run("A Exact, B Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4, []float64{1.0, 2.0})
+		assert.NoError(t, a.UpdateInt64(4, []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](
 			2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6, []float64{1.0, 2.0})
+		assertUpdate(t, b.UpdateInt64(6, []float64{1.0, 2.0}))
 
 		result, err := ArrayOfNumbersSketchANotB[float64](a, b, theta.DefaultSeed, true)
 		assert.NoError(t, err)
@@ -302,13 +302,13 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 	t.Run("A Exact Compact, B Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4, []float64{1.0, 2.0})
+		assert.NoError(t, a.UpdateInt64(4, []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](
 			2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		b.UpdateInt64(6, []float64{1.0, 2.0})
+		assertUpdate(t, b.UpdateInt64(6, []float64{1.0, 2.0}))
 
 		aCompact, _ := a.Compact(false)
 		bCompact, _ := b.Compact(false)
@@ -326,11 +326,11 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 			2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		a.UpdateInt64(6, []float64{1.0, 2.0})
+		assertUpdate(t, a.UpdateInt64(6, []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		b.UpdateInt64(4, []float64{1.0, 2.0})
+		assert.NoError(t, b.UpdateInt64(4, []float64{1.0, 2.0}))
 
 		result, err := ArrayOfNumbersSketchANotB[float64](a, b, theta.DefaultSeed, true)
 		assert.NoError(t, err)
@@ -345,11 +345,11 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 			2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1),
 		)
 		assert.NoError(t, err)
-		a.UpdateInt64(6, []float64{1.0, 2.0})
+		assertUpdate(t, a.UpdateInt64(6, []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		b.UpdateInt64(4, []float64{1.0, 2.0})
+		assert.NoError(t, b.UpdateInt64(4, []float64{1.0, 2.0}))
 
 		aCompact, _ := a.Compact(false)
 		bCompact, _ := b.Compact(false)
@@ -365,11 +365,11 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 	t.Run("A Estimation Mode, B Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4, []float64{1.0, 2.0})
+		assert.NoError(t, a.UpdateInt64(4, []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(6, []float64{1.0, 2.0})
+		assertUpdate(t, b.UpdateInt64(6, []float64{1.0, 2.0}))
 
 		result, err := ArrayOfNumbersSketchANotB[float64](a, b, theta.DefaultSeed, true)
 		assert.NoError(t, err)
@@ -382,11 +382,11 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 	t.Run("A Estimation Mode Compact, B Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(4, []float64{1.0, 2.0})
+		assert.NoError(t, a.UpdateInt64(4, []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(6, []float64{1.0, 2.0})
+		assertUpdate(t, b.UpdateInt64(6, []float64{1.0, 2.0}))
 
 		aCompact, _ := a.Compact(false)
 		bCompact, _ := b.Compact(false)
@@ -402,11 +402,11 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 	t.Run("A Non Empty No Retained Keys, B Estimation Mode", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(6, []float64{1.0, 2.0})
+		assert.NoError(t, a.UpdateInt64(6, []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(4, []float64{1.0, 2.0})
+		assert.NoError(t, b.UpdateInt64(4, []float64{1.0, 2.0}))
 
 		result, err := ArrayOfNumbersSketchANotB[float64](a, b, theta.DefaultSeed, true)
 		assert.NoError(t, err)
@@ -419,11 +419,11 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 	t.Run("A Non Empty No Retained Keys Compact, B Estimation Mode Compact", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(6, []float64{1.0, 2.0})
+		assert.NoError(t, a.UpdateInt64(6, []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(4, []float64{1.0, 2.0})
+		assert.NoError(t, b.UpdateInt64(4, []float64{1.0, 2.0}))
 
 		aCompact, _ := a.Compact(false)
 		bCompact, _ := b.Compact(false)
@@ -442,7 +442,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 1000; i++ {
-			a.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assert.NoError(t, a.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -450,7 +450,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 0; i < 1000; i++ {
-			b.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assert.NoError(t, b.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -468,7 +468,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 1000; i++ {
-			a.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assert.NoError(t, a.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -476,7 +476,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 0; i < 1000; i++ {
-			b.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assert.NoError(t, b.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -497,7 +497,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 1000; i++ {
-			a.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assert.NoError(t, a.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -506,7 +506,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value = 500
 		for i := 0; i < 1000; i++ {
-			b.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assert.NoError(t, b.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -525,7 +525,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 1000; i++ {
-			a.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assert.NoError(t, a.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -534,7 +534,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value = 500
 		for i := 0; i < 1000; i++ {
-			b.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assert.NoError(t, b.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -556,7 +556,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assert.NoError(t, sketch.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -574,7 +574,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 1000; i++ {
-			sketch.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assert.NoError(t, sketch.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -593,7 +593,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 10000; i++ {
-			a.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assertUpdate(t, a.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -601,7 +601,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
-			b.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assertUpdate(t, b.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -621,7 +621,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 10000; i++ {
-			a.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assertUpdate(t, a.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -629,7 +629,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
-			b.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assertUpdate(t, b.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -651,7 +651,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 10000; i++ {
-			a.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assertUpdate(t, a.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -660,7 +660,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value = 5000
 		for i := 0; i < 10000; i++ {
-			b.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assertUpdate(t, b.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -680,7 +680,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 10000; i++ {
-			a.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assertUpdate(t, a.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -689,7 +689,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value = 5000
 		for i := 0; i < 10000; i++ {
-			b.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assertUpdate(t, b.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -711,7 +711,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assertUpdate(t, sketch.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -729,7 +729,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 
 		value := 0
 		for i := 0; i < 10000; i++ {
-			sketch.UpdateInt64(int64(value), []float64{1.0, 2.0})
+			assertUpdate(t, sketch.UpdateInt64(int64(value), []float64{1.0, 2.0}))
 			value++
 		}
 
@@ -745,11 +745,11 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 	t.Run("A Exact Mode, B Estimation Mode Full Overlap", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(4), []float64{1.0, 2.0})
+		assert.NoError(t, a.UpdateInt64(int64(4), []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(4), []float64{1.0, 2.0})
+		assert.NoError(t, b.UpdateInt64(int64(4), []float64{1.0, 2.0}))
 
 		result, err := ArrayOfNumbersSketchANotB[float64](a, b, theta.DefaultSeed, true)
 		assert.NoError(t, err)
@@ -762,11 +762,11 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 	t.Run("A Exact Mode Compact, B Estimation Mode Compact Full Overlap", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(4), []float64{1.0, 2.0})
+		assert.NoError(t, a.UpdateInt64(int64(4), []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(4), []float64{1.0, 2.0})
+		assert.NoError(t, b.UpdateInt64(int64(4), []float64{1.0, 2.0}))
 
 		aCompact, _ := a.Compact(false)
 		bCompact, _ := b.Compact(false)
@@ -782,11 +782,11 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 	t.Run("A Non Empty No Retained Keys, B Non Empty No Retained Keys", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(3), []float64{1.0, 2.0})
+		assertUpdate(t, a.UpdateInt64(int64(3), []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(6), []float64{1.0, 2.0})
+		assertUpdate(t, b.UpdateInt64(int64(6), []float64{1.0, 2.0}))
 
 		result, err := ArrayOfNumbersSketchANotB[float64](a, b, theta.DefaultSeed, true)
 		assert.NoError(t, err)
@@ -799,11 +799,11 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 	t.Run("A Non Empty No Retained Keys Compact, B Non Empty No Retained Keys Compact", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.5))
 		assert.NoError(t, err)
-		a.UpdateInt64(int64(3), []float64{1.0, 2.0})
+		assertUpdate(t, a.UpdateInt64(int64(3), []float64{1.0, 2.0}))
 
 		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
 		assert.NoError(t, err)
-		b.UpdateInt64(int64(6), []float64{1.0, 2.0})
+		assertUpdate(t, b.UpdateInt64(int64(6), []float64{1.0, 2.0}))
 
 		aCompact, _ := a.Compact(false)
 		bCompact, _ := b.Compact(false)
@@ -850,7 +850,7 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 		sketch, err := NewArrayOfNumbersUpdateSketch[float64](2)
 		assert.NoError(t, err)
 
-		sketch.UpdateInt64(1, []float64{1.0, 2.0}) // non-empty should not be ignored
+		assert.NoError(t, sketch.UpdateInt64(1, []float64{1.0, 2.0})) // non-empty should not be ignored
 
 		_, err = ArrayOfNumbersSketchANotB[float64](sketch, sketch, 123, true)
 		assert.Error(t, err)

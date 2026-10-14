@@ -699,12 +699,12 @@ func (s *VarOptItemsSketch[T]) String() string {
 	var sb strings.Builder
 	sb.WriteString("\n")
 	sb.WriteString("### VarOptItemsSketch SUMMARY: \n")
-	sb.WriteString(fmt.Sprintf("   k            : %d\n", s.k))
-	sb.WriteString(fmt.Sprintf("   h            : %d\n", s.h))
-	sb.WriteString(fmt.Sprintf("   r            : %d\n", s.r))
-	sb.WriteString(fmt.Sprintf("   weight_r     : %g\n", s.totalWeightR))
-	sb.WriteString(fmt.Sprintf("   Current size : %d\n", cap(s.data)))
-	sb.WriteString(fmt.Sprintf("   Resize factor: %v\n", s.rf))
+	fmt.Fprintf(&sb, "   k            : %d\n", s.k)
+	fmt.Fprintf(&sb, "   h            : %d\n", s.h)
+	fmt.Fprintf(&sb, "   r            : %d\n", s.r)
+	fmt.Fprintf(&sb, "   weight_r     : %g\n", s.totalWeightR)
+	fmt.Fprintf(&sb, "   Current size : %d\n", cap(s.data))
+	fmt.Fprintf(&sb, "   Resize factor: %v\n", s.rf)
 	sb.WriteString("### END SKETCH SUMMARY\n")
 	return sb.String()
 }
@@ -902,7 +902,7 @@ func (s *VarOptItemsSketch[T]) decreaseKBy1() error {
 		s.k--
 		s.n-- // will be re-incremented with the update
 
-		s.update(pulledItem, pulledWeight, pulledMark)
+		s.update(pulledItem, pulledWeight, pulledMark) //nolint:errcheck
 	case s.h == 0 && s.r > 0:
 		// pure reservoir mode, so can simply eject a randomly chosen sample from the reservoir
 		if s.r < 2 {

@@ -275,7 +275,7 @@ func Test_CountMinSketch(t *testing.T) {
 		err = c.Serialize(b)
 		assert.NoError(t, err)
 
-		d, err := c.Deserialize(b.Bytes(), seed)
+		d, err := NewCountMinSketchFromSlice(b.Bytes(), seed)
 		assert.NoError(t, err)
 		assert.Equal(t, c, d)
 		assert.NotEqual(t, &c, d)
@@ -290,9 +290,44 @@ func Test_CountMinSketch(t *testing.T) {
 		err = c.Serialize(b)
 		assert.NoError(t, err)
 
-		d, err = c.Deserialize(b.Bytes(), seed)
+		d, err = NewCountMinSketchFromSlice(b.Bytes(), seed)
 		assert.NoError(t, err)
 		assert.Equal(t, c, d)
 		assert.NotEqual(t, &c, d)
 	})
+}
+
+func BenchmarkCountMinSketch_Update(b *testing.B) {
+	cms, err := NewCountMinSketch(int8(3), int32(1024), int64(1234567))
+	if err != nil {
+		b.Fatal(err)
+	}
+	item := []byte("benchmark-item")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := cms.Update(item, 1); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkCountMinSketch_GetEstimate(b *testing.B) {
+	cms, err := NewCountMinSketch(int8(3), int32(1024), int64(1234567))
+	if err != nil {
+		b.Fatal(err)
+	}
+	item := []byte("benchmark-item")
+	if err := cms.Update(item, 1); err != nil {
+		b.Fatal(err)
+	}
+
+	var sink int64
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		sink = cms.GetEstimate(item)
+	}
+	_ = sink
 }

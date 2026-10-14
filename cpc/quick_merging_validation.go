@@ -158,10 +158,10 @@ func (qmv *QuickMergingValidation) quickTest(lgK int, cA, cB int64) error {
 
 func (qmv *QuickMergingValidation) printf(format string, args ...interface{}) {
 	if qmv.printStream != nil {
-		fmt.Fprintf(qmv.printStream, format, args...)
+		fmt.Fprintf(qmv.printStream, format, args...) //nolint:errcheck
 	}
 	if qmv.printWriter != nil {
-		fmt.Fprintf(qmv.printWriter, format, args...)
+		fmt.Fprintf(qmv.printWriter, format, args...) //nolint:errcheck
 	}
 }
 

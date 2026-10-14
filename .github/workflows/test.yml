@@ -45,3 +45,6 @@ jobs:
 
     - name: Run Test With coverage
       run: make test
+
+    - name: Generate Go snapshots
+      run: make generate-go-snapshots

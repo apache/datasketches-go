@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"slices"
 
 	"github.com/cespare/xxhash/v2"
 )
@@ -40,9 +41,9 @@ const (
 func GenerateHashKeyFromStrings(s []string) uint64 {
 	hasher := xxhash.NewWithSeed(stringSliceHashSeed)
 	for i, v := range s {
-		hasher.WriteString(v)
+		hasher.WriteString(v) //nolint:errcheck
 		if i+1 < len(s) {
-			hasher.WriteString(",")
+			hasher.WriteString(",") //nolint:errcheck
 		}
 	}
 	return hasher.Sum64()
@@ -72,7 +73,7 @@ func (s *ArrayOfStringsSummary) Clone() Summary {
 
 // Update incorporates a new string value into the summary.
 func (s *ArrayOfStringsSummary) Update(values []string) {
-	s.values = values
+	s.values = slices.Clone(values)
 }
 
 // ArrayOfStringsSummaryWriter writes an ArrayOfStringsSummary to the provided io.Writer in binary format.

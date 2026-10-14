@@ -175,10 +175,12 @@ func find[S Summary](entries []entry[S], lgSize uint8, key uint64) (int, error) 
 	loopIndex := index
 	for {
 		probe := entries[index]
-		if probe.Hash == 0 {
+		switch probe.Hash {
+		case 0:
 			return int(index), ErrKeyNotFound
-		} else if probe.Hash == key {
+		case key:
 			return int(index), nil
+		default:
 		}
 
 		index = (index + stride) & mask

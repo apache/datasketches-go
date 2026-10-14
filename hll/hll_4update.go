@@ -187,7 +187,7 @@ func shiftToBiggerCurMin(h *hll4ArrayImpl) error {
 				return fmt.Errorf("newShiftedVal < 0")
 			}
 			if h.getNibble(slotNum) != auxToken {
-				return fmt.Errorf("Array slot != AUX_TOKEN %d", h.getNibble(slotNum))
+				return fmt.Errorf("Array slot != AUX_TOKEN %d", h.getNibble(slotNum)) //nolint:staticcheck
 			}
 			if newShiftedVal < auxToken {
 				if newShiftedVal != 14 {

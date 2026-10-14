@@ -185,11 +185,7 @@ func (u *Union) Result(ordered bool) (*CompactSketch, error) {
 		}
 	}
 
-	if uint32(len(entries)) > nominalNum {
-		internal.QuickSelect(entries, 0, len(entries)-1, int(nominalNum))
-		theta = entries[nominalNum]
-		entries = entries[:nominalNum]
-	}
+	entries, theta = trimToNominal(entries, nominalNum, theta)
 
 	if ordered {
 		slices.Sort(entries)

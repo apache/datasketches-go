@@ -18,6 +18,7 @@
 package hll
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"testing"
 
@@ -334,4 +335,100 @@ func TestCheckUnionDeserializeRebuildAfterMerge(t *testing.T) {
 	rebuild = sk3.(*hllSketchState).sketch.(*hll8ArrayImpl).isRebuildCurMinNumKxQFlag()
 	assert.False(t, rebuild)
 
+	//The rebuilt state must be the state the incremental update path maintains, or the
+	//image would depend on when the rebuild ran. HLL_8 convention: curMin is always 0 and
+	//numAtCurMin counts the zero registers. HipAccum stays dead once out of order.
+	zeros := 0
+	for i := hllByteArrStart; i < len(sl); i++ {
+		if sl[i] == 0 {
+			zeros++
+		}
+	}
+	assert.Equal(t, 0, extractCurMin(sl))
+	assert.Equal(t, zeros, extractNumAtCurMin(sl))
+	assert.True(t, extractOooFlag(sl))
+	assert.Equal(t, 0.0, extractHipAccum(sl))
+
+	//Saturate a second union so no register is left at zero. This is the case that
+	//distinguishes the two representations: a rebuild that stored the true minimum would
+	//leave curMin > 0 here, while the incremental path always reports curMin = 0 with
+	//numAtCurMin = 0. Above, with a sparse gadget, the true minimum is 0 anyway.
+	union2, err := NewUnion(lgK)
+	assert.NoError(t, err)
+	dense := 50000
+	assert.NoError(t, union2.UpdateSketch(buildRangeSketch(t, lgK, TgtHllTypeDefault, 0, int64(dense))))
+	assert.NoError(t, union2.UpdateSketch(buildRangeSketch(t, lgK, TgtHllTypeDefault, int64(dense), int64(2*dense))))
+
+	sl2, err := union2.ToUpdatableSlice() //forces rebuild
+	assert.NoError(t, err)
+	for i := hllByteArrStart; i < len(sl2); i++ {
+		assert.NotEqual(t, byte(0), sl2[i], "register %d should be non-zero", i-hllByteArrStart)
+	}
+	assert.Equal(t, 0, extractCurMin(sl2))
+	assert.Equal(t, 0, extractNumAtCurMin(sl2))
+}
+
+func buildRangeSketch(t *testing.T, lgK int, tgtType TgtHllType, lo, hi int64) HllSketch {
+	t.Helper()
+	sk, err := NewHllSketch(lgK, tgtType)
+	assert.NoError(t, err)
+	for i := lo; i < hi; i++ {
+		assert.NoError(t, sk.UpdateInt64(i))
+	}
+	return sk
+}
+
+func unionResultImage(t *testing.T, u Union) ([]byte, string) {
+	t.Helper()
+	res, err := u.GetResult(TgtHllTypeHll8)
+	assert.NoError(t, err)
+	img, err := res.ToUpdatableSlice()
+	assert.NoError(t, err)
+	return img, fmt.Sprintf("%d bytes sha256=%x", len(img), sha256.Sum256(img))
+}
+
+func TestUnionRebuildIsMergeOrderIndependent(t *testing.T) {
+	const lgK = 12
+	in := []HllSketch{
+		buildRangeSketch(t, lgK, TgtHllTypeHll4, 20000, 30364),
+		buildRangeSketch(t, lgK, TgtHllTypeHll8, 5000, 14699),
+		buildRangeSketch(t, lgK, TgtHllTypeHll4, 70000, 70300),
+	}
+	assert.Equal(t, curModeSet, in[2].GetCurMode(), "third sketch must stay in SET mode")
+	orders := [][]int{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}}
+
+	ref := ""
+	for _, order := range orders {
+		u, err := NewUnion(lgK)
+		assert.NoError(t, err)
+		for _, i := range order {
+			assert.NoError(t, u.UpdateSketch(in[i]))
+		}
+		_, got := unionResultImage(t, u)
+		if ref == "" {
+			ref = got
+		} else {
+			assert.Equal(t, ref, got, "merge order %v produced a different image", order)
+		}
+	}
+}
+
+func TestUnionHipAccumStaysZeroAfterMerge(t *testing.T) {
+	const lgK = 13
+	p := buildRangeSketch(t, lgK, TgtHllTypeHll8, 0, 50000)
+	q := buildRangeSketch(t, lgK, TgtHllTypeHll8, 50000, 100000)
+
+	for _, n := range []int64{10, 200000} {
+		u, err := NewUnion(lgK)
+		assert.NoError(t, err)
+		assert.NoError(t, u.UpdateSketch(p))
+		assert.NoError(t, u.UpdateSketch(q))
+		for v := int64(9000000); v < 9000000+n; v++ {
+			assert.NoError(t, u.UpdateInt64(v))
+		}
+
+		img, _ := unionResultImage(t, u)
+		assert.True(t, extractOooFlag(img), "n=%d", n)
+		assert.Equal(t, 0.0, extractHipAccum(img), "n=%d", n)
+	}
 }

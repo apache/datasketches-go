@@ -97,16 +97,10 @@ func (c *CountMinSketch) isEmpty() bool {
 	return c.totalWeight == 0
 }
 
-func (c *CountMinSketch) getHashes(item []byte) []int64 {
-	sketchUpdateLocations := make([]int64, c.numHashes)
-
-	for i, s := range c.hashSeeds {
-		h1, _ := internal.HashByteArrMurmur3(item, 0, len(item), uint64(s))
-		bucketIndex := h1 % uint64(c.numBuckets)
-		sketchUpdateLocations[i] = int64(i)*int64(c.numBuckets) + int64(bucketIndex)
-	}
-
-	return sketchUpdateLocations
+func (c *CountMinSketch) hashLocation(item []byte, i int, seed int64) int64 {
+	h1, _ := internal.HashByteArrMurmur3(item, 0, len(item), uint64(seed))
+	bucketIndex := h1 % uint64(c.numBuckets)
+	return int64(i)*int64(c.numBuckets) + int64(bucketIndex)
 }
 
 func (c *CountMinSketch) Update(item []byte, weight int64) error {
@@ -120,9 +114,8 @@ func (c *CountMinSketch) Update(item []byte, weight int64) error {
 		c.totalWeight += weight
 	}
 
-	hashLocations := c.getHashes(item)
-	for _, h := range hashLocations {
-		c.sketchSlice[h] += weight
+	for i, s := range c.hashSeeds {
+		c.sketchSlice[c.hashLocation(item, i, s)] += weight
 	}
 	return nil
 }
@@ -146,10 +139,9 @@ func (c *CountMinSketch) GetEstimate(item []byte) int64 {
 		return 0
 	}
 
-	hashLocations := c.getHashes(item)
 	estimate := int64(math.MaxInt64)
-	for _, h := range hashLocations {
-		estimate = min(estimate, c.sketchSlice[h])
+	for i, s := range c.hashSeeds {
+		estimate = min(estimate, c.sketchSlice[c.hashLocation(item, i, s)])
 	}
 	return estimate
 }
@@ -273,7 +265,8 @@ func (c *CountMinSketch) Serialize(w io.Writer) error {
 	return nil
 }
 
-func (c *CountMinSketch) Deserialize(b []byte, seed int64) (*CountMinSketch, error) {
+// NewCountMinSketchFromSlice deserializes a Count-Min sketch from a byte slice.
+func NewCountMinSketchFromSlice(b []byte, seed int64) (*CountMinSketch, error) {
 	r := bytes.NewReader(b)
 	var err error
 
@@ -365,4 +358,11 @@ func (c *CountMinSketch) Deserialize(b []byte, seed int64) (*CountMinSketch, err
 	}
 
 	return cms, nil
+}
+
+// Deserialize deserializes a Count-Min sketch from a byte slice.
+//
+// Deprecated: use NewCountMinSketchFromSlice instead.
+func (c *CountMinSketch) Deserialize(b []byte, seed int64) (*CountMinSketch, error) {
+	return NewCountMinSketchFromSlice(b, seed)
 }

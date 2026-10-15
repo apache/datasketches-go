@@ -39,6 +39,9 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Download C++ and Java snapshots
+        run: make download-snapshots
+
       - name: Run tests with coverage
         run: make test
 

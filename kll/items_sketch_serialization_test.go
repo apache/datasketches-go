@@ -27,6 +27,7 @@ import (
 
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/testutil"
 )
 
 func TestGenerateGoSnapshots(t *testing.T) {
@@ -104,12 +105,7 @@ func TestJavaCompat(t *testing.T) {
 		for _, n := range nArr {
 			digits := numDigits(n)
 			filename := fmt.Sprintf("%s/kll_string_n%d_java.sk", internal.JavaPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			bytes, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[string](bytes, comparatorString, serde)
 			if err != nil {
 				return
@@ -157,12 +153,7 @@ func TestJavaCompat(t *testing.T) {
 		comparatorDouble := common.ItemSketchDoubleComparator(false)
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/kll_double_n%d_java.sk", internal.JavaPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			bytes, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[float64](bytes, comparatorDouble, serde)
 			if err != nil {
 				return
@@ -209,12 +200,7 @@ func TestJavaCompat(t *testing.T) {
 		comparatorLong := common.ItemSketchLongComparator(false)
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/kll_long_n%d_java.sk", internal.JavaPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			bytes, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[int64](bytes, comparatorLong, serde)
 			if err != nil {
 				return
@@ -261,12 +247,7 @@ func TestJavaCompat(t *testing.T) {
 		comparatorFloat := common.ItemSketchFloatComparator(false)
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/kll_float_n%d_java.sk", internal.JavaPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			bytes, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[float32](bytes, comparatorFloat, serde)
 			if err != nil {
 				return
@@ -318,12 +299,7 @@ func TestCPPCompat(t *testing.T) {
 		comparatorString := common.ItemSketchStringComparator(false)
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/kll_string_n%d_cpp.sk", internal.CppPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			bytes, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[string](bytes, comparatorString, serde)
 			if err != nil {
 				return
@@ -376,12 +352,7 @@ func TestCPPCompat(t *testing.T) {
 		comparatorDouble := common.ItemSketchDoubleComparator(false)
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/kll_double_n%d_cpp.sk", internal.CppPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			bytes, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[float64](bytes, comparatorDouble, serde)
 			if err != nil {
 				return
@@ -428,12 +399,7 @@ func TestCPPCompat(t *testing.T) {
 		comparatorLong := common.ItemSketchLongComparator(false)
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/kll_long_n%d_cpp.sk", internal.CppPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			bytes, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[int64](bytes, comparatorLong, serde)
 			if err != nil {
 				return
@@ -480,12 +446,7 @@ func TestCPPCompat(t *testing.T) {
 		comparatorFloat := common.ItemSketchFloatComparator(false)
 		for _, n := range nArr {
 			filename := fmt.Sprintf("%s/kll_float_n%d_cpp.sk", internal.CppPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			bytes, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[float32](bytes, comparatorFloat, serde)
 			if err != nil {
 				return

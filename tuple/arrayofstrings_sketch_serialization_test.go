@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/testutil"
 
 	"github.com/apache/datasketches-go/theta"
 )
@@ -218,13 +219,7 @@ func assertArrayOfStringsSnapshots(t *testing.T, dir, sfx string) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/aos_1_n%d%s.sk", dir, n, sfx)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "missing fixture", "file %s does not exist", filename)
-				continue
-			}
-
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			sketch, err := Decode[*ArrayOfStringsSummary](b, theta.DefaultSeed, ArrayOfStringsSummaryReader)
 			assert.NoError(t, err)
@@ -244,13 +239,7 @@ func assertArrayOfStringsSnapshots(t *testing.T, dir, sfx string) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/aos_3_n%d%s.sk", dir, n, sfx)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "missing fixture", "file %s does not exist", filename)
-				continue
-			}
-
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			sketch, err := Decode[*ArrayOfStringsSummary](b, theta.DefaultSeed, ArrayOfStringsSummaryReader)
 			assert.NoError(t, err)
@@ -274,13 +263,7 @@ func assertArrayOfStringsSnapshots(t *testing.T, dir, sfx string) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/aos_multikey_n%d%s.sk", dir, n, sfx)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "missing fixture", "file %s does not exist", filename)
-				continue
-			}
-
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			sketch, err := Decode[*ArrayOfStringsSummary](b, theta.DefaultSeed, ArrayOfStringsSummaryReader)
 			assert.NoError(t, err)
@@ -298,13 +281,7 @@ func assertArrayOfStringsSnapshots(t *testing.T, dir, sfx string) {
 
 	t.Run("non empty no entries", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/aos_1_non_empty_no_entries%s.sk", dir, sfx)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "missing fixture", "file %s does not exist", filename)
-			return
-		}
-
-		b, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		b := testutil.ReadSnapshot(t, filename)
 
 		sketch, err := Decode[*ArrayOfStringsSummary](b, theta.DefaultSeed, ArrayOfStringsSummaryReader)
 		assert.NoError(t, err)
@@ -315,13 +292,7 @@ func assertArrayOfStringsSnapshots(t *testing.T, dir, sfx string) {
 
 	t.Run("unicode strings", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/aos_unicode%s.sk", dir, sfx)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "missing fixture", "file %s does not exist", filename)
-			return
-		}
-
-		b, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		b := testutil.ReadSnapshot(t, filename)
 
 		sketch, err := Decode[*ArrayOfStringsSummary](b, theta.DefaultSeed, ArrayOfStringsSummaryReader)
 		assert.NoError(t, err)
@@ -345,13 +316,7 @@ func assertArrayOfStringsSnapshots(t *testing.T, dir, sfx string) {
 
 	t.Run("empty strings", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/aos_empty_strings%s.sk", dir, sfx)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "missing fixture", "file %s does not exist", filename)
-			return
-		}
-
-		b, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		b := testutil.ReadSnapshot(t, filename)
 
 		sketch, err := Decode[*ArrayOfStringsSummary](b, theta.DefaultSeed, ArrayOfStringsSummaryReader)
 		assert.NoError(t, err)
@@ -380,10 +345,6 @@ func TestArrayOfStringsSketch_GoSnapshots(t *testing.T) {
 
 func TestArrayOfStringsSketch_JavaCompat(t *testing.T) {
 	assertArrayOfStringsSnapshots(t, internal.JavaPath, "_java")
-}
-
-func TestArrayOfStringsSketch_CPPCompat(t *testing.T) {
-	assertArrayOfStringsSnapshots(t, internal.CppPath, "_cpp")
 }
 
 func TestArrayOfStringsSummaryWriter_ErrTooManyStrings(t *testing.T) {

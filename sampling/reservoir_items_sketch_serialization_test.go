@@ -28,6 +28,7 @@ import (
 
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/testutil"
 )
 
 // Note: Go only has generic ReservoirItemsSketch[T], no separate ReservoirLongsSketch.
@@ -149,12 +150,7 @@ func TestGenerateGoSnapshots(t *testing.T) {
 // TestSerializationCompatibilityEmpty tests deserialization of an empty sketch.
 func TestSerializationCompatibilityEmpty(t *testing.T) {
 	filename := filepath.Join(internal.GoPath, "reservoir_items_long_empty_k128_go.sk")
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		assert.FailNowf(t, "file %s does not exist", filename)
-		return
-	}
-	data, err := os.ReadFile(filename)
-	assert.NoError(t, err)
+	data := testutil.ReadSnapshot(t, filename)
 
 	sketch, err := NewReservoirItemsSketchFromSlice[int64](data, common.ItemSketchLongSerDe{})
 	assert.NoError(t, err)
@@ -180,12 +176,7 @@ func TestSerializationCompatibilityExact(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.filename, func(t *testing.T) {
 			filename := filepath.Join(internal.GoPath, tc.filename)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			data, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			data := testutil.ReadSnapshot(t, filename)
 
 			sketch, err := NewReservoirItemsSketchFromSlice[int64](data, common.ItemSketchLongSerDe{})
 			assert.NoError(t, err)
@@ -211,12 +202,7 @@ func TestSerializationCompatibilityWithSampling(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.filename, func(t *testing.T) {
 			filename := filepath.Join(internal.GoPath, tc.filename)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				return
-			}
-			data, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			data := testutil.ReadSnapshot(t, filename)
 
 			sketch, err := NewReservoirItemsSketchFromSlice[int64](data, common.ItemSketchLongSerDe{})
 			assert.NoError(t, err)
@@ -314,13 +300,7 @@ func TestReservoirItemsSketch_JavaCompat(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			filepath := filepath.Join(internal.JavaPath, tc.filename)
 
-			if _, err := os.Stat(filepath); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filepath)
-				return
-			}
-
-			data, err := os.ReadFile(filepath)
-			assert.NoError(t, err)
+			data := testutil.ReadSnapshot(t, filepath)
 
 			sketch, err := NewReservoirItemsSketchFromSlice[int64](data, common.ItemSketchLongSerDe{})
 			assert.NoError(t, err)

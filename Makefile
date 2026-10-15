@@ -14,9 +14,13 @@
 # limitations under the License.
 
 .PHONY: test
-test:
+test: generate-go-snapshots
 	rm -rf coverage.out
 	go test ./... -coverprofile=coverage.out
+
+.PHONY: download-snapshots
+download-snapshots:
+	./scripts/download_serialization_test_data.sh
 
 .PHONY: generate-go-snapshots
 generate-go-snapshots:

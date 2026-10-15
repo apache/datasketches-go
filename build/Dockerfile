@@ -16,11 +16,13 @@
 
 FROM golang:1.24.11-alpine
 ENV CGO_ENABLED=0
+RUN apk add --no-cache bash curl make tar
 
 WORKDIR /github.com/apache/datasketches-go/
 COPY go.mod .
 COPY go.sum .
-COPY serialization_test_data ./serialization_test_data
+COPY Makefile .
+COPY scripts ./scripts
 COPY common ./common
 COPY count ./count
 COPY cpc ./cpc
@@ -30,6 +32,7 @@ COPY frequencies ./frequencies
 COPY hll ./hll
 COPY internal ./internal
 COPY kll ./kll
+COPY req ./req
 COPY sampling ./sampling
 COPY tdigest ./tdigest
 COPY theta ./theta
@@ -37,5 +40,6 @@ COPY tuple ./tuple
 
 RUN go mod download
 RUN go build -v ./...
+RUN make download-snapshots
 
-CMD ["go", "test", "-v", "./..."]
+CMD ["make", "test"]

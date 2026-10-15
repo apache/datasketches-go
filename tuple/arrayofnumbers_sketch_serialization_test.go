@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/testutil"
 	"github.com/apache/datasketches-go/theta"
 )
 
@@ -119,13 +120,7 @@ func TestArrayOfNumbersSketch_JavaCompat(t *testing.T) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/aod_1_n%d_java.sk", internal.JavaPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file does not exist", filename)
-				continue
-			}
-
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			buf := bytes.NewBuffer(b)
 			sketch, err := DecodeArrayOfNumbersCompactSketch[float64](buf.Bytes(), theta.DefaultSeed)
@@ -145,13 +140,7 @@ func TestArrayOfNumbersSketch_JavaCompat(t *testing.T) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/aod_3_n%d_java.sk", internal.JavaPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file does not exist", filename)
-				continue
-			}
-
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			buf := bytes.NewBuffer(b)
 			sketch, err := DecodeArrayOfNumbersCompactSketch[float64](buf.Bytes(), theta.DefaultSeed)
@@ -171,13 +160,7 @@ func TestArrayOfNumbersSketch_JavaCompat(t *testing.T) {
 
 	t.Run("non empty no entries", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/aod_1_non_empty_no_entries_java.sk", internal.JavaPath)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "file does not exist", filename)
-			return
-		}
-
-		b, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		b := testutil.ReadSnapshot(t, filename)
 
 		buf := bytes.NewBuffer(b)
 		sketch, err := DecodeArrayOfNumbersCompactSketch[float64](buf.Bytes(), theta.DefaultSeed)
@@ -193,13 +176,7 @@ func TestArrayOfNumbersSketch_CPPCompat(t *testing.T) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/aod_1_n%d_cpp.sk", internal.CppPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file does not exist", filename)
-				continue
-			}
-
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			buf := bytes.NewBuffer(b)
 			sketch, err := DecodeArrayOfNumbersCompactSketch[float64](buf.Bytes(), theta.DefaultSeed)
@@ -219,13 +196,7 @@ func TestArrayOfNumbersSketch_CPPCompat(t *testing.T) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/aod_3_n%d_cpp.sk", internal.CppPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file does not exist", filename)
-				continue
-			}
-
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			buf := bytes.NewBuffer(b)
 			sketch, err := DecodeArrayOfNumbersCompactSketch[float64](buf.Bytes(), theta.DefaultSeed)
@@ -245,13 +216,7 @@ func TestArrayOfNumbersSketch_CPPCompat(t *testing.T) {
 
 	t.Run("non empty no entries", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/aod_1_non_empty_no_entries_cpp.sk", internal.CppPath)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-			return
-		}
-
-		b, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		b := testutil.ReadSnapshot(t, filename)
 
 		buf := bytes.NewBuffer(b)
 		sketch, err := DecodeArrayOfNumbersCompactSketch[float64](buf.Bytes(), theta.DefaultSeed)

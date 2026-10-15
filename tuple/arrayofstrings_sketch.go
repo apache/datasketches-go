@@ -22,6 +22,8 @@ import (
 	"errors"
 	"io"
 	"slices"
+	"unicode"
+	"unicode/utf16"
 
 	"github.com/cespare/xxhash/v2"
 )
@@ -38,15 +40,45 @@ const (
 )
 
 // GenerateHashKeyFromStrings returns the hash of the concatenated strings.
+//
+// It is compatible with Java's tuple Util.stringArrHash: the elements are joined
+// with "," and the joined string is hashed with XXH64 as UTF-16 code units in
+// little-endian byte order (UTF-16LE, no byte-order mark).
+//
+// Key arrays are hashed by joining their elements with ",". Keys that join to
+// the same string, for example {"a,b"} and {"a", "b"}, or {} and {""}, are
+// treated as the same key. If key elements may contain commas, escape or encode
+// them before updating the sketch.
+//
+// If the caller cares about cross-language compatibility, it is the caller's
+// responsibility to ensure that the strings are encoded as valid UTF-8.
+// Each invalid byte is hashed as U+FFFD.
 func GenerateHashKeyFromStrings(s []string) uint64 {
-	hasher := xxhash.NewWithSeed(stringSliceHashSeed)
+	var stack [256]byte
+	buf := stack[:0]
 	for i, v := range s {
-		hasher.WriteString(v) //nolint:errcheck
-		if i+1 < len(s) {
-			hasher.WriteString(",") //nolint:errcheck
+		if i > 0 {
+			buf = append(buf, ',', 0)
 		}
+		buf = appendUTF16LE(buf, v)
 	}
-	return hasher.Sum64()
+
+	var d xxhash.Digest
+	d.ResetWithSeed(stringSliceHashSeed)
+	d.Write(buf) //nolint:errcheck
+	return d.Sum64()
+}
+
+func appendUTF16LE(dst []byte, s string) []byte {
+	for _, r := range s {
+		if r1, r2 := utf16.EncodeRune(r); r1 != unicode.ReplacementChar {
+			dst = binary.LittleEndian.AppendUint16(dst, uint16(r1))
+			dst = binary.LittleEndian.AppendUint16(dst, uint16(r2))
+			continue
+		}
+		dst = binary.LittleEndian.AppendUint16(dst, uint16(r))
+	}
+	return dst
 }
 
 // ArrayOfStringsSummary represents a summary type that holds and manages a collection of string values.

@@ -34,182 +34,110 @@ import (
 	"github.com/apache/datasketches-go/theta"
 )
 
+type arrayOfStringsSnapshotCase struct {
+	name    string
+	opts    []UpdateSketchOptionFunc
+	updates func(update func(key, values []string))
+}
+
+func arrayOfStringsSnapshotCases() []arrayOfStringsSnapshotCase {
+	var cases []arrayOfStringsSnapshotCase
+	for _, n := range []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000} {
+		cases = append(cases,
+			arrayOfStringsSnapshotCase{
+				name: fmt.Sprintf("aos_1_n%d", n),
+				updates: func(update func(key, values []string)) {
+					for i := 0; i < n; i++ {
+						update([]string{strconv.Itoa(i)}, []string{"value" + strconv.Itoa(i)})
+					}
+				},
+			},
+			arrayOfStringsSnapshotCase{
+				name: fmt.Sprintf("aos_3_n%d", n),
+				updates: func(update func(key, values []string)) {
+					for i := 0; i < n; i++ {
+						s := strconv.Itoa(i)
+						update([]string{s}, []string{"a" + s, "b" + s, "c" + s})
+					}
+				},
+			},
+			arrayOfStringsSnapshotCase{
+				name: fmt.Sprintf("aos_multikey_n%d", n),
+				updates: func(update func(key, values []string)) {
+					for i := 0; i < n; i++ {
+						update(
+							[]string{"key" + strconv.Itoa(i), "subkey" + strconv.Itoa(i%10)},
+							[]string{"value" + strconv.Itoa(i)},
+						)
+					}
+				},
+			},
+		)
+	}
+
+	return append(cases,
+		arrayOfStringsSnapshotCase{
+			name: "aos_1_non_empty_no_entries",
+			opts: []UpdateSketchOptionFunc{WithUpdateSketchP(0.01)},
+			updates: func(update func(key, values []string)) {
+				update([]string{"key1"}, []string{"value1"})
+			},
+		},
+		arrayOfStringsSnapshotCase{
+			name: "aos_unicode",
+			updates: func(update func(key, values []string)) {
+				update([]string{"키", "열쇠"}, []string{"밸류", "값"})
+				// "🗝️" is U+1F5DD followed by the variation selector U+FE0F, as in Java.
+				update([]string{"🔑", "🗝️"}, []string{"📦", "🎁"})
+				update([]string{"ключ1", "ключ2"}, []string{"ценить1", "ценить2"})
+			},
+		},
+		arrayOfStringsSnapshotCase{
+			name: "aos_empty_strings",
+			updates: func(update func(key, values []string)) {
+				update([]string{""}, []string{"empty_key_value"})
+				update([]string{"empty_value_key"}, []string{""})
+				update([]string{"", ""}, []string{"", ""})
+			},
+		},
+	)
+}
+
+func newArrayOfStringsSnapshotSketch(t *testing.T, c arrayOfStringsSnapshotCase) *CompactSketch[*ArrayOfStringsSummary] {
+	t.Helper()
+
+	sketch, err := NewUpdateSketch[*ArrayOfStringsSummary, []string](NewArrayOfStringsSummaryFunc, c.opts...)
+	assert.NoError(t, err)
+	c.updates(func(key, values []string) {
+		assertUpdate(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), values))
+	})
+
+	compactSketch, err := sketch.Compact(false)
+	assert.NoError(t, err)
+	return compactSketch
+}
+
 func TestGenerateGoSnapshots_ArrayOfStringsSketch(t *testing.T) {
 	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
 		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
 	}
 
-	t.Run("generate one value", func(t *testing.T) {
-		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
-		for _, n := range ns {
-			sketch, err := NewUpdateSketch[*ArrayOfStringsSummary, []string](NewArrayOfStringsSummaryFunc)
-			assert.NoError(t, err)
-			for i := 0; i < n; i++ {
-				s := []string{strconv.Itoa(i)}
-				values := []string{"value" + strconv.Itoa(i)}
-				err := sketch.UpdateUint64(GenerateHashKeyFromStrings(s), values)
-				assertUpdate(t, err)
-			}
+	err := os.MkdirAll(internal.GoPath, os.ModePerm)
+	assert.NoError(t, err)
 
-			assert.True(t, sketch.IsEmpty() == (n == 0))
-			assert.InDelta(t, n, sketch.Estimate(), float64(n)*0.03)
+	for _, c := range arrayOfStringsSnapshotCases() {
+		t.Run(c.name, func(t *testing.T) {
+			compactSketch := newArrayOfStringsSnapshotSketch(t, c)
 
-			compactSketch, err := sketch.Compact(false)
-			assert.NoError(t, err)
 			var buf bytes.Buffer
 			encoder := NewEncoder[*ArrayOfStringsSummary](&buf, ArrayOfStringsSummaryWriter)
-			err = encoder.Encode(compactSketch)
+			err := encoder.Encode(compactSketch)
 			assert.NoError(t, err)
 
-			err = os.MkdirAll(internal.GoPath, os.ModePerm)
+			err = os.WriteFile(fmt.Sprintf("%s/%s_go.sk", internal.GoPath, c.name), buf.Bytes(), 0644)
 			assert.NoError(t, err)
-			err = os.WriteFile(fmt.Sprintf("%s/aos_1_n%d_go.sk", internal.GoPath, n), buf.Bytes(), 0644)
-			assert.NoError(t, err)
-		}
-	})
-
-	t.Run("generate three values", func(t *testing.T) {
-		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
-		for _, n := range ns {
-			sketch, err := NewUpdateSketch[*ArrayOfStringsSummary, []string](NewArrayOfStringsSummaryFunc)
-			assert.NoError(t, err)
-			for i := 0; i < n; i++ {
-				s := []string{strconv.Itoa(i)}
-				values := []string{"a" + strconv.Itoa(i), "b" + strconv.Itoa(i), "c" + strconv.Itoa(i)}
-				err := sketch.UpdateUint64(GenerateHashKeyFromStrings(s), values)
-				assertUpdate(t, err)
-			}
-
-			assert.True(t, sketch.IsEmpty() == (n == 0))
-			assert.InDelta(t, n, sketch.Estimate(), float64(n)*0.03)
-
-			compactSketch, err := sketch.Compact(false)
-			assert.NoError(t, err)
-			var buf bytes.Buffer
-			encoder := NewEncoder[*ArrayOfStringsSummary](&buf, ArrayOfStringsSummaryWriter)
-			err = encoder.Encode(compactSketch)
-			assert.NoError(t, err)
-
-			err = os.MkdirAll(internal.GoPath, os.ModePerm)
-			assert.NoError(t, err)
-			err = os.WriteFile(fmt.Sprintf("%s/aos_3_n%d_go.sk", internal.GoPath, n), buf.Bytes(), 0644)
-			assert.NoError(t, err)
-		}
-	})
-
-	t.Run("generate non empty no entries", func(t *testing.T) {
-		sketch, err := NewUpdateSketch[*ArrayOfStringsSummary, []string](NewArrayOfStringsSummaryFunc, WithUpdateSketchP(0.01))
-		assert.NoError(t, err)
-		err = sketch.UpdateUint64(GenerateHashKeyFromStrings([]string{"key"}), []string{"value"})
-		assertUpdate(t, err)
-
-		assert.False(t, sketch.IsEmpty())
-		assert.Equal(t, uint32(0), sketch.NumRetained())
-
-		compactSketch, err := sketch.Compact(false)
-		assert.NoError(t, err)
-		var buf bytes.Buffer
-		encoder := NewEncoder[*ArrayOfStringsSummary](&buf, ArrayOfStringsSummaryWriter)
-		err = encoder.Encode(compactSketch)
-		assert.NoError(t, err)
-
-		err = os.MkdirAll(internal.GoPath, os.ModePerm)
-		assert.NoError(t, err)
-		err = os.WriteFile(fmt.Sprintf("%s/aos_1_non_empty_no_entries_go.sk", internal.GoPath), buf.Bytes(), 0644)
-		assert.NoError(t, err)
-	})
-
-	t.Run("generate multi key strings", func(t *testing.T) {
-		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
-		for _, n := range ns {
-			sketch, err := NewUpdateSketch[*ArrayOfStringsSummary, []string](NewArrayOfStringsSummaryFunc)
-			assert.NoError(t, err)
-			for i := 0; i < n; i++ {
-				s := []string{"key" + strconv.Itoa(i), "subkey" + strconv.Itoa(i%10)}
-				values := []string{"value" + strconv.Itoa(i)}
-				assertUpdate(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(s), values))
-			}
-
-			assert.True(t, sketch.IsEmpty() == (n == 0))
-			assert.InDelta(t, n, sketch.Estimate(), float64(n)*0.03)
-
-			CompactSketch, err := sketch.Compact(false)
-			assert.NoError(t, err)
-			var buf bytes.Buffer
-			encoder := NewEncoder[*ArrayOfStringsSummary](&buf, ArrayOfStringsSummaryWriter)
-			err = encoder.Encode(CompactSketch)
-			assert.NoError(t, err)
-
-			err = os.MkdirAll(internal.GoPath, os.ModePerm)
-			assert.NoError(t, err)
-			err = os.WriteFile(fmt.Sprintf("%s/aos_multikey_n%d_go.sk", internal.GoPath, n), buf.Bytes(), 0644)
-			assert.NoError(t, err)
-		}
-	})
-
-	t.Run("generate unicode strings", func(t *testing.T) {
-		sketch, err := NewUpdateSketch[*ArrayOfStringsSummary, []string](NewArrayOfStringsSummaryFunc)
-		assert.NoError(t, err)
-
-		key := []string{"키", "열쇠"}
-		value := []string{"밸류", "값"}
-		assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
-
-		key = []string{"🔑", "🗝️"}
-		value = []string{"📦", "🎁"}
-		assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
-
-		key = []string{"ключ1", "ключ2"}
-		value = []string{"ценить1", "ценить2"}
-		assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
-
-		assert.False(t, sketch.IsEmpty())
-		assert.Equal(t, uint32(3), sketch.NumRetained())
-
-		CompactSketch, err := sketch.Compact(false)
-		assert.NoError(t, err)
-		var buf bytes.Buffer
-		encoder := NewEncoder[*ArrayOfStringsSummary](&buf, ArrayOfStringsSummaryWriter)
-		err = encoder.Encode(CompactSketch)
-		assert.NoError(t, err)
-
-		err = os.MkdirAll(internal.GoPath, os.ModePerm)
-		assert.NoError(t, err)
-		err = os.WriteFile(fmt.Sprintf("%s/aos_unicode_go.sk", internal.GoPath), buf.Bytes(), 0644)
-		assert.NoError(t, err)
-	})
-
-	t.Run("generate empty strings", func(t *testing.T) {
-		sketch, err := NewUpdateSketch[*ArrayOfStringsSummary, []string](NewArrayOfStringsSummaryFunc)
-		assert.NoError(t, err)
-
-		key := []string{""}
-		value := []string{"empty_key_value"}
-		assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
-
-		key = []string{"empty_value_key"}
-		value = []string{""}
-		assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
-
-		key = []string{"", ""}
-		value = []string{"", ""}
-		assert.NoError(t, sketch.UpdateUint64(GenerateHashKeyFromStrings(key), value))
-
-		assert.False(t, sketch.IsEmpty())
-		assert.Equal(t, uint32(3), sketch.NumRetained())
-
-		CompactSketch, err := sketch.Compact(false)
-		assert.NoError(t, err)
-		var buf bytes.Buffer
-		encoder := NewEncoder[*ArrayOfStringsSummary](&buf, ArrayOfStringsSummaryWriter)
-		err = encoder.Encode(CompactSketch)
-		assert.NoError(t, err)
-
-		err = os.MkdirAll(internal.GoPath, os.ModePerm)
-		assert.NoError(t, err)
-		err = os.WriteFile(fmt.Sprintf("%s/aos_empty_strings_go.sk", internal.GoPath), buf.Bytes(), 0644)
-		assert.NoError(t, err)
-	})
+		})
+	}
 }
 
 func assertArrayOfStringsSnapshots(t *testing.T, dir, sfx string) {
@@ -345,6 +273,38 @@ func TestArrayOfStringsSketch_GoSnapshots(t *testing.T) {
 
 func TestArrayOfStringsSketch_JavaCompat(t *testing.T) {
 	assertArrayOfStringsSnapshots(t, internal.JavaPath, "_java")
+}
+
+// NOTE: See https://github.com/apache/datasketches-go/issues/191
+func TestArrayOfStringsSketch_JavaHashCompat(t *testing.T) {
+	for _, c := range arrayOfStringsSnapshotCases() {
+		t.Run(c.name, func(t *testing.T) {
+			b := testutil.ReadSnapshot(t, fmt.Sprintf("%s/%s_java.sk", internal.JavaPath, c.name))
+			javaSketch, err := Decode[*ArrayOfStringsSummary](b, theta.DefaultSeed, ArrayOfStringsSummaryReader)
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			goSketch := newArrayOfStringsSnapshotSketch(t, c)
+
+			assert.Equal(t, javaSketch.Theta64(), goSketch.Theta64())
+			if !assert.Equal(t, javaSketch.NumRetained(), goSketch.NumRetained()) {
+				return
+			}
+
+			goEntries := make(map[uint64][]string, goSketch.NumRetained())
+			for hash, summary := range goSketch.All() {
+				goEntries[hash] = summary.values
+			}
+			for hash, summary := range javaSketch.All() {
+				values, ok := goEntries[hash]
+				if !assert.Truef(t, ok, "hash %d of the Java snapshot is not retained by Go", hash) {
+					return
+				}
+				assert.Equal(t, summary.values, values)
+			}
+		})
+	}
 }
 
 func TestArrayOfStringsSummaryWriter_ErrTooManyStrings(t *testing.T) {

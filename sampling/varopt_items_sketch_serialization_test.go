@@ -32,6 +32,7 @@ import (
 
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/testutil"
 )
 
 const varOptItemsSerializationEpsilon = 1e-13
@@ -97,11 +98,7 @@ func TestVarOptItemsSketchJavaCompat(t *testing.T) {
 		for _, n := range []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000} {
 			t.Run(fmt.Sprintf("n%d", n), func(t *testing.T) {
 				filename := filepath.Join(internal.JavaPath, fmt.Sprintf("varopt_sketch_long_n%d_java.sk", n))
-				data, err := os.ReadFile(filename)
-				if os.IsNotExist(err) {
-					assert.FailNowf(t, "file %s does not exist", filename)
-				}
-				require.NoError(t, err)
+				data := testutil.ReadSnapshot(t, filename)
 
 				sketch, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 				require.NoError(t, err)
@@ -124,11 +121,7 @@ func TestVarOptItemsSketchJavaCompat(t *testing.T) {
 
 	t.Run("string exact", func(t *testing.T) {
 		filename := filepath.Join(internal.JavaPath, "varopt_sketch_string_exact_java.sk")
-		data, err := os.ReadFile(filename)
-		if os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-		}
-		require.NoError(t, err)
+		data := testutil.ReadSnapshot(t, filename)
 
 		sketch, err := DecodeVarOptItemsSketch[string](data, common.ItemSketchStringSerDe{})
 		require.NoError(t, err)
@@ -150,11 +143,7 @@ func TestVarOptItemsSketchJavaCompat(t *testing.T) {
 
 	t.Run("long sampling", func(t *testing.T) {
 		filename := filepath.Join(internal.JavaPath, "varopt_sketch_long_sampling_java.sk")
-		data, err := os.ReadFile(filename)
-		if os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-		}
-		require.NoError(t, err)
+		data := testutil.ReadSnapshot(t, filename)
 
 		sketch, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 		require.NoError(t, err)
@@ -184,11 +173,7 @@ func TestVarOptItemsSketchCppCompat(t *testing.T) {
 			n := n
 			t.Run(fmt.Sprintf("n%d", n), func(t *testing.T) {
 				filename := filepath.Join(internal.CppPath, fmt.Sprintf("varopt_sketch_long_n%d_cpp.sk", n))
-				data, err := os.ReadFile(filename)
-				if os.IsNotExist(err) {
-					assert.FailNowf(t, "file %s does not exist", filename)
-				}
-				require.NoError(t, err)
+				data := testutil.ReadSnapshot(t, filename)
 
 				sketch, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 				require.NoError(t, err)
@@ -211,11 +196,7 @@ func TestVarOptItemsSketchCppCompat(t *testing.T) {
 
 	t.Run("string exact", func(t *testing.T) {
 		filename := filepath.Join(internal.CppPath, "varopt_sketch_string_exact_cpp.sk")
-		data, err := os.ReadFile(filename)
-		if os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-		}
-		require.NoError(t, err)
+		data := testutil.ReadSnapshot(t, filename)
 
 		sketch, err := DecodeVarOptItemsSketch[string](data, common.ItemSketchStringSerDe{})
 		require.NoError(t, err)
@@ -237,11 +218,7 @@ func TestVarOptItemsSketchCppCompat(t *testing.T) {
 
 	t.Run("long sampling", func(t *testing.T) {
 		filename := filepath.Join(internal.CppPath, "varopt_sketch_long_sampling_cpp.sk")
-		data, err := os.ReadFile(filename)
-		if os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-		}
-		require.NoError(t, err)
+		data := testutil.ReadSnapshot(t, filename)
 
 		sketch, err := DecodeVarOptItemsSketch[int64](data, common.ItemSketchLongSerDe{})
 		require.NoError(t, err)

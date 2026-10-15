@@ -30,12 +30,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/testutil"
 )
 
 func TestGenerateGoSnapshots(t *testing.T) {
 	if len(os.Getenv(internal.DSketchTestGenerateGo)) == 0 {
 		t.Skipf("%s not set", internal.DSketchTestGenerateGo)
 	}
+	assert.NoError(t, os.MkdirAll(internal.GoPath, os.ModePerm))
 
 	t.Run("Without Buffer", func(t *testing.T) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
@@ -83,13 +85,7 @@ func TestDoubleJavaCompat(t *testing.T) {
 	ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	for _, n := range ns {
 		filename := fmt.Sprintf("%s/tdigest_double_n%d_java.sk", internal.JavaPath, n)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-			continue
-		}
-
-		b, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		b := testutil.ReadSnapshot(t, filename)
 
 		sketch, err := DecodeDouble(b)
 		assert.NoError(t, err)
@@ -131,13 +127,7 @@ func TestDoubleCPPCompat(t *testing.T) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/tdigest_double_n%d_cpp.sk", internal.CppPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				continue
-			}
-
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			sketch, err := DecodeDouble(b)
 			assert.NoError(t, err)
@@ -178,13 +168,7 @@ func TestDoubleCPPCompat(t *testing.T) {
 		ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 		for _, n := range ns {
 			filename := fmt.Sprintf("%s/tdigest_double_buf_n%d_cpp.sk", internal.CppPath, n)
-			if _, err := os.Stat(filename); os.IsNotExist(err) {
-				assert.FailNowf(t, "file %s does not exist", filename)
-				continue
-			}
-
-			b, err := os.ReadFile(filename)
-			assert.NoError(t, err)
+			b := testutil.ReadSnapshot(t, filename)
 
 			sketch, err := DecodeDouble(b)
 			assert.NoError(t, err)

@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/testutil"
 	"github.com/apache/datasketches-go/theta"
 )
 
@@ -79,12 +80,7 @@ func TestJavaCompat(t *testing.T) {
 	ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	for _, n := range ns {
 		filename := fmt.Sprintf("%s/tuple_int_n%d_java.sk", internal.JavaPath, n)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-			return
-		}
-		b, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		b := testutil.ReadSnapshot(t, filename)
 
 		buf := bytes.NewBuffer(b)
 		sketch, err := Decode[*int32Summary](buf.Bytes(), theta.DefaultSeed, int32SummaryReader)
@@ -104,12 +100,7 @@ func TestCPPCompat(t *testing.T) {
 	ns := []int{0, 1, 10, 100, 1000, 10000, 100000, 1000000}
 	for _, n := range ns {
 		filename := fmt.Sprintf("%s/tuple_int_n%d_cpp.sk", internal.CppPath, n)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-			return
-		}
-		b, err := os.ReadFile(filename)
-		assert.NoError(t, err)
+		b := testutil.ReadSnapshot(t, filename)
 
 		buf := bytes.NewBuffer(b)
 		sketch, err := Decode[*int32Summary](buf.Bytes(), theta.DefaultSeed, int32SummaryReader)

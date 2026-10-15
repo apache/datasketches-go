@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/testutil"
 )
 
 func TestSketchSerializationDeserialization(t *testing.T) {
@@ -197,13 +198,7 @@ func assertReqCompat(t *testing.T, dir, lang string) {
 
 func assertReqSketchFromFile(t *testing.T, path string, expectN int64, expectEmpty, expectEstimation bool, expectMin, expectMax float32) {
 	t.Helper()
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		assert.FailNowf(t, "file does not exist", "file %s does not exist", path)
-		return
-	}
-
-	b, err := os.ReadFile(path)
-	assert.NoError(t, err)
+	b := testutil.ReadSnapshot(t, path)
 	sk, err := Decode(b)
 	if err != nil {
 		return

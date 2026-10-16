@@ -19,6 +19,7 @@ package tuple
 
 import (
 	"bytes"
+	"encoding/binary"
 	"strings"
 	"testing"
 
@@ -57,6 +58,49 @@ func TestGenerateHashKeyFromStrings_UTF16LE(t *testing.T) {
 			hasher.Write(tc.want) //nolint:errcheck
 
 			assert.Equal(t, hasher.Sum64(), GenerateHashKeyFromStrings(tc.key))
+		})
+	}
+}
+
+func TestGenerateHashKeyFromStrings_JavaDecoding(t *testing.T) {
+	testCases := []struct {
+		name string
+		s    string
+		// want is what new String(bytes, StandardCharsets.UTF_8) gives in Java 8-26.
+		want []uint16
+	}{
+		{name: "last code point before surrogates", s: "\xed\x9f\xbf", want: []uint16{0xd7ff}},
+		{name: "first code point after surrogates", s: "\xee\x80\x80", want: []uint16{0xe000}},
+		{name: "replacement character", s: "\xef\xbf\xbd", want: []uint16{0xfffd}},
+		{name: "first supplementary code point", s: "\xf0\x90\x80\x80", want: []uint16{0xd800, 0xdc00}},
+		{name: "last code point", s: "\xf4\x8f\xbf\xbf", want: []uint16{0xdbff, 0xdfff}},
+		{name: "lone continuation byte", s: "\x80", want: []uint16{0xfffd}},
+		{name: "overlong 2-byte", s: "\xc0\x80", want: []uint16{0xfffd, 0xfffd}},
+		{name: "truncated 3-byte at end", s: "\xe2\x82", want: []uint16{0xfffd}},
+		{name: "truncated 3-byte", s: "\xe2\x82A", want: []uint16{0xfffd, 0x41}},
+		{name: "encoded surrogate", s: "\xed\xa0\x80", want: []uint16{0xfffd}},
+		{name: "truncated encoded surrogate", s: "\xed\xa0A", want: []uint16{0xfffd, 0x41}},
+		{name: "overlong 3-byte", s: "\xe0\x80\x80", want: []uint16{0xfffd, 0xfffd, 0xfffd}},
+		{name: "truncated overlong 3-byte at end", s: "\xe0\x9f", want: []uint16{0xfffd, 0xfffd}},
+		{name: "truncated encoded surrogate at end", s: "\xed\xa0", want: []uint16{0xfffd}},
+		{name: "truncated 4-byte", s: "\xf0\x9f\x94A", want: []uint16{0xfffd, 0x41}},
+		{name: "truncated 4-byte at end", s: "\xf0\x9f\xbf", want: []uint16{0xfffd}},
+		{name: "truncated above U+10FFFF at end", s: "\xf4\x90", want: []uint16{0xfffd, 0xfffd}},
+		{name: "above U+10FFFF", s: "\xf4\x90\x80\x80", want: []uint16{0xfffd, 0xfffd, 0xfffd, 0xfffd}},
+		{name: "5-byte form", s: "\xf8\x88\x80\x80\x80", want: []uint16{0xfffd, 0xfffd, 0xfffd, 0xfffd, 0xfffd}},
+		{name: "between valid characters", s: "a\xe2\x82b", want: []uint16{0x61, 0xfffd, 0x62}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var want []byte
+			for _, unit := range tc.want {
+				want = binary.LittleEndian.AppendUint16(want, unit)
+			}
+			hasher := xxhash.NewWithSeed(stringSliceHashSeed)
+			hasher.Write(want) //nolint:errcheck
+
+			assert.Equal(t, hasher.Sum64(), GenerateHashKeyFromStrings([]string{tc.s}))
 		})
 	}
 }

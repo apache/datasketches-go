@@ -254,7 +254,7 @@ func (u *unionImpl) unionImpl(source HllSketch) (hllSketchStateI, error) {
 	}
 
 	if srcLgK < gdgtLgK {
-		bit3 = 0
+		bit3 = 8
 	}
 
 	if srcLgK > u.lgMaxK {
@@ -282,7 +282,12 @@ func (u *unionImpl) unionImpl(source HllSketch) (hllSketchStateI, error) {
 		// case 16: src >  max, src >= gdt, gdtList, gdtHeap
 		// case 18: src >  max, src >= gdt, gdtSet,  gdtHeap
 		{ //Action: downsample src to MaxLgK, reverse merge w/autofold, ooof=src
-			return nil, fmt.Errorf("not implemented cas 16,18")
+			srcHll8, err := downsample(source, u.lgMaxK)
+			if err != nil {
+				return nil, err
+			}
+			err = gadgetC.mergeTo(srcHll8.(*hllSketchState))
+			return srcHll8.(*hllSketchState).sketch, err
 		}
 	case 4, 20:
 		// case 4: src <= max, src >= gdt, gdtHLL, gdtHeap
@@ -298,7 +303,15 @@ func (u *unionImpl) unionImpl(source HllSketch) (hllSketchStateI, error) {
 		}
 	case 12: //src <= max, src <  gdt, gdtHLL, gdtHeap
 		{ //Action: downsample gdt to srcLgK, forward HLL merge w/autofold, ooof=True
-			return nil, fmt.Errorf("not implemented case 12")
+			gdtHll8, err := downsample(u.gadget, srcLgK)
+			if err != nil {
+				return nil, err
+			}
+			if err := mergeHlltoHLLmode(source, gdtHll8, srcLgK, gdgtLgK); err != nil {
+				return nil, err
+			}
+			gdtHll8.(*hllSketchState).sketch.putOutOfOrder(true)
+			return gdtHll8.(*hllSketchState).sketch, nil
 		}
 	case 6, 14:
 		// case 6: src <= max, src >= gdt, gdtEmpty, gdtHeap
@@ -312,7 +325,11 @@ func (u *unionImpl) unionImpl(source HllSketch) (hllSketchStateI, error) {
 		}
 	case 22: //src >  max, src >= gdt, gdtEmpty, gdtHeap
 		{ //Action: downsample src to lgMaxK, replace gdt, ooof=src
-			return nil, fmt.Errorf("not implemented")
+			srcHll8, err := downsample(source, u.lgMaxK)
+			if err != nil {
+				return nil, err
+			}
+			return srcHll8.(*hllSketchState).sketch, nil
 		}
 	default:
 		return nil, fmt.Errorf("impossible")
@@ -388,8 +405,20 @@ func mergeHlltoHLLmode(src HllSketch, tgt HllSketch, srcLgK int, tgtLgK int) err
 				}
 			}
 		}
-	case 8, 9: //!HLL_8, srcLgK=tgtLgK, src=heap, tgt=heap/mem
+	case 4: //HLL_8, srcLgK>tgtLgK, src=heap, tgt=heap
 		{
+			tgtKmask := (1 << tgtLgK) - 1
+			srcArr := src.(*hllSketchState).sketch.(*hll8ArrayImpl).hllByteArr
+			tgtArr := tgt.(*hllSketchState).sketch.(*hll8ArrayImpl).hllByteArr
+			for i, srcV := range srcArr[:srcK] {
+				if j := i & tgtKmask; srcV > tgtArr[j] {
+					tgtArr[j] = srcV
+				}
+			}
+		}
+	case 8, 9, 12, 13: //!HLL_8, srcLgK>=tgtLgK, src=heap, tgt=heap/mem
+		{
+			tgtKmask := (1 << tgtLgK) - 1
 			tgtAbsHllArr := tgt.(*hllSketchState).sketch.(*hll8ArrayImpl)
 			if src.GetTgtHllType() == TgtHllTypeHll4 {
 				src4 := src.(*hllSketchState).sketch.(*hll4ArrayImpl)
@@ -406,9 +435,9 @@ func mergeHlltoHLLmode(src HllSketch, tgt HllSketch, srcLgK int, tgtLgK int) err
 						if err != nil {
 							return err
 						}
-						tgtAbsHllArr.updateSlotNoKxQ(j, v)
+						tgtAbsHllArr.updateSlotNoKxQ(j&tgtKmask, v)
 					} else {
-						tgtAbsHllArr.updateSlotNoKxQ(j, int(value)+curMin)
+						tgtAbsHllArr.updateSlotNoKxQ(j&tgtKmask, int(value)+curMin)
 					}
 					j++
 					value = uint(b) >> 4
@@ -417,9 +446,9 @@ func mergeHlltoHLLmode(src HllSketch, tgt HllSketch, srcLgK int, tgtLgK int) err
 						if err != nil {
 							return err
 						}
-						tgtAbsHllArr.updateSlotNoKxQ(j, v)
+						tgtAbsHllArr.updateSlotNoKxQ(j&tgtKmask, v)
 					} else {
-						tgtAbsHllArr.updateSlotNoKxQ(j, int(value)+curMin)
+						tgtAbsHllArr.updateSlotNoKxQ(j&tgtKmask, int(value)+curMin)
 					}
 					j++
 				}
@@ -433,26 +462,48 @@ func mergeHlltoHLLmode(src HllSketch, tgt HllSketch, srcLgK int, tgtLgK int) err
 					b3 := src6.hllByteArr[i+2]
 					i += 3
 					value := uint(b1) & 0x3f
-					tgtAbsHllArr.updateSlotNoKxQ(j, int(value))
+					tgtAbsHllArr.updateSlotNoKxQ(j&tgtKmask, int(value))
 					j++
 					value = uint(b1) >> 6
 					value |= (uint(b2) & 0x0f) << 2
-					tgtAbsHllArr.updateSlotNoKxQ(j, int(value))
+					tgtAbsHllArr.updateSlotNoKxQ(j&tgtKmask, int(value))
 					j++
 					value = uint(b2) >> 4
 					value |= (uint(b3) & 3) << 4
-					tgtAbsHllArr.updateSlotNoKxQ(j, int(value))
+					tgtAbsHllArr.updateSlotNoKxQ(j&tgtKmask, int(value))
 					j++
 					value = uint(b3) >> 2
-					tgtAbsHllArr.updateSlotNoKxQ(j, int(value))
+					tgtAbsHllArr.updateSlotNoKxQ(j&tgtKmask, int(value))
 					j++
 				}
 			}
 		}
-		// TODO continue implementing
 	default:
 		return fmt.Errorf("not implemented")
 	}
 	tgt.(*hllSketchState).sketch.putRebuildCurMinNumKxQFlag(true)
 	return nil
+}
+
+// downsample copies an HLL-mode sketch into a new heap HLL_8 sketch with tgtLgK registers.
+func downsample(candidate HllSketch, tgtLgK int) (HllSketch, error) {
+	candArr := candidate.(*hllSketchState).sketch.(hllArray)
+	tgtArr, err := newHllArray(tgtLgK, TgtHllTypeHll8)
+	if err != nil {
+		return nil, err
+	}
+	itr := candArr.iterator()
+	for itr.nextValid() {
+		p, err := itr.getPair()
+		if err != nil {
+			return nil, err
+		}
+		if _, err := tgtArr.couponUpdate(p); err != nil {
+			return nil, err
+		}
+	}
+	tgtArr.putHipAccum(candArr.getHipAccum())
+	tgtArr.putOutOfOrder(candArr.isOutOfOrder())
+	tgtArr.putRebuildCurMinNumKxQFlag(false)
+	return newHllSketchState(tgtArr), nil
 }

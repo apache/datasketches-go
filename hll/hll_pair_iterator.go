@@ -30,10 +30,6 @@ func newHllPairIterator(lengthPairs int) hllPairIterator {
 	}
 }
 
-func (h *hllPairIterator) nextValid() bool {
-	panic("override me")
-}
-
 func (h *hllPairIterator) nextAll() bool {
 	h.index++
 	return h.index < h.lengthPairs

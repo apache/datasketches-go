@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/apache/datasketches-go/internal"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -48,6 +49,31 @@ func Test_CountMinSketch(t *testing.T) {
 		assert.Equal(t, numBuckets, cms.GetNumBuckets())
 		assert.Equal(t, seed, cms.GetSeed())
 		assert.True(t, cms.isEmpty())
+	})
+
+	t.Run("CM default seed", func(t *testing.T) {
+		cms, err := NewCountMinSketchWithDefaultSeed(int8(3), int32(5))
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.Equal(t, int64(internal.DEFAULT_UPDATE_SEED), cms.GetSeed())
+
+		err = cms.UpdateUint64(7, 1)
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		var b bytes.Buffer
+		err = cms.Serialize(&b)
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		d, err := NewCountMinSketchFromSliceWithDefaultSeed(b.Bytes())
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.Equal(t, cms, d)
 	})
 
 	t.Run("CM parameter suggestion", func(t *testing.T) {
@@ -294,6 +320,9 @@ func Test_CountMinSketch(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, c, d)
 		assert.NotEqual(t, &c, d)
+
+		_, err = NewCountMinSketchFromSlice(b.Bytes(), seed+1)
+		assert.Error(t, err)
 	})
 }
 

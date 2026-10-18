@@ -46,6 +46,63 @@ func TestUnions(t *testing.T) {
 	checkBasicUnion(t, n1, n2, lgK1, lgK2, lgMaxK, t1, t2, rt)
 }
 
+func TestUnionMixedLgK(t *testing.T) {
+	for _, tc := range []struct{ lgK1, lgK2 int }{{10, 12}, {12, 10}, {12, 12}, {4, 21}} {
+		for _, lgMaxK := range []int{8, 11, 12, 14} {
+			for _, n := range []int{100, 3000, 50000} {
+				for t1 := 0; t1 < 3; t1++ {
+					for t2 := 0; t2 < 3; t2++ {
+						name := fmt.Sprintf("lgK%d_%d/max%d/n%d/t%d_%d", tc.lgK1, tc.lgK2, lgMaxK, n, t1, t2)
+						t.Run(name, func(t *testing.T) {
+							checkUnionMatchesControl(t, n, tc.lgK1, tc.lgK2, lgMaxK, TgtHllType(t1), TgtHllType(t2))
+						})
+					}
+				}
+			}
+		}
+	}
+}
+
+// checkUnionMatchesControl compares registers of a union against the same values built at the smallest lgK.
+func checkUnionMatchesControl(t *testing.T, n, lgK1, lgK2, lgMaxK int, type1, type2 TgtHllType) {
+	lgControlK := min(lgK1, lgK2, lgMaxK)
+	build := func(lgK int, tgt TgtHllType, from int) HllSketch {
+		s, err := NewHllSketch(lgK, tgt)
+		assert.NoError(t, err)
+		for i := from; i < from+n; i++ {
+			assert.NoError(t, s.UpdateInt64(int64(i)))
+		}
+		return s
+	}
+	unionOf := func(a, b HllSketch) HllSketch {
+		u, err := NewUnion(lgMaxK)
+		assert.NoError(t, err)
+		assert.NoError(t, u.UpdateSketch(a))
+		assert.NoError(t, u.UpdateSketch(b))
+		r, err := u.GetResult(TgtHllTypeHll8)
+		assert.NoError(t, err)
+		return r
+	}
+	got := unionOf(build(lgK1, type1, 0), build(lgK2, type2, n/2))
+	want := unionOf(build(lgControlK, type1, 0), build(lgControlK, type2, n/2))
+	assert.Equal(t, want.GetLgConfigK(), got.GetLgConfigK())
+	registers := func(s HllSketch) map[int]int {
+		m := map[int]int{}
+		for it := s.(*hllSketchState).iterator(); it.nextValid(); {
+			v, err := it.getValue()
+			assert.NoError(t, err)
+			m[it.getSlot()] = max(m[it.getSlot()], v)
+		}
+		return m
+	}
+	assert.Equal(t, registers(want), registers(got))
+	g, err := got.GetCompositeEstimate()
+	assert.NoError(t, err)
+	w, err := want.GetCompositeEstimate()
+	assert.NoError(t, err)
+	assert.InEpsilon(t, w, g, 1e-9)
+}
+
 func checkBasicUnion(t *testing.T, n1 int, n2 int, lgK1 int, lgK2 int, lgMaxK int, t1 int, t2 int, rt int) {
 	v := 0
 	tot := n1 + n2
@@ -56,7 +113,7 @@ func checkBasicUnion(t *testing.T, n1 int, n2 int, lgK1 int, lgK2 int, lgMaxK in
 
 	h1, err := NewHllSketch(lgK1, type1)
 	assert.NoError(t, err)
-	h2, err := NewHllSketch(lgK1, type2)
+	h2, err := NewHllSketch(lgK2, type2)
 	assert.NoError(t, err)
 
 	lgControlK := min(min(lgK1, lgK2), lgMaxK)
@@ -109,7 +166,7 @@ func checkBasicUnion(t *testing.T, n1 int, n2 int, lgK1 int, lgK2 int, lgMaxK in
 	assert.True(t, controlEst-controlLb >= 0)
 	assert.True(t, uEst-uLb >= 0)
 
-	assert.Equal(t, 7, result.GetLgConfigK())
+	assert.Equal(t, lgControlK, result.GetLgConfigK())
 	est, err := result.GetEstimate()
 	assert.NoError(t, err)
 	assert.InDelta(t, tot, est, float64(tot)*0.03)

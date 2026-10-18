@@ -86,6 +86,16 @@ func checkUnionMatchesControl(t *testing.T, n, lgK1, lgK2, lgMaxK int, type1, ty
 	got := unionOf(build(lgK1, type1, 0), build(lgK2, type2, n/2))
 	want := unionOf(build(lgControlK, type1, 0), build(lgControlK, type2, n/2))
 	assert.Equal(t, want.GetLgConfigK(), got.GetLgConfigK())
+	registers := func(s HllSketch) map[int]int {
+		m := map[int]int{}
+		for it := s.(*hllSketchState).iterator(); it.nextValid(); {
+			v, err := it.getValue()
+			assert.NoError(t, err)
+			m[it.getSlot()] = max(m[it.getSlot()], v)
+		}
+		return m
+	}
+	assert.Equal(t, registers(want), registers(got))
 	g, err := got.GetCompositeEstimate()
 	assert.NoError(t, err)
 	w, err := want.GetCompositeEstimate()

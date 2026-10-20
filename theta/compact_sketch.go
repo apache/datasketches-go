@@ -59,6 +59,7 @@ const (
 	serializationFlagIsEmpty
 	serializationFlagIsCompact
 	serializationFlagIsOrdered
+	serializationFlagIsSingleItem
 )
 
 // CompactSketch is an immutable form of the Theta sketch, the form that can be serialized and deserialized
@@ -288,6 +289,11 @@ func (s *CompactSketch) SerializedSizeBytes(compressed bool) int {
 		return s.compressedSerializedSizeBytes(entryBits, numEntriesBytes)
 	}
 	return int(s.preambleLongs(false))*8 + len(s.entries)*8
+}
+
+// isSingleItem reports one entry in exact mode: the same condition Java uses to set its SingleItem flag.
+func (s *CompactSketch) isSingleItem() bool {
+	return len(s.entries) == 1 && !s.IsEstimationMode()
 }
 
 func (s *CompactSketch) isSuitableForCompression() bool {

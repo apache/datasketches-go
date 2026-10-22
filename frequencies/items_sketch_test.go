@@ -23,6 +23,7 @@ import (
 	"slices"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -466,6 +467,102 @@ func TestMemExceptions(t *testing.T) {
 
 	tryBadMem(t, bytes, _FLAGS_BYTE, 4)        //Corrupt to true
 	binary.LittleEndian.PutUint64(bytes, pre0) //restore
+}
+
+func newPurgedItemsSketch(t *testing.T) *ItemsSketch[string] {
+	t.Helper()
+	sk, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<8, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
+	assert.NoError(t, err)
+	for i := 0; i < 193; i++ {
+		assert.NoError(t, sk.Update(strconv.Itoa(i)))
+	}
+	return sk
+}
+
+func TestItemsPurgedToZeroIsNotEmpty(t *testing.T) {
+	sk := newPurgedItemsSketch(t)
+	assert.Equal(t, 0, sk.GetNumActiveItems())
+	assert.False(t, sk.IsEmpty())
+	assert.Equal(t, int64(193), sk.GetStreamLength())
+	assert.Equal(t, int64(1), sk.GetMaximumError())
+
+	str, err := sk.ToString()
+	assert.NoError(t, err)
+	assert.True(t, strings.HasPrefix(str, "1,10,8,0,193,1,"), str)
+
+	bytes, err := sk.ToSlice()
+	assert.NoError(t, err)
+	assert.Len(t, bytes, 32)
+	assert.Equal(t, byte(4), bytes[_PREAMBLE_LONGS_BYTE])
+	assert.Equal(t, byte(0), bytes[_FLAGS_BYTE])
+
+	sk2, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
+	assert.NoError(t, err)
+	assert.False(t, sk2.IsEmpty())
+	assert.Equal(t, 0, sk2.GetNumActiveItems())
+	assert.Equal(t, int64(193), sk2.GetStreamLength())
+	assert.Equal(t, int64(1), sk2.GetMaximumError())
+
+	sk3, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<8, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
+	assert.NoError(t, err)
+	assert.NoError(t, sk3.Update("x"))
+	_, err = sk3.Merge(sk)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(194), sk3.GetStreamLength())
+	assert.Equal(t, int64(1), sk3.GetMaximumError())
+}
+
+func TestItemsResetAfterPurge(t *testing.T) {
+	sk := newPurgedItemsSketch(t)
+	assert.NoError(t, sk.Reset())
+	assert.True(t, sk.IsEmpty())
+	assert.Equal(t, int64(0), sk.GetStreamLength())
+	assert.Equal(t, int64(0), sk.GetMaximumError())
+	bytes, err := sk.ToSlice()
+	assert.NoError(t, err)
+	assert.Len(t, bytes, 8)
+}
+
+func TestItemsEmptyWithEitherLegacyFlag(t *testing.T) {
+	sk, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<8, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
+	assert.NoError(t, err)
+	bytes, err := sk.ToSlice()
+	assert.NoError(t, err)
+	assert.Len(t, bytes, 8)
+	assert.Equal(t, byte(_EMPTY_FLAG_MASK), bytes[_FLAGS_BYTE])
+	for _, flags := range []byte{1, 4, 5} {
+		bytes[_FLAGS_BYTE] = flags
+		sk2, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
+		assert.NoError(t, err)
+		assert.True(t, sk2.IsEmpty())
+		assert.Equal(t, sk.GetMaximumMapCapacity(), sk2.GetMaximumMapCapacity())
+	}
+}
+
+func TestItemsCorruptEmptyPreamble(t *testing.T) {
+	deserialize := func(bytes []byte) error {
+		_, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
+		return err
+	}
+	sk, err := NewFrequencyItemsSketchWithMaxMapSize[string](1<<8, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
+	assert.NoError(t, err)
+	empty, err := sk.ToSlice()
+	assert.NoError(t, err)
+	empty[_FLAGS_BYTE] = 0 //preLongs 1 without the empty flag
+	assert.Error(t, deserialize(empty))
+
+	assert.NoError(t, sk.Update("a"))
+	flagged, err := sk.ToSlice()
+	assert.NoError(t, err)
+	flagged[_FLAGS_BYTE] = _EMPTY_FLAG_MASK //preLongs 4 with the empty flag
+	assert.Error(t, deserialize(flagged))
+
+	for _, streamWeight := range []int64{0, -1} {
+		badWeight, err := sk.ToSlice()
+		assert.NoError(t, err)
+		binary.LittleEndian.PutUint64(badWeight[16:], uint64(streamWeight))
+		assert.Error(t, deserialize(badWeight))
+	}
 }
 
 func TestOneItemUtf8(t *testing.T) {

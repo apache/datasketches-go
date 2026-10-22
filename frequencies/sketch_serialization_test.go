@@ -97,6 +97,22 @@ func TestGenerateGoSnapshots_LongsSketch(t *testing.T) {
 		}
 	})
 
+	t.Run("Long purged", func(t *testing.T) {
+		err := os.MkdirAll(internal.GoPath, os.ModePerm)
+		assert.NoError(t, err)
+		err = os.WriteFile(fmt.Sprintf("%s/frequent_long_purged_go.sk", internal.GoPath), newPurgedLongsSketch(t).ToSlice(), 0644)
+		assert.NoError(t, err)
+	})
+
+	t.Run("String purged", func(t *testing.T) {
+		err := os.MkdirAll(internal.GoPath, os.ModePerm)
+		assert.NoError(t, err)
+		slc, err := newPurgedItemsSketch(t).ToSlice()
+		assert.NoError(t, err)
+		err = os.WriteFile(fmt.Sprintf("%s/frequent_string_purged_go.sk", internal.GoPath), slc, 0644)
+		assert.NoError(t, err)
+	})
+
 	t.Run("String ut8", func(t *testing.T) {
 		sk, err := NewFrequencyItemsSketchWithMaxMapSize[string](64, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
 		assert.NoError(t, err)
@@ -189,6 +205,14 @@ func TestJavaCompat(t *testing.T) {
 			}
 			assert.Equal(t, sketch.GetStreamLength(), int64(n))
 		}
+	})
+
+	t.Run("Long purged", func(t *testing.T) {
+		checkLongsPurged(t, fmt.Sprintf("%s/frequent_long_purged_java.sk", internal.JavaPath))
+	})
+
+	t.Run("String purged", func(t *testing.T) {
+		checkStringsPurged(t, fmt.Sprintf("%s/frequent_string_purged_java.sk", internal.JavaPath))
 	})
 
 	t.Run("String utf8", func(t *testing.T) {
@@ -298,6 +322,14 @@ func TestCppCompat(t *testing.T) {
 		}
 	})
 
+	t.Run("Long purged", func(t *testing.T) {
+		checkLongsPurged(t, fmt.Sprintf("%s/frequent_long_purged_cpp.sk", internal.CppPath))
+	})
+
+	t.Run("String purged", func(t *testing.T) {
+		checkStringsPurged(t, fmt.Sprintf("%s/frequent_string_purged_cpp.sk", internal.CppPath))
+	})
+
 	t.Run("String utf8", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/frequent_string_utf8_cpp.sk", internal.CppPath)
 		bytes := testutil.ReadSnapshot(t, filename)
@@ -354,4 +386,38 @@ func TestCppCompat(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, est, int64(4))
 	})
+}
+
+// checkLongsPurged reads a sketch that a purge left with no items, then checks that it is
+// not empty and that both re-encoding it and encoding a Go sketch built the same way
+// reproduce the file byte for byte.
+func checkLongsPurged(t *testing.T, filename string) {
+	t.Helper()
+	bytes := testutil.ReadSnapshot(t, filename)
+	sketch, err := NewLongsSketchFromSlice(bytes)
+	assert.NoError(t, err)
+	assert.False(t, sketch.IsEmpty())
+	assert.Equal(t, 0, sketch.GetNumActiveItems())
+	assert.Equal(t, int64(193), sketch.GetStreamLength())
+	assert.Equal(t, int64(1), sketch.GetMaximumError())
+	assert.Equal(t, bytes, sketch.ToSlice())
+	assert.Equal(t, bytes, newPurgedLongsSketch(t).ToSlice())
+}
+
+// checkStringsPurged is checkLongsPurged for ItemsSketch[string].
+func checkStringsPurged(t *testing.T, filename string) {
+	t.Helper()
+	bytes := testutil.ReadSnapshot(t, filename)
+	sketch, err := NewFrequencyItemsSketchFromSlice[string](bytes, common.ItemSketchStringHasher{}, common.ItemSketchStringSerDe{})
+	assert.NoError(t, err)
+	assert.False(t, sketch.IsEmpty())
+	assert.Equal(t, 0, sketch.GetNumActiveItems())
+	assert.Equal(t, int64(193), sketch.GetStreamLength())
+	assert.Equal(t, int64(1), sketch.GetMaximumError())
+	reencoded, err := sketch.ToSlice()
+	assert.NoError(t, err)
+	assert.Equal(t, bytes, reencoded)
+	fresh, err := newPurgedItemsSketch(t).ToSlice()
+	assert.NoError(t, err)
+	assert.Equal(t, bytes, fresh)
 }

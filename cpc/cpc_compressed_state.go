@@ -519,6 +519,9 @@ func (c *CpcCompressedState) uncompressSlidingFlavor(src *CpcSketch) error {
 			rowCol := pairs[i]
 			row := rowCol >> 6
 			col := rowCol & 63
+			if col >= 56 {
+				return fmt.Errorf("uncompressSlidingFlavor: invalid pair value %d at index %d", rowCol, i)
+			}
 			// First, undo the permutation.
 			col = int(permutation[col])
 			// Then, undo the rotation: old = (new + (offset+8)) mod 64.
@@ -543,6 +546,10 @@ func importFromMemory(bytes []byte) (*CpcCompressedState, error) {
 	if !isCompressed(bytes) {
 		return nil, fmt.Errorf("not compressed")
 	}
+	// preInts matches the format, so this covers every hi field of the preamble
+	if err := checkCapacity(len(bytes), getPreInts(bytes)<<2); err != nil {
+		return nil, err
+	}
 	lgK := getLgK(bytes)
 	seedHash := getSeedHash(bytes)
 	state := NewCpcCompressedState(lgK, seedHash)
@@ -564,6 +571,9 @@ func importFromMemory(bytes []byte) (*CpcCompressedState, error) {
 		if err := checkCapacity(len(bytes), state.getRequiredSerializedBytes()); err != nil {
 			return nil, err
 		}
+		if err := checkCapacity(len(bytes), 4*(getPreInts(bytes)+state.CsvLengthInts+state.CwLengthInts)); err != nil {
+			return nil, err
+		}
 		state.CsvStream = getSvStream(bytes)
 	case CpcFormatSparseHybridHip:
 		state.NumCoupons = getNumCoupons(bytes)
@@ -574,12 +584,18 @@ func importFromMemory(bytes []byte) (*CpcCompressedState, error) {
 		if err := checkCapacity(len(bytes), state.getRequiredSerializedBytes()); err != nil {
 			return nil, err
 		}
+		if err := checkCapacity(len(bytes), 4*(getPreInts(bytes)+state.CsvLengthInts+state.CwLengthInts)); err != nil {
+			return nil, err
+		}
 		state.CsvStream = getSvStream(bytes)
 	case CpcFormatPinnedSlidingMergedNosv:
 		state.FiCol = getFiCol(bytes)
 		state.NumCoupons = getNumCoupons(bytes)
 		state.CwLengthInts = getWLengthInts(bytes)
 		if err := checkCapacity(len(bytes), state.getRequiredSerializedBytes()); err != nil {
+			return nil, err
+		}
+		if err := checkCapacity(len(bytes), 4*(getPreInts(bytes)+state.CsvLengthInts+state.CwLengthInts)); err != nil {
 			return nil, err
 		}
 		state.CwStream = getWStream(bytes)
@@ -592,6 +608,9 @@ func importFromMemory(bytes []byte) (*CpcCompressedState, error) {
 		if err := checkCapacity(len(bytes), state.getRequiredSerializedBytes()); err != nil {
 			return nil, err
 		}
+		if err := checkCapacity(len(bytes), 4*(getPreInts(bytes)+state.CsvLengthInts+state.CwLengthInts)); err != nil {
+			return nil, err
+		}
 		state.CwStream = getWStream(bytes)
 	case CpcFormatPinnedSlidingMerged:
 		state.FiCol = getFiCol(bytes)
@@ -600,6 +619,9 @@ func importFromMemory(bytes []byte) (*CpcCompressedState, error) {
 		state.CsvLengthInts = getSvLengthInts(bytes)
 		state.CwLengthInts = getWLengthInts(bytes)
 		if err := checkCapacity(len(bytes), state.getRequiredSerializedBytes()); err != nil {
+			return nil, err
+		}
+		if err := checkCapacity(len(bytes), 4*(getPreInts(bytes)+state.CsvLengthInts+state.CwLengthInts)); err != nil {
 			return nil, err
 		}
 		state.CwStream = getWStream(bytes)
@@ -615,10 +637,16 @@ func importFromMemory(bytes []byte) (*CpcCompressedState, error) {
 		if err := checkCapacity(len(bytes), state.getRequiredSerializedBytes()); err != nil {
 			return nil, err
 		}
+		if err := checkCapacity(len(bytes), 4*(getPreInts(bytes)+state.CsvLengthInts+state.CwLengthInts)); err != nil {
+			return nil, err
+		}
 		state.CwStream = getWStream(bytes)
 		state.CsvStream = getSvStream(bytes)
 	default:
 		return nil, fmt.Errorf("unknown format: %d", format)
+	}
+	if err := checkNumCoupons(lgK, state.NumCoupons, state.NumCsv); err != nil {
+		return nil, err
 	}
 	return state, nil
 }
@@ -722,6 +750,12 @@ func uncompressTheSurprisingValues(source *CpcCompressedState) ([]int, error) {
 	// lowLevelUncompressPairs fills the 'pairs' slice using the compressed CSV stream.
 	if err := lowLevelUncompressPairs(pairs, numPairs, numBaseBits, source.CsvStream, source.CsvLengthInts); err != nil {
 		return nil, err
+	}
+	for _, rowCol := range pairs {
+		// a huge yDelta can overflow the row into the sign bit
+		if row := rowCol >> 6; row < 0 || row >= srcK {
+			return nil, fmt.Errorf("uncompressTheSurprisingValues: row index %d out of range for k %d", row, srcK)
+		}
 	}
 	return pairs, nil
 }
@@ -941,6 +975,9 @@ func lowLevelUncompressPairs(pairArray []int, numPairsToDecode, numBaseBits int,
 		}
 		rowIndex := predictedRowIndex + int(yDelta)
 		colIndex := predictedColIndex + xDelta
+		if colIndex > 63 {
+			return fmt.Errorf("lowLevelUncompressPairs: column index %d out of range", colIndex)
+		}
 		rowCol := (rowIndex << 6) | colIndex
 		pairArray[pairIndex] = rowCol
 		pairIndex++

@@ -299,6 +299,16 @@ func checkLoPreamble(bytes []byte) error {
 	return nil
 }
 
+func checkNumCoupons(lgK int, numCoupons, numSV uint64) error {
+	if numCoupons > uint64(64)<<lgK {
+		return fmt.Errorf("possible corruption: numCoupons %d exceeds the capacity for lgK %d", numCoupons, lgK)
+	}
+	if numSV > numCoupons {
+		return fmt.Errorf("possible corruption: numSV %d exceeds numCoupons %d", numSV, numCoupons)
+	}
+	return nil
+}
+
 func checkBounds(reqOff, reqLen, allocSize int) error {
 	if reqOff < 0 || reqLen < 0 || reqOff+reqLen < 0 || allocSize-(reqOff+reqLen) < 0 {
 		return fmt.Errorf("bounds Violation: reqOffset: %d, reqLength: %d, (reqOff + reqLen): %d, allocSize: %d", reqOff, reqLen, reqOff+reqLen, allocSize)

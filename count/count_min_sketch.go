@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"math/rand"
@@ -47,7 +48,11 @@ func NewCountMinSketch(numHashes int8, numBuckets int32, seed int64) (*CountMinS
 		return nil, errors.New("using fewer than 3 buckets incurs relative error greater than 1.0")
 	}
 
-	if numBuckets*int32(numHashes) >= 1<<30 {
+	if numHashes < 0 {
+		return nil, errors.New("number of hashes must be non-negative")
+	}
+
+	if int64(numBuckets)*int64(numHashes) >= 1<<30 {
 		return nil, errors.New("these parameters generate a sketch that exceeds 2^30 elements")
 	}
 
@@ -57,7 +62,7 @@ func NewCountMinSketch(numHashes int8, numBuckets int32, seed int64) (*CountMinS
 		hashSeeds[i] = int64(rng.Int()) + seed
 	}
 
-	sketchSize := int(numBuckets * int32(numHashes))
+	sketchSize := int(numBuckets) * int(numHashes)
 	sketchSlice := make([]int64, sketchSize)
 
 	return &CountMinSketch{
@@ -251,14 +256,7 @@ func (c *CountMinSketch) Serialize(w io.Writer) error {
 		return err
 	}
 
-	for _, h := range c.sketchSlice {
-		err := binary.Write(w, binary.LittleEndian, h)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return binary.Write(w, binary.LittleEndian, c.sketchSlice)
 }
 
 // NewCountMinSketchFromSlice deserializes a Count-Min sketch from a byte slice.
@@ -335,6 +333,12 @@ func NewCountMinSketchFromSlice(b []byte, seed int64) (*CountMinSketch, error) {
 		return cms, nil
 	}
 
+	// preamble (already read) + total weight + table
+	expectedBytes := PreambleLongsShort*8 + 8*(1+len(cms.sketchSlice))
+	if len(b) < expectedBytes {
+		return nil, fmt.Errorf("at least %d bytes expected, actual %d", expectedBytes, len(b))
+	}
+
 	var totalWeight int64
 	err = binary.Read(r, binary.LittleEndian, &totalWeight)
 	if err != nil {
@@ -342,15 +346,9 @@ func NewCountMinSketchFromSlice(b []byte, seed int64) (*CountMinSketch, error) {
 	}
 	cms.totalWeight = totalWeight
 
-	var w int64
-	var i int
-	for r.Len() > 0 {
-		err = binary.Read(r, binary.LittleEndian, &w)
-		if err != nil {
-			return nil, err
-		}
-		cms.sketchSlice[i] = w
-		i++
+	err = binary.Read(r, binary.LittleEndian, cms.sketchSlice)
+	if err != nil {
+		return nil, err
 	}
 
 	return cms, nil

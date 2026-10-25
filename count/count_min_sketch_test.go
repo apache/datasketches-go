@@ -19,6 +19,7 @@ package count
 
 import (
 	"bytes"
+	"encoding/binary"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,6 +36,15 @@ func Test_CountMinSketch(t *testing.T) {
 		cms, err = NewCountMinSketch(4, 268435456, seed)
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "these parameters generate a sketch that exceeds 2^30 elements")
+		assert.Nil(t, cms)
+
+		// numBuckets * numHashes wraps to 0 in 32-bit arithmetic
+		cms, err = NewCountMinSketch(8, 1<<29, seed)
+		assert.ErrorContains(t, err, "these parameters generate a sketch that exceeds 2^30 elements")
+		assert.Nil(t, cms)
+
+		cms, err = NewCountMinSketch(-1, 5, seed)
+		assert.ErrorContains(t, err, "number of hashes must be non-negative")
 		assert.Nil(t, cms)
 	})
 
@@ -294,6 +304,60 @@ func Test_CountMinSketch(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, c, d)
 		assert.NotEqual(t, &c, d)
+	})
+
+	t.Run("CM deserialize truncated non-empty", func(t *testing.T) {
+		c, err := NewCountMinSketch(5, 64, seed)
+		assert.NoError(t, err)
+		for i := range uint64(10) {
+			assert.NoError(t, c.UpdateUint64(i, int64(10*i*i)))
+		}
+		var b bytes.Buffer
+		assert.NoError(t, c.Serialize(&b))
+		data := b.Bytes()
+
+		for trim := 1; trim <= 24; trim++ {
+			d, err := NewCountMinSketchFromSlice(data[:len(data)-trim], seed)
+			assert.ErrorContains(t, err, "bytes expected", "trim %d", trim)
+			assert.Nil(t, d)
+		}
+	})
+
+	t.Run("CM deserialize ignores trailing bytes", func(t *testing.T) {
+		c, err := NewCountMinSketch(5, 64, seed)
+		assert.NoError(t, err)
+		assert.NoError(t, c.UpdateUint64(1, 1))
+		var b bytes.Buffer
+		assert.NoError(t, c.Serialize(&b))
+
+		data := append(b.Bytes(), make([]byte, 8)...)
+		d, err := NewCountMinSketchFromSlice(data, seed)
+		assert.NoError(t, err)
+		assert.Equal(t, c, d)
+	})
+
+	t.Run("CM deserialize rejects invalid dimensions", func(t *testing.T) {
+		c, err := NewCountMinSketch(2, 64, seed)
+		assert.NoError(t, err)
+		assert.NoError(t, c.UpdateUint64(1, 1))
+		var b bytes.Buffer
+		assert.NoError(t, c.Serialize(&b))
+		data := b.Bytes()
+
+		// numBuckets * numHashes wraps to 0 in 32-bit arithmetic
+		overflow := bytes.Clone(data)
+		binary.LittleEndian.PutUint32(overflow[8:], 1<<29)
+		overflow[12] = 8
+		d, err := NewCountMinSketchFromSlice(overflow, seed)
+		assert.ErrorContains(t, err, "these parameters generate a sketch that exceeds 2^30 elements")
+		assert.Nil(t, d)
+
+		// numHashes >= 128 is negative as an int8
+		negativeHashes := bytes.Clone(data)
+		negativeHashes[12] = 128
+		d, err = NewCountMinSketchFromSlice(negativeHashes, seed)
+		assert.ErrorContains(t, err, "number of hashes must be non-negative")
+		assert.Nil(t, d)
 	})
 }
 

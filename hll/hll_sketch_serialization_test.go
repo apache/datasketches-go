@@ -252,3 +252,25 @@ func TestGoCompat(t *testing.T) {
 func setCompactFlag(flags byte) byte {
 	return flags | compactFlagMask
 }
+
+func TestDeserializeCopiesRegisters(t *testing.T) {
+	for _, tgt := range []TgtHllType{TgtHllTypeHll4, TgtHllTypeHll6, TgtHllTypeHll8} {
+		sk, err := NewHllSketch(defaultLgK, tgt)
+		assert.NoError(t, err)
+		for i := 0; i < 10000; i++ {
+			assert.NoError(t, sk.UpdateUInt64(uint64(i)))
+		}
+		b, err := sk.ToUpdatableSlice()
+		assert.NoError(t, err)
+		decoded, err := NewHllSketchFromSlice(b, true)
+		assert.NoError(t, err)
+		want, err := decoded.ToCompactSlice()
+		assert.NoError(t, err)
+		for i := hllByteArrStart; i < len(b); i++ {
+			b[i] = 0
+		}
+		got, err := decoded.ToCompactSlice()
+		assert.NoError(t, err)
+		assert.Equal(t, want, got, "type %d", tgt)
+	}
+}

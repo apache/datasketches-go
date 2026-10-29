@@ -322,5 +322,5 @@ func (a *hllArrayImpl) extractCommonHll(byteArr []byte) {
 	a.putNumAtCurMin(extractNumAtCurMin(byteArr))
 	a.putRebuildCurMinNumKxQFlag(extractRebuildCurMinNumKxQFlag(byteArr))
 
-	a.hllByteArr = byteArr[hllByteArrStart : hllByteArrStart+len(a.hllByteArr)]
+	copy(a.hllByteArr, byteArr[hllByteArrStart:])
 }

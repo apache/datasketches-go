@@ -50,6 +50,9 @@ func (f ItemSketchStringSerDe) SizeOfMany(mem []byte, offsetBytes int, numItems 
 	if numItems <= 0 {
 		return 0, nil
 	}
+	if !checkBounds(offsetBytes, 0, len(mem)) || numItems > (len(mem)-offsetBytes)/4 {
+		return 0, errors.New("offset out of bounds")
+	}
 	reqLen := 4
 	offset := offsetBytes
 	memCap := len(mem)
@@ -57,12 +60,12 @@ func (f ItemSketchStringSerDe) SizeOfMany(mem []byte, offsetBytes int, numItems 
 		if !checkBounds(offset, reqLen, memCap) {
 			return 0, errors.New("offset out of bounds")
 		}
-		itemLenBytes := int(binary.LittleEndian.Uint32(mem[offset:]))
+		itemLenBytes := binary.LittleEndian.Uint32(mem[offset:])
 		offset += 4
-		if offset+itemLenBytes > memCap {
+		if uint64(itemLenBytes) > uint64(memCap-offset) {
 			return 0, errors.New("offset out of bounds")
 		}
-		offset += itemLenBytes
+		offset += int(itemLenBytes)
 	}
 	return offset - offsetBytes, nil
 }
@@ -117,6 +120,9 @@ func (f ItemSketchStringSerDe) DeserializeManyFromSlice(mem []byte, offsetBytes 
 	if numItems <= 0 {
 		return []string{}, nil
 	}
+	if !checkBounds(offsetBytes, 0, len(mem)) || numItems > (len(mem)-offsetBytes)/4 {
+		return nil, errors.New("offset out of bounds")
+	}
 	array := make([]string, numItems)
 	offset := offsetBytes
 	intSize := 4
@@ -125,15 +131,14 @@ func (f ItemSketchStringSerDe) DeserializeManyFromSlice(mem []byte, offsetBytes 
 		if !checkBounds(offset, intSize, memCap) {
 			return nil, errors.New("offset out of bounds")
 		}
-		strLength := int(binary.LittleEndian.Uint32(mem[offset:]))
+		strLength := binary.LittleEndian.Uint32(mem[offset:])
 		offset += intSize
-		utf8Bytes := make([]byte, strLength)
-		if !checkBounds(offset, strLength, memCap) {
+		if uint64(strLength) > uint64(memCap-offset) {
 			return nil, errors.New("offset out of bounds")
 		}
-		copy(utf8Bytes, mem[offset:offset+strLength])
-		offset += strLength
-		array[i] = string(utf8Bytes)
+		end := offset + int(strLength)
+		array[i] = string(mem[offset:end])
+		offset = end
 	}
 	return array, nil
 }

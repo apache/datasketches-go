@@ -45,7 +45,7 @@ type hllArray interface {
 	putNumAtCurMin(numAtCurMin int)
 	putOutOfOrder(oooFlag bool)
 
-	extractCommonHll(byteArr []byte)
+	extractCommonHll(byteArr []byte) error
 	hipAndKxQIncrementalUpdate(oldValue int, newValue int) error
 }
 
@@ -313,7 +313,10 @@ func (a *hllArrayImpl) incrementalUpdateKxQ(oldValue int, newValue int, kxq0 flo
 }
 
 // extractCommonHll extracts the common fields from the given byte array.
-func (a *hllArrayImpl) extractCommonHll(byteArr []byte) {
+func (a *hllArrayImpl) extractCommonHll(byteArr []byte) error {
+	if len(byteArr) < hllByteArrStart+len(a.hllByteArr) {
+		return fmt.Errorf("possible Corruption: HLL array too small: %d < %d", len(byteArr), hllByteArrStart+len(a.hllByteArr))
+	}
 	a.putOutOfOrder(extractOooFlag(byteArr))
 	a.putCurMin(extractCurMin(byteArr))
 	a.putHipAccum(extractHipAccum(byteArr))
@@ -323,4 +326,5 @@ func (a *hllArrayImpl) extractCommonHll(byteArr []byte) {
 	a.putRebuildCurMinNumKxQFlag(extractRebuildCurMinNumKxQFlag(byteArr))
 
 	copy(a.hllByteArr, byteArr[hllByteArrStart:])
+	return nil
 }

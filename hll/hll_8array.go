@@ -81,11 +81,13 @@ func newHll8Array(lgConfigK int) hllArray {
 }
 
 // deserializeHll8 returns a new Hll8Array from the given byte array.
-func deserializeHll8(byteArray []byte) hllArray {
+func deserializeHll8(byteArray []byte) (hllArray, error) {
 	lgConfigK := extractLgK(byteArray)
 	hll8 := newHll8Array(lgConfigK)
-	hll8.extractCommonHll(byteArray)
-	return hll8
+	if err := hll8.extractCommonHll(byteArray); err != nil {
+		return nil, err
+	}
+	return hll8, nil
 }
 
 func convertToHll8(srcAbsHllArr hllArray) (hllSketchStateI, error) {

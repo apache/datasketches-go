@@ -274,3 +274,34 @@ func TestDeserializeCopiesRegisters(t *testing.T) {
 		assert.Equal(t, want, got, "type %d", tgt)
 	}
 }
+
+func TestDeserializeCorruptBytes(t *testing.T) {
+	for name, b := range map[string][]byte{
+		"target type 3, lgK 211": {0x03, 0x01, 0x07, 0xd3, 0x4d, 0x34, 0xd3, 0x4d, 0x34, 0xd3, 0x4d, 0x00},
+		"target type 3":          {0x03, 0x01, 0x07, 0x0b, 0x4d, 0x34, 0xd3, 0x4d, 0x34, 0xd3, 0x4d, 0x00},
+		"mode 3":                 {0x02, 0x01, 0x07, 0x0b, 0x00, 0x00, 0x00, 0x03},
+		"lgK 22":                 {0x02, 0x01, 0x07, 0x16, 0x00, 0x00, 0x00, 0x08},
+	} {
+		_, err := NewHllSketchFromSlice(b, true)
+		assert.Error(t, err, name)
+	}
+
+	for _, tgt := range []TgtHllType{TgtHllTypeHll4, TgtHllTypeHll6, TgtHllTypeHll8} {
+		for _, n := range []int{1, 100, 1000, 10000} {
+			sk, err := NewHllSketch(defaultLgK, tgt)
+			assert.NoError(t, err)
+			for i := 0; i < n; i++ {
+				assert.NoError(t, sk.UpdateUInt64(uint64(i)))
+			}
+			compact, err := sk.ToCompactSlice()
+			assert.NoError(t, err)
+			updatable, err := sk.ToUpdatableSlice()
+			assert.NoError(t, err)
+			for _, b := range [][]byte{compact, updatable} {
+				for l := 8; l < len(b); l++ {
+					assert.NotPanics(t, func() { _, _ = NewHllSketchFromSlice(b[:l], true) }, "type %d n %d len %d", tgt, n, l)
+				}
+			}
+		}
+	}
+}

@@ -63,6 +63,13 @@ func deserializeAuxHashMap(byteArray []byte, offset int, lgConfigL int, auxCount
 		lgAuxArrInts = extractLgArr(byteArray)
 	}
 
+	arrInts := auxCount
+	if !srcCompact {
+		arrInts = 1 << lgAuxArrInts
+	}
+	if lgAuxArrInts > lgConfigL || auxCount > 1<<lgAuxArrInts || len(byteArray) < offset+(arrInts<<2) {
+		return nil, fmt.Errorf("possible Corruption: invalid aux count %d or lgArr %d", auxCount, lgAuxArrInts)
+	}
 	auxMap := newAuxHashMap(lgAuxArrInts, lgConfigL)
 	configKMask := (1 << lgConfigL) - 1
 

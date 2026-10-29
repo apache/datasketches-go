@@ -104,7 +104,9 @@ func newHll4Array(lgConfigK int) hllArray {
 func deserializeHll4(byteArray []byte) (hllArray, error) {
 	lgConfigK := extractLgK(byteArray)
 	hll4 := newHll4Array(lgConfigK)
-	hll4.extractCommonHll(byteArray)
+	if err := hll4.extractCommonHll(byteArray); err != nil {
+		return nil, err
+	}
 
 	auxStart := hll4.getAuxStart()
 	auxCount := extractAuxCount(byteArray)

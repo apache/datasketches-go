@@ -197,9 +197,17 @@ func NewHllSketchFromSlice(bytes []byte, checkRebuild bool) (HllSketch, error) {
 			}
 			return newHllSketchState(sk), nil
 		case TgtHllTypeHll6:
-			return newHllSketchState(deserializeHll6(bytes)), nil
+			sk, err := deserializeHll6(bytes)
+			if err != nil {
+				return nil, err
+			}
+			return newHllSketchState(sk), nil
 		default:
-			a := newHllSketchState(deserializeHll8(bytes))
+			sk, err := deserializeHll8(bytes)
+			if err != nil {
+				return nil, err
+			}
+			a := newHllSketchState(sk)
 			if checkRebuild {
 				err := checkRebuildCurMinNumKxQ(a)
 				if err != nil {

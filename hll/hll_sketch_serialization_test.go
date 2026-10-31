@@ -382,6 +382,13 @@ func FuzzNewHllSketchFromSlice(f *testing.F) {
 			}
 		}
 	}
+	// Inputs found by fuzzing that used to decode and then panic on a later operation.
+	// LIST: duplicate coupons and an empty slot within count.
+	f.Add([]byte("B\x01\a\f00\b00000000000000000000000000000\x00\x00\x00\x00"))
+	// SET: duplicate coupons in the updatable table.
+	f.Add([]byte("C\x01\a\f\x05001\x14\x00\x00\x00\x00\x00\x00\x000000\x00\x00\x00\x0000000000\x00\x00\x00\x000000\x00\x00\x00\x00\x00\x00\x00\x000000\x00\x00\x00\x000000\x00\x00\x00\x0000000000\x00\x00\x00\x000000\x00\x00\x00\x000000\x00\x00\x00\x000000000000000000\x00\x00\x00\x00000000000000000000000000\x00\x00\x00\x00"))
+	// HLL4: aux tokens without an aux map.
+	f.Add([]byte("\n\x01\a\b0A020000000000000000000000000000\x00\x00\x00\x0000000000000000000_0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		sk, err := NewHllSketchFromSlice(data, true)
 		if err != nil {

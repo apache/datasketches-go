@@ -74,6 +74,12 @@ func NewCountMinSketch(numHashes int8, numBuckets int32, seed int64) (*CountMinS
 	}, nil
 }
 
+// NewCountMinSketchWithDefaultSeed creates an instance of the CountMin sketch given parameters numHashes and numBuckets,
+// using the library default seed (9001).
+func NewCountMinSketchWithDefaultSeed(numHashes int8, numBuckets int32) (*CountMinSketch, error) {
+	return NewCountMinSketch(numHashes, numBuckets, int64(internal.DEFAULT_UPDATE_SEED))
+}
+
 func (c *CountMinSketch) GetNumBuckets() int32 {
 	return c.numBuckets
 }
@@ -317,6 +323,14 @@ func NewCountMinSketchFromSlice(b []byte, seed int64) (*CountMinSketch, error) {
 		return nil, err
 	}
 
+	expectedSeedHash, err := internal.ComputeSeedHash(seed)
+	if err != nil {
+		return nil, err
+	}
+	if seedHash != expectedSeedHash {
+		return nil, fmt.Errorf("incompatible seed hashes: %d, %d", seedHash, expectedSeedHash)
+	}
+
 	var unused8 int8
 	err = binary.Read(r, binary.LittleEndian, &unused8)
 	if err != nil {
@@ -352,6 +366,12 @@ func NewCountMinSketchFromSlice(b []byte, seed int64) (*CountMinSketch, error) {
 	}
 
 	return cms, nil
+}
+
+// NewCountMinSketchFromSliceWithDefaultSeed deserializes a Count-Min sketch from a byte slice
+// that was serialized with the library default seed (9001).
+func NewCountMinSketchFromSliceWithDefaultSeed(b []byte) (*CountMinSketch, error) {
+	return NewCountMinSketchFromSlice(b, int64(internal.DEFAULT_UPDATE_SEED))
 }
 
 // Deserialize deserializes a Count-Min sketch from a byte slice.

@@ -145,7 +145,10 @@ func growHashSet(couponIntArr []int, tgtLgCoupArrSize int) ([]int, error) {
 
 // promoteSetToHll move coupons to an hllArray from couponHashSetImpl
 func promoteSetToHll(src *couponHashSetImpl) (hllArray, error) {
-	tgtHllArr, _ := newHllArray(src.lgConfigK, src.tgtHllType)
+	tgtHllArr, err := newHllArray(src.lgConfigK, src.tgtHllType)
+	if err != nil {
+		return nil, err
+	}
 	srcIter := src.iterator()
 	tgtHllArr.putKxQ0(float64(uint64(1) << src.lgConfigK))
 
@@ -239,9 +242,22 @@ func deserializeCouponHashSet(byteArray []byte) (hllCoupon, error) {
 		set.couponCount = couponCount
 		set.lgCouponArrInts = lgCouponArrInts
 		couponArrInts := 1 << lgCouponArrInts
-		set.couponIntArr = make([]int, couponArrInts)
+		srcIntArr := make([]int, couponArrInts)
+		validCount := 0
 		for it := 0; it < couponArrInts; it++ {
-			set.couponIntArr[it] = int(binary.LittleEndian.Uint32(byteArray[hashSetIntArrStart+(it<<2) : hashSetIntArrStart+(it<<2)+4]))
+			coupon := int(binary.LittleEndian.Uint32(byteArray[hashSetIntArrStart+(it<<2) : hashSetIntArrStart+(it<<2)+4]))
+			if coupon != empty {
+				validCount++
+			}
+			srcIntArr[it] = coupon
+		}
+		if validCount != couponCount {
+			return nil, fmt.Errorf("possible corruption: set count %d != non-empty entries %d", couponCount, validCount)
+		}
+		// Rehash so duplicate coupons are rejected here instead of failing a later grow.
+		set.couponIntArr, err = growHashSet(srcIntArr, lgCouponArrInts)
+		if err != nil {
+			return nil, fmt.Errorf("possible corruption: %w", err)
 		}
 	}
 	return &set, nil

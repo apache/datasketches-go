@@ -81,11 +81,16 @@ func newHll8Array(lgConfigK int) hllArray {
 }
 
 // deserializeHll8 returns a new Hll8Array from the given byte array.
-func deserializeHll8(byteArray []byte) hllArray {
+func deserializeHll8(byteArray []byte) (hllArray, error) {
 	lgConfigK := extractLgK(byteArray)
 	hll8 := newHll8Array(lgConfigK)
 	hll8.extractCommonHll(byteArray)
-	return hll8
+	for slotNo, v := range hll8.getHllByteArr() {
+		if v > valMask6 {
+			return nil, fmt.Errorf("possible corruption: HLL8 slot %d value %d > %d", slotNo, v, valMask6)
+		}
+	}
+	return hll8, nil
 }
 
 func convertToHll8(srcAbsHllArr hllArray) (hllSketchStateI, error) {

@@ -20,6 +20,7 @@ package hll
 import (
 	"encoding/binary"
 	"fmt"
+	"slices"
 )
 
 type couponListImpl struct {
@@ -118,7 +119,10 @@ func (c *couponListImpl) mergeTo(dest HllSketch) error {
 
 // promoteListToHll move coupons to an hllArray from couponListImpl
 func promoteListToHll(src *couponListImpl) (hllArray, error) {
-	tgtHllArr, _ := newHllArray(src.lgConfigK, src.tgtHllType)
+	tgtHllArr, err := newHllArray(src.lgConfigK, src.tgtHllType)
+	if err != nil {
+		return nil, err
+	}
 	srcIter := src.iterator()
 	tgtHllArr.putKxQ0(float64(uint64(1) << src.lgConfigK))
 
@@ -193,7 +197,12 @@ func deserializeCouponList(byteArray []byte) (hllCoupon, error) {
 	// TODO there must be a more efficient to reinterpret the byte array as an int array
 	base := listIntArrStart
 	for it := 0; it < couponCount; it++ {
-		list.couponIntArr[it] = int(binary.LittleEndian.Uint32(byteArray[base:]))
+		coupon := int(binary.LittleEndian.Uint32(byteArray[base:]))
+		// couponUpdate assumes the first couponCount entries are filled and distinct.
+		if coupon == empty || slices.Contains(list.couponIntArr[:it], coupon) {
+			return nil, fmt.Errorf("possible corruption: invalid list coupon %d at %d", coupon, it)
+		}
+		list.couponIntArr[it] = coupon
 		base += 4
 	}
 	list.couponCount = couponCount

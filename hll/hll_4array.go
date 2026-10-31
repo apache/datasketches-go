@@ -118,6 +118,36 @@ func deserializeHll4(byteArray []byte) (hllArray, error) {
 		hll4.putAuxHashMap(auxHashMap, false)
 	}
 
+	// Every auxToken register must have exactly one aux entry: getSlotValue and the union
+	// merge look it up without checking for a nil map.
+	auxHashMap := hll4.getAuxHashMap()
+	auxEntries := 0
+	if auxHashMap != nil {
+		auxEntries = auxHashMap.getAuxCount()
+	}
+	auxTokens := 0
+	hllByteArr := hll4.getHllByteArr()
+	for slotNo := 0; slotNo < 1<<lgConfigK; slotNo++ {
+		nib := hllByteArr[slotNo>>1]
+		if (slotNo & 1) > 0 {
+			nib >>= 4
+		}
+		if nib&loNibbleMask != auxToken {
+			continue
+		}
+		// Fail before the lookup so a nil map is never touched and lookups stay bounded by auxEntries.
+		auxTokens++
+		if auxTokens > auxEntries {
+			return nil, fmt.Errorf("possible corruption: more aux tokens than aux entries (%d)", auxEntries)
+		}
+		if _, err := auxHashMap.mustFindValueFor(slotNo); err != nil {
+			return nil, fmt.Errorf("possible corruption: %w", err)
+		}
+	}
+	if auxTokens != auxEntries {
+		return nil, fmt.Errorf("possible corruption: %d aux tokens != %d aux entries", auxTokens, auxEntries)
+	}
+
 	return hll4, nil
 }
 

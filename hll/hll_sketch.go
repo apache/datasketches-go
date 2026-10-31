@@ -163,6 +163,9 @@ func NewHllSketch(lgConfigK int, tgtHllType TgtHllType) (HllSketch, error) {
 	if err != nil {
 		return nil, err
 	}
+	if tgtHllType < TgtHllTypeHll4 || tgtHllType > TgtHllTypeHll8 {
+		return nil, fmt.Errorf("invalid TgtHllType: %d", tgtHllType)
+	}
 	couponList, err := newCouponList(lgK, tgtHllType, curModeList)
 	if err != nil {
 		return nil, err
@@ -199,7 +202,11 @@ func NewHllSketchFromSlice(bytes []byte, checkRebuild bool) (HllSketch, error) {
 		case TgtHllTypeHll6:
 			return newHllSketchState(deserializeHll6(bytes)), nil
 		default:
-			a := newHllSketchState(deserializeHll8(bytes))
+			sk, err := deserializeHll8(bytes)
+			if err != nil {
+				return nil, err
+			}
+			a := newHllSketchState(sk)
 			if checkRebuild {
 				err := checkRebuildCurMinNumKxQ(a)
 				if err != nil {
@@ -339,8 +346,11 @@ func (h *hllSketchState) couponUpdate(coupon int) (hllSketchStateI, error) {
 		return h.sketch, nil
 	}
 	sk, err := h.sketch.couponUpdate(coupon)
+	if err != nil {
+		return h.sketch, err
+	}
 	h.sketch = sk
-	return h.sketch, err
+	return h.sketch, nil
 }
 
 func (h *hllSketchState) putRebuildCurMinNumKxQFlag(rebuildCurMinNumKxQFlag bool) {

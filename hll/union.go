@@ -112,6 +112,9 @@ func NewUnion(lgMaxK int) (Union, error) {
 }
 
 func NewUnionFromSlice(byteArray []byte) (Union, error) {
+	if len(byteArray) < 8 {
+		return nil, fmt.Errorf("input array too small: %d", len(byteArray))
+	}
 	lgK, err := checkLgK(extractLgK(byteArray))
 	if err != nil {
 		return nil, err

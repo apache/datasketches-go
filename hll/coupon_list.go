@@ -194,7 +194,7 @@ func deserializeCouponList(byteArray []byte) (hllCoupon, error) {
 		return nil, err
 	}
 	couponCount := extractListCount(byteArray)
-	if couponCount > len(list.couponIntArr) || len(byteArray) < listIntArrStart+(couponCount<<2) {
+	if couponCount >= len(list.couponIntArr) || len(byteArray) < listIntArrStart+(couponCount<<2) {
 		return nil, fmt.Errorf("possible Corruption: invalid list count: %d", couponCount)
 	}
 	// TODO there must be a more efficient to reinterpret the byte array as an int array

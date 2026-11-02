@@ -18,6 +18,7 @@
 package hll
 
 import (
+	"encoding/binary"
 	"fmt"
 	"os"
 	"testing"
@@ -441,4 +442,40 @@ func TestDeserializeCorruptBytes(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestDeserializeRejectsImpossibleSizes(t *testing.T) {
+	updatable := func(lgK int, tgt TgtHllType, n int) []byte {
+		sk, err := NewHllSketch(lgK, tgt)
+		assert.NoError(t, err)
+		for i := 0; i < n; i++ {
+			assert.NoError(t, sk.UpdateUInt64(uint64(i)))
+		}
+		b, err := sk.ToUpdatableSlice()
+		assert.NoError(t, err)
+		return b
+	}
+
+	list := updatable(12, TgtHllTypeHll8, 7)
+	list[listCountByte] = byte(len(list[listIntArrStart:]) >> 2)
+	_, err := NewHllSketchFromSlice(list, true)
+	assert.Error(t, err, "full list")
+
+	set := updatable(12, TgtHllTypeHll8, 20)
+	set[lgArrByte] = 10
+	set = append(set, make([]byte, 4<<10)...)
+	_, err = NewHllSketchFromSlice(set, true)
+	assert.Error(t, err, "set larger than lgK-3")
+
+	set = updatable(12, TgtHllTypeHll8, 20)
+	binary.LittleEndian.PutUint32(set[hashSetCountInt:], uint32(1<<extractLgArr(set))*3/4+1)
+	_, err = NewHllSketchFromSlice(set, true)
+	assert.Error(t, err, "set over three quarters full")
+
+	hll := updatable(10, TgtHllTypeHll4, 10000)
+	hll[lgArrByte] = 10
+	binary.LittleEndian.PutUint32(hll[auxCountInt:], 1)
+	hll = append(hll, make([]byte, 4<<10)...)
+	_, err = NewHllSketchFromSlice(hll, true)
+	assert.Error(t, err, "aux map as large as lgK")
 }

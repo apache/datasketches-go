@@ -235,7 +235,7 @@ func deserializeCouponHashSet(byteArray []byte) (hllCoupon, error) {
 	if !memIsCompact {
 		arrInts = 1 << lgCouponArrInts
 	}
-	if lgCouponArrInts > lgConfigK || couponCount > 1<<lgCouponArrInts || len(byteArray) < memArrStart+(arrInts<<2) {
+	if lgCouponArrInts > lgConfigK-3 || resizeDenom*couponCount > resizeNumber<<lgCouponArrInts || len(byteArray) < memArrStart+(arrInts<<2) {
 		return nil, fmt.Errorf("possible Corruption: invalid set count %d or lgArr %d", couponCount, lgCouponArrInts)
 	}
 	if memIsCompact {

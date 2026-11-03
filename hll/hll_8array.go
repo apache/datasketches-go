@@ -84,7 +84,9 @@ func newHll8Array(lgConfigK int) hllArray {
 func deserializeHll8(byteArray []byte) (hllArray, error) {
 	lgConfigK := extractLgK(byteArray)
 	hll8 := newHll8Array(lgConfigK)
-	hll8.extractCommonHll(byteArray)
+	if err := hll8.extractCommonHll(byteArray); err != nil {
+		return nil, err
+	}
 	for slotNo, v := range hll8.getHllByteArr() {
 		if v > valMask6 {
 			return nil, fmt.Errorf("possible corruption: HLL8 slot %d value %d > %d", slotNo, v, valMask6)

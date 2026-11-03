@@ -176,6 +176,18 @@ func checkPreamble(preamble []byte) (curMode, error) {
 		return 0, fmt.Errorf("possible Corruption: Invalid Preamble Ints: %d", preInts)
 	}
 
+	if curMode > curModeHll {
+		return 0, fmt.Errorf("possible Corruption: Invalid Mode: %d", curMode)
+	}
+
+	if tgtHllType := extractTgtHllType(preamble); tgtHllType > TgtHllTypeHll8 {
+		return 0, fmt.Errorf("possible Corruption: Invalid Target HLL Type: %d", tgtHllType)
+	}
+
+	if _, err := checkLgK(extractLgK(preamble)); err != nil {
+		return 0, fmt.Errorf("possible Corruption: %w", err)
+	}
+
 	return curMode, nil
 }
 

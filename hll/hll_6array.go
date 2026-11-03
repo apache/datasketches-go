@@ -84,11 +84,13 @@ func newHll6Array(lgConfigK int) hllArray {
 }
 
 // deserializeHll6 returns a new Hll6Array from the given byte array.
-func deserializeHll6(byteArray []byte) hllArray {
+func deserializeHll6(byteArray []byte) (hllArray, error) {
 	lgConfigK := extractLgK(byteArray)
 	hll6 := newHll6Array(lgConfigK)
-	hll6.extractCommonHll(byteArray)
-	return hll6
+	if err := hll6.extractCommonHll(byteArray); err != nil {
+		return nil, err
+	}
+	return hll6, nil
 }
 
 func (h *hll6ArrayImpl) couponUpdate(coupon int) (hllSketchStateI, error) {

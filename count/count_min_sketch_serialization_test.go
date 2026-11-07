@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/apache/datasketches-go/internal"
+	"github.com/apache/datasketches-go/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -82,15 +83,7 @@ func TestGenerateGoSnapshots(t *testing.T) {
 func TestCPPCompat(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/count_min_empty_cpp.sk", internal.CppPath)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-			return
-		}
-
-		b, err := os.ReadFile(filename)
-		if !assert.NoError(t, err) {
-			return
-		}
+		b := testutil.ReadSnapshot(t, filename)
 
 		sketch, err := NewCountMinSketchWithDefaultSeed(1, 5)
 		if !assert.NoError(t, err) {
@@ -111,15 +104,7 @@ func TestCPPCompat(t *testing.T) {
 
 	t.Run("non empty", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/count_min_non_empty_cpp.sk", internal.CppPath)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-			return
-		}
-
-		b, err := os.ReadFile(filename)
-		if !assert.NoError(t, err) {
-			return
-		}
+		b := testutil.ReadSnapshot(t, filename)
 
 		sketch, err := NewCountMinSketchWithDefaultSeed(3, 1024)
 		if !assert.NoError(t, err) {
@@ -158,17 +143,9 @@ func TestCPPCompat(t *testing.T) {
 
 	t.Run("seed mismatch", func(t *testing.T) {
 		filename := fmt.Sprintf("%s/count_min_non_empty_cpp.sk", internal.CppPath)
-		if _, err := os.Stat(filename); os.IsNotExist(err) {
-			assert.FailNowf(t, "file %s does not exist", filename)
-			return
-		}
+		b := testutil.ReadSnapshot(t, filename)
 
-		b, err := os.ReadFile(filename)
-		if !assert.NoError(t, err) {
-			return
-		}
-
-		_, err = NewCountMinSketchFromSlice(b, int64(internal.DEFAULT_UPDATE_SEED)+1)
+		_, err := NewCountMinSketchFromSlice(b, int64(internal.DEFAULT_UPDATE_SEED)+1)
 		assert.Error(t, err)
 	})
 }

@@ -120,12 +120,12 @@ func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, hasher common.It
 	}
 	maxPreLongs := internal.FamilyEnum.Frequency.MaxPreLongs
 
-	preLongs := extractPreLongs(pre0)                     //Byte 0
-	serVer := extractSerVer(pre0)                         //Byte 1
-	familyID := extractFamilyID(pre0)                     //Byte 2
-	lgMaxMapSize := extractLgMaxMapSize(pre0)             //Byte 3
-	lgCurMapSize := extractLgCurMapSize(pre0)             //Byte 4
-	empty := (extractFlags(pre0) & _EMPTY_FLAG_MASK) != 0 //Byte 5
+	preLongs := extractPreLongs(pre0)                         //Byte 0
+	serVer := extractSerVer(pre0)                             //Byte 1
+	familyID := extractFamilyID(pre0)                         //Byte 2
+	lgMaxMapSize := extractLgMaxMapSize(pre0)                 //Byte 3
+	lgCurMapSize := extractLgCurMapSize(pre0)                 //Byte 4
+	emptyFlag := (extractFlags(pre0) & _EMPTY_FLAG_MASK) != 0 //Byte 5
 
 	// Checks
 	preLongsEq1 := (preLongs == 1) //Byte 0
@@ -140,11 +140,15 @@ func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, hasher common.It
 	if familyID != actFamID {
 		return nil, fmt.Errorf("possible corruption: familyID must be %d: %d", actFamID, familyID)
 	}
-	if empty && !preLongsEq1 { //Byte 5 and Byte 0
+	if emptyFlag != preLongsEq1 { //Byte 5 and Byte 0
 		return nil, fmt.Errorf("(preLongs == 1) ^ empty == true")
 	}
-	if empty {
-		return NewFrequencyItemsSketchWithMaxMapSize[C](1<<_LG_MIN_MAP_SIZE, hasher, serde)
+	if preLongsEq1 { //empty is determined by preLongs
+		return NewFrequencyItemsSketch[C](lgMaxMapSize, _LG_MIN_MAP_SIZE, hasher, serde)
+	}
+	streamWeight := int64(binary.LittleEndian.Uint64(slc[16:]))
+	if err := checkStreamWeight(streamWeight); err != nil {
+		return nil, err
 	}
 
 	fis, err := NewFrequencyItemsSketch[C](lgMaxMapSize, lgCurMapSize, hasher, serde)
@@ -175,7 +179,7 @@ func NewFrequencyItemsSketchFromSlice[C comparable](slc []byte, hasher common.It
 			return nil, err
 		}
 	}
-	fis.streamWeight = int64(binary.LittleEndian.Uint64(slc[16:])) // override streamWeight due to updating
+	fis.streamWeight = streamWeight // override streamWeight due to updating
 	return fis, nil
 }
 
@@ -317,9 +321,11 @@ func (i *ItemsSketch[C]) GetStreamLength() int64 {
 	return i.streamWeight
 }
 
-// IsEmpty returns true if this sketch is empty.
+// IsEmpty returns true if this sketch is empty, that is, it has not been updated with any
+// positive count. A sketch that is not empty may retain no items if a purge removed all of
+// them.
 func (i *ItemsSketch[C]) IsEmpty() bool {
-	return i.GetNumActiveItems() == 0
+	return i.streamWeight == 0
 }
 
 // Update this sketch with an item and a frequency count of one.
@@ -411,7 +417,7 @@ func (i *ItemsSketch[C]) ToString() (string, error) {
 	famID := internal.FamilyEnum.Frequency.Id
 	lgMaxMapSz := i.lgMaxMapSize
 	flags := 0
-	if i.hashMap.numActive == 0 {
+	if i.IsEmpty() {
 		flags = _EMPTY_FLAG_MASK
 	}
 	_, err := fmt.Fprintf(&sb, "%d,%d,%d,%d,%d,%d,", serVer, famID, lgMaxMapSz, flags, i.streamWeight, i.offset)
@@ -441,7 +447,9 @@ func (i *ItemsSketch[C]) ToSlice() ([]byte, error) {
 		outBytes = 8
 	} else {
 		preLongs = internal.FamilyEnum.Frequency.MaxPreLongs
-		bytes = i.hashMap.serde.SerializeManyToSlice(i.hashMap.getActiveKeys())
+		if activeItems > 0 { //a purge may have removed all items
+			bytes = i.hashMap.serde.SerializeManyToSlice(i.hashMap.getActiveKeys())
+		}
 		outBytes = ((preLongs + activeItems) << 3) + len(bytes)
 	}
 

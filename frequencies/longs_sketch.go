@@ -109,7 +109,7 @@ func NewLongsSketchFromSlice(slc []byte) (*LongsSketch, error) {
 	familyID := extractFamilyID(pre0)
 	lgMaxMapSize := extractLgMaxMapSize(pre0)
 	lgCurMapSize := extractLgCurMapSize(pre0)
-	empty := (extractFlags(pre0) & _EMPTY_FLAG_MASK) != 0
+	emptyFlag := (extractFlags(pre0) & _EMPTY_FLAG_MASK) != 0
 
 	// Checks
 	preLongsEq1 := preLongs == 1
@@ -124,11 +124,15 @@ func NewLongsSketchFromSlice(slc []byte) (*LongsSketch, error) {
 	if familyID != actFamID {
 		return nil, fmt.Errorf("possible Corruption: FamilyID must be %d: %d", actFamID, familyID)
 	}
-	if empty && !preLongsEq1 {
+	if emptyFlag != preLongsEq1 {
 		return nil, fmt.Errorf("possible Corruption: Empty Flag set incorrectly: %t", preLongsEq1)
 	}
-	if empty {
+	if preLongsEq1 { //empty is determined by PreLongs
 		return NewLongsSketch(lgMaxMapSize, _LG_MIN_MAP_SIZE)
+	}
+	streamWeight := int64(binary.LittleEndian.Uint64(slc[16:]))
+	if err := checkStreamWeight(streamWeight); err != nil {
+		return nil, err
 	}
 
 	fls, err := NewLongsSketch(lgMaxMapSize, lgCurMapSize)
@@ -159,7 +163,7 @@ func NewLongsSketchFromSlice(slc []byte) (*LongsSketch, error) {
 		}
 	}
 
-	fls.streamWeight = int64(binary.LittleEndian.Uint64(slc[16:])) //override streamWeight due to updating
+	fls.streamWeight = streamWeight //override streamWeight due to updating
 	return fls, nil
 }
 
@@ -222,9 +226,18 @@ func NewLongsSketchFromString(str string) (*LongsSketch, error) {
 	if famID != int64(internal.FamilyEnum.Frequency.Id) {
 		return nil, fmt.Errorf("possible Corruption: Bad Family: %d", famID)
 	}
-	empty := flags > 0
-	if !empty && (numActive == 0) {
+	emptyFlag := (flags & _EMPTY_FLAG_MASK) != 0
+	// A non-empty sketch may have no items after a purge, but not without stream weight.
+	if !emptyFlag && numActive == 0 && streamWt <= 0 {
 		return nil, fmt.Errorf("Possible Corruption: !Empty && NumActive=0;  strLen: %d", numActive) //nolint:staticcheck
+	}
+	if emptyFlag != (streamWt == 0) {
+		return nil, fmt.Errorf("possible Corruption: Empty flag does not match stream weight: flags %d, stream weight %d", flags, streamWt)
+	}
+	if streamWt != 0 {
+		if err := checkStreamWeight(streamWt); err != nil {
+			return nil, err
+		}
 	}
 	numTokens := int64(len(tokens))
 	if (2 * numActive) != (numTokens - strPreambleTokens - 2) {
@@ -381,9 +394,11 @@ func (s *LongsSketch) GetStreamLength() int64 {
 	return s.streamWeight
 }
 
-// IsEmpty returns true if this sketch is empty
+// IsEmpty returns true if this sketch is empty, that is, it has not been updated with any
+// positive count. A sketch that is not empty may retain no items if a purge removed all of
+// them.
 func (s *LongsSketch) IsEmpty() bool {
-	return s.GetNumActiveItems() == 0
+	return s.streamWeight == 0
 }
 
 // Update this sketch with an item and a frequency count of one.
@@ -463,7 +478,7 @@ func (s *LongsSketch) ToString() (string, error) {
 	famID := internal.FamilyEnum.Frequency.Id
 	lgMaxMapSz := s.lgMaxMapSize
 	flags := 0
-	if s.hashMap.numActive == 0 {
+	if s.IsEmpty() {
 		flags = _EMPTY_FLAG_MASK
 	}
 	_, err := fmt.Fprintf(&sb, "%d,%d,%d,%d,%d,%d,", serVer, famID, lgMaxMapSz, flags, s.streamWeight, s.offset)

@@ -19,6 +19,7 @@ package theta
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -132,6 +133,7 @@ func TestJavaCompat(t *testing.T) {
 				entries = append(entries, entry)
 			}
 			assert.True(t, slices.IsSorted(entries))
+			assertEncodesTo(t, sketch, false, b)
 		}
 	})
 
@@ -155,6 +157,7 @@ func TestJavaCompat(t *testing.T) {
 				entries = append(entries, entry)
 			}
 			assert.True(t, slices.IsSorted(entries))
+			assertEncodesTo(t, sketch, true, b)
 		}
 	})
 
@@ -167,6 +170,7 @@ func TestJavaCompat(t *testing.T) {
 
 		assert.False(t, sketch.IsEmpty())
 		assert.Zero(t, sketch.NumRetained())
+		assertEncodesTo(t, sketch, false, b)
 	})
 
 	t.Run("Compact V1 Empty From Java", func(t *testing.T) {
@@ -402,6 +406,7 @@ func TestCPPCompat(t *testing.T) {
 				entries = append(entries, entry)
 			}
 			assert.True(t, slices.IsSorted(entries))
+			assertEncodesTo(t, sketch, false, b)
 		}
 	})
 
@@ -425,6 +430,7 @@ func TestCPPCompat(t *testing.T) {
 				entries = append(entries, entry)
 			}
 			assert.True(t, slices.IsSorted(entries))
+			assertEncodesTo(t, sketch, true, b)
 		}
 	})
 
@@ -437,7 +443,16 @@ func TestCPPCompat(t *testing.T) {
 
 		assert.False(t, sketch.IsEmpty())
 		assert.Zero(t, sketch.NumRetained())
+		assertEncodesTo(t, sketch, false, b)
 	})
+}
+
+func assertEncodesTo(t *testing.T, sketch *CompactSketch, compressed bool, expected []byte) {
+	t.Helper()
+	var buffer bytes.Buffer
+	encoder := NewEncoder(&buffer, compressed)
+	assert.NoError(t, encoder.Encode(sketch))
+	assert.Equal(t, expected, buffer.Bytes())
 }
 
 func TestEncodingAndDecoding(t *testing.T) {
@@ -686,6 +701,52 @@ func TestEncodingAndDecoding(t *testing.T) {
 		assert.Equal(t, uint32(0), decoded.NumRetained())
 	})
 
+	t.Run("Single item serialized image", func(t *testing.T) {
+		seed := uint64(12345)
+		seedHash, err := internal.ComputeSeedHash(int64(seed))
+		assert.NoError(t, err)
+		sketch, err := NewQuickSelectUpdateSketch(WithUpdateSketchSeed(seed))
+		assert.NoError(t, err)
+		assertUpdate(t, sketch.UpdateInt64(1))
+		compact := sketch.CompactOrdered()
+		hash := compact.entries[0]
+
+		// same image as C++ and Java: flags (single item, ordered, compact, read only),
+		// then the seed hash and the one hash
+		expected := binary.LittleEndian.AppendUint64(
+			[]byte{1, 3, 3, 0, 0, 0x3a, byte(seedHash), byte(seedHash >> 8)}, hash)
+		data, err := compact.MarshalBinary()
+		assert.NoError(t, err)
+		assert.Equal(t, expected, data)
+		assertEncodesTo(t, compact, true, expected) // no compressed form of a single item
+
+		// the single item flag is informational: the reader does not depend on it
+		for _, flags := range []byte{0x3a, 0x1a} {
+			image := slices.Clone(expected)
+			image[compactSketchFlagsByte] = flags
+			decoded, err := Decode(image, seed)
+			assert.NoError(t, err)
+			assert.Equal(t, uint32(1), decoded.NumRetained())
+			assert.Equal(t, hash, decoded.entries[0])
+		}
+	})
+
+	t.Run("One entry in estimation mode is not a single item", func(t *testing.T) {
+		sketch, err := NewQuickSelectUpdateSketch(WithUpdateSketchP(0.5))
+		assert.NoError(t, err)
+		for i := int64(0); sketch.NumRetained() < 1; i++ {
+			assertUpdate(t, sketch.UpdateInt64(i))
+		}
+		compact := sketch.CompactOrdered()
+		assert.Equal(t, uint32(1), compact.NumRetained())
+		assert.True(t, compact.IsEstimationMode())
+
+		data, err := compact.MarshalBinary()
+		assert.NoError(t, err)
+		assert.Equal(t, uint8(3), data[compactSketchPreLongsByte]) // theta is present
+		assert.Equal(t, uint8(0x1a), data[compactSketchFlagsByte]) // no single item flag
+	})
+
 	t.Run("Compressed sketch with custom seed", func(t *testing.T) {
 		customSeed := uint64(9999)
 		sketch, _ := NewQuickSelectUpdateSketch(WithUpdateSketchSeed(customSeed))
@@ -894,5 +955,99 @@ func TestDecoderErrors(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported serial version: 99")
+	})
+
+	// The header fields of serial versions 1 to 3 that follow the first 8 bytes must not be read
+	// before the size of the buffer is checked. Each full buffer below would decode as an empty
+	// sketch, and each truncated buffer stops inside its preamble.
+	t.Run("Truncated preamble", func(t *testing.T) {
+		seedHash, err := internal.ComputeSeedHash(int64(DefaultSeed))
+		assert.NoError(t, err)
+		seedHashLo, seedHashHi := byte(seedHash), byte(seedHash>>8)
+
+		v1 := binary.LittleEndian.AppendUint64(
+			[]byte{3, 1, 3, 0, 0, 0x1a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, MaxTheta)
+		v2Exact := []byte{2, 2, 3, 0, 0, 0x1a, seedHashLo, seedHashHi, 0, 0, 0, 0, 0, 0, 0, 0}
+		v2Estimation := binary.LittleEndian.AppendUint64(
+			[]byte{3, 2, 3, 0, 0, 0x1a, seedHashLo, seedHashHi, 0, 0, 0, 0, 0, 0, 0, 0}, MaxTheta)
+		v3 := []byte{2, 3, 3, 0, 0, 0x1a, seedHashLo, seedHashHi}
+
+		testCases := []struct {
+			name  string
+			bytes []byte
+		}{
+			{"v1 8 bytes", slices.Clone(v1[:8])},
+			{"v1 16 bytes", slices.Clone(v1[:16])},
+			{"v2 exact 8 bytes", slices.Clone(v2Exact[:8])},
+			{"v2 estimation 8 bytes", slices.Clone(v2Estimation[:8])},
+			{"v2 estimation 16 bytes", slices.Clone(v2Estimation[:16])},
+			{"v3 8 bytes", v3},
+		}
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				_, err := Decode(tc.bytes, DefaultSeed)
+				assert.ErrorContains(t, err, "bytes expected")
+				_, err = WrapCompactSketch(tc.bytes, DefaultSeed)
+				assert.ErrorContains(t, err, "bytes expected")
+			})
+		}
+
+		for _, full := range [][]byte{v2Exact, v2Estimation} {
+			sketch, err := Decode(full, DefaultSeed)
+			assert.NoError(t, err)
+			assert.True(t, sketch.IsEmpty())
+		}
+	})
+
+	t.Run("V4 corrupt header", func(t *testing.T) {
+		updateSketch, err := NewQuickSelectUpdateSketch()
+		assert.NoError(t, err)
+		for i := 0; i < 100; i++ {
+			assertUpdate(t, updateSketch.UpdateInt64(int64(i)))
+		}
+		var buffer bytes.Buffer
+		encoder := NewEncoder(&buffer, true)
+		assert.NoError(t, encoder.Encode(updateSketch.CompactOrdered()))
+		b := buffer.Bytes()
+		assert.Equal(t, uint8(CompressedSerialVersion), b[compactSketchSerialVersionByte])
+
+		for _, entryBits := range []byte{0, 64, 255} {
+			corrupt := slices.Clone(b)
+			corrupt[compactSketchV4EntryBitsByte] = entryBits
+			_, err := Decode(corrupt, DefaultSeed)
+			assert.ErrorContains(t, err, "invalid entry bits")
+			_, err = WrapCompactSketch(corrupt, DefaultSeed)
+			assert.ErrorContains(t, err, "invalid entry bits")
+		}
+		for _, numEntriesBytes := range []byte{0, 5, 255} {
+			corrupt := slices.Clone(b)
+			corrupt[compactSketchV4NumEntriesBytesByte] = numEntriesBytes
+			_, err := Decode(corrupt, DefaultSeed)
+			assert.ErrorContains(t, err, "invalid num entries bytes")
+			_, err = WrapCompactSketch(corrupt, DefaultSeed)
+			assert.ErrorContains(t, err, "invalid num entries bytes")
+		}
+	})
+
+	t.Run("V4 entry bits overflow", func(t *testing.T) {
+		updateSketch, err := NewQuickSelectUpdateSketch()
+		assert.NoError(t, err)
+		for i := 0; i < 100; i++ {
+			assertUpdate(t, updateSketch.UpdateInt64(int64(i)))
+		}
+		var buffer bytes.Buffer
+		encoder := NewEncoder(&buffer, true)
+		assert.NoError(t, encoder.Encode(updateSketch.CompactOrdered()))
+		// exact mode, num_entries follows the first preamble long
+		assert.Equal(t, uint8(1), buffer.Bytes()[compactSketchPreLongsByte])
+
+		// 8 bits * 2^29 entries = 2^32 bits wraps to 0 in 32-bit arithmetic
+		b := slices.Clone(buffer.Bytes()[:12])
+		b[compactSketchV4EntryBitsByte] = 8
+		b[compactSketchV4NumEntriesBytesByte] = 4
+		binary.LittleEndian.PutUint32(b[8:], 1<<29)
+
+		_, err = Decode(b, DefaultSeed)
+		assert.ErrorContains(t, err, "bytes expected")
 	})
 }

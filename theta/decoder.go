@@ -168,6 +168,9 @@ func decodeVersion4(bytes []byte, seed uint64) (compactSketchData, error) {
 	}
 
 	numEntriesBytes := bytes[compactSketchV4NumEntriesBytesByte]
+	if numEntriesBytes == 0 || numEntriesBytes > 4 {
+		return compactSketchData{}, fmt.Errorf("invalid num entries bytes: %d (expected 1 to 4)", numEntriesBytes)
+	}
 	dataOffsetBytes := compactSketchV4PackedDataExactByte
 	if hasTheta {
 		dataOffsetBytes = compactSketchV4PackedDataEstByte
@@ -185,6 +188,10 @@ func decodeVersion4(bytes []byte, seed uint64) (compactSketchData, error) {
 	dataOffsetBytes += int(numEntriesBytes)
 
 	entryBits := bytes[compactSketchV4EntryBitsByte]
+	// deltas between ordered hashes below 2^63 need 1 to 63 bits
+	if entryBits == 0 || entryBits > 63 {
+		return compactSketchData{}, fmt.Errorf("invalid entry bits: %d (expected 1 to 63)", entryBits)
+	}
 	expectedBits := uint64(entryBits) * uint64(numEntries)
 	expectedSize := dataOffsetBytes + int(wholeBytesToHoldBits(expectedBits))
 
@@ -254,11 +261,14 @@ func decodeVersion3(bytes []byte, seed uint64) (compactSketchData, error) {
 		}, nil
 	}
 
-	numEntries := binary.LittleEndian.Uint32(bytes[compactSketchNumEntriesU32*4:])
 	entriesStartU64 := compactSketchEntriesExactU64
 	if hasTheta {
 		entriesStartU64 = compactSketchEntriesEstimationU64
 	}
+	if err := validateMemorySize(bytes, entriesStartU64*8); err != nil {
+		return compactSketchData{}, err
+	}
+	numEntries := binary.LittleEndian.Uint32(bytes[compactSketchNumEntriesU32*4:])
 
 	expectedSize := (entriesStartU64 + int(numEntries)) * 8
 	if err := validateMemorySize(bytes, expectedSize); err != nil {
@@ -303,6 +313,9 @@ func decodeVersion2(bytes []byte, seed uint64) (compactSketchData, error) {
 			bytes:      bytes,
 		}, nil
 	case 2:
+		if err := validateMemorySize(bytes, compactSketchEntriesExactU64*8); err != nil {
+			return compactSketchData{}, err
+		}
 		numEntries := binary.LittleEndian.Uint32(bytes[compactSketchNumEntriesU32*4:])
 		if numEntries == 0 {
 			return compactSketchData{
@@ -332,6 +345,9 @@ func decodeVersion2(bytes []byte, seed uint64) (compactSketchData, error) {
 			bytes:           bytes,
 		}, nil
 	case 3:
+		if err := validateMemorySize(bytes, compactSketchEntriesEstimationU64*8); err != nil {
+			return compactSketchData{}, err
+		}
 		numEntries := binary.LittleEndian.Uint32(bytes[compactSketchNumEntriesU32*4:])
 		theta := binary.LittleEndian.Uint64(bytes[compactSketchThetaU64*8:])
 
@@ -374,6 +390,9 @@ func decodeVersion1(bytes []byte, seed uint64) (compactSketchData, error) {
 		return compactSketchData{}, err
 	}
 
+	if err := validateMemorySize(bytes, compactSketchEntriesEstimationU64*8); err != nil {
+		return compactSketchData{}, err
+	}
 	numEntries := binary.LittleEndian.Uint32(bytes[compactSketchNumEntriesU32*4:])
 	theta := binary.LittleEndian.Uint64(bytes[compactSketchThetaU64*8:])
 

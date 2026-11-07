@@ -188,6 +188,24 @@ func TestWriteReadPairs(t *testing.T) {
 	}
 }
 
+func TestUncompressPairsColumnOutOfRange(t *testing.T) {
+	// (row 0, col 63), then xDelta 0 in the same row: the decoder predicts column 64
+	compressedWords := make([]int, 2)
+	ptrArr := make([]int64, 3)
+	for _, xDelta := range []int{63, 0} {
+		codeInfo := uint64(lengthLimitedUnaryEncodingTable65[xDelta])
+		ptrArr[BitBuf] |= int64((codeInfo & 0xFFF) << uint(ptrArr[BufBits]))
+		ptrArr[BufBits] += int64(codeInfo >> 12)
+		writeUnary(compressedWords, ptrArr, 0) // yDelta 0, no base bits
+	}
+	assert.Zero(t, ptrArr[NextWordIdx])
+	compressedWords[0] = int(uint64(ptrArr[BitBuf]) & 0xFFFFFFFF)
+
+	pairs := make([]int, 2)
+	err := lowLevelUncompressPairs(pairs, 2, 0, compressedWords, len(compressedWords))
+	assert.ErrorContains(t, err, "column index")
+}
+
 // updateStateUnion compresses the current sketch, exports its compressed state,
 // re-imports it, then creates a union (using the official union implementation),
 // updates the union with the sketch, and verifies that the union’s result

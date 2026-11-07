@@ -22,6 +22,9 @@ import (
 	"errors"
 	"io"
 	"slices"
+	"unicode"
+	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/cespare/xxhash/v2"
 )
@@ -38,15 +41,109 @@ const (
 )
 
 // GenerateHashKeyFromStrings returns the hash of the concatenated strings.
+//
+// It is compatible with Java's tuple Util.stringArrHash: the elements are joined
+// with "," and the joined string is hashed with XXH64 as UTF-16 code units in
+// little-endian byte order (UTF-16LE, no byte-order mark).
+//
+// Key arrays are hashed by joining their elements with ",". Keys that join to
+// the same string, for example {"a,b"} and {"a", "b"}, or {} and {""}, are
+// treated as the same key. If key elements may contain commas, escape or encode
+// them before updating the sketch.
+//
+// The strings are expected to be valid UTF-8. Invalid UTF-8 is replaced with
+// U+FFFD the same way Java's UTF-8 decoder (new String(bytes, UTF_8)) replaces
+// it, so a key hashes as Java hashes the String decoded from the same bytes.
 func GenerateHashKeyFromStrings(s []string) uint64 {
-	hasher := xxhash.NewWithSeed(stringSliceHashSeed)
+	var stack [256]byte
+	buf := stack[:0]
 	for i, v := range s {
-		hasher.WriteString(v) //nolint:errcheck
-		if i+1 < len(s) {
-			hasher.WriteString(",") //nolint:errcheck
+		if i > 0 {
+			buf = append(buf, ',', 0)
 		}
+		buf = appendUTF16LE(buf, v)
 	}
-	return hasher.Sum64()
+
+	var d xxhash.Digest
+	d.ResetWithSeed(stringSliceHashSeed)
+	d.Write(buf) //nolint:errcheck
+	return d.Sum64()
+}
+
+// appendUTF16LE appends s to dst as UTF-16LE code units, which is how Java hashes
+// a String with XxHash.hashCharArr(s.toCharArray(), ...).
+//
+// s is decoded from UTF-8. Malformed input is replaced with U+FFFD exactly as
+// Java's UTF-8 decoder does it: one U+FFFD for the longest valid prefix of a
+// malformed sequence (at least one byte), and one U+FFFD for a complete 3-byte
+// sequence that encodes a surrogate. Ranging over s would instead yield one
+// U+FFFD per invalid byte.
+func appendUTF16LE(dst []byte, s string) []byte {
+	for i := 0; i < len(s); {
+		lead := s[i]
+		i++
+		if lead < utf8.RuneSelf {
+			dst = binary.LittleEndian.AppendUint16(dst, uint16(lead))
+			continue
+		}
+		numContinuation, secondMin, secondMax := utf8SequenceRule(lead)
+		if numContinuation == 0 {
+			dst = binary.LittleEndian.AppendUint16(dst, unicode.ReplacementChar)
+			continue
+		}
+		r := rune(lead & (0x3f >> numContinuation))
+		numRead := 0
+		for numRead < numContinuation && i < len(s) {
+			b := s[i]
+			var valid bool
+			if numRead == 0 {
+				valid = b >= secondMin && b <= secondMax
+			} else {
+				valid = b&0xc0 == 0x80
+			}
+			if !valid {
+				break
+			}
+			r = r<<6 | rune(b&0x3f)
+			i++
+			numRead++
+		}
+		if numRead < numContinuation || utf16.IsSurrogate(r) {
+			// The bytes read so far are the longest valid prefix. Resume at the next byte.
+			dst = binary.LittleEndian.AppendUint16(dst, unicode.ReplacementChar)
+			continue
+		}
+		if r1, r2 := utf16.EncodeRune(r); r1 != unicode.ReplacementChar {
+			dst = binary.LittleEndian.AppendUint16(dst, uint16(r1))
+			dst = binary.LittleEndian.AppendUint16(dst, uint16(r2))
+			continue
+		}
+		dst = binary.LittleEndian.AppendUint16(dst, uint16(r))
+	}
+	return dst
+}
+
+// utf8SequenceRule returns the number of continuation bytes that follow a UTF-8
+// lead byte, or 0 if the byte cannot start a sequence (0x80-0xC1, 0xF5-0xFF),
+// and the range the second byte must be in, as Java's decoder checks it.
+func utf8SequenceRule(lead byte) (numContinuation int, secondMin, secondMax byte) {
+	switch {
+	case lead >= 0xc2 && lead <= 0xdf:
+		return 1, 0x80, 0xbf
+	case lead == 0xe0:
+		return 2, 0xa0, 0xbf // no overlong forms
+	case lead >= 0xe1 && lead <= 0xef:
+		// ED A0-BF encodes a surrogate, which Java's decoder accepts here and
+		// replaces once decoded.
+		return 2, 0x80, 0xbf
+	case lead == 0xf0:
+		return 3, 0x90, 0xbf // no overlong forms
+	case lead >= 0xf1 && lead <= 0xf3:
+		return 3, 0x80, 0xbf
+	case lead == 0xf4:
+		return 3, 0x80, 0x8f // nothing above U+10FFFF
+	}
+	return 0, 0, 0
 }
 
 // ArrayOfStringsSummary represents a summary type that holds and manages a collection of string values.

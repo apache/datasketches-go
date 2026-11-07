@@ -18,6 +18,7 @@
 package frequencies
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 )
@@ -65,6 +66,15 @@ func hashFn(okey int64) int64 {
 	key *= 0xc4ceb9fe1a85ec53
 	key ^= key >> 33
 	return int64(key)
+}
+
+// checkStreamWeight checks the stream weight read from the serialized image of a
+// non-empty sketch, which must be positive.
+func checkStreamWeight(streamWeight int64) error {
+	if streamWeight <= 0 {
+		return fmt.Errorf("possible corruption: stream weight of a non-empty sketch must be positive: %d", streamWeight)
+	}
+	return nil
 }
 
 func randomGeometricDist(prob float64) int64 {

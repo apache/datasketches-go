@@ -178,6 +178,9 @@ func (enc *Encoder) encodeSketch(sketch *CompactSketch, bytes []byte, offset int
 	if sketch.IsOrdered() {
 		flags |= 1 << serializationFlagIsOrdered
 	}
+	if sketch.isSingleItem() {
+		flags |= 1 << serializationFlagIsSingleItem
+	}
 	bytes[offset] = flags
 	offset++
 

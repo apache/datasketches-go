@@ -206,6 +206,17 @@ func newHll4Iterator(lengthPairs int, hll *hll4ArrayImpl) hll4Iterator {
 	}
 }
 
+func (itr *hll4Iterator) nextValid() bool {
+	for itr.index+1 < itr.lengthPairs {
+		itr.index++
+		// A lookup error stops here so getPair returns it.
+		if v, err := itr.getValue(); err != nil || v != empty {
+			return true
+		}
+	}
+	return false
+}
+
 func (itr *hll4Iterator) getValue() (int, error) {
 	return itr.hll.getSlotValue(itr.getIndex())
 }

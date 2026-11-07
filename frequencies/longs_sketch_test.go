@@ -581,18 +581,146 @@ func TestStringDeserEmptyNotCorrupt(t *testing.T) {
 	}
 }
 
-func TestStringDeserEmptyCorrupt(t *testing.T) {
+func TestStringDeserNonEmptyNoItems(t *testing.T) {
+	var s strings.Builder
+	s.WriteString("1,")  //serVer
+	s.WriteString("10,") //FamID
+	s.WriteString("3,")  //lgMaxMapSz
+	s.WriteString("0,")  //Empty Flag = false
+	s.WriteString("7,")  //stream Len so far
+	s.WriteString("1,")  //error offset
+	s.WriteString("0,")  //numActive: a purge removed all items
+	s.WriteString("8,")  //curMapLen
+	sk, err := NewLongsSketchFromString(s.String())
+	assert.NoError(t, err)
+	assert.False(t, sk.IsEmpty())
+	assert.Equal(t, 0, sk.GetNumActiveItems())
+	assert.Equal(t, int64(7), sk.GetStreamLength())
+	assert.Equal(t, int64(1), sk.GetMaximumError())
+}
+
+func TestStringDeserEmptyFlagMissing(t *testing.T) {
 	var s strings.Builder
 	s.WriteString("1,")  //serVer
 	s.WriteString("10,") //FamID
 	s.WriteString("3,")  //lgMaxMapSz
 	s.WriteString("0,")  //Empty Flag = false ... corrupted, should be true
-	s.WriteString("7,")  //stream Len so far
-	s.WriteString("1,")  //error offset
-	s.WriteString("0,")  //numActive ...conflict with empty
+	s.WriteString("0,")  //stream Len: empty
+	s.WriteString("0,")  //error offset
+	s.WriteString("0,")  //numActive
 	s.WriteString("8,")  //curMapLen
 	_, err := NewLongsSketchFromString(s.String())
 	assert.Error(t, err)
+}
+
+func TestStringDeserEmptyFlagWithStreamLength(t *testing.T) {
+	var s strings.Builder
+	s.WriteString("1,")  //serVer
+	s.WriteString("10,") //FamID
+	s.WriteString("3,")  //lgMaxMapSz
+	s.WriteString("5,")  //Empty Flag = true ... corrupted, should be false
+	s.WriteString("7,")  //stream Len so far
+	s.WriteString("1,")  //error offset
+	s.WriteString("0,")  //numActive
+	s.WriteString("8,")  //curMapLen
+	_, err := NewLongsSketchFromString(s.String())
+	assert.Error(t, err)
+}
+
+func newPurgedLongsSketch(t *testing.T) *LongsSketch {
+	t.Helper()
+	sk, err := NewLongsSketchWithMaxMapSize(1 << 8)
+	assert.NoError(t, err)
+	for i := int64(0); i < 193; i++ {
+		assert.NoError(t, sk.Update(i))
+	}
+	return sk
+}
+
+func TestPurgedToZeroIsNotEmpty(t *testing.T) {
+	sk := newPurgedLongsSketch(t)
+	assert.Equal(t, 0, sk.GetNumActiveItems())
+	assert.False(t, sk.IsEmpty())
+	assert.Equal(t, int64(193), sk.GetStreamLength())
+	assert.Equal(t, int64(1), sk.GetMaximumError())
+
+	bytes := sk.ToSlice()
+	assert.Len(t, bytes, 32)
+	assert.Equal(t, byte(4), bytes[_PREAMBLE_LONGS_BYTE])
+	assert.Equal(t, byte(0), bytes[_FLAGS_BYTE])
+	assert.Equal(t, 32, sk.GetStorageBytes())
+
+	sk2, err := NewLongsSketchFromSlice(bytes)
+	assert.NoError(t, err)
+	assert.False(t, sk2.IsEmpty())
+	assert.Equal(t, 0, sk2.GetNumActiveItems())
+	assert.Equal(t, int64(193), sk2.GetStreamLength())
+	assert.Equal(t, int64(1), sk2.GetMaximumError())
+
+	str, err := sk.ToString()
+	assert.NoError(t, err)
+	sk3, err := NewLongsSketchFromString(str)
+	assert.NoError(t, err)
+	assert.False(t, sk3.IsEmpty())
+	assert.Equal(t, int64(193), sk3.GetStreamLength())
+	assert.Equal(t, int64(1), sk3.GetMaximumError())
+	str3, err := sk3.ToString()
+	assert.NoError(t, err)
+	assert.Equal(t, str, str3)
+
+	sk4, err := NewLongsSketchWithMaxMapSize(1 << 8)
+	assert.NoError(t, err)
+	assert.NoError(t, sk4.Update(999_999))
+	_, err = sk4.Merge(sk)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(194), sk4.GetStreamLength())
+	assert.Equal(t, int64(1), sk4.GetMaximumError())
+}
+
+func TestResetAfterPurge(t *testing.T) {
+	sk := newPurgedLongsSketch(t)
+	sk.Reset()
+	assert.True(t, sk.IsEmpty())
+	assert.Equal(t, int64(0), sk.GetStreamLength())
+	assert.Equal(t, int64(0), sk.GetMaximumError())
+	assert.Len(t, sk.ToSlice(), 8)
+}
+
+func TestEmptyWithEitherLegacyFlag(t *testing.T) {
+	sk, err := NewLongsSketchWithMaxMapSize(1 << 8)
+	assert.NoError(t, err)
+	bytes := sk.ToSlice()
+	assert.Len(t, bytes, 8)
+	assert.Equal(t, byte(_EMPTY_FLAG_MASK), bytes[_FLAGS_BYTE])
+	for _, flags := range []byte{1, 4, 5} {
+		bytes[_FLAGS_BYTE] = flags
+		sk2, err := NewLongsSketchFromSlice(bytes)
+		assert.NoError(t, err)
+		assert.True(t, sk2.IsEmpty())
+		assert.Equal(t, sk.GetMaximumMapCapacity(), sk2.GetMaximumMapCapacity())
+	}
+}
+
+func TestCorruptEmptyPreamble(t *testing.T) {
+	sk, err := NewLongsSketchWithMaxMapSize(1 << 8)
+	assert.NoError(t, err)
+	empty := sk.ToSlice()
+	empty[_FLAGS_BYTE] = 0 //preLongs 1 without the empty flag
+	_, err = NewLongsSketchFromSlice(empty)
+	assert.Error(t, err)
+
+	assert.NoError(t, sk.Update(1))
+	flagged := sk.ToSlice()
+	flagged[_FLAGS_BYTE] = _EMPTY_FLAG_MASK //preLongs 4 with the empty flag
+	_, err = NewLongsSketchFromSlice(flagged)
+	assert.Error(t, err)
+
+	for _, streamWeight := range []int64{0, -1} {
+		badWeight := sk.ToSlice()
+		binary.LittleEndian.PutUint64(badWeight[16:], uint64(streamWeight))
+		_, err = NewLongsSketchFromSlice(badWeight)
+		assert.Error(t, err)
+	}
 }
 
 func TestGetEpsilon(t *testing.T) {

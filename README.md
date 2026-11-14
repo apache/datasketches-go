@@ -49,12 +49,12 @@ If you are interested in making contributions to this site, please see our [Comm
 | 	            | ThetaSketch             | ✅      |
 | 	            | TupleSketch<S>          | ✅      |
 | Quantiles	   |                         |        |
-| 	            | CormodeDoublesSketch    | ❌      |
-| 	            | CormodeItemsSketch<T>   | ❌      |
+| 	            | CormodeDoublesSketch    | 🚧      |
+| 	            | CormodeItemsSketch<T>   | 🚧      |
 | 	            | KllDoublesSketch        | ✅      |
 | 	            | KllFloatsSketch         | ✅     |
 | 	            | KllSketch<T>            | ✅      |
-| 	            | ReqFloatsSketch         | ⚠️     |
+| 	            | ReqFloatsSketch         | ✅     |
 | 	            | TDigestDouble           | ✅      |
 |               | TDigestFloat            | ❌      |
 | Frequencies  |                         | ️      |
@@ -68,6 +68,7 @@ If you are interested in making contributions to this site, please see our [Comm
 | 	            | EbppsSketch<T>          | ❌     |
 | Membership   |                         |        |
 |              | BloomFilter             | ✅      |
+|               | XORFilter              | ❌     |
 | Density      |                         |        |
 |              | DensitySketch           | ❌      | 
 
@@ -85,7 +86,7 @@ If you are interested in making contributions to this site, please see our [Comm
 | 	| EngagementTest3 | ❌ |
 
 
-✅ = Released in v0.2.0
+✅ = Released in v0.3.0
 
 ❌ = Not yet implemented
 

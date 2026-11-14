@@ -56,7 +56,7 @@ git pull origin main
 git tag -s "v${CANDIDATE_NAME}" -m "Release Candidate ${RC} for version ${VERSION}"
 
 # 3. Push the tag to the Apache remote
-git push origin "v${CANDIDATE_NAME}"
+git push upstream "v${CANDIDATE_NAME}"
 ```
 
 ## Step 2: Package the Source Release
@@ -142,14 +142,16 @@ svn commit -m "Remove ${LANGUAGE} ${VERSION} release candidates from dev dist"
 cd /path/to/datasketches-go
 git checkout v${VERSION}-${RC}
 git tag -a v${VERSION} -m "Release version ${VERSION}"
-git push origin v${VERSION}
+git push upstream v${VERSION}
 ```
 
 4. **Create GitHub Release**: Create a new release on GitHub with the tag `v${VERSION}` and link to the release notes.
 
 5. **Announce**: Wait 24 hours for mirrors to sync, then send [ANNOUNCE] email
    * To: dev@datasketches.apache.org and announce@apache.org
-   * Include: GitHub release, Apache dist and pkg.go.dev link
+   * From: your @apache.org address
+   * **Send in plain text mode only.** Do not send HTML mail to announce@apache.org.
+   * Include: GitHub release and pkg.go.dev link
 
 6. **Update Website**: Update the [Apache DataSketches website](https://github.com/apache/datasketches-website) to reflect the new released version for datasketches-go.
 ```bash

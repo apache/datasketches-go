@@ -1082,3 +1082,50 @@ func TestL0SortDuringMerge(t *testing.T) {
 		}
 	}
 }
+
+func TestItemsSketch_QuantileEndpointsAfterCompaction(t *testing.T) {
+	sketch, err := NewKllItemsSketch[string](8, _DEFAULT_M, common.ItemSketchStringComparator(false), common.ItemSketchStringSerDe{})
+	if !assert.NoError(t, err) {
+		return
+	}
+	// The ninth update compacts the first eight items. Either parity drops one endpoint.
+	for _, value := range []string{"a", "b", "c", "d", "e", "f", "g", "z", "e"} {
+		sketch.Update(value)
+	}
+	assert.True(t, sketch.IsEstimationMode())
+
+	view, err := sketch.GetSortedView()
+	if !assert.NoError(t, err) {
+		return
+	}
+	for _, inclusive := range []bool{true, false} {
+		points, err := sketch.GetQuantiles([]float64{0, 0.5, 1}, inclusive)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.Equal(t, "a", points[0])
+		assert.Equal(t, "z", points[2])
+
+		boundaries, err := sketch.GetPartitionBoundaries(2, inclusive)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.Equal(t, points, boundaries.GetBoundaries())
+		after, err := sketch.GetQuantiles([]float64{0, 0.5, 1}, inclusive)
+		assert.NoError(t, err)
+		assert.Equal(t, points, after)
+	}
+
+	totalWeight := int64(0)
+	var first, last string
+	for it := view.Iterator(); it.Next(); {
+		if first == "" {
+			first = it.GetQuantile()
+		}
+		last = it.GetQuantile()
+		totalWeight += it.GetWeight()
+	}
+	assert.Equal(t, "a", first)
+	assert.Equal(t, "z", last)
+	assert.Equal(t, int64(sketch.GetN()), totalWeight)
+}

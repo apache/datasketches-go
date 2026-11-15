@@ -19,6 +19,7 @@ package kll
 
 import (
 	"errors"
+	"slices"
 	"sort"
 
 	"github.com/apache/datasketches-go/common"
@@ -65,6 +66,19 @@ func newItemsSketchSortedView[C comparable](sketch *ItemsSketch[C]) (*ItemsSketc
 	numQuantiles := srcLevels[srcNumLevels] - srcLevels[0]
 
 	quantiles, cumWeights := populateFromSketch(srcQuantiles, srcLevels, srcNumLevels, numQuantiles, sketch.compareFn)
+
+	// Include exact endpoints missing after compaction. Each inserted endpoint takes
+	// one unit of weight from its neighbor, preserving the total (as in Java IncludeMinMax).
+	if sketch.compareFn(minItem, quantiles[0]) {
+		quantiles = slices.Insert(quantiles, 0, minItem)
+		cumWeights = slices.Insert(cumWeights, 0, 1)
+	}
+	if last := len(quantiles) - 1; sketch.compareFn(quantiles[last], maxItem) {
+		quantiles = append(quantiles, maxItem)
+		cumWeights = append(cumWeights, cumWeights[last])
+		cumWeights[last]--
+	}
+
 	return &ItemsSketchSortedView[C]{
 		quantiles:  quantiles,
 		cumWeights: cumWeights,
@@ -181,11 +195,6 @@ func (s *ItemsSketchSortedView[C]) GetPartitionBoundaries(numEquallySized int, i
 	if s.totalN == 0 {
 		return nil, errors.New("empty sketch")
 	}
-	s.cumWeights[0] = 1
-	s.cumWeights[len(s.cumWeights)-1] = int64(s.totalN)
-	s.quantiles[0] = s.minItem
-	s.quantiles[len(s.quantiles)-1] = s.maxItem
-
 	evSpNormRanks, err := evenlySpacedDoubles(0, 1.0, numEquallySized+1)
 	if err != nil {
 		return nil, err
@@ -201,6 +210,9 @@ func (s *ItemsSketchSortedView[C]) GetPartitionBoundaries(numEquallySized int, i
 		evSpQuantiles[i] = s.quantiles[index]
 		evSpNatRanks[i] = s.cumWeights[index]
 	}
+	// The first boundary starts at the first stream item, even when ties give
+	// the minimum a larger cumulative weight in the sorted view.
+	evSpNatRanks[0] = 1
 	return newItemsSketchPartitionBoundaries[C](s.totalN, evSpQuantiles, evSpNatRanks, evSpNormRanks, s.maxItem, s.minItem, inclusive)
 }
 

@@ -283,6 +283,7 @@ func (s *ItemsSketch[C]) GetRanks(item []C, inclusive bool) ([]float64, error) {
 }
 
 // GetQuantile return the approximate quantile of the given normalized rank and the given search criterion.
+// Ranks 0 and 1 return the exact minimum and maximum.
 // If INCLUSIVE, the given rank includes all quantiles <= the quantile directly corresponding to the given rank.
 // If EXCLUSIVE, the given rank includes all quantiles < the quantile directly corresponding to the given rank.
 func (s *ItemsSketch[C]) GetQuantile(rank float64, inclusive bool) (C, error) {
@@ -300,6 +301,7 @@ func (s *ItemsSketch[C]) GetQuantile(rank float64, inclusive bool) (C, error) {
 }
 
 // GetQuantiles return an array of quantiles from the given array of normalized ranks.
+// Ranks 0 and 1 return the exact minimum and maximum.
 // if INCLUSIVE, the given ranks include all quantiles <= the quantile directly corresponding to each rank.
 func (s *ItemsSketch[C]) GetQuantiles(ranks []float64, inclusive bool) ([]C, error) {
 	if s.IsEmpty() {

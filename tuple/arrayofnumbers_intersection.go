@@ -41,11 +41,11 @@ func NewArrayOfNumbersSketchIntersection[V Number](
 	numValuesInSummary uint8,
 	opts ...IntersectionOptionFunc,
 ) *ArrayOfNumbersSketchIntersection[V] {
-	options := &intersectionOptions{
+	options := intersectionOptions{
 		seed: theta.DefaultSeed,
 	}
 	for _, opt := range opts {
-		opt(options)
+		options = opt(options)
 	}
 
 	return &ArrayOfNumbersSketchIntersection[V]{

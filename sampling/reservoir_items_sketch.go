@@ -59,12 +59,13 @@ type reservoirItemsSketchOptions struct {
 }
 
 // ReservoirItemsSketchOptionFunc defines a functional option for configuring reservoirItemsSketchOptions.
-type ReservoirItemsSketchOptionFunc func(*reservoirItemsSketchOptions)
+type ReservoirItemsSketchOptionFunc func(reservoirItemsSketchOptions) reservoirItemsSketchOptions
 
 // WithReservoirItemsSketchResizeFactor sets the resize factor for the internal array.
 func WithReservoirItemsSketchResizeFactor(rf ResizeFactor) ReservoirItemsSketchOptionFunc {
-	return func(r *reservoirItemsSketchOptions) {
+	return func(r reservoirItemsSketchOptions) reservoirItemsSketchOptions {
 		r.resizeFactor = rf
+		return r
 	}
 }
 
@@ -76,11 +77,11 @@ func NewReservoirItemsSketch[T any](
 		return nil, errors.New("k must be at least 2")
 	}
 
-	options := &reservoirItemsSketchOptions{
+	options := reservoirItemsSketchOptions{
 		resizeFactor: defaultResizeFactor,
 	}
 	for _, opt := range opts {
-		opt(options)
+		options = opt(options)
 	}
 
 	ceilingLgK, _ := internal.ExactLog2(common.CeilingPowerOf2(k))

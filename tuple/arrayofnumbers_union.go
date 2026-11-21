@@ -41,14 +41,14 @@ func NewArrayOfNumbersSketchUnion[V Number](
 	numValuesInSummary uint8,
 	opts ...UnionOptionFunc,
 ) (*ArrayOfNumbersSketchUnion[V], error) {
-	options := &unionOptions{
+	options := unionOptions{
 		lgK:  theta.DefaultLgK,
 		rf:   theta.DefaultResizeFactor,
 		p:    1.0,
 		seed: theta.DefaultSeed,
 	}
 	for _, opt := range opts {
-		opt(options)
+		options = opt(options)
 	}
 
 	if options.lgK < theta.MinLgK {

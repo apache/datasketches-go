@@ -29,19 +29,22 @@ type intersectionOptions struct {
 	seed   uint64
 }
 
-type IntersectionOptionFunc func(*intersectionOptions)
+// IntersectionOptionFunc configures NewIntersection.
+type IntersectionOptionFunc func(intersectionOptions) intersectionOptions
 
 // WithIntersectionPolicy sets the policy for processing matched entries during intersection.
 func WithIntersectionPolicy(policy Policy) IntersectionOptionFunc {
-	return func(i *intersectionOptions) {
+	return func(i intersectionOptions) intersectionOptions {
 		i.policy = policy
+		return i
 	}
 }
 
 // WithIntersectionSeed sets the seed for the hash function.
 func WithIntersectionSeed(seed uint64) IntersectionOptionFunc {
-	return func(i *intersectionOptions) {
+	return func(i intersectionOptions) intersectionOptions {
 		i.seed = seed
+		return i
 	}
 }
 
@@ -54,12 +57,12 @@ type Intersection struct {
 
 // NewIntersection creates a new intersection.
 func NewIntersection(opts ...IntersectionOptionFunc) *Intersection {
-	options := &intersectionOptions{
+	options := intersectionOptions{
 		policy: &noopPolicy{},
 		seed:   DefaultSeed,
 	}
 	for _, opt := range opts {
-		opt(options)
+		options = opt(options)
 	}
 
 	return &Intersection{

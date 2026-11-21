@@ -19,6 +19,7 @@ package kll
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/apache/datasketches-go/common"
@@ -130,10 +131,13 @@ func (vlid *itemsSketchMemoryValidate[C]) validate() error {
 			offset := _DATA_START_ADR + i*4
 			vlid.levelsArr[i] = binary.LittleEndian.Uint32(vlid.srcMem[offset : offset+4])
 		}
-		capacityItems := computeTotalItemCapacity(uint16(vlid.k), uint8(vlid.m), uint8(vlid.numLevels))
+		capacityItems := computeTotalItemCapacity(vlid.k, vlid.m, vlid.numLevels)
 		vlid.levelsArr[vlid.numLevels] = capacityItems //load the last one
 		if err := checkLevels(vlid.levelsArr); err != nil {
 			return err
+		}
+		if vlid.levelsArr[numLevels] == vlid.levelsArr[0] {
+			return errors.New("possible corruption: non-empty sketch with no retained items")
 		}
 		sb, err := computeSketchBytes(vlid.srcMem, vlid.levelsArr, vlid.typeBytes, vlid.serde)
 		if err != nil {

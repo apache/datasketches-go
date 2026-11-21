@@ -1194,6 +1194,12 @@ func TestItemsSketch_DeserializeRejectsInconsistentLevels(t *testing.T) {
 		checkRejected(t, bytes)
 	})
 
+	t.Run("zero retained items", func(t *testing.T) {
+		bytes := oneLevel(t)
+		binary.LittleEndian.PutUint32(bytes[levelsOffset:], computeTotalItemCapacity(8, _DEFAULT_M, 1))
+		checkRejected(t, bytes)
+	})
+
 	t.Run("k below minimum", func(t *testing.T) {
 		bytes := threeLevels(t)
 		binary.LittleEndian.PutUint16(bytes[kOffset:], 4)
@@ -1227,4 +1233,8 @@ func TestItemsSketch_DeserializeRejectsInconsistentLevels(t *testing.T) {
 		bytes := threeLevels(t)
 		checkRejected(t, bytes[:4:8])
 	})
+}
+
+func TestBlockyTandemMergeSortWithNoLevels(t *testing.T) {
+	blockyTandemMergeSort[int64](nil, nil, []uint32{0}, 0, common.ItemSketchLongComparator(false))
 }

@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/apache/datasketches-go/common"
 	"github.com/apache/datasketches-go/internal"
@@ -107,9 +108,7 @@ func TestJavaCompat(t *testing.T) {
 			filename := fmt.Sprintf("%s/kll_string_n%d_java.sk", internal.JavaPath, n)
 			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[string](bytes, comparatorString, serde)
-			if err != nil {
-				return
-			}
+			require.NoError(t, err, filename)
 
 			assert.Equal(t, sketch.GetK(), uint16(200))
 			if n == 0 {
@@ -155,9 +154,7 @@ func TestJavaCompat(t *testing.T) {
 			filename := fmt.Sprintf("%s/kll_double_n%d_java.sk", internal.JavaPath, n)
 			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[float64](bytes, comparatorDouble, serde)
-			if err != nil {
-				return
-			}
+			require.NoError(t, err, filename)
 
 			assert.Equal(t, sketch.GetK(), uint16(200))
 			if n == 0 {
@@ -202,9 +199,7 @@ func TestJavaCompat(t *testing.T) {
 			filename := fmt.Sprintf("%s/kll_long_n%d_java.sk", internal.JavaPath, n)
 			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[int64](bytes, comparatorLong, serde)
-			if err != nil {
-				return
-			}
+			require.NoError(t, err, filename)
 
 			assert.Equal(t, sketch.GetK(), uint16(200))
 			if n == 0 {
@@ -249,9 +244,7 @@ func TestJavaCompat(t *testing.T) {
 			filename := fmt.Sprintf("%s/kll_float_n%d_java.sk", internal.JavaPath, n)
 			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[float32](bytes, comparatorFloat, serde)
-			if err != nil {
-				return
-			}
+			require.NoError(t, err, filename)
 
 			assert.Equal(t, sketch.GetK(), uint16(200))
 			if n == 0 {
@@ -301,9 +294,7 @@ func TestCPPCompat(t *testing.T) {
 			filename := fmt.Sprintf("%s/kll_string_n%d_cpp.sk", internal.CppPath, n)
 			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[string](bytes, comparatorString, serde)
-			if err != nil {
-				return
-			}
+			require.NoError(t, err, filename)
 
 			assert.Equal(t, sketch.GetK(), uint16(200))
 			if n == 0 {
@@ -354,9 +345,7 @@ func TestCPPCompat(t *testing.T) {
 			filename := fmt.Sprintf("%s/kll_double_n%d_cpp.sk", internal.CppPath, n)
 			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[float64](bytes, comparatorDouble, serde)
-			if err != nil {
-				return
-			}
+			require.NoError(t, err, filename)
 
 			assert.Equal(t, sketch.GetK(), uint16(200))
 			if n == 0 {
@@ -401,9 +390,7 @@ func TestCPPCompat(t *testing.T) {
 			filename := fmt.Sprintf("%s/kll_long_n%d_cpp.sk", internal.CppPath, n)
 			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[int64](bytes, comparatorLong, serde)
-			if err != nil {
-				return
-			}
+			require.NoError(t, err, filename)
 
 			assert.Equal(t, sketch.GetK(), uint16(200))
 			if n == 0 {
@@ -448,9 +435,7 @@ func TestCPPCompat(t *testing.T) {
 			filename := fmt.Sprintf("%s/kll_float_n%d_cpp.sk", internal.CppPath, n)
 			bytes := testutil.ReadSnapshot(t, filename)
 			sketch, err := NewKllItemsSketchFromSlice[float32](bytes, comparatorFloat, serde)
-			if err != nil {
-				return
-			}
+			require.NoError(t, err, filename)
 
 			assert.Equal(t, sketch.GetK(), uint16(200))
 			if n == 0 {

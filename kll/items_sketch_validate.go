@@ -57,15 +57,18 @@ type itemsSketchMemoryValidate[C comparable] struct {
 }
 
 func newItemsSketchMemoryValidate[C comparable](srcMem []byte, serde common.ItemSketchSerde[C]) (*itemsSketchMemoryValidate[C], error) {
-	capa := cap(srcMem)
-	if capa < 8 {
-		return nil, fmt.Errorf("Memory too small: %d", capa) //nolint:staticcheck
+	memLen := len(srcMem)
+	if memLen < 8 {
+		return nil, fmt.Errorf("Memory too small: %d", memLen) //nolint:staticcheck
 	}
 	preInts := getPreInts(srcMem)
 	serVer := getSerVer(srcMem)
 	sketchStructure, err := getSketchStructure(preInts, serVer)
 	if err != nil {
 		return nil, err
+	}
+	if preambleBytes := preInts * 4; memLen < preambleBytes {
+		return nil, fmt.Errorf("possible corruption: %d bytes is shorter than the %d-byte preamble", memLen, preambleBytes)
 	}
 
 	familyID := getFamilyID(srcMem)
@@ -114,13 +117,24 @@ func (vlid *itemsSketchMemoryValidate[C]) validate() error {
 		vlid.n = getN(vlid.srcMem)
 		vlid.minK = getMinK(vlid.srcMem)
 		vlid.numLevels = getNumLevels(vlid.srcMem)
+		if err := checkNumLevels(vlid.numLevels); err != nil {
+			return err
+		}
+		numLevels := int(vlid.numLevels)
+		if levelsEnd := _DATA_START_ADR + numLevels*4; len(vlid.srcMem) < levelsEnd {
+			return fmt.Errorf("possible corruption: %d bytes is too short for %d levels, need %d", len(vlid.srcMem), numLevels, levelsEnd)
+		}
 		// Get Levels Arr and add the last element
-		vlid.levelsArr = make([]uint32, vlid.numLevels+1)
-		for i := uint8(0); i < vlid.numLevels; i++ {
-			vlid.levelsArr[i] = binary.LittleEndian.Uint32(vlid.srcMem[_DATA_START_ADR+i*4 : _DATA_START_ADR+i*4+4])
+		vlid.levelsArr = make([]uint32, numLevels+1)
+		for i := 0; i < numLevels; i++ {
+			offset := _DATA_START_ADR + i*4
+			vlid.levelsArr[i] = binary.LittleEndian.Uint32(vlid.srcMem[offset : offset+4])
 		}
 		capacityItems := computeTotalItemCapacity(uint16(vlid.k), uint8(vlid.m), uint8(vlid.numLevels))
 		vlid.levelsArr[vlid.numLevels] = capacityItems //load the last one
+		if err := checkLevels(vlid.levelsArr); err != nil {
+			return err
+		}
 		sb, err := computeSketchBytes(vlid.srcMem, vlid.levelsArr, vlid.typeBytes, vlid.serde)
 		if err != nil {
 			return err

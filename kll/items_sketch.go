@@ -155,7 +155,7 @@ func NewKllItemsSketchFromSlice[C comparable](sl []byte, compareFn common.Compar
 		items = make([]C, k)
 		items[k-1] = deserItems[0]
 	case _COMPACT_FULL:
-		offset := int(_DATA_START_ADR + memVal.numLevels*4)
+		offset := _DATA_START_ADR + int(memVal.numLevels)*4
 		deserMinItems, err := serde.DeserializeManyFromSlice(sl, offset, 1)
 		if err != nil {
 			return nil, err

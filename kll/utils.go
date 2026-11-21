@@ -19,6 +19,7 @@ package kll
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"math/bits"
 	"strconv"
@@ -32,6 +33,9 @@ const (
 	_PMF_EXP  = 0.9433
 	_CDF_COEF = 2.296
 	_CDF_EXP  = 0.9723
+
+	// intCapAux supports depth <= 60 (powersOfThree ends at 3^30), so at most 61 levels.
+	_MAX_NUM_LEVELS = 61
 )
 
 func convertToCumulative(array []int64) int64 {
@@ -53,6 +57,23 @@ func checkK(k uint16, m uint8) error {
 func checkM(m uint8) error {
 	if m < _MIN_M || m > _MAX_M || ((m & 1) == 1) {
 		return errors.New("M must be >= 2, <= 8 and even: " + strconv.Itoa(int(m)))
+	}
+	return nil
+}
+
+func checkNumLevels(numLevels uint8) error {
+	if numLevels == 0 || numLevels > _MAX_NUM_LEVELS {
+		return fmt.Errorf("possible corruption: number of levels must be > 0 and <= %d: %d", _MAX_NUM_LEVELS, numLevels)
+	}
+	return nil
+}
+
+// The last entry is the capacity, so non-decreasing levels also lie within the items buffer.
+func checkLevels(levels []uint32) error {
+	for i := 1; i < len(levels); i++ {
+		if levels[i-1] > levels[i] {
+			return fmt.Errorf("possible corruption: levels[%d] = %d > levels[%d] = %d", i-1, levels[i-1], i, levels[i])
+		}
 	}
 	return nil
 }

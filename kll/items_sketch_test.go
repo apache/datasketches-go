@@ -18,6 +18,7 @@
 package kll
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math"
 	"math/rand"
@@ -26,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/apache/datasketches-go/common"
 )
@@ -1128,4 +1130,101 @@ func TestItemsSketch_QuantileEndpointsAfterCompaction(t *testing.T) {
 	assert.Equal(t, "a", first)
 	assert.Equal(t, "z", last)
 	assert.Equal(t, int64(sketch.GetN()), totalWeight)
+}
+
+func TestItemsSketch_DeserializeRejectsInconsistentLevels(t *testing.T) {
+	const (
+		kOffset         = _K_SHORT_ADR
+		numLevelsOffset = _NUM_LEVELS_BYTE_ADR
+		levelsOffset    = _DATA_START_ADR
+	)
+	comparator := common.ItemSketchLongComparator(false)
+	serde := common.ItemSketchLongSerDe{}
+
+	serialize := func(t *testing.T, numItems int) []byte {
+		t.Helper()
+		sk, err := NewKllItemsSketch[int64](8, _DEFAULT_M, comparator, serde)
+		require.NoError(t, err)
+		for i := 0; i < numItems; i++ {
+			sk.Update(int64(i))
+		}
+		bytes, err := sk.ToSlice()
+		require.NoError(t, err)
+		return bytes
+	}
+	oneLevel := func(t *testing.T) []byte { return serialize(t, 3) }
+	threeLevels := func(t *testing.T) []byte {
+		bytes := serialize(t, 40)
+		require.Equal(t, byte(3), bytes[numLevelsOffset])
+		return bytes
+	}
+	checkRejected := func(t *testing.T, bytes []byte) {
+		t.Helper()
+		_, err := NewKllItemsSketchFromSlice[int64](bytes, comparator, serde)
+		assert.Error(t, err)
+	}
+
+	for _, bytes := range [][]byte{oneLevel(t), threeLevels(t)} {
+		_, err := NewKllItemsSketchFromSlice[int64](bytes, comparator, serde)
+		require.NoError(t, err)
+	}
+
+	t.Run("first level beyond capacity", func(t *testing.T) {
+		bytes := oneLevel(t)
+		binary.LittleEndian.PutUint32(bytes[levelsOffset:], 1009)
+		checkRejected(t, bytes)
+	})
+
+	t.Run("level beyond capacity", func(t *testing.T) {
+		bytes := threeLevels(t)
+		binary.LittleEndian.PutUint32(bytes[levelsOffset+4:], 100000)
+		checkRejected(t, bytes)
+	})
+
+	t.Run("decreasing levels", func(t *testing.T) {
+		bytes := threeLevels(t)
+		require.Greater(t, binary.LittleEndian.Uint32(bytes[levelsOffset:]), uint32(0))
+		binary.LittleEndian.PutUint32(bytes[levelsOffset+4:], 0)
+		checkRejected(t, bytes)
+	})
+
+	t.Run("zero levels", func(t *testing.T) {
+		bytes := threeLevels(t)
+		bytes[numLevelsOffset] = 0
+		checkRejected(t, bytes)
+	})
+
+	t.Run("k below minimum", func(t *testing.T) {
+		bytes := threeLevels(t)
+		binary.LittleEndian.PutUint16(bytes[kOffset:], 4)
+		checkRejected(t, bytes)
+	})
+
+	t.Run("levels beyond the input", func(t *testing.T) {
+		bytes := threeLevels(t)
+		bytes[numLevelsOffset] = 40
+		checkRejected(t, bytes[:levelsOffset])
+	})
+
+	t.Run("too many levels", func(t *testing.T) {
+		for _, numLevels := range []byte{_MAX_NUM_LEVELS + 1, 255} {
+			bytes := append(threeLevels(t), make([]byte, 4*int(numLevels))...)
+			bytes[numLevelsOffset] = numLevels
+			checkRejected(t, bytes)
+		}
+	})
+
+	t.Run("max levels is accepted by the capacity computation", func(t *testing.T) {
+		assert.NotPanics(t, func() { computeTotalItemCapacity(_MAX_K, _MAX_M, _MAX_NUM_LEVELS) })
+		assert.NotPanics(t, func() { computeTotalItemCapacity(_MIN_K, _DEFAULT_M, _MAX_NUM_LEVELS) })
+	})
+
+	t.Run("truncated full preamble", func(t *testing.T) {
+		checkRejected(t, threeLevels(t)[:_DATA_START_ADR-1:_DATA_START_ADR-1])
+	})
+
+	t.Run("short input with spare capacity", func(t *testing.T) {
+		bytes := threeLevels(t)
+		checkRejected(t, bytes[:4:8])
+	})
 }

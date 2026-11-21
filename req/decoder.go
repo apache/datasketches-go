@@ -23,11 +23,15 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/bits"
 
 	"github.com/apache/datasketches-go/internal"
 )
 
-var errNonEmptyWithNoItems = errors.New("possible corruption: non-empty sketch with no items")
+var (
+	errNonEmptyWithNoItems    = errors.New("possible corruption: non-empty sketch with no items")
+	errRetainedWeightOverflow = errors.New("possible corruption: retained weight exceeds the maximum n")
+)
 
 // Decoder is responsible for decoding sketches from binary format.
 type Decoder struct{}
@@ -191,6 +195,9 @@ func (d *Decoder) Decode(r io.Reader) (*Sketch, error) {
 
 				compactors = append(compactors, result.compactor)
 			}
+		}
+		if err := checkRetainedWeight(n, compactors); err != nil {
+			return nil, err
 		}
 
 		sk := &Sketch{
@@ -374,6 +381,9 @@ func Decode(buf []byte) (*Sketch, error) {
 				index = res.bufferEndIndex
 			}
 		}
+		if err := checkRetainedWeight(n, compactors); err != nil {
+			return nil, err
+		}
 
 		sk := &Sketch{
 			k:                      int(k),
@@ -392,6 +402,30 @@ func Decode(buf []byte) (*Sketch, error) {
 func validateBuffer(buf []byte, endIndex int) error {
 	if len(buf) < endIndex {
 		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+
+func checkRetainedWeight(n uint64, compactors []*compactor) error {
+	var total uint64
+	for _, c := range compactors {
+		if c.count == 0 {
+			continue
+		}
+		if c.lgWeight >= 63 {
+			return errRetainedWeightOverflow
+		}
+		hi, weight := bits.Mul64(uint64(c.count), 1<<c.lgWeight)
+		if hi != 0 || weight > math.MaxInt64-total {
+			return errRetainedWeightOverflow
+		}
+		total += weight
+	}
+	if total == 0 {
+		return errNonEmptyWithNoItems
+	}
+	if total != n {
+		return fmt.Errorf("possible corruption: retained items weigh %d, but n is %d", total, n)
 	}
 	return nil
 }

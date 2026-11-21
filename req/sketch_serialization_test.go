@@ -243,6 +243,7 @@ func TestDecodeRejectsInconsistentCompactors(t *testing.T) {
 		kOffset             = 4
 		numLevelsOffset     = 6
 		numRawItemsOffset   = 7
+		nOffset             = 8
 		exactCompactor      = 8
 		estimationCompactor = 24
 		sectionSizeOffset   = 8
@@ -396,5 +397,39 @@ func TestDecodeRejectsInconsistentCompactors(t *testing.T) {
 		b := estimation(t)
 		b[0] = 2
 		checkRejected(t, b)
+	})
+
+	withCompactors := func(t *testing.T, n uint64, counts []uint32) []byte {
+		t.Helper()
+		b := append([]byte(nil), estimation(t)[:estimationCompactor]...)
+		b[numLevelsOffset] = byte(len(counts))
+		binary.LittleEndian.PutUint64(b[nOffset:], n)
+		for level, count := range counts {
+			c := make([]byte, itemsOffset+4*int(count))
+			putFloat(c, sectionSizeOffset, 12)
+			c[lgWeightOffset] = byte(level)
+			c[numSectionsOffset] = 3
+			binary.LittleEndian.PutUint32(c[numItemsOffset:], count)
+			b = append(b, c...)
+		}
+		return b
+	}
+
+	t.Run("estimation with no retained items", func(t *testing.T) {
+		checkAccepted(t, withCompactors(t, 5, []uint32{1, 2}), 5)
+		checkRejected(t, withCompactors(t, 1, []uint32{0, 0}))
+	})
+
+	t.Run("retained weight does not match n", func(t *testing.T) {
+		b := estimation(t)
+		n := binary.LittleEndian.Uint64(b[nOffset:])
+		binary.LittleEndian.PutUint64(b[nOffset:], n+1)
+		checkRejected(t, b)
+	})
+
+	t.Run("retained weight beyond the maximum n", func(t *testing.T) {
+		counts := make([]uint32, 64)
+		counts[63] = 1
+		checkRejected(t, withCompactors(t, 1<<63, counts))
 	})
 }

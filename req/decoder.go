@@ -19,12 +19,15 @@ package req
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math"
 
 	"github.com/apache/datasketches-go/internal"
 )
+
+var errNonEmptyWithNoItems = errors.New("possible corruption: non-empty sketch with no items")
 
 // Decoder is responsible for decoding sketches from binary format.
 type Decoder struct{}
@@ -70,6 +73,9 @@ func (d *Decoder) Decode(r io.Reader) (*Sketch, error) {
 	if err := binary.Read(r, binary.LittleEndian, &k); err != nil {
 		return nil, err
 	}
+	if err := checkK(int(k)); err != nil {
+		return nil, err
+	}
 
 	var numCompactors byte
 	if err := binary.Read(r, binary.LittleEndian, &numCompactors); err != nil {
@@ -79,6 +85,12 @@ func (d *Decoder) Decode(r io.Reader) (*Sketch, error) {
 	var numRawItems byte
 	if err := binary.Read(r, binary.LittleEndian, &numRawItems); err != nil {
 		return nil, err
+	}
+
+	if !isEmpty {
+		if err := checkNumCompactors(int(numCompactors), isRawItemsSketch); err != nil {
+			return nil, err
+		}
 	}
 
 	format := inferEncodingFormat(isEmpty, isRawItemsSketch, int(numCompactors))
@@ -91,6 +103,10 @@ func (d *Decoder) Decode(r io.Reader) (*Sketch, error) {
 	case encodingFormatRawItems:
 		if preambleInt != 2 {
 			return nil, fmt.Errorf("invalid preamble: %d", preambleInt)
+		}
+
+		if numRawItems == 0 {
+			return nil, errNonEmptyWithNoItems
 		}
 
 		sk, err := NewSketch(WithK(int(k)), WithHighRankAccuracyMode(isHighRankAccuracyMode))
@@ -114,10 +130,13 @@ func (d *Decoder) Decode(r io.Reader) (*Sketch, error) {
 			return nil, fmt.Errorf("invalid preamble: %d", preambleInt)
 		}
 
-		decoder := newCompactorDecoder(isLevel0Sorted, isHighRankAccuracyMode)
+		decoder := newCompactorDecoder(int(k), 0, isLevel0Sorted, isHighRankAccuracyMode)
 		result, err := decoder.Decode(r)
 		if err != nil {
 			return nil, err
+		}
+		if result.n == 0 {
+			return nil, errNonEmptyWithNoItems
 		}
 
 		sk := &Sketch{
@@ -127,9 +146,6 @@ func (d *Decoder) Decode(r io.Reader) (*Sketch, error) {
 			maxItem:                result.maxItem,
 			k:                      int(k),
 			isHighRankAccuracyMode: isHighRankAccuracyMode,
-		}
-		if err := sk.validateK(); err != nil {
-			return nil, err
 		}
 		sk.maxNomSize = sk.computeMaxNomSize()
 		sk.numRetained = sk.computeRetainedItems()
@@ -159,7 +175,7 @@ func (d *Decoder) Decode(r io.Reader) (*Sketch, error) {
 		compactors := make([]*compactor, 0, int(numCompactors))
 		for i := 0; i < int(numCompactors); i++ {
 			if i == 0 {
-				decoder := newCompactorDecoder(isLevel0Sorted, isHighRankAccuracyMode)
+				decoder := newCompactorDecoder(int(k), i, isLevel0Sorted, isHighRankAccuracyMode)
 				result, err := decoder.Decode(r)
 				if err != nil {
 					return nil, err
@@ -167,7 +183,7 @@ func (d *Decoder) Decode(r io.Reader) (*Sketch, error) {
 
 				compactors = append(compactors, result.compactor)
 			} else {
-				decoder := newCompactorDecoder(true, isHighRankAccuracyMode)
+				decoder := newCompactorDecoder(int(k), i, true, isHighRankAccuracyMode)
 				result, err := decoder.Decode(r)
 				if err != nil {
 					return nil, err
@@ -184,9 +200,6 @@ func (d *Decoder) Decode(r io.Reader) (*Sketch, error) {
 			minItem:                minItem,
 			maxItem:                maxItem,
 			compactors:             compactors,
-		}
-		if err := sk.validateK(); err != nil {
-			return nil, err
 		}
 		sk.maxNomSize = sk.computeMaxNomSize()
 		sk.numRetained = sk.computeRetainedItems()
@@ -238,6 +251,9 @@ func Decode(buf []byte) (*Sketch, error) {
 	}
 	k := binary.LittleEndian.Uint16(buf[index : index+2])
 	index += 2
+	if err := checkK(int(k)); err != nil {
+		return nil, err
+	}
 
 	if err := validateBuffer(buf, index+1); err != nil {
 		return nil, err
@@ -251,6 +267,12 @@ func Decode(buf []byte) (*Sketch, error) {
 	numRawItems := buf[index]
 	index++
 
+	if !isEmpty {
+		if err := checkNumCompactors(int(numCompactors), isRawItemsSketch); err != nil {
+			return nil, err
+		}
+	}
+
 	format := inferEncodingFormat(isEmpty, isRawItemsSketch, int(numCompactors))
 	switch format {
 	case encodingFormatEmpty:
@@ -261,6 +283,9 @@ func Decode(buf []byte) (*Sketch, error) {
 	case encodingFormatRawItems:
 		if preambleInts != 2 {
 			return nil, fmt.Errorf("invalid preamble ints for raw items encoding: %d", preambleInts)
+		}
+		if numRawItems == 0 {
+			return nil, errNonEmptyWithNoItems
 		}
 
 		sk, err := NewSketch(WithK(int(k)), WithHighRankAccuracyMode(isHighRankAccuracyMode))
@@ -287,9 +312,12 @@ func Decode(buf []byte) (*Sketch, error) {
 			return nil, fmt.Errorf("invalid preamble ints for exact encoding: %d", preambleInts)
 		}
 
-		result, err := decodeCompactor(buf, index, isLevel0Sorted, isHighRankAccuracyMode)
+		result, err := decodeCompactor(buf, index, int(k), 0, isLevel0Sorted, isHighRankAccuracyMode)
 		if err != nil {
 			return nil, err
+		}
+		if result.n == 0 {
+			return nil, errNonEmptyWithNoItems
 		}
 
 		sk := &Sketch{
@@ -300,13 +328,14 @@ func Decode(buf []byte) (*Sketch, error) {
 			k:                      int(k),
 			isHighRankAccuracyMode: isHighRankAccuracyMode,
 		}
-		if err := sk.validateK(); err != nil {
-			return nil, err
-		}
 		sk.maxNomSize = sk.computeMaxNomSize()
 		sk.numRetained = sk.computeRetainedItems()
 		return sk, nil
 	default: // Estimation.
+		if preambleInts != 4 {
+			return nil, fmt.Errorf("invalid preamble ints for estimation encoding: %d", preambleInts)
+		}
+
 		if err := validateBuffer(buf, index+8); err != nil {
 			return nil, err
 		}
@@ -328,7 +357,7 @@ func Decode(buf []byte) (*Sketch, error) {
 		compactors := make([]*compactor, 0, int(numCompactors))
 		for i := 0; i < int(numCompactors); i++ {
 			if i == 0 {
-				res, err := decodeCompactor(buf, index, isLevel0Sorted, isHighRankAccuracyMode)
+				res, err := decodeCompactor(buf, index, int(k), i, isLevel0Sorted, isHighRankAccuracyMode)
 				if err != nil {
 					return nil, err
 				}
@@ -336,7 +365,7 @@ func Decode(buf []byte) (*Sketch, error) {
 				compactors = append(compactors, res.compactor)
 				index = res.bufferEndIndex
 			} else {
-				res, err := decodeCompactor(buf, index, true, isHighRankAccuracyMode)
+				res, err := decodeCompactor(buf, index, int(k), i, true, isHighRankAccuracyMode)
 				if err != nil {
 					return nil, err
 				}
@@ -354,9 +383,6 @@ func Decode(buf []byte) (*Sketch, error) {
 			maxItem:                maxItem,
 			compactors:             compactors,
 		}
-		if err := sk.validateK(); err != nil {
-			return nil, err
-		}
 		sk.maxNomSize = sk.computeMaxNomSize()
 		sk.numRetained = sk.computeRetainedItems()
 		return sk, nil
@@ -366,6 +392,13 @@ func Decode(buf []byte) (*Sketch, error) {
 func validateBuffer(buf []byte, endIndex int) error {
 	if len(buf) < endIndex {
 		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+
+func checkNumCompactors(numCompactors int, isRawItemsSketch bool) error {
+	if numCompactors == 0 || (isRawItemsSketch && numCompactors != 1) {
+		return fmt.Errorf("possible corruption: %d compactors (raw items: %t)", numCompactors, isRawItemsSketch)
 	}
 	return nil
 }

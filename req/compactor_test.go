@@ -396,14 +396,14 @@ func TestNearestEven(t *testing.T) {
 
 func TestNumberOfTrailingOnes(t *testing.T) {
 	tests := []struct {
-		input    int64
+		input    uint64
 		expected int
 	}{
 		{0b0, 0},
 		{0b1, 1},
 		{0b111, 3},
 		{0b1011, 2},
-		{-1, 64},
+		{math.MaxUint64, 64},
 	}
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("input=%d", tt.input), func(t *testing.T) {
@@ -419,7 +419,7 @@ func TestCompactorGetters(t *testing.T) {
 	assert.Greater(t, c.SectionSize(), 0)
 	assert.Greater(t, c.SectionSizeFlt(), float32(0))
 	assert.True(t, c.IsHighRankAccuracyMode())
-	assert.Equal(t, int64(0), c.State())
+	assert.Equal(t, uint64(0), c.State())
 }
 
 func TestCompactorItemsSerDe(t *testing.T) {

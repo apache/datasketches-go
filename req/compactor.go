@@ -44,7 +44,7 @@ type compactor struct {
 	numSections            byte
 	coin                   bool
 	sectionSizeFlt         float32
-	state                  int64
+	state                  uint64
 	sectionSize            int
 	delta                  int
 	lgWeight               byte
@@ -86,8 +86,8 @@ func copyCompactor(other *compactor) *compactor {
 	}
 }
 
-func numberOfTrailingOnes(v int64) int {
-	return bits.TrailingZeros64(uint64(^v))
+func numberOfTrailingOnes(v uint64) int {
+	return bits.TrailingZeros64(^v)
 }
 
 func (c *compactor) Compact(next *compactor) (compactResult, error) {
@@ -154,7 +154,7 @@ func (c *compactor) SectionSizeFlt() float32 {
 	return c.sectionSizeFlt
 }
 
-func (c *compactor) State() int64 {
+func (c *compactor) State() uint64 {
 	return c.state
 }
 
@@ -187,9 +187,8 @@ func (c *compactor) Merge(other *compactor) error {
 }
 
 func (c *compactor) ensureEnoughSections() bool {
-	if c.state >= (int64(1)<<(c.numSections-1)) && c.sectionSize > minK {
-		szf := float32(float64(c.sectionSizeFlt) / math.Sqrt2)
-		ne := nearestEven(szf)
+	if c.state >= uint64(1)<<(c.numSections-1) && c.sectionSize > minK {
+		szf, ne := nextSectionSize(c.sectionSizeFlt)
 		if ne >= minK {
 			c.sectionSizeFlt = szf
 			c.sectionSize = ne
@@ -222,12 +221,17 @@ func nearestEven(val float32) int {
 	return int(math.Round(float64(val)/2.0)) << 1
 }
 
+func nextSectionSize(sectionSizeFlt float32) (float32, int) {
+	szf := float32(float64(sectionSizeFlt) / math.Sqrt2)
+	return szf, nearestEven(szf)
+}
+
 func (c *compactor) MarshalBinary() ([]byte, error) {
 	size := c.SerializationBytes()
 	arr := make([]byte, size)
 	offset := 0
 
-	binary.LittleEndian.PutUint64(arr[offset:], uint64(c.state))
+	binary.LittleEndian.PutUint64(arr[offset:], c.state)
 	offset += 8
 
 	binary.LittleEndian.PutUint32(arr[offset:], math.Float32bits(c.sectionSizeFlt))
@@ -545,7 +549,7 @@ type compactorDecodingResult struct {
 	n              int64
 }
 
-func checkCompactorHeader(k, level int, lgWeight byte, sectionSizeFlt float32, numSections byte) error {
+func checkCompactorHeader(k, level int, lgWeight byte, sectionSizeFlt float32, numSections byte, state uint64) error {
 	if int(lgWeight) != level {
 		return fmt.Errorf("possible corruption: compactor %d has lg weight %d", level, lgWeight)
 	}
@@ -564,6 +568,14 @@ func checkCompactorHeader(k, level int, lgWeight byte, sectionSizeFlt float32, n
 	if numSections < 1 || numSections > 64 || roundedSectionSize*int(numSections) > k*k {
 		return fmt.Errorf("possible corruption: number of sections %d is out of range for section size %v and k %d",
 			numSections, sectionSizeFlt, k)
+	}
+
+	// sections start at 3 and double as soon as state reaches 2^(sections-1), unless the section can't shrink
+	if numSections%initNumberOfSections != 0 || bits.OnesCount8(numSections/initNumberOfSections) != 1 {
+		return fmt.Errorf("possible corruption: %d sections can't come from doubling %d", numSections, initNumberOfSections)
+	}
+	if _, next := nextSectionSize(sectionSizeFlt); sectionSize > minK && next >= minK && state >= uint64(1)<<(numSections-1) {
+		return fmt.Errorf("possible corruption: state %d would already have doubled %d sections", state, numSections)
 	}
 	return nil
 }
@@ -604,7 +616,7 @@ func decodeCompactor(
 	count := binary.LittleEndian.Uint32(buf[index : index+4])
 	index += 4
 
-	if err := checkCompactorHeader(k, level, lgWeight, sectionSizeFloat, numSections); err != nil {
+	if err := checkCompactorHeader(k, level, lgWeight, sectionSizeFloat, numSections, state); err != nil {
 		return compactorDecodingResult{}, err
 	}
 	if uint64(len(buf)-index) < 4*uint64(count) {
@@ -646,7 +658,7 @@ func decodeCompactor(
 			isHighRankAccuracyMode: isHighRankAccuracyMode,
 			sectionSizeFlt:         sectionSizeFloat,
 			numSections:            numSections,
-			state:                  int64(state),
+			state:                  state,
 			coin:                   false,
 			sectionSize:            nearestEven(sectionSizeFloat),
 		},
@@ -706,7 +718,7 @@ func (d *compactorDecoder) Decode(r io.Reader) (compactorDecodingResult, error) 
 		return compactorDecodingResult{}, err
 	}
 
-	if err := checkCompactorHeader(d.k, d.level, lgWeight, sectionSizeFlt, numSections); err != nil {
+	if err := checkCompactorHeader(d.k, d.level, lgWeight, sectionSizeFlt, numSections, state); err != nil {
 		return compactorDecodingResult{}, err
 	}
 
@@ -749,7 +761,7 @@ func (d *compactorDecoder) Decode(r io.Reader) (compactorDecodingResult, error) 
 			isHighRankAccuracyMode: d.isHighRankAccuracyMode,
 			sectionSizeFlt:         sectionSizeFlt,
 			numSections:            numSections,
-			state:                  int64(state),
+			state:                  state,
 			coin:                   false,
 			sectionSize:            nearestEven(sectionSizeFlt),
 		},

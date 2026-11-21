@@ -463,4 +463,33 @@ func TestDecodeRejectsInconsistentCompactors(t *testing.T) {
 		checkAccepted(t, b, 5)
 		assert.Equal(t, []int64{1, 4}, weightsOf(t, b))
 	})
+
+	withLevel0 := func(b []byte, sectionSize float32, numSections byte, state uint64) []byte {
+		b = append([]byte(nil), b...)
+		binary.LittleEndian.PutUint64(b[estimationCompactor:], state)
+		putFloat(b, estimationCompactor+sectionSizeOffset, sectionSize)
+		b[estimationCompactor+numSectionsOffset] = numSections
+		return b
+	}
+
+	t.Run("64 sections that double after one compaction", func(t *testing.T) {
+		checkRejected(t, withLevel0(serialize(t, 24, 1000, true), 6, 64, 0))
+	})
+
+	t.Run("unreachable number of sections", func(t *testing.T) {
+		for _, sections := range []byte{5, 7, 11} {
+			checkRejected(t, withLevel0(estimation(t), 12, sections, 0), "sections %d", sections)
+		}
+	})
+
+	t.Run("state the sections should have doubled at", func(t *testing.T) {
+		b := estimation(t)
+		checkAccepted(t, withLevel0(b, 12, 3, 3), 1000)
+		checkRejected(t, withLevel0(b, 12, 3, 4))
+		checkRejected(t, withLevel0(b, 12, 3, 1<<62))
+	})
+
+	t.Run("any state when the section can't shrink", func(t *testing.T) {
+		checkAccepted(t, withLevel0(estimation(t), 3, 48, 1<<62), 1000)
+	})
 }

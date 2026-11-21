@@ -93,8 +93,12 @@ func NewSketch(options ...SketchOptionFunc) (*Sketch, error) {
 }
 
 func (s *Sketch) validateK() error {
-	if s.k&1 > 0 || s.k < minK || s.k > 1024 {
-		return fmt.Errorf("must be even and in the range [4, 1024]: %d", s.k)
+	return checkK(s.k)
+}
+
+func checkK(k int) error {
+	if k&1 > 0 || k < minK || k > 1024 {
+		return fmt.Errorf("must be even and in the range [4, 1024]: %d", k)
 	}
 
 	return nil

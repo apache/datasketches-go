@@ -545,8 +545,31 @@ type compactorDecodingResult struct {
 	n              int64
 }
 
+func checkCompactorHeader(k, level int, lgWeight byte, sectionSizeFlt float32, numSections byte) error {
+	if int(lgWeight) != level {
+		return fmt.Errorf("possible corruption: compactor %d has lg weight %d", level, lgWeight)
+	}
+
+	// false for NaN, and keeps nearestEven in range
+	sectionSize := 0
+	if sectionSizeFlt > 0 && sectionSizeFlt <= float32(k+1) {
+		sectionSize = nearestEven(sectionSizeFlt)
+	}
+	if sectionSize < minK || sectionSize > k {
+		return fmt.Errorf("possible corruption: section size %v is out of range for k %d", sectionSizeFlt, k)
+	}
+
+	// raw, not even: a raw size of 3 rounds to an even size of 4, which can exceed this limit
+	roundedSectionSize := int(math.Round(float64(sectionSizeFlt)))
+	if numSections < 1 || numSections > 64 || roundedSectionSize*int(numSections) > k*k {
+		return fmt.Errorf("possible corruption: number of sections %d is out of range for section size %v and k %d",
+			numSections, sectionSizeFlt, k)
+	}
+	return nil
+}
+
 func decodeCompactor(
-	buf []byte, index int, isLevel0Sorted, isHighRankAccuracyMode bool,
+	buf []byte, index, k, level int, isLevel0Sorted, isHighRankAccuracyMode bool,
 ) (compactorDecodingResult, error) { // the second returned value is the end index of after decoding.
 	if err := validateBuffer(buf, index+8); err != nil {
 		return compactorDecodingResult{}, err
@@ -581,16 +604,19 @@ func decodeCompactor(
 	count := binary.LittleEndian.Uint32(buf[index : index+4])
 	index += 4
 
+	if err := checkCompactorHeader(k, level, lgWeight, sectionSizeFloat, numSections); err != nil {
+		return compactorDecodingResult{}, err
+	}
+	if uint64(len(buf)-index) < 4*uint64(count) {
+		return compactorDecodingResult{}, io.ErrUnexpectedEOF
+	}
+
 	var (
 		minItem = float32(math.Inf(1))
 		maxItem = float32(math.Inf(-1))
 	)
 	items := make([]float32, 0, count)
 	for i := uint32(0); i < count; i++ {
-		if err := validateBuffer(buf, index+4); err != nil {
-			return compactorDecodingResult{}, err
-		}
-
 		item := math.Float32frombits(binary.LittleEndian.Uint32(buf[index : index+4]))
 		items = append(items, item)
 
@@ -632,12 +658,16 @@ func decodeCompactor(
 }
 
 type compactorDecoder struct {
+	k                      int
+	level                  int
 	isLevel0Sorted         bool
 	isHighRankAccuracyMode bool
 }
 
-func newCompactorDecoder(isLevel0Sorted, isHighRankAccuracyMode bool) compactorDecoder {
+func newCompactorDecoder(k, level int, isLevel0Sorted, isHighRankAccuracyMode bool) compactorDecoder {
 	return compactorDecoder{
+		k:                      k,
+		level:                  level,
 		isLevel0Sorted:         isLevel0Sorted,
 		isHighRankAccuracyMode: isHighRankAccuracyMode,
 	}
@@ -676,11 +706,18 @@ func (d *compactorDecoder) Decode(r io.Reader) (compactorDecodingResult, error) 
 		return compactorDecodingResult{}, err
 	}
 
+	if err := checkCompactorHeader(d.k, d.level, lgWeight, sectionSizeFlt, numSections); err != nil {
+		return compactorDecodingResult{}, err
+	}
+
+	delta := 2 * int(sectionSize) * int(numSections)
+	nomCap := 2 * delta
+
 	var (
 		minItem = float32(math.Inf(1))
 		maxItem = float32(math.Inf(-1))
 	)
-	items := make([]float32, 0, count)
+	items := make([]float32, 0, min(int(count), nomCap))
 	for i := uint32(0); i < count; i++ {
 		var itemRaw uint32
 		if err := binary.Read(r, binary.LittleEndian, &itemRaw); err != nil {
@@ -694,8 +731,6 @@ func (d *compactorDecoder) Decode(r io.Reader) (compactorDecodingResult, error) 
 		maxItem = max(maxItem, item)
 	}
 
-	delta := 2 * int(sectionSize) * int(numSections)
-	nomCap := 2 * delta
 	capacity := max(int(count), nomCap)
 
 	if d.isHighRankAccuracyMode {

@@ -41,19 +41,22 @@ type unionOptions struct {
 	rf        ResizeFactor
 }
 
-type UnionOptionFunc func(*unionOptions)
+// UnionOptionFunc configures NewUnion.
+type UnionOptionFunc func(unionOptions) unionOptions
 
 // WithUnionLgK sets log2(k), where k is a nominal number of entries in the union
 func WithUnionLgK(lgK uint8) UnionOptionFunc {
-	return func(opts *unionOptions) {
+	return func(opts unionOptions) unionOptions {
 		opts.lgK = lgK
+		return opts
 	}
 }
 
 // WithUnionResizeFactor sets a resize factor for the internal hash table (defaults to 8)
 func WithUnionResizeFactor(rf ResizeFactor) UnionOptionFunc {
-	return func(opts *unionOptions) {
+	return func(opts unionOptions) unionOptions {
 		opts.rf = rf
+		return opts
 	}
 }
 
@@ -61,8 +64,9 @@ func WithUnionResizeFactor(rf ResizeFactor) UnionOptionFunc {
 // all entries until it reaches the limit, at which point it goes into the estimation mode
 // and reduces the effective sampling probability (theta) as necessary
 func WithUnionSketchP(p float32) UnionOptionFunc {
-	return func(opts *unionOptions) {
+	return func(opts unionOptions) unionOptions {
 		opts.p = p
+		return opts
 	}
 }
 
@@ -70,21 +74,22 @@ func WithUnionSketchP(p float32) UnionOptionFunc {
 // Union produced with different seeds are not compatible
 // and cannot be mixed in set operations.
 func WithUnionSeed(seed uint64) UnionOptionFunc {
-	return func(opts *unionOptions) {
+	return func(opts unionOptions) unionOptions {
 		opts.seed = seed
+		return opts
 	}
 }
 
 // NewUnion creates a new union with the given options
 func NewUnion(opts ...UnionOptionFunc) (*Union, error) {
-	options := &unionOptions{
+	options := unionOptions{
 		lgK:  DefaultLgK,
 		rf:   DefaultResizeFactor,
 		p:    1.0,
 		seed: DefaultSeed,
 	}
 	for _, opt := range opts {
-		opt(options)
+		options = opt(options)
 	}
 
 	if options.lgK < MinLgK {

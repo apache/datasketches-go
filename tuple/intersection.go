@@ -29,12 +29,15 @@ type intersectionOptions struct {
 	seed uint64
 }
 
-type IntersectionOptionFunc func(*intersectionOptions)
+// IntersectionOptionFunc configures NewIntersection, NewIntersectionWithSummaryMergeFunc
+// and NewArrayOfNumbersSketchIntersection.
+type IntersectionOptionFunc func(intersectionOptions) intersectionOptions
 
 // WithIntersectionSeed sets the seed for the hash function.
 func WithIntersectionSeed(seed uint64) IntersectionOptionFunc {
-	return func(i *intersectionOptions) {
+	return func(i intersectionOptions) intersectionOptions {
 		i.seed = seed
+		return i
 	}
 }
 
@@ -49,11 +52,11 @@ type Intersection[S Summary] struct {
 
 // NewIntersection creates a new intersection.
 func NewIntersection[S Summary](policy Policy[S], opts ...IntersectionOptionFunc) *Intersection[S] {
-	options := &intersectionOptions{
+	options := intersectionOptions{
 		seed: theta.DefaultSeed,
 	}
 	for _, opt := range opts {
-		opt(options)
+		options = opt(options)
 	}
 
 	return &Intersection[S]{
@@ -78,11 +81,11 @@ func NewIntersection[S Summary](policy Policy[S], opts ...IntersectionOptionFunc
 func NewIntersectionWithSummaryMergeFunc[S Summary](
 	applyFunc func(S, S) S, opts ...IntersectionOptionFunc,
 ) *Intersection[S] {
-	options := &intersectionOptions{
+	options := intersectionOptions{
 		seed: theta.DefaultSeed,
 	}
 	for _, opt := range opts {
-		opt(options)
+		options = opt(options)
 	}
 
 	return &Intersection[S]{

@@ -57,19 +57,23 @@ type updateSketchOptions struct {
 	rf        theta.ResizeFactor
 }
 
-type UpdateSketchOptionFunc func(*updateSketchOptions)
+// UpdateSketchOptionFunc configures NewUpdateSketch, NewUpdateSketchWithSummaryUpdateFunc
+// and NewArrayOfNumbersUpdateSketch.
+type UpdateSketchOptionFunc func(updateSketchOptions) updateSketchOptions
 
 // WithUpdateSketchLgK sets log2(k), where k is a nominal number of entries in the sketch
 func WithUpdateSketchLgK(lgK uint8) UpdateSketchOptionFunc {
-	return func(opts *updateSketchOptions) {
+	return func(opts updateSketchOptions) updateSketchOptions {
 		opts.lgK = lgK
+		return opts
 	}
 }
 
 // WithUpdateSketchResizeFactor sets a resize factor for the internal hash table (defaults to 8)
 func WithUpdateSketchResizeFactor(rf theta.ResizeFactor) UpdateSketchOptionFunc {
-	return func(opts *updateSketchOptions) {
+	return func(opts updateSketchOptions) updateSketchOptions {
 		opts.rf = rf
+		return opts
 	}
 }
 
@@ -77,8 +81,9 @@ func WithUpdateSketchResizeFactor(rf theta.ResizeFactor) UpdateSketchOptionFunc 
 // all entries until it reaches the limit, at which point it goes into the estimation mode
 // and reduces the effective sampling probability (theta) as necessary
 func WithUpdateSketchP(p float32) UpdateSketchOptionFunc {
-	return func(opts *updateSketchOptions) {
+	return func(opts updateSketchOptions) updateSketchOptions {
 		opts.p = p
+		return opts
 	}
 }
 
@@ -86,8 +91,9 @@ func WithUpdateSketchP(p float32) UpdateSketchOptionFunc {
 // Sketches produced with different seed are not compatible
 // and cannot be mixed in set operations.
 func WithUpdateSketchSeed(seed uint64) UpdateSketchOptionFunc {
-	return func(opts *updateSketchOptions) {
+	return func(opts updateSketchOptions) updateSketchOptions {
 		opts.seed = seed
+		return opts
 	}
 }
 
@@ -95,14 +101,14 @@ func WithUpdateSketchSeed(seed uint64) UpdateSketchOptionFunc {
 func NewUpdateSketch[S UpdatableSummary[V], V any](
 	newSummaryFunc func() S, opts ...UpdateSketchOptionFunc,
 ) (*UpdateSketch[S, V], error) {
-	options := &updateSketchOptions{
+	options := updateSketchOptions{
 		lgK:  theta.DefaultLgK,
 		rf:   theta.DefaultResizeFactor,
 		p:    1.0,
 		seed: theta.DefaultSeed,
 	}
 	for _, opt := range opts {
-		opt(options)
+		options = opt(options)
 	}
 
 	if options.lgK < theta.MinLgK {

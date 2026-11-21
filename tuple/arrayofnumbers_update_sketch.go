@@ -40,14 +40,14 @@ type ArrayOfNumbersUpdateSketch[V Number] struct {
 func NewArrayOfNumbersUpdateSketch[V Number](
 	numberOfValuesInSummary uint8, opts ...UpdateSketchOptionFunc,
 ) (*ArrayOfNumbersUpdateSketch[V], error) {
-	options := &updateSketchOptions{
+	options := updateSketchOptions{
 		lgK:  theta.DefaultLgK,
 		rf:   theta.DefaultResizeFactor,
 		p:    1.0,
 		seed: theta.DefaultSeed,
 	}
 	for _, opt := range opts {
-		opt(options)
+		options = opt(options)
 	}
 
 	if options.lgK < theta.MinLgK {

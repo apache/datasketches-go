@@ -512,39 +512,13 @@ func (s *Sketch) IsEstimationMode() bool {
 // All returns all retained items of the sketch.
 func (s *Sketch) All() iter.Seq[Item] {
 	return func(yield func(Item) bool) {
-		if s.numRetained == 0 {
-			return
-		}
-
-		var (
-			itemIndex        = 0
-			compactorIndex   = 0
-			currentCompactor = s.compactors[0]
-		)
-		for compactorIndex < len(s.compactors) {
-			quantile := currentCompactor.Item(itemIndex)
+		for compactorIndex, c := range s.compactors {
 			weight := int64(1) << compactorIndex
-
-			item := Item{
-				Quantile: quantile,
-				Weight:   weight,
-			}
-			if !yield(item) {
-				return
-			}
-
-			if itemIndex == currentCompactor.Count()-1 {
-				compactorIndex++
-				if compactorIndex >= len(s.compactors) {
-					break
+			for i := 0; i < c.Count(); i++ {
+				if !yield(Item{Quantile: c.Item(i), Weight: weight}) {
+					return
 				}
-
-				currentCompactor = s.compactors[compactorIndex]
-				itemIndex = 0
-				continue
 			}
-
-			itemIndex++
 		}
 	}
 }

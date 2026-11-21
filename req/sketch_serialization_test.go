@@ -428,8 +428,39 @@ func TestDecodeRejectsInconsistentCompactors(t *testing.T) {
 	})
 
 	t.Run("retained weight beyond the maximum n", func(t *testing.T) {
-		counts := make([]uint32, 64)
-		counts[63] = 1
+		counts := make([]uint32, 63)
+		counts[62] = 2
 		checkRejected(t, withCompactors(t, 1<<63, counts))
+	})
+
+	weightsOf := func(t *testing.T, b []byte) []int64 {
+		t.Helper()
+		sk, err := Decode(b)
+		require.NoError(t, err)
+		var weights []int64
+		for item := range sk.All() {
+			weights = append(weights, item.Weight)
+		}
+		return weights
+	}
+
+	t.Run("more than 63 compactors", func(t *testing.T) {
+		counts := make([]uint32, 64)
+		counts[0] = 1
+		checkRejected(t, withCompactors(t, 1, counts))
+	})
+
+	t.Run("63 compactors", func(t *testing.T) {
+		counts := make([]uint32, 63)
+		counts[0] = 1
+		b := withCompactors(t, 1, counts)
+		checkAccepted(t, b, 1)
+		assert.Equal(t, []int64{1}, weightsOf(t, b))
+	})
+
+	t.Run("empty compactors below the top", func(t *testing.T) {
+		b := withCompactors(t, 5, []uint32{1, 0, 1})
+		checkAccepted(t, b, 5)
+		assert.Equal(t, []int64{1, 4}, weightsOf(t, b))
 	})
 }

@@ -430,8 +430,11 @@ func checkRetainedWeight(n uint64, compactors []*compactor) error {
 	return nil
 }
 
+// an item at level 63 would weigh 2^63, more than any n
+const maxNumCompactors = 63
+
 func checkNumCompactors(numCompactors int, isRawItemsSketch bool) error {
-	if numCompactors == 0 || (isRawItemsSketch && numCompactors != 1) {
+	if numCompactors == 0 || numCompactors > maxNumCompactors || (isRawItemsSketch && numCompactors != 1) {
 		return fmt.Errorf("possible corruption: %d compactors (raw items: %t)", numCompactors, isRawItemsSketch)
 	}
 	return nil

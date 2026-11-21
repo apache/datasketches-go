@@ -248,7 +248,7 @@ func populateFromSketch[C comparable](srcQuantiles []C, levels []uint32, numLeve
 }
 
 func blockyTandemMergeSort[C comparable](quantiles []C, weights []int64, levels []uint32, numLevels uint8, compareFn common.CompareFn[C]) {
-	if numLevels == 1 {
+	if numLevels <= 1 {
 		return
 	}
 
@@ -262,7 +262,7 @@ func blockyTandemMergeSort[C comparable](quantiles []C, weights []int64, levels 
 }
 
 func blockyTandemMergeSortRecursion[C comparable](quantilesSrc []C, weightsSrc []int64, quantilesDst []C, weightsDst []int64, levels []uint32, startingLevel uint8, numLevels uint8, compareFn common.CompareFn[C]) {
-	if numLevels == 1 {
+	if numLevels <= 1 {
 		return
 	}
 	numLevels1 := numLevels / 2

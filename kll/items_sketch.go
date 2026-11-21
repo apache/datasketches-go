@@ -155,7 +155,7 @@ func NewKllItemsSketchFromSlice[C comparable](sl []byte, compareFn common.Compar
 		items = make([]C, k)
 		items[k-1] = deserItems[0]
 	case _COMPACT_FULL:
-		offset := int(_DATA_START_ADR + memVal.numLevels*4)
+		offset := _DATA_START_ADR + int(memVal.numLevels)*4
 		deserMinItems, err := serde.DeserializeManyFromSlice(sl, offset, 1)
 		if err != nil {
 			return nil, err
@@ -1025,7 +1025,7 @@ func intCapAux(k uint16, depth uint8) uint32 {
 }
 
 func intCapAuxAux(k uint16, depth uint8) uint32 {
-	twok := uint64(k << 1)                        // for rounding at the end, pre-multiply by 2 here, divide by 2 during rounding.
+	twok := uint64(k) << 1                        // for rounding at the end, pre-multiply by 2 here, divide by 2 during rounding.
 	tmp := (twok << depth) / powersOfThree[depth] //2k* (2/3)^depth. 2k also keeps the fraction larger.
 	result := (tmp + 1) >> 1                      // (tmp + 1)/2. If odd, round up. This guarantees an integer.
 	if result <= uint64(k) {

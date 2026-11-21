@@ -19,11 +19,15 @@ package req
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
+	"math"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/apache/datasketches-go/internal"
 	"github.com/apache/datasketches-go/internal/testutil"
@@ -200,9 +204,12 @@ func assertReqSketchFromFile(t *testing.T, path string, expectN int64, expectEmp
 	t.Helper()
 	b := testutil.ReadSnapshot(t, path)
 	sk, err := Decode(b)
-	if err != nil {
-		return
-	}
+	require.NoError(t, err, path)
+
+	decoder := NewDecoder()
+	streamSk, err := decoder.Decode(bytes.NewReader(b))
+	require.NoError(t, err, path)
+	assert.Equal(t, sk.N(), streamSk.N(), path)
 
 	assert.True(t, sk.IsHighRankAccuracyMode())
 	assert.Equal(t, expectEmpty, sk.IsEmpty())
@@ -227,4 +234,262 @@ func assertReqSketchFromFile(t *testing.T, path string, expectN int64, expectEmp
 		totalWeight += item.Weight
 	}
 	assert.Equal(t, sk.N(), totalWeight)
+}
+
+func TestDecodeRejectsInconsistentCompactors(t *testing.T) {
+	const (
+		flagsOffset         = 3
+		rawItemsFlag        = 16
+		kOffset             = 4
+		numLevelsOffset     = 6
+		numRawItemsOffset   = 7
+		nOffset             = 8
+		exactCompactor      = 8
+		estimationCompactor = 24
+		sectionSizeOffset   = 8
+		lgWeightOffset      = 12
+		numSectionsOffset   = 13
+		numItemsOffset      = 16
+		itemsOffset         = 20
+	)
+	serialize := func(t *testing.T, k, n int, hra bool) []byte {
+		t.Helper()
+		b, err := newSketchForTest(t, k, hra, n).MarshalBinary()
+		require.NoError(t, err)
+		return b
+	}
+	raw := func(t *testing.T) []byte { return serialize(t, 12, 3, true) }
+	exact := func(t *testing.T) []byte { return serialize(t, 12, 50, true) }
+	estimation := func(t *testing.T) []byte {
+		b := serialize(t, 12, 1000, true)
+		require.Greater(t, b[numLevelsOffset], byte(2))
+		return b
+	}
+	putFloat := func(b []byte, offset int, v float32) {
+		binary.LittleEndian.PutUint32(b[offset:], math.Float32bits(v))
+	}
+	checkAccepted := func(t *testing.T, b []byte, n int64) {
+		t.Helper()
+		sk, err := Decode(b)
+		require.NoError(t, err)
+		assert.Equal(t, n, sk.N())
+		decoder := NewDecoder()
+		sk, err = decoder.Decode(bytes.NewReader(b))
+		require.NoError(t, err)
+		assert.Equal(t, n, sk.N())
+	}
+	checkRejected := func(t *testing.T, b []byte, msgAndArgs ...any) {
+		t.Helper()
+		_, err := Decode(b)
+		assert.Error(t, err, msgAndArgs...)
+		decoder := NewDecoder()
+		_, err = decoder.Decode(bytes.NewReader(b))
+		assert.Error(t, err, msgAndArgs...)
+	}
+
+	t.Run("valid images", func(t *testing.T) {
+		for _, hra := range []bool{true, false} {
+			sk := newSketchForTest(t, 12, hra, 1_000_000)
+			b, err := sk.MarshalBinary()
+			require.NoError(t, err)
+			require.Greater(t, b[estimationCompactor+numSectionsOffset], byte(initNumberOfSections))
+			checkAccepted(t, b, sk.N())
+		}
+	})
+
+	t.Run("valid images with the smallest section size", func(t *testing.T) {
+		b := serialize(t, 6, 100_000, true)
+		putFloat(b, estimationCompactor+sectionSizeOffset, 3)
+		b[estimationCompactor+numSectionsOffset] = 12
+		checkAccepted(t, b, 100_000)
+
+		b = estimation(t)
+		putFloat(b, estimationCompactor+sectionSizeOffset, 3)
+		b[estimationCompactor+numSectionsOffset] = 48
+		checkAccepted(t, b, 1000)
+	})
+
+	t.Run("invalid k", func(t *testing.T) {
+		for _, k := range []uint16{2, 13, 2000} {
+			b := estimation(t)
+			binary.LittleEndian.PutUint16(b[kOffset:], k)
+			checkRejected(t, b, "k %d", k)
+		}
+	})
+
+	t.Run("section size out of range", func(t *testing.T) {
+		for _, size := range []float32{0, 2, 14, 1e12, float32(math.NaN())} {
+			b := estimation(t)
+			putFloat(b, estimationCompactor+sectionSizeOffset, size)
+			checkRejected(t, b, "section size %v", size)
+		}
+	})
+
+	t.Run("number of sections out of range", func(t *testing.T) {
+		for _, sections := range []byte{0, 65} {
+			b := estimation(t)
+			b[estimationCompactor+numSectionsOffset] = sections
+			checkRejected(t, b, "sections %d", sections)
+		}
+		b := estimation(t)
+		putFloat(b, estimationCompactor+sectionSizeOffset, 3)
+		b[estimationCompactor+numSectionsOffset] = 64
+		checkRejected(t, b, "too many sections for the section size and k")
+	})
+
+	t.Run("wrong lg weight", func(t *testing.T) {
+		for _, weight := range []byte{1, 70} {
+			b := estimation(t)
+			b[estimationCompactor+lgWeightOffset] = weight
+			checkRejected(t, b, "lg weight %d", weight)
+		}
+		b := exact(t)
+		b[exactCompactor+lgWeightOffset] = 1
+		checkRejected(t, b, "exact lg weight")
+
+		b = estimation(t)
+		count := binary.LittleEndian.Uint32(b[estimationCompactor+numItemsOffset:])
+		secondCompactor := estimationCompactor + itemsOffset + 4*int(count)
+		require.Equal(t, byte(1), b[secondCompactor+lgWeightOffset])
+		b[secondCompactor+lgWeightOffset] = 0
+		checkRejected(t, b, "second compactor repeats the first lg weight")
+	})
+
+	t.Run("no levels", func(t *testing.T) {
+		b := exact(t)
+		b[numLevelsOffset] = 0
+		checkRejected(t, b, "exact")
+		b = raw(t)
+		b[numLevelsOffset] = 0
+		checkRejected(t, b, "raw")
+	})
+
+	t.Run("no items", func(t *testing.T) {
+		b := exact(t)
+		binary.LittleEndian.PutUint32(b[exactCompactor+numItemsOffset:], 0)
+		checkRejected(t, b, "exact")
+		b = raw(t)
+		b[numRawItemsOffset] = 0
+		checkRejected(t, b, "raw")
+	})
+
+	t.Run("compactor header beyond the input", func(t *testing.T) {
+		checkRejected(t, estimation(t)[:estimationCompactor+10])
+	})
+
+	t.Run("raw items with more than one compactor", func(t *testing.T) {
+		b := estimation(t)
+		b[flagsOffset] |= rawItemsFlag
+		checkRejected(t, b)
+	})
+
+	t.Run("item count beyond the input", func(t *testing.T) {
+		b := exact(t)
+		binary.LittleEndian.PutUint32(b[exactCompactor+numItemsOffset:], math.MaxUint32)
+		var before, after runtime.MemStats
+		runtime.ReadMemStats(&before)
+		checkRejected(t, b)
+		runtime.ReadMemStats(&after)
+		assert.Less(t, after.TotalAlloc-before.TotalAlloc, uint64(1<<20))
+	})
+
+	t.Run("estimation with the exact preamble size", func(t *testing.T) {
+		b := estimation(t)
+		b[0] = 2
+		checkRejected(t, b)
+	})
+
+	withCompactors := func(t *testing.T, n uint64, counts []uint32) []byte {
+		t.Helper()
+		b := append([]byte(nil), estimation(t)[:estimationCompactor]...)
+		b[numLevelsOffset] = byte(len(counts))
+		binary.LittleEndian.PutUint64(b[nOffset:], n)
+		for level, count := range counts {
+			c := make([]byte, itemsOffset+4*int(count))
+			putFloat(c, sectionSizeOffset, 12)
+			c[lgWeightOffset] = byte(level)
+			c[numSectionsOffset] = 3
+			binary.LittleEndian.PutUint32(c[numItemsOffset:], count)
+			b = append(b, c...)
+		}
+		return b
+	}
+
+	t.Run("estimation with no retained items", func(t *testing.T) {
+		checkAccepted(t, withCompactors(t, 5, []uint32{1, 2}), 5)
+		checkRejected(t, withCompactors(t, 1, []uint32{0, 0}))
+	})
+
+	t.Run("retained weight does not match n", func(t *testing.T) {
+		b := estimation(t)
+		n := binary.LittleEndian.Uint64(b[nOffset:])
+		binary.LittleEndian.PutUint64(b[nOffset:], n+1)
+		checkRejected(t, b)
+	})
+
+	t.Run("retained weight beyond the maximum n", func(t *testing.T) {
+		counts := make([]uint32, 63)
+		counts[62] = 2
+		checkRejected(t, withCompactors(t, 1<<63, counts))
+	})
+
+	weightsOf := func(t *testing.T, b []byte) []int64 {
+		t.Helper()
+		sk, err := Decode(b)
+		require.NoError(t, err)
+		var weights []int64
+		for item := range sk.All() {
+			weights = append(weights, item.Weight)
+		}
+		return weights
+	}
+
+	t.Run("more than 63 compactors", func(t *testing.T) {
+		counts := make([]uint32, 64)
+		counts[0] = 1
+		checkRejected(t, withCompactors(t, 1, counts))
+	})
+
+	t.Run("63 compactors", func(t *testing.T) {
+		counts := make([]uint32, 63)
+		counts[0] = 1
+		b := withCompactors(t, 1, counts)
+		checkAccepted(t, b, 1)
+		assert.Equal(t, []int64{1}, weightsOf(t, b))
+	})
+
+	t.Run("empty compactors below the top", func(t *testing.T) {
+		b := withCompactors(t, 5, []uint32{1, 0, 1})
+		checkAccepted(t, b, 5)
+		assert.Equal(t, []int64{1, 4}, weightsOf(t, b))
+	})
+
+	withLevel0 := func(b []byte, sectionSize float32, numSections byte, state uint64) []byte {
+		b = append([]byte(nil), b...)
+		binary.LittleEndian.PutUint64(b[estimationCompactor:], state)
+		putFloat(b, estimationCompactor+sectionSizeOffset, sectionSize)
+		b[estimationCompactor+numSectionsOffset] = numSections
+		return b
+	}
+
+	t.Run("64 sections that double after one compaction", func(t *testing.T) {
+		checkRejected(t, withLevel0(serialize(t, 24, 1000, true), 6, 64, 0))
+	})
+
+	t.Run("unreachable number of sections", func(t *testing.T) {
+		for _, sections := range []byte{5, 7, 11} {
+			checkRejected(t, withLevel0(estimation(t), 12, sections, 0), "sections %d", sections)
+		}
+	})
+
+	t.Run("state the sections should have doubled at", func(t *testing.T) {
+		b := estimation(t)
+		checkAccepted(t, withLevel0(b, 12, 3, 3), 1000)
+		checkRejected(t, withLevel0(b, 12, 3, 4))
+		checkRejected(t, withLevel0(b, 12, 3, 1<<62))
+	})
+
+	t.Run("any state when the section can't shrink", func(t *testing.T) {
+		checkAccepted(t, withLevel0(estimation(t), 3, 48, 1<<62), 1000)
+	})
 }

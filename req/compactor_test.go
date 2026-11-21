@@ -396,14 +396,14 @@ func TestNearestEven(t *testing.T) {
 
 func TestNumberOfTrailingOnes(t *testing.T) {
 	tests := []struct {
-		input    int64
+		input    uint64
 		expected int
 	}{
 		{0b0, 0},
 		{0b1, 1},
 		{0b111, 3},
 		{0b1011, 2},
-		{-1, 64},
+		{math.MaxUint64, 64},
 	}
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("input=%d", tt.input), func(t *testing.T) {
@@ -419,7 +419,7 @@ func TestCompactorGetters(t *testing.T) {
 	assert.Greater(t, c.SectionSize(), 0)
 	assert.Greater(t, c.SectionSizeFlt(), float32(0))
 	assert.True(t, c.IsHighRankAccuracyMode())
-	assert.Equal(t, int64(0), c.State())
+	assert.Equal(t, uint64(0), c.State())
 }
 
 func TestCompactorItemsSerDe(t *testing.T) {
@@ -464,7 +464,7 @@ func runCompactorItemsSerDe(t *testing.T, hra bool) {
 
 	fullBytes, err := c.MarshalBinary()
 	assert.NoError(t, err)
-	result, err := decodeCompactor(fullBytes, 0, sorted, hra)
+	result, err := decodeCompactor(fullBytes, 0, minK, 0, sorted, hra)
 	assert.NoError(t, err)
 	c2 := result.compactor
 
@@ -516,7 +516,7 @@ func runCompactorSerializationDeserialization(t *testing.T, k int, hra bool) {
 	c1ser, err := c1.MarshalBinary()
 	assert.NoError(t, err)
 
-	result, err := decodeCompactor(c1ser, 0, sorted, hra)
+	result, err := decodeCompactor(c1ser, 0, k, 0, sorted, hra)
 	assert.NoError(t, err)
 	c2 := result.compactor
 
@@ -540,7 +540,7 @@ func runCompactorSerializationDeserialization(t *testing.T, k int, hra bool) {
 		assert.Equal(t, c1.Item(i), c2.Item(i), "item mismatch at offset %d", i)
 	}
 
-	decoder := newCompactorDecoder(sorted, hra)
+	decoder := newCompactorDecoder(k, 0, sorted, hra)
 	result2, err := decoder.Decode(bytes.NewReader(c1ser))
 	assert.NoError(t, err)
 	c3 := result2.compactor
@@ -576,12 +576,12 @@ func runCompactorSerializationDeserializationNegative(t *testing.T, k int, hra b
 	c1ser, err := c1.MarshalBinary()
 	assert.NoError(t, err)
 
-	result, err := decodeCompactor(c1ser, 0, c1.sorted, hra)
+	result, err := decodeCompactor(c1ser, 0, k, 0, c1.sorted, hra)
 	assert.NoError(t, err)
 	assert.Equal(t, float32(-nomCap), result.minItem)
 	assert.Equal(t, float32(-1), result.maxItem)
 
-	decoder := newCompactorDecoder(c1.sorted, hra)
+	decoder := newCompactorDecoder(k, 0, c1.sorted, hra)
 	result2, err := decoder.Decode(bytes.NewReader(c1ser))
 	assert.NoError(t, err)
 	assert.Equal(t, float32(-nomCap), result2.minItem)
@@ -610,12 +610,12 @@ func runCompactorSerializationDeserializationMixed(t *testing.T, k int, hra bool
 	c1ser, err := c1.MarshalBinary()
 	assert.NoError(t, err)
 
-	result, err := decodeCompactor(c1ser, 0, c1.sorted, hra)
+	result, err := decodeCompactor(c1ser, 0, k, 0, c1.sorted, hra)
 	assert.NoError(t, err)
 	assert.Equal(t, float32(-half), result.minItem)
 	assert.Equal(t, float32(half-1), result.maxItem)
 
-	decoder := newCompactorDecoder(c1.sorted, hra)
+	decoder := newCompactorDecoder(k, 0, c1.sorted, hra)
 	result2, err := decoder.Decode(bytes.NewReader(c1ser))
 	assert.NoError(t, err)
 	assert.Equal(t, float32(-half), result2.minItem)
@@ -645,12 +645,12 @@ func runCompactorSerializationDeserializationInfinite(t *testing.T, k int, hra b
 	c1ser, err := c1.MarshalBinary()
 	assert.NoError(t, err)
 
-	result, err := decodeCompactor(c1ser, 0, c1.sorted, hra)
+	result, err := decodeCompactor(c1ser, 0, k, 0, c1.sorted, hra)
 	assert.NoError(t, err)
 	assert.Equal(t, negInf, result.minItem)
 	assert.Equal(t, posInf, result.maxItem)
 
-	decoder := newCompactorDecoder(c1.sorted, hra)
+	decoder := newCompactorDecoder(k, 0, c1.sorted, hra)
 	result2, err := decoder.Decode(bytes.NewReader(c1ser))
 	assert.NoError(t, err)
 	assert.Equal(t, negInf, result2.minItem)

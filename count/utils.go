@@ -19,7 +19,10 @@ package count
 
 import (
 	"errors"
+	"fmt"
 	"math"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 func SuggestNumBuckets(relativeError float64) (int32, error) {
@@ -29,14 +32,23 @@ func SuggestNumBuckets(relativeError float64) (int32, error) {
 	return int32(math.Ceil(math.Exp(1.0) / relativeError)), nil
 }
 
-func SuggestNumHashes(confidence float64) (int8, error) {
+func SuggestNumHashes(confidence float64) (uint8, error) {
 	if confidence < 0 || confidence > 1.0 {
 		return 0, errors.New("confidence must be between 0 and 1.0 (inclusive)")
 	}
-	return min(int8(math.Ceil(math.Log(1.0/(1.0-confidence)))), int8(math.MaxInt8)), nil
+	return uint8(min(math.Ceil(math.Log(1.0/(1.0-confidence))), math.MaxUint8)), nil
 }
 
-func checkHeaderValidity(preamble, serVer, familyID, flagsByte byte) error {
+func checkHeaderValidity(preambleLongs, serVer, familyID byte) error {
+	if preambleLongs != PreambleLongsShort {
+		return fmt.Errorf("possible corruption: preamble longs must be %d: %d", PreambleLongsShort, preambleLongs)
+	}
+	if serVer != SerialVersion1 {
+		return fmt.Errorf("possible corruption: serial version must be %d: %d", SerialVersion1, serVer)
+	}
+	if int(familyID) != internal.FamilyEnum.CountMinSketch.Id {
+		return fmt.Errorf("possible corruption: family ID must be %d: %d", internal.FamilyEnum.CountMinSketch.Id, familyID)
+	}
 	return nil
 }
 

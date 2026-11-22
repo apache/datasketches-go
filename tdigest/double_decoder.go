@@ -178,6 +178,9 @@ func (d *DoubleDecoder) Decode(r io.Reader) (*Double, error) {
 		}
 		totalWeight = sum
 	}
+	if _, err := addWeight(totalWeight, uint64(numBuffered)); err != nil {
+		return nil, err
+	}
 
 	buffer := make([]float64, numBuffered)
 	for i := range buffer {
@@ -458,6 +461,9 @@ func DecodeDouble(data []byte) (*Double, error) {
 		}
 		totalWeight = sum
 	}
+	if _, err := addWeight(totalWeight, uint64(numBuffered)); err != nil {
+		return nil, err
+	}
 
 	buffer := make([]float64, numBuffered)
 	for i := range buffer {
@@ -634,8 +640,8 @@ func validateFinite(v float64, name string) error {
 }
 
 func validateCompatWeight(w float64) (uint64, error) {
-	if !(w >= 1 && w < 1<<64) { // false for NaN too
-		return 0, fmt.Errorf("centroid weight: %v is not in [1, 2^64)", w)
+	if !(w >= 1 && w < 1<<64 && w == math.Trunc(w)) { // false for NaN too
+		return 0, fmt.Errorf("centroid weight: %v is not an integer in [1, 2^64)", w)
 	}
 	return uint64(w), nil
 }

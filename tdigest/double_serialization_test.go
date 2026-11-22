@@ -1340,11 +1340,13 @@ func TestDecodeRejectsInvalidValuesInBothDecoders(t *testing.T) {
 		{"compat double weight NaN", compatDouble(1, 5, []float64{nan, 2}, []float64{1, 5})},
 		{"compat double weight +Inf", compatDouble(1, 5, []float64{inf, 2}, []float64{1, 5})},
 		{"compat double weight 0.5", compatDouble(1, 5, []float64{0.5, 2}, []float64{1, 5})},
+		{"compat double weight 1.5", compatDouble(1, 5, []float64{1.5, 2}, []float64{1, 5})},
 		{"compat double weight -1", compatDouble(1, 5, []float64{-1, 2}, []float64{1, 5})},
 		{"compat double weight 1e30", compatDouble(1, 5, []float64{1e30, 2}, []float64{1, 5})},
 		{"compat float weight NaN", compatFloat(1, 5, []float32{float32(nan), 2}, []float32{1, 5})},
 		{"compat float weight +Inf", compatFloat(1, 5, []float32{float32(inf), 2}, []float32{1, 5})},
 		{"compat float weight 0.5", compatFloat(1, 5, []float32{0.5, 2}, []float32{1, 5})},
+		{"compat float weight 1.5", compatFloat(1, 5, []float32{1.5, 2}, []float32{1, 5})},
 		{"compat float weight -1", compatFloat(1, 5, []float32{-1, 2}, []float32{1, 5})},
 		{"compat double total weight overflow", compatDouble(1, 5, []float64{1 << 63, 1 << 63}, []float64{1, 5})},
 	} {
@@ -1362,5 +1364,18 @@ func TestDecodeRejectsInvalidValuesInBothDecoders(t *testing.T) {
 		bytesErr, streamErr := decodeBoth(b)
 		assert.Error(t, bytesErr, "bytes decoder")
 		assert.Error(t, streamErr, "stream decoder")
+	})
+
+	t.Run("native total weight overflow with buffered values", func(t *testing.T) {
+		b := buildValidSerializedSketch(1, 1)
+		binary.LittleEndian.PutUint64(b[firstWeightOffset:], math.MaxUint64)
+		bytesErr, streamErr := decodeBoth(b)
+		assert.Error(t, bytesErr, "bytes decoder")
+		assert.Error(t, streamErr, "stream decoder")
+
+		binary.LittleEndian.PutUint64(b[firstWeightOffset:], math.MaxUint64-1)
+		bytesErr, streamErr = decodeBoth(b)
+		assert.NoError(t, bytesErr, "bytes decoder")
+		assert.NoError(t, streamErr, "stream decoder")
 	})
 }

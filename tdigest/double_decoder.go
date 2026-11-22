@@ -20,8 +20,10 @@ package tdigest
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"math"
+	"math/bits"
 
 	"github.com/apache/datasketches-go/internal"
 )
@@ -131,7 +133,7 @@ func (d *DoubleDecoder) Decode(r io.Reader) (*Double, error) {
 		return nil, err
 	}
 	minVal := math.Float64frombits(minValBytes)
-	if err := validateNaN(minVal, "min"); err != nil {
+	if err := validateFinite(minVal, "min"); err != nil {
 		return nil, err
 	}
 
@@ -140,7 +142,7 @@ func (d *DoubleDecoder) Decode(r io.Reader) (*Double, error) {
 		return nil, err
 	}
 	maxVal := math.Float64frombits(maxValBytes)
-	if err := validateNaN(minVal, "max"); err != nil {
+	if err := validateFinite(maxVal, "max"); err != nil {
 		return nil, err
 	}
 
@@ -170,7 +172,14 @@ func (d *DoubleDecoder) Decode(r io.Reader) (*Double, error) {
 		}
 
 		centroids[i].weight = weight
-		totalWeight += weight
+		sum, err := addWeight(totalWeight, weight)
+		if err != nil {
+			return nil, err
+		}
+		totalWeight = sum
+	}
+	if _, err := addWeight(totalWeight, uint64(numBuffered)); err != nil {
+		return nil, err
 	}
 
 	buffer := make([]float64, numBuffered)
@@ -206,7 +215,7 @@ func (d *DoubleDecoder) decodeCompat(r io.Reader) (*Double, error) {
 			return nil, err
 		}
 		minVal := math.Float64frombits(minValBytes)
-		if err := validateNaN(minVal, "min"); err != nil {
+		if err := validateFinite(minVal, "min"); err != nil {
 			return nil, err
 		}
 
@@ -215,7 +224,7 @@ func (d *DoubleDecoder) decodeCompat(r io.Reader) (*Double, error) {
 			return nil, err
 		}
 		maxVal := math.Float64frombits(maxValBytes)
-		if err := validateNaN(maxVal, "max"); err != nil {
+		if err := validateFinite(maxVal, "max"); err != nil {
 			return nil, err
 		}
 
@@ -237,8 +246,8 @@ func (d *DoubleDecoder) decodeCompat(r io.Reader) (*Double, error) {
 			if err := binary.Read(r, binary.BigEndian, &weightBytes); err != nil {
 				return nil, err
 			}
-			weight := math.Float64frombits(weightBytes)
-			if err := validateZero(weight, "centroid weight"); err != nil {
+			weight, err := validateCompatWeight(math.Float64frombits(weightBytes))
+			if err != nil {
 				return nil, err
 			}
 
@@ -254,8 +263,12 @@ func (d *DoubleDecoder) decodeCompat(r io.Reader) (*Double, error) {
 				return nil, err
 			}
 
-			centroids[i] = doublePrecisionCentroid{mean: mean, weight: uint64(weight)}
-			totalWeight += uint64(weight)
+			centroids[i] = doublePrecisionCentroid{mean: mean, weight: weight}
+			sum, err := addWeight(totalWeight, weight)
+			if err != nil {
+				return nil, err
+			}
+			totalWeight = sum
 		}
 
 		return newDoubleFromInternalStates(false, k, minVal, maxVal, centroids, totalWeight, nil)
@@ -266,7 +279,7 @@ func (d *DoubleDecoder) decodeCompat(r io.Reader) (*Double, error) {
 		return nil, err
 	}
 	minVal := math.Float64frombits(minValBytes)
-	if err := validateNaN(minVal, "min"); err != nil {
+	if err := validateFinite(minVal, "min"); err != nil {
 		return nil, err
 	}
 
@@ -275,7 +288,7 @@ func (d *DoubleDecoder) decodeCompat(r io.Reader) (*Double, error) {
 		return nil, err
 	}
 	maxVal := math.Float64frombits(maxValBytes)
-	if err := validateNaN(maxVal, "max"); err != nil {
+	if err := validateFinite(maxVal, "max"); err != nil {
 		return nil, err
 	}
 
@@ -302,8 +315,8 @@ func (d *DoubleDecoder) decodeCompat(r io.Reader) (*Double, error) {
 		if err := binary.Read(r, binary.BigEndian, &weightBytes); err != nil {
 			return nil, err
 		}
-		weight := math.Float32frombits(weightBytes)
-		if err := validateZero(float64(weight), "centroid weight"); err != nil {
+		weight, err := validateCompatWeight(float64(math.Float32frombits(weightBytes)))
+		if err != nil {
 			return nil, err
 		}
 
@@ -315,12 +328,16 @@ func (d *DoubleDecoder) decodeCompat(r io.Reader) (*Double, error) {
 		if err := validateInf(float64(mean), "centroid mean"); err != nil {
 			return nil, err
 		}
-		if err := validateNaN(float64(weight), "centroid mean"); err != nil {
+		if err := validateNaN(float64(mean), "centroid mean"); err != nil {
 			return nil, err
 		}
 
-		centroids[i] = doublePrecisionCentroid{mean: float64(mean), weight: uint64(weight)}
-		totalWeight += uint64(weight)
+		centroids[i] = doublePrecisionCentroid{mean: float64(mean), weight: weight}
+		sum, err := addWeight(totalWeight, weight)
+		if err != nil {
+			return nil, err
+		}
+		totalWeight = sum
 	}
 
 	return newDoubleFromInternalStates(false, k, minVal, maxVal, centroids, totalWeight, nil)
@@ -408,13 +425,13 @@ func DecodeDouble(data []byte) (*Double, error) {
 
 	minVal := math.Float64frombits(binary.LittleEndian.Uint64(data[offset:]))
 	offset += 8
-	if err := validateNaN(minVal, "min"); err != nil {
+	if err := validateFinite(minVal, "min"); err != nil {
 		return nil, err
 	}
 
 	maxVal := math.Float64frombits(binary.LittleEndian.Uint64(data[offset:]))
 	offset += 8
-	if err := validateNaN(maxVal, "max"); err != nil {
+	if err := validateFinite(maxVal, "max"); err != nil {
 		return nil, err
 	}
 
@@ -438,7 +455,14 @@ func DecodeDouble(data []byte) (*Double, error) {
 		}
 
 		centroids[i].weight = weight
-		totalWeight += weight
+		sum, err := addWeight(totalWeight, weight)
+		if err != nil {
+			return nil, err
+		}
+		totalWeight = sum
+	}
+	if _, err := addWeight(totalWeight, uint64(numBuffered)); err != nil {
+		return nil, err
 	}
 
 	buffer := make([]float64, numBuffered)
@@ -478,13 +502,13 @@ func decodeDoubleCompat(data []byte) (*Double, error) {
 
 		minVal := math.Float64frombits(binary.BigEndian.Uint64(data[offset:]))
 		offset += 8
-		if err := validateNaN(minVal, "min"); err != nil {
+		if err := validateFinite(minVal, "min"); err != nil {
 			return nil, err
 		}
 
 		maxVal := math.Float64frombits(binary.BigEndian.Uint64(data[offset:]))
 		offset += 8
-		if err := validateNaN(maxVal, "max"); err != nil {
+		if err := validateFinite(maxVal, "max"); err != nil {
 			return nil, err
 		}
 
@@ -502,9 +526,9 @@ func decodeDoubleCompat(data []byte) (*Double, error) {
 		centroids := make([]doublePrecisionCentroid, numCentroids)
 		var totalWeight uint64
 		for i := range centroids {
-			weight := math.Float64frombits(binary.BigEndian.Uint64(data[offset:]))
+			weight, err := validateCompatWeight(math.Float64frombits(binary.BigEndian.Uint64(data[offset:])))
 			offset += 8
-			if err := validateZero(float64(weight), "centroid weight"); err != nil {
+			if err != nil {
 				return nil, err
 			}
 
@@ -517,8 +541,12 @@ func decodeDoubleCompat(data []byte) (*Double, error) {
 				return nil, err
 			}
 
-			centroids[i] = doublePrecisionCentroid{mean: mean, weight: uint64(weight)}
-			totalWeight += uint64(weight)
+			centroids[i] = doublePrecisionCentroid{mean: mean, weight: weight}
+			sum, err := addWeight(totalWeight, weight)
+			if err != nil {
+				return nil, err
+			}
+			totalWeight = sum
 		}
 
 		return newDoubleFromInternalStates(false, k, minVal, maxVal, centroids, totalWeight, nil)
@@ -531,13 +559,13 @@ func decodeDoubleCompat(data []byte) (*Double, error) {
 
 	minVal := math.Float64frombits(binary.BigEndian.Uint64(data[offset:]))
 	offset += 8
-	if err := validateNaN(minVal, "min"); err != nil {
+	if err := validateFinite(minVal, "min"); err != nil {
 		return nil, err
 	}
 
 	maxVal := math.Float64frombits(binary.BigEndian.Uint64(data[offset:]))
 	offset += 8
-	if err := validateNaN(maxVal, "max"); err != nil {
+	if err := validateFinite(maxVal, "max"); err != nil {
 		return nil, err
 	}
 
@@ -557,9 +585,9 @@ func decodeDoubleCompat(data []byte) (*Double, error) {
 	centroids := make([]doublePrecisionCentroid, numCentroids)
 	var totalWeight uint64
 	for i := range centroids {
-		weight := math.Float32frombits(binary.BigEndian.Uint32(data[offset:]))
+		weight, err := validateCompatWeight(float64(math.Float32frombits(binary.BigEndian.Uint32(data[offset:]))))
 		offset += 4
-		if err := validateZero(float64(weight), "centroid weight"); err != nil {
+		if err != nil {
 			return nil, err
 		}
 
@@ -572,8 +600,12 @@ func decodeDoubleCompat(data []byte) (*Double, error) {
 			return nil, err
 		}
 
-		centroids[i] = doublePrecisionCentroid{mean: float64(mean), weight: uint64(weight)}
-		totalWeight += uint64(weight)
+		centroids[i] = doublePrecisionCentroid{mean: float64(mean), weight: weight}
+		sum, err := addWeight(totalWeight, weight)
+		if err != nil {
+			return nil, err
+		}
+		totalWeight = sum
 	}
 
 	return newDoubleFromInternalStates(false, k, minVal, maxVal, centroids, totalWeight, nil)
@@ -598,4 +630,26 @@ func validateZero(v float64, name string) error {
 		return errors.New(name + ": Zero")
 	}
 	return nil
+}
+
+func validateFinite(v float64, name string) error {
+	if err := validateNaN(v, name); err != nil {
+		return err
+	}
+	return validateInf(v, name)
+}
+
+func validateCompatWeight(w float64) (uint64, error) {
+	if !(w >= 1 && w < 1<<64 && w == math.Trunc(w)) { // false for NaN too
+		return 0, fmt.Errorf("centroid weight: %v is not an integer in [1, 2^64)", w)
+	}
+	return uint64(w), nil
+}
+
+func addWeight(total, weight uint64) (uint64, error) {
+	sum, carry := bits.Add64(total, weight, 0)
+	if carry != 0 {
+		return 0, errors.New("total weight: overflow")
+	}
+	return sum, nil
 }

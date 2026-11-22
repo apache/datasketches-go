@@ -19,6 +19,8 @@ package sampling
 
 import (
 	"bytes"
+	"encoding/binary"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -251,6 +253,53 @@ func TestVarOptItemsUnionSerialization(t *testing.T) {
 
 		_, err = DecodeVarOptItemsUnion[int64](data, serde)
 		require.ErrorContains(t, err, "invalid family ID")
+	})
+
+	serde := common.ItemSketchLongSerDe{}
+	encodeUnion := func(t *testing.T, n int) []byte {
+		t.Helper()
+		union, err := NewVarOptItemsUnion[int64](25)
+		require.NoError(t, err)
+		if n > 0 {
+			require.NoError(t, union.Update(newUnweightedLongsVarOptItemsSketch(t, 25, n)))
+		}
+		return encodeVarOptItemsUnion(t, union, serde)
+	}
+
+	t.Run("pre longs that disagree with the empty flag", func(t *testing.T) {
+		nonEmpty := encodeUnion(t, 30)
+		nonEmpty[0] = varOptItemsUnionEmptyPreLongs
+		_, err := DecodeVarOptItemsUnion[int64](nonEmpty, serde)
+		require.ErrorContains(t, err, "invalid preLongs")
+
+		empty := encodeUnion(t, 0)
+		empty[0] = byte(internal.FamilyEnum.VarOptItemsUnion.MaxPreLongs)
+		_, err = DecodeVarOptItemsUnion[int64](empty, serde)
+		require.ErrorContains(t, err, "invalid preLongs")
+
+		flagged := encodeUnion(t, 30)
+		flagged[3] |= varOptItemsUnionEmptyFlag
+		_, err = DecodeVarOptItemsUnion[int64](flagged, serde)
+		require.ErrorContains(t, err, "invalid preLongs")
+	})
+
+	t.Run("max k out of range", func(t *testing.T) {
+		for _, n := range []int{0, 30} {
+			for _, maxK := range []uint32{0, varOptMaxK + 1, math.MaxUint32} {
+				data := encodeUnion(t, n)
+				binary.LittleEndian.PutUint32(data[4:], maxK)
+				_, err := DecodeVarOptItemsUnion[int64](data, serde)
+				require.ErrorContains(t, err, "k must be at least 1", "n=%d maxK=%d", n, maxK)
+			}
+		}
+	})
+
+	t.Run("max k at the limit", func(t *testing.T) {
+		data := encodeUnion(t, 30)
+		binary.LittleEndian.PutUint32(data[4:], varOptMaxK)
+		union, err := DecodeVarOptItemsUnion[int64](data, serde)
+		require.NoError(t, err)
+		assert.Equal(t, varOptMaxK, union.k)
 	})
 }
 

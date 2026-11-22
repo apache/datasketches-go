@@ -66,19 +66,31 @@ func DecodeVarOptItemsUnion[T any](buffer []byte, serde common.ItemSketchSerde[T
 	isEmpty := (buffer[index] & varOptItemsUnionEmptyFlag) != 0
 	index++
 
+	expectedPreLongs := byte(internal.FamilyEnum.VarOptItemsUnion.MaxPreLongs)
+	if isEmpty {
+		expectedPreLongs = varOptItemsUnionEmptyPreLongs
+	}
+	if preLongs != expectedPreLongs {
+		return nil, fmt.Errorf("invalid preLongs: %d, expected %d for empty=%t", preLongs, expectedPreLongs, isEmpty)
+	}
+
 	if err := validateBuffer(buffer, index+4); err != nil {
 		return nil, err
 	}
-	maxK := int(binary.LittleEndian.Uint32(buffer[index:]))
+	maxK := binary.LittleEndian.Uint32(buffer[index:])
 	index += 4
+	if maxK == 0 || maxK > varOptMaxK {
+		return nil, fmt.Errorf("k must be at least 1 and less than 2^31 - 1: %d", maxK)
+	}
+	k := int(maxK)
 
 	if isEmpty {
-		union, err := NewVarOptItemsUnion[T](uint(maxK))
+		union, err := NewVarOptItemsUnion[T](uint(k))
 		if err != nil {
 			return nil, err
 		}
 
-		gadget, err := newVarOptItemsSketchFromState[T](maxK, defaultResizeFactor, true)
+		gadget, err := newVarOptItemsSketchFromState[T](k, defaultResizeFactor, true)
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +125,7 @@ func DecodeVarOptItemsUnion[T any](buffer []byte, serde common.ItemSketchSerde[T
 
 	return &VarOptItemsUnion[T]{
 		gadget:        gadget,
-		k:             maxK,
+		k:             k,
 		n:             n,
 		outerTauNumer: outerTauNumer,
 		outerTauDenom: int64(outerTauDenom),

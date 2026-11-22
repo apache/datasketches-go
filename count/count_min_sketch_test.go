@@ -159,6 +159,17 @@ func Test_CountMinSketch(t *testing.T) {
 		numHashes, err = SuggestNumHashes(1.0)
 		assert.NoError(t, err)
 		assert.Equal(t, uint8(255), numHashes)
+
+		numHashes, err = SuggestNumHashes(0.0)
+		assert.NoError(t, err)
+		assert.Equal(t, uint8(1), numHashes)
+
+		for _, confidence := range []float64{0, 1e-17, 1e-15, 0.5, 0.99, 1.0} {
+			numHashes, err = SuggestNumHashes(confidence)
+			assert.NoError(t, err)
+			_, err = NewCountMinSketch(numHashes, 14, seed)
+			assert.NoError(t, err, "confidence %v suggests %d hashes", confidence, numHashes)
+		}
 	})
 
 	t.Run("CM one update: uint64_t", func(t *testing.T) {

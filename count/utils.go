@@ -36,7 +36,7 @@ func SuggestNumHashes(confidence float64) (uint8, error) {
 	if confidence < 0 || confidence > 1.0 {
 		return 0, errors.New("confidence must be between 0 and 1.0 (inclusive)")
 	}
-	return uint8(min(math.Ceil(math.Log(1.0/(1.0-confidence))), math.MaxUint8)), nil
+	return uint8(max(1.0, min(math.Ceil(math.Log(1.0/(1.0-confidence))), math.MaxUint8))), nil
 }
 
 func checkHeaderValidity(preambleLongs, serVer, familyID byte) error {

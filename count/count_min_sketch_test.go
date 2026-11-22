@@ -39,18 +39,18 @@ func Test_CountMinSketch(t *testing.T) {
 		assert.ErrorContains(t, err, "these parameters generate a sketch that exceeds 2^30 elements")
 		assert.Nil(t, cms)
 
+		cms, err = NewCountMinSketch(0, 64, seed)
+		assert.ErrorContains(t, err, "number of hashes must be positive")
+		assert.Nil(t, cms)
+
 		// numBuckets * numHashes wraps to 0 in 32-bit arithmetic
 		cms, err = NewCountMinSketch(8, 1<<29, seed)
 		assert.ErrorContains(t, err, "these parameters generate a sketch that exceeds 2^30 elements")
 		assert.Nil(t, cms)
-
-		cms, err = NewCountMinSketch(-1, 5, seed)
-		assert.ErrorContains(t, err, "number of hashes must be non-negative")
-		assert.Nil(t, cms)
 	})
 
 	t.Run("CM Init", func(t *testing.T) {
-		numHashes := int8(3)
+		numHashes := uint8(3)
 		numBuckets := int32(5)
 		cms, err := NewCountMinSketch(numHashes, numBuckets, seed)
 		assert.NoError(t, err)
@@ -62,7 +62,7 @@ func Test_CountMinSketch(t *testing.T) {
 	})
 
 	t.Run("CM default seed", func(t *testing.T) {
-		cms, err := NewCountMinSketchWithDefaultSeed(int8(3), int32(5))
+		cms, err := NewCountMinSketchWithDefaultSeed(uint8(3), int32(5))
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -89,7 +89,7 @@ func Test_CountMinSketch(t *testing.T) {
 	t.Run("CM parameter suggestion", func(t *testing.T) {
 		var (
 			numBuckets int32
-			numHashes  int8
+			numHashes  uint8
 			err        error
 		)
 
@@ -116,7 +116,7 @@ func Test_CountMinSketch(t *testing.T) {
 		assert.Equal(t, int32(272), numBuckets)
 
 		// Check that the sketch get_epsilon acts inversely to suggest_num_buckets
-		numHashes = int8(3)
+		numHashes = uint8(3)
 		cms, err := NewCountMinSketch(numHashes, int32(14), seed)
 		assert.NoError(t, err)
 		assert.Less(t, cms.GetRelativeError(), 0.2)
@@ -137,28 +137,43 @@ func Test_CountMinSketch(t *testing.T) {
 		numHashes, err = SuggestNumHashes(-1.0)
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "confidence must be between 0 and 1.0")
-		assert.Equal(t, int8(0), numHashes)
+		assert.Equal(t, uint8(0), numHashes)
 
 		numHashes, err = SuggestNumHashes(10.0)
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "confidence must be between 0 and 1.0")
-		assert.Equal(t, int8(0), numHashes)
+		assert.Equal(t, uint8(0), numHashes)
 
 		numHashes, err = SuggestNumHashes(0.682689492)
 		assert.NoError(t, err)
-		assert.Equal(t, int8(2), numHashes)
+		assert.Equal(t, uint8(2), numHashes)
 
 		numHashes, err = SuggestNumHashes(0.954499736)
 		assert.NoError(t, err)
-		assert.Equal(t, int8(4), numHashes)
+		assert.Equal(t, uint8(4), numHashes)
 
 		numHashes, err = SuggestNumHashes(0.997300204)
 		assert.NoError(t, err)
-		assert.Equal(t, int8(6), numHashes)
+		assert.Equal(t, uint8(6), numHashes)
+
+		numHashes, err = SuggestNumHashes(1.0)
+		assert.NoError(t, err)
+		assert.Equal(t, uint8(255), numHashes)
+
+		numHashes, err = SuggestNumHashes(0.0)
+		assert.NoError(t, err)
+		assert.Equal(t, uint8(1), numHashes)
+
+		for _, confidence := range []float64{0, 1e-17, 1e-15, 0.5, 0.99, 1.0} {
+			numHashes, err = SuggestNumHashes(confidence)
+			assert.NoError(t, err)
+			_, err = NewCountMinSketch(numHashes, 14, seed)
+			assert.NoError(t, err, "confidence %v suggests %d hashes", confidence, numHashes)
+		}
 	})
 
 	t.Run("CM one update: uint64_t", func(t *testing.T) {
-		numHashes := int8(3)
+		numHashes := uint8(3)
 		numBuckets := int32(5)
 		insertedWeights := int64(0)
 		cms, err := NewCountMinSketch(numHashes, numBuckets, seed)
@@ -186,7 +201,7 @@ func Test_CountMinSketch(t *testing.T) {
 	})
 
 	t.Run("CM frequency cancellation", func(t *testing.T) {
-		cms, err := NewCountMinSketch(int8(1), int32(5), seed)
+		cms, err := NewCountMinSketch(uint8(1), int32(5), seed)
 		assert.NoError(t, err)
 		err = cms.UpdateString("x", 1)
 		assert.NoError(t, err)
@@ -302,7 +317,7 @@ func Test_CountMinSketch(t *testing.T) {
 	})
 
 	t.Run("CM serialize-deserialize", func(t *testing.T) {
-		numHashes := int8(3)
+		numHashes := uint8(3)
 		numBuckets := int32(5)
 		c, err := NewCountMinSketch(numHashes, numBuckets, seed)
 		assert.NoError(t, err)
@@ -381,17 +396,54 @@ func Test_CountMinSketch(t *testing.T) {
 		assert.ErrorContains(t, err, "these parameters generate a sketch that exceeds 2^30 elements")
 		assert.Nil(t, d)
 
-		// numHashes >= 128 is negative as an int8
-		negativeHashes := bytes.Clone(data)
-		negativeHashes[12] = 128
-		d, err = NewCountMinSketchFromSlice(negativeHashes, seed)
-		assert.ErrorContains(t, err, "number of hashes must be non-negative")
+		zeroHashes := bytes.Clone(data)
+		zeroHashes[12] = 0
+		d, err = NewCountMinSketchFromSlice(zeroHashes, seed)
+		assert.ErrorContains(t, err, "number of hashes must be positive")
 		assert.Nil(t, d)
+	})
+
+	t.Run("CM deserialize rejects a wrong header", func(t *testing.T) {
+		c, err := NewCountMinSketch(3, 64, seed)
+		assert.NoError(t, err)
+		assert.NoError(t, c.UpdateUint64(1, 1))
+		var b bytes.Buffer
+		assert.NoError(t, c.Serialize(&b))
+
+		for _, tc := range []struct {
+			name   string
+			offset int
+			value  byte
+		}{
+			{"preamble longs 3", 0, 3},
+			{"serial version 2 (C++ v2 format)", 1, 2},
+			{"REQ family ID", 2, byte(internal.FamilyEnum.REQ.Id)},
+		} {
+			data := bytes.Clone(b.Bytes())
+			data[tc.offset] = tc.value
+			d, err := NewCountMinSketchFromSlice(data, seed)
+			assert.ErrorContains(t, err, "possible corruption", tc.name)
+			assert.Nil(t, d, tc.name)
+		}
+	})
+
+	t.Run("CM supports up to 255 hashes", func(t *testing.T) {
+		c, err := NewCountMinSketch(255, 3, seed)
+		assert.NoError(t, err)
+		assert.NoError(t, c.UpdateUint64(1, 7))
+		var b bytes.Buffer
+		assert.NoError(t, c.Serialize(&b))
+		assert.Equal(t, byte(255), b.Bytes()[12])
+
+		d, err := NewCountMinSketchFromSlice(b.Bytes(), seed)
+		assert.NoError(t, err)
+		assert.Equal(t, c, d)
+		assert.Equal(t, int64(7), d.GetEstimateUint64(1))
 	})
 }
 
 func BenchmarkCountMinSketch_Update(b *testing.B) {
-	cms, err := NewCountMinSketch(int8(3), int32(1024), int64(1234567))
+	cms, err := NewCountMinSketch(uint8(3), int32(1024), int64(1234567))
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -407,7 +459,7 @@ func BenchmarkCountMinSketch_Update(b *testing.B) {
 }
 
 func BenchmarkCountMinSketch_GetEstimate(b *testing.B) {
-	cms, err := NewCountMinSketch(int8(3), int32(1024), int64(1234567))
+	cms, err := NewCountMinSketch(uint8(3), int32(1024), int64(1234567))
 	if err != nil {
 		b.Fatal(err)
 	}

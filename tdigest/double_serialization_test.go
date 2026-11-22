@@ -1258,3 +1258,109 @@ func buildValidSerializedSketch(numCentroids, numBuffered uint32) []byte {
 
 	return data
 }
+
+func TestDecodeRejectsInvalidValuesInBothDecoders(t *testing.T) {
+	compatDouble := func(minV, maxV float64, weights, means []float64) []byte {
+		b := []byte{0, 0, 0, compatTypeDouble}
+		b = binary.BigEndian.AppendUint64(b, math.Float64bits(minV))
+		b = binary.BigEndian.AppendUint64(b, math.Float64bits(maxV))
+		b = binary.BigEndian.AppendUint64(b, math.Float64bits(100))
+		b = binary.BigEndian.AppendUint32(b, uint32(len(weights)))
+		for i := range weights {
+			b = binary.BigEndian.AppendUint64(b, math.Float64bits(weights[i]))
+			b = binary.BigEndian.AppendUint64(b, math.Float64bits(means[i]))
+		}
+		return b
+	}
+	compatFloat := func(minV, maxV float64, weights, means []float32) []byte {
+		b := []byte{0, 0, 0, compatTypeFloat}
+		b = binary.BigEndian.AppendUint64(b, math.Float64bits(minV))
+		b = binary.BigEndian.AppendUint64(b, math.Float64bits(maxV))
+		b = binary.BigEndian.AppendUint32(b, math.Float32bits(100))
+		b = binary.BigEndian.AppendUint32(b, 0)
+		b = binary.BigEndian.AppendUint16(b, uint16(len(weights)))
+		for i := range weights {
+			b = binary.BigEndian.AppendUint32(b, math.Float32bits(weights[i]))
+			b = binary.BigEndian.AppendUint32(b, math.Float32bits(means[i]))
+		}
+		return b
+	}
+	decodeBoth := func(b []byte) (bytesErr, streamErr error) {
+		_, bytesErr = DecodeDouble(b)
+		decoder := NewDoubleDecoder()
+		_, streamErr = decoder.Decode(bytes.NewReader(b))
+		return bytesErr, streamErr
+	}
+
+	sketch, err := NewDouble(100)
+	assert.NoError(t, err)
+	for i := 0; i < 1000; i++ {
+		assert.NoError(t, sketch.Update(float64(i)))
+	}
+	native, err := EncodeDouble(sketch, false)
+	assert.NoError(t, err)
+	withFloat := func(offset int, v float64) []byte {
+		b := bytes.Clone(native)
+		binary.LittleEndian.PutUint64(b[offset:], math.Float64bits(v))
+		return b
+	}
+	const (
+		minOffset          = 16
+		maxOffset          = 24
+		firstWeightOffset  = 40
+		secondWeightOffset = 56
+	)
+
+	t.Run("valid images", func(t *testing.T) {
+		for name, b := range map[string][]byte{
+			"native":        native,
+			"compat double": compatDouble(1, 5, []float64{1, 2}, []float64{1, 5}),
+			"compat float":  compatFloat(1, 5, []float32{1, 2}, []float32{1, 5}),
+		} {
+			bytesErr, streamErr := decodeBoth(b)
+			assert.NoError(t, bytesErr, name)
+			assert.NoError(t, streamErr, name)
+		}
+	})
+
+	inf, nan := math.Inf(1), math.NaN()
+	for _, tc := range []struct {
+		name string
+		data []byte
+	}{
+		{"native min -Inf", withFloat(minOffset, -inf)},
+		{"native min +Inf", withFloat(minOffset, inf)},
+		{"native max +Inf", withFloat(maxOffset, inf)},
+		{"native max NaN", withFloat(maxOffset, nan)},
+		{"compat double min -Inf", compatDouble(-inf, 5, []float64{1, 2}, []float64{1, 5})},
+		{"compat double max +Inf", compatDouble(1, inf, []float64{1, 2}, []float64{1, 5})},
+		{"compat float min -Inf", compatFloat(-inf, 5, []float32{1, 2}, []float32{1, 5})},
+		{"compat float max +Inf", compatFloat(1, inf, []float32{1, 2}, []float32{1, 5})},
+		{"compat float mean NaN", compatFloat(1, 5, []float32{1, 2}, []float32{float32(nan), 5})},
+		{"compat double weight NaN", compatDouble(1, 5, []float64{nan, 2}, []float64{1, 5})},
+		{"compat double weight +Inf", compatDouble(1, 5, []float64{inf, 2}, []float64{1, 5})},
+		{"compat double weight 0.5", compatDouble(1, 5, []float64{0.5, 2}, []float64{1, 5})},
+		{"compat double weight -1", compatDouble(1, 5, []float64{-1, 2}, []float64{1, 5})},
+		{"compat double weight 1e30", compatDouble(1, 5, []float64{1e30, 2}, []float64{1, 5})},
+		{"compat float weight NaN", compatFloat(1, 5, []float32{float32(nan), 2}, []float32{1, 5})},
+		{"compat float weight +Inf", compatFloat(1, 5, []float32{float32(inf), 2}, []float32{1, 5})},
+		{"compat float weight 0.5", compatFloat(1, 5, []float32{0.5, 2}, []float32{1, 5})},
+		{"compat float weight -1", compatFloat(1, 5, []float32{-1, 2}, []float32{1, 5})},
+		{"compat double total weight overflow", compatDouble(1, 5, []float64{1 << 63, 1 << 63}, []float64{1, 5})},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bytesErr, streamErr := decodeBoth(tc.data)
+			assert.Error(t, bytesErr, "bytes decoder")
+			assert.Error(t, streamErr, "stream decoder")
+		})
+	}
+
+	t.Run("native total weight overflow", func(t *testing.T) {
+		b := bytes.Clone(native)
+		binary.LittleEndian.PutUint64(b[firstWeightOffset:], 1<<63)
+		binary.LittleEndian.PutUint64(b[secondWeightOffset:], 1<<63)
+		bytesErr, streamErr := decodeBoth(b)
+		assert.Error(t, bytesErr, "bytes decoder")
+		assert.Error(t, streamErr, "stream decoder")
+	})
+}

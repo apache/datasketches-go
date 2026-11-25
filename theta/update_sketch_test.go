@@ -19,10 +19,12 @@ package theta
 
 import (
 	"bytes"
+	"fmt"
 	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewQuickSelectUpdateSketch(t *testing.T) {
@@ -836,4 +838,64 @@ func TestQuickSelectUpdateSketch_CompactTrimmed(t *testing.T) {
 		single := newSketch(t, 1)
 		assert.True(t, single.CompactTrimmed(false).IsOrdered())
 	})
+}
+
+func TestQuickSelectUpdateSketch_MinLgK(t *testing.T) {
+	assert.Equal(t, uint8(4), MinLgK)
+	_, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(MinLgK - 1))
+	assert.ErrorContains(t, err, "lg_k must not be less than")
+
+	sketch, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(4))
+	require.NoError(t, err)
+
+	const n = 10000
+	var maxRetained uint32
+	for i := 0; i < n; i++ {
+		assertUpdate(t, sketch.UpdateInt64(int64(i)))
+		maxRetained = max(maxRetained, sketch.NumRetained())
+	}
+	assert.True(t, sketch.IsEstimationMode())
+	assert.Less(t, sketch.Theta(), 1.0)
+	// the table has 32 slots, so between rebuilds it holds more than the nominal 16 entries
+	assert.Greater(t, maxRetained, uint32(16))
+	assert.LessOrEqual(t, maxRetained, uint32(32))
+
+	lb, err := sketch.LowerBound(2)
+	assert.NoError(t, err)
+	assert.LessOrEqual(t, lb, float64(n))
+	ub, err := sketch.UpperBound(2)
+	assert.NoError(t, err)
+	assert.GreaterOrEqual(t, ub, float64(n))
+
+	sketch.Trim()
+	assert.Equal(t, uint32(16), sketch.NumRetained())
+
+	compact := sketch.Compact(true)
+	data, err := compact.MarshalBinary()
+	require.NoError(t, err)
+	decoded, err := Decode(data, DefaultSeed)
+	require.NoError(t, err)
+	assert.Equal(t, compact.NumRetained(), decoded.NumRetained())
+	assert.Equal(t, compact.Estimate(), decoded.Estimate())
+}
+
+func TestStartingTableSize(t *testing.T) {
+	// lgK+1 reduced by whole resize steps (x8 by default), but never below 5
+	for _, tc := range []struct{ lgK, lgCurSize uint8 }{{4, 5}, {5, 6}, {12, 7}} {
+		t.Run(fmt.Sprintf("lgK=%d", tc.lgK), func(t *testing.T) {
+			sketch, err := NewQuickSelectUpdateSketch(WithUpdateSketchLgK(tc.lgK))
+			require.NoError(t, err)
+			assert.Equal(t, tc.lgCurSize, sketch.table.lgCurSize, "update sketch")
+
+			for i := 0; i < 1000; i++ {
+				assertUpdate(t, sketch.UpdateInt64(int64(i)))
+			}
+			sketch.Reset()
+			assert.Equal(t, tc.lgCurSize, sketch.table.lgCurSize, "update sketch after reset")
+
+			union, err := NewUnion(WithUnionLgK(tc.lgK))
+			require.NoError(t, err)
+			assert.Equal(t, tc.lgCurSize, union.hashtable.lgCurSize, "union")
+		})
+	}
 }

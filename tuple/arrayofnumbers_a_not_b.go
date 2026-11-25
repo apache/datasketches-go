@@ -52,7 +52,7 @@ func ArrayOfNumbersSketchANotB[V Number](
 	if aSeedHash != uint16(seedHash) {
 		return nil, fmt.Errorf("sketch A seed hash mismatch: expected %d, got %d", seedHash, aSeedHash)
 	}
-	if bSeedHash != uint16(seedHash) {
+	if !b.IsEmpty() && bSeedHash != uint16(seedHash) {
 		return nil, fmt.Errorf("sketch B seed hash mismatch: expected %d, got %d", seedHash, bSeedHash)
 	}
 

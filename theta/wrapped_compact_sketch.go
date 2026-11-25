@@ -64,6 +64,9 @@ func (s *WrappedCompactSketch) NumRetained() uint32 {
 
 // SeedHash returns hash of the seed
 func (s *WrappedCompactSketch) SeedHash() (uint16, error) {
+	if s.IsEmpty() {
+		return 0, nil
+	}
 	return s.data.seedHash, nil
 }
 

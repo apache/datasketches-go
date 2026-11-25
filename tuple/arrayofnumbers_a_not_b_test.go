@@ -206,6 +206,22 @@ func TestArrayOfNumbersSketchANotB(t *testing.T) {
 		assert.False(t, result.IsEmpty())
 	})
 
+	t.Run("A Non Empty No Retained Keys, B Empty With Different Seed", func(t *testing.T) {
+		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5), WithUpdateSketchP(0.1))
+		assert.NoError(t, err)
+		assertUpdate(t, a.UpdateInt64(6, []float64{1.0, 2.0}))
+
+		b, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchSeed(123))
+		assert.NoError(t, err)
+
+		result, err := ArrayOfNumbersSketchANotB[float64](a, b, theta.DefaultSeed, true)
+		assert.NoError(t, err)
+
+		assert.InDelta(t, 0.1, result.Theta(), 1e-8)
+		assert.Equal(t, uint32(0), result.NumRetained())
+		assert.False(t, result.IsEmpty())
+	})
+
 	t.Run("A Empty, B Estimation Mode", func(t *testing.T) {
 		a, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(5))
 		assert.NoError(t, err)

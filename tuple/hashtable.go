@@ -269,7 +269,7 @@ func (t *hashtable[S]) Trim() {
 
 // Reset clears the sketch
 func (t *hashtable[S]) Reset() {
-	startingLgSize := startingSubMultiple(t.lgNomSize+1, theta.MinLgK, uint8(t.rf))
+	startingLgSize := startingSubMultiple(t.lgNomSize+1, theta.MinLgArr, uint8(t.rf))
 
 	if startingLgSize != t.lgCurSize {
 		t.lgCurSize = startingLgSize

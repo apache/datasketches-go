@@ -61,7 +61,7 @@ func NewArrayOfNumbersSketchUnion[V Number](
 		return nil, errors.New("sampling probability must be between 0 and 1")
 	}
 
-	options.lgCurSize = startingSubMultiple(options.lgK+1, theta.MinLgK, uint8(options.rf))
+	options.lgCurSize = startingSubMultiple(options.lgK+1, theta.MinLgArr, uint8(options.rf))
 	options.theta = startingThetaFromP(options.p)
 
 	table := newHashtable[*ArrayOfNumbersSummary[V]](

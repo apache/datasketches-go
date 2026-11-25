@@ -114,7 +114,7 @@ func NewUnion[S Summary](policy Policy[S], opts ...UnionOptionFunc) (*Union[S], 
 		return nil, err
 	}
 
-	options.lgCurSize = startingSubMultiple(options.lgK+1, theta.MinLgK, uint8(options.rf))
+	options.lgCurSize = startingSubMultiple(options.lgK+1, theta.MinLgArr, uint8(options.rf))
 	options.theta = startingThetaFromP(options.p)
 
 	table := newHashtable[S](
@@ -155,7 +155,7 @@ func NewUnionWithSummaryMergeFunc[S Summary](
 		return nil, err
 	}
 
-	options.lgCurSize = startingSubMultiple(options.lgK+1, theta.MinLgK, uint8(options.rf))
+	options.lgCurSize = startingSubMultiple(options.lgK+1, theta.MinLgArr, uint8(options.rf))
 	options.theta = startingThetaFromP(options.p)
 
 	table := newHashtable[S](

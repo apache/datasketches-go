@@ -110,7 +110,7 @@ func NewQuickSelectUpdateSketch(opts ...UpdateSketchOptionFunc) (*QuickSelectUpd
 		return nil, errors.New("sampling probability must be between 0 and 1")
 	}
 
-	options.lgCurSize = startingSubMultiple(options.lgK+1, MinLgK, uint8(options.rf))
+	options.lgCurSize = startingSubMultiple(options.lgK+1, MinLgArr, uint8(options.rf))
 	options.theta = startingThetaFromP(options.p)
 
 	return &QuickSelectUpdateSketch{

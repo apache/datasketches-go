@@ -19,6 +19,7 @@ package theta
 
 import (
 	"bytes"
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -663,4 +664,22 @@ func TestWrapCompactSketch_Compatibility(t *testing.T) {
 		}
 		assert.Equal(t, expectedEntries, resultEntries)
 	})
+}
+
+func TestWrappedCompactSketch_SeedHashIsZeroWhenEmpty(t *testing.T) {
+	seedHash, err := internal.ComputeSeedHash(int64(DefaultSeed))
+	assert.NoError(t, err)
+
+	source, err := NewQuickSelectUpdateSketch()
+	assert.NoError(t, err)
+	data, err := source.Compact(false).MarshalBinary()
+	assert.NoError(t, err)
+	binary.LittleEndian.PutUint16(data[6:], uint16(seedHash))
+
+	wrapped, err := WrapCompactSketch(data, DefaultSeed)
+	assert.NoError(t, err)
+	assert.True(t, wrapped.IsEmpty())
+	got, err := wrapped.SeedHash()
+	assert.NoError(t, err)
+	assert.Zero(t, got)
 }

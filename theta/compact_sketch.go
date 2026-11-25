@@ -135,6 +135,9 @@ func (s *CompactSketch) NumRetained() uint32 {
 
 // SeedHash returns hash of the seed that was used to hash the input
 func (s *CompactSketch) SeedHash() (uint16, error) {
+	if s.IsEmpty() {
+		return 0, nil
+	}
 	return s.seedHash, nil
 }
 

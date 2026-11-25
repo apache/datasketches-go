@@ -232,6 +232,9 @@ func (s *ArrayOfNumbersCompactSketch[V]) NumRetained() uint32 {
 
 // SeedHash returns the hash of the seed used to hash the input.
 func (s *ArrayOfNumbersCompactSketch[V]) SeedHash() (uint16, error) {
+	if s.IsEmpty() {
+		return 0, nil
+	}
 	return s.seedHash, nil
 }
 

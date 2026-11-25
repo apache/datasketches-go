@@ -40,10 +40,13 @@ const DefaultResizeFactor = ResizeX8
 const MaxTheta uint64 = math.MaxInt64
 
 // MinLgK is the min log2 of K
-const MinLgK uint8 = 5
+const MinLgK uint8 = 4
 
 // MaxLgK is the max log2 of K
 const MaxLgK uint8 = 26
+
+// MinLgArr is the min log2 of the hash table size
+const MinLgArr uint8 = 5
 
 // DefaultLgK is the default log2 of K
 const DefaultLgK uint8 = 12

@@ -18,9 +18,13 @@
 package theta
 
 import (
+	"encoding/binary"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/apache/datasketches-go/internal"
 )
 
 func TestNewCompactSketch(t *testing.T) {
@@ -237,4 +241,30 @@ func TestCompactSketch_MarshalBinary(t *testing.T) {
 		assert.Equal(t, compact.NumRetained(), decoded.NumRetained())
 		assert.Equal(t, compact.Theta64(), decoded.Theta64())
 	})
+}
+
+func TestCompactSketch_SeedHash(t *testing.T) {
+	seedHash, err := internal.ComputeSeedHash(int64(DefaultSeed))
+	require.NoError(t, err)
+
+	source, err := NewQuickSelectUpdateSketch()
+	require.NoError(t, err)
+	empty := source.Compact(false)
+	got, err := empty.SeedHash()
+	assert.NoError(t, err)
+	assert.Zero(t, got, "empty")
+
+	data, err := empty.MarshalBinary()
+	require.NoError(t, err)
+	binary.LittleEndian.PutUint16(data[6:], uint16(seedHash))
+	decoded, err := Decode(data, DefaultSeed)
+	require.NoError(t, err)
+	got, err = decoded.SeedHash()
+	assert.NoError(t, err)
+	assert.Zero(t, got, "decoded empty image with a seed hash")
+
+	assertUpdate(t, source.UpdateInt64(1))
+	got, err = source.Compact(false).SeedHash()
+	assert.NoError(t, err)
+	assert.Equal(t, uint16(seedHash), got, "non-empty")
 }

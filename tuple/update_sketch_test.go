@@ -18,10 +18,12 @@
 package tuple
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/apache/datasketches-go/theta"
 )
@@ -1050,4 +1052,78 @@ func TestUpdateSketch_Filter(t *testing.T) {
 		assert.True(t, got.IsEstimationMode())
 		assert.Equal(t, uint32(2), got.NumRetained())
 	})
+}
+
+func TestUpdateSketch_MinLgK(t *testing.T) {
+	_, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(theta.MinLgK-1))
+	assert.ErrorContains(t, err, "lg_k must not be less than")
+
+	sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(4))
+	require.NoError(t, err)
+
+	const n = 10000
+	var maxRetained uint32
+	for i := 0; i < n; i++ {
+		assertUpdate(t, sketch.UpdateInt64(int64(i), 1))
+		maxRetained = max(maxRetained, sketch.NumRetained())
+	}
+	assert.True(t, sketch.IsEstimationMode())
+	assert.Less(t, sketch.Theta(), 1.0)
+	// the table has 32 slots, so between rebuilds it holds more than the nominal 16 entries
+	assert.Greater(t, maxRetained, uint32(16))
+	assert.LessOrEqual(t, maxRetained, uint32(32))
+
+	lb, err := sketch.LowerBound(2)
+	assert.NoError(t, err)
+	assert.LessOrEqual(t, lb, float64(n))
+	ub, err := sketch.UpperBound(2)
+	assert.NoError(t, err)
+	assert.GreaterOrEqual(t, ub, float64(n))
+
+	sketch.Trim()
+	assert.Equal(t, uint32(16), sketch.NumRetained())
+
+	compact, err := sketch.Compact(true)
+	require.NoError(t, err)
+	var buf bytes.Buffer
+	encoder := NewEncoder[*int32Summary](&buf, int32SummaryWriter)
+	require.NoError(t, encoder.Encode(compact))
+	decoded, err := Decode[*int32Summary](buf.Bytes(), theta.DefaultSeed, int32SummaryReader)
+	require.NoError(t, err)
+	assert.Equal(t, compact.NumRetained(), decoded.NumRetained())
+	assert.Equal(t, compact.Estimate(), decoded.Estimate())
+}
+
+func TestStartingTableSize(t *testing.T) {
+	// lgK+1 reduced by whole resize steps (x8 by default), but never below 5
+	for _, tc := range []struct{ lgK, lgCurSize uint8 }{{4, 5}, {5, 6}, {12, 7}} {
+		t.Run(fmt.Sprintf("lgK=%d", tc.lgK), func(t *testing.T) {
+			sketch, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary, WithUpdateSketchLgK(tc.lgK))
+			require.NoError(t, err)
+			assert.Equal(t, tc.lgCurSize, sketch.table.lgCurSize, "update sketch")
+			for i := 0; i < 1000; i++ {
+				assertUpdate(t, sketch.UpdateInt64(int64(i), 1))
+			}
+			sketch.Reset()
+			assert.Equal(t, tc.lgCurSize, sketch.table.lgCurSize, "update sketch after reset")
+
+			aon, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(tc.lgK))
+			require.NoError(t, err)
+			assert.Equal(t, tc.lgCurSize, aon.table.lgCurSize, "array of numbers update sketch")
+
+			union, err := NewUnion[*int32Summary](&unionSumPolicy{}, WithUnionLgK(tc.lgK))
+			require.NoError(t, err)
+			assert.Equal(t, tc.lgCurSize, union.hashtable.lgCurSize, "union")
+
+			mergeUnion, err := NewUnionWithSummaryMergeFunc[*int32Summary](
+				func(a, b *int32Summary) *int32Summary { return a }, WithUnionLgK(tc.lgK),
+			)
+			require.NoError(t, err)
+			assert.Equal(t, tc.lgCurSize, mergeUnion.hashtable.lgCurSize, "union with merge func")
+
+			aonUnion, err := NewArrayOfNumbersSketchUnion[float64](&arrayOfNumbersUnionSumPolicy[float64]{}, 2, WithUnionLgK(tc.lgK))
+			require.NoError(t, err)
+			assert.Equal(t, tc.lgCurSize, aonUnion.hashtable.lgCurSize, "array of numbers union")
+		})
+	}
 }

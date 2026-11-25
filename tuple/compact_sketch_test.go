@@ -18,10 +18,14 @@
 package tuple
 
 import (
+	"bytes"
+	"encoding/binary"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/apache/datasketches-go/internal"
 	"github.com/apache/datasketches-go/theta"
 )
 
@@ -558,4 +562,30 @@ func TestNewCompactSketchFromThetaSketch(t *testing.T) {
 		assert.True(t, sketch.IsEstimationMode())
 		assert.Less(t, sketch.Theta64(), theta.MaxTheta)
 	})
+}
+
+func TestCompactSketch_SeedHashIsZeroWhenEmpty(t *testing.T) {
+	source, err := NewUpdateSketch[*int32Summary, int32](newInt32Summary)
+	require.NoError(t, err)
+	sketch, err := source.Compact(false)
+	require.NoError(t, err)
+
+	seedHash, err := sketch.SeedHash()
+	assert.NoError(t, err)
+	assert.Zero(t, seedHash)
+
+	var buf bytes.Buffer
+	encoder := NewEncoder[*int32Summary](&buf, int32SummaryWriter)
+	require.NoError(t, encoder.Encode(sketch))
+	data := buf.Bytes()
+	assert.Equal(t, []byte{0, 0}, data[6:8], "serialized seed hash")
+
+	expected, err := internal.ComputeSeedHash(int64(theta.DefaultSeed))
+	require.NoError(t, err)
+	binary.LittleEndian.PutUint16(data[6:], uint16(expected))
+	decoded, err := Decode[*int32Summary](data, theta.DefaultSeed, int32SummaryReader)
+	require.NoError(t, err)
+	seedHash, err = decoded.SeedHash()
+	assert.NoError(t, err)
+	assert.Zero(t, seedHash, "decoded empty image with a seed hash")
 }

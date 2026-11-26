@@ -623,6 +623,26 @@ func TestArrayOfNumbersSketchUnion(t *testing.T) {
 		assert.ErrorContains(t, err, "numValuesInSummary does not match")
 	})
 
+	t.Run("NumValuesInSummary Mismatch With Empty Sketch", func(t *testing.T) {
+		empty, err := NewArrayOfNumbersUpdateSketch[float64](3)
+		assert.NoError(t, err)
+		emptyCompact, err := empty.Compact(false)
+		assert.NoError(t, err)
+
+		union, err := NewArrayOfNumbersSketchUnion[float64](&arrayOfNumbersUnionSumPolicy[float64]{}, 2)
+		assert.NoError(t, err)
+		assert.ErrorContains(t, union.Update(empty), "numValuesInSummary does not match")
+		assert.ErrorContains(t, union.Update(emptyCompact), "numValuesInSummary does not match")
+
+		sketch, err := NewArrayOfNumbersUpdateSketch[float64](2)
+		assert.NoError(t, err)
+		assert.NoError(t, sketch.UpdateInt64(1, []float64{1.0, 2.0}))
+		assert.NoError(t, union.Update(sketch))
+		result, err := union.Result(false)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1), result.NumRetained())
+	})
+
 	t.Run("Larger K", func(t *testing.T) {
 		updateSketch1, err := NewArrayOfNumbersUpdateSketch[float64](2, WithUpdateSketchLgK(14))
 		assert.NoError(t, err)

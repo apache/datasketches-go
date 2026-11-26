@@ -26,3 +26,5 @@ header:
     - go.sum
     - RELEASE.md
     - CONTRIBUTING.md
+    # adapted from FDLIBM; keeps the Sun notice it requires, see LICENSE
+    - internal/fdlibm/log.go

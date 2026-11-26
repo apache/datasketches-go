@@ -17,7 +17,7 @@
 
 package hll
 
-import "math"
+import "github.com/apache/datasketches-go/internal/fdlibm"
 
 const (
 	numExactHarmonicNumbers = 25
@@ -69,7 +69,7 @@ func harmonicNumber(n int) float64 {
 	} else {
 		x := float64(n)
 		invSq := 1.0 / (x * x)
-		sum := math.Log(x) + eulerMascheroniConstant + (1.0 / (2.0 * x))
+		sum := fdlibm.Log(x) + eulerMascheroniConstant + (1.0 / (2.0 * x))
 		/* note: the number of terms included from this series expansion is appropriate
 		   for the size of the exact table (25) and the precision of doubles */
 		pow := invSq /* now n^-2 */

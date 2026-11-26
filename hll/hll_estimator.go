@@ -19,6 +19,8 @@ package hll
 
 import (
 	"math"
+
+	"github.com/apache/datasketches-go/internal/fdlibm"
 )
 
 // hllCompositeEstimate is the (non-HIP) estimator.
@@ -89,7 +91,7 @@ func getHllBitMapEstimate(lgConfigK int, curMin int, numAtCurMin int) float64 {
 
 	//This will eventually go away.
 	if numUnhitBuckets == 0 {
-		return float64(configK) * math.Log(float64(configK)/0.5)
+		return float64(configK) * fdlibm.Log(float64(configK)/0.5)
 	}
 
 	numHitBuckets := configK - numUnhitBuckets

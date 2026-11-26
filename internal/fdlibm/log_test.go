@@ -72,7 +72,6 @@ func TestLogWithinOneULPOfMathLog(t *testing.T) {
 	r := rand.New(rand.NewPCG(1, 2))
 	for range 100000 {
 		x := math.Float64frombits(r.Uint64() &^ (1 << 63))
-		// math.Log on amd64 is wrong for subnormals; the Java table covers them
 		if x < 0x1p-1022 || math.IsInf(x, 0) || math.IsNaN(x) || x == 1 {
 			continue
 		}

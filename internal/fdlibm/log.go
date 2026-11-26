@@ -29,9 +29,6 @@ const (
 )
 
 // Log returns the natural logarithm of x.
-//
-// Every product that feeds an addition is wrapped in float64(): the Go spec rounds an explicit
-// conversion, so the compiler can't fuse it into a multiply-add, which would change the result.
 func Log(x float64) float64 {
 	hx := int32(math.Float64bits(x) >> 32)
 	lx := uint32(math.Float64bits(x))

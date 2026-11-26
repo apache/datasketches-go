@@ -68,11 +68,11 @@ func NewArrayOfNumbersSketchIntersection[V Number](
 
 // Update updates the intersection with a given sketch.
 func (i *ArrayOfNumbersSketchIntersection[V]) Update(sketch ArrayOfNumbersSketch[V]) error {
-	if i.hashtable.isEmpty {
-		return nil
-	}
 	if i.numValuesInSummary != sketch.NumValuesInSummary() {
 		return errors.New("numValuesInSummary does not match")
+	}
+	if i.hashtable.isEmpty {
+		return nil
 	}
 
 	seedHash, err := internal.ComputeSeedHash(int64(i.hashtable.seed))

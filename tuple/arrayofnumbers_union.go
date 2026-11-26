@@ -86,11 +86,11 @@ func NewArrayOfNumbersSketchUnion[V Number](
 
 // Update adds a sketch to the union
 func (u *ArrayOfNumbersSketchUnion[V]) Update(sketch ArrayOfNumbersSketch[V]) error {
-	if sketch.IsEmpty() {
-		return nil
-	}
 	if u.numValuesInSummary != sketch.NumValuesInSummary() {
 		return errors.New("numValuesInSummary does not match")
+	}
+	if sketch.IsEmpty() {
+		return nil
 	}
 
 	seedHash, err := internal.ComputeSeedHash(int64(u.hashtable.seed))

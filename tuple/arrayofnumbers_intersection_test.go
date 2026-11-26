@@ -772,6 +772,25 @@ func TestArrayOfNumberSketchIntersection(t *testing.T) {
 		assert.ErrorContains(t, err, "numValuesInSummary does not match")
 	})
 
+	t.Run("NumValuesInSummary Mismatch After Empty Sketch", func(t *testing.T) {
+		empty, err := NewArrayOfNumbersUpdateSketch[float64](2)
+		assert.NoError(t, err)
+		mismatched, err := NewArrayOfNumbersUpdateSketch[float64](3)
+		assert.NoError(t, err)
+		assert.NoError(t, mismatched.UpdateInt64(1, []float64{1.0, 2.0, 3.0}))
+		mismatchedCompact, err := mismatched.Compact(false)
+		assert.NoError(t, err)
+
+		intersection := NewArrayOfNumbersSketchIntersection[float64](&arrayOfNumberSumPolicy[float64]{}, 2)
+		assert.NoError(t, intersection.Update(empty))
+		assert.ErrorContains(t, intersection.Update(mismatched), "numValuesInSummary does not match")
+		assert.ErrorContains(t, intersection.Update(mismatchedCompact), "numValuesInSummary does not match")
+
+		result, err := intersection.Result(false)
+		assert.NoError(t, err)
+		assert.True(t, result.IsEmpty())
+	})
+
 	t.Run("Policy", func(t *testing.T) {
 		policy := &arrayOfNumberSumPolicy[float64]{}
 		intersection := NewArrayOfNumbersSketchIntersection[float64](policy, 2)

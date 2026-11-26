@@ -26,8 +26,6 @@ import (
 )
 
 func TestLogMatchesJavaStrictMath(t *testing.T) {
-	// expected bits are Java's StrictMath.log; 48 through 1261 are the datasketches-cpp test values,
-	// and math.Log is 1 ULP off at 176 (amd64) and 185 (amd64 and arm64)
 	for _, tc := range []struct {
 		x    float64
 		bits uint64
